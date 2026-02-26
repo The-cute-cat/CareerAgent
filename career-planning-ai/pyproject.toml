@@ -1,0 +1,21 @@
+[project]
+name = "ai_service"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "The_cute_cat",email = "qwerty6u7i8o9p0@163.com"}
+]
+requires-python = ">=3.12,<3.13.0"
+dependencies = [
+    "poetry-core (>=2.0.0)",
+    "fastapi (>=0.133.1)",
+    "uvicorn (>=0.41.0,<0.42.0)",
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.hatch.index.sources.pypi]
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
