@@ -1,6 +1,13 @@
 .venv/
-.env
 .idea/
 logs/
 *.pyc
 __pycache__/
+
+# 环境变量文件
+.env
+.env.local
+.env.*.local
+
+# 环境变量文件模板
+!.env.example

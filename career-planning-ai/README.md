@@ -13,5 +13,5 @@ poetry install
 # 启动服务
 
 ```bash
-poetry run uvicorn main:app --host 127.0.0.1 --port 9000
+poetry run uvicorn main:app --host 127.0.0.1 --port 9000 --reload
 ```
