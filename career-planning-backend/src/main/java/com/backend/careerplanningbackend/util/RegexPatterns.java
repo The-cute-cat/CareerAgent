@@ -1,10 +1,10 @@
 package com.backend.careerplanningbackend.util;
 
 public abstract class RegexPatterns {
-    /**
-     * 手机号正则
-     */
-    public static final String PHONE_REGEX = "^1([38][0-9]|4[579]|5[0-3,5-9]|6[6]|7[0135678]|9[89])\\d{8}$";
+//    /**
+//     * 手机号正则
+//     */
+//    public static final String PHONE_REGEX = "^1([38][0-9]|4[579]|5[0-3,5-9]|6[6]|7[0135678]|9[89])\\d{8}$";
     /**
      * 邮箱正则
      */
@@ -17,4 +17,9 @@ public abstract class RegexPatterns {
      * 验证码正则, 6位数字或字母
      */
     public static final String VERIFY_CODE_REGEX = "^[a-zA-Z\\d]{6}$";
+    
+    /**
+     * 用户名最大长度
+     */
+    public static final int USERNAME_MAX_LENGTH = 25;
 }
