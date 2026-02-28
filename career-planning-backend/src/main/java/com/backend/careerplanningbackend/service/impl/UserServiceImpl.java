@@ -57,7 +57,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             log.warn("登录失败: 账号或密码错误 - {}", user.getUsername());
             return Result.fail("账号或密码错误");
         }
-        System.err.println(userByName.getStatus());
         // 检查账号状态
         if (userByName.getStatus() == 0) {
             log.warn("登录失败: 账号被禁用 - {}", user.getUsername());
