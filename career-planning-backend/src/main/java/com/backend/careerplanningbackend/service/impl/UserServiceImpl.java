@@ -83,11 +83,18 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     @Override
     public Result register(LoginFormDTO user) {
         log.debug("用户注册请求: {}", user);
-        if (!user.getPassword().equals(user.getPasswordConfirm())) {
-            return Result.fail("两次输入的密码不一致");
-        }
+        String password = user.getPassword();
         String username = user.getUsername();
         String email = user.getEmail();
+        if (!password.equals(user.getPasswordConfirm())) {
+            return Result.fail("两次输入的密码不一致");
+        }
+        if(RegexUtil.isPasswordInvalid(password)){
+            return Result.fail("密码格式无效,4~32位有效数字");
+        }
+        if(RegexUtil.isUsernameInvalid(username)){
+            return Result.fail("用户名格式无效,24位有效数字");
+        }
         if (RegexUtil.isEmailInvalid(email)) {
             return Result.fail("邮箱格式无效");
         }
@@ -95,11 +102,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         if(ByEmail!=null){
             return Result.fail("邮箱已经存在");
         }
-        if(StrUtil.isBlank(user.getPassword())){
-            return Result.fail("密码不能为空");
-        }
-        if(StrUtil.isBlank(username)){
-            return Result.fail("用户名为空");
+        if(StrUtil.isBlank(password)||StrUtil.isBlank(username)){
+            return Result.fail("账号或密码不能为空");
         }
         User userByName = userMapper.selectByUsername(user.getUsername());
         if(userByName!=null){
@@ -121,7 +125,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         }
        
         //加密
-        String encode = PwdUtil.encode(user.getPassword());
+        String encode = PwdUtil.encode(password);
         user.setPassword(encode);
 
         //注册功能点实现
