@@ -7,8 +7,6 @@ public class LoginFormDTO {
     private String username;
     private String password;
     private String passwordConfirm;
-
     private String email;
-
     private String code;
 }
