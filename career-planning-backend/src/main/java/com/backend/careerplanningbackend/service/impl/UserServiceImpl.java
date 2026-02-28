@@ -45,21 +45,29 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
     @Override
     public Result login(LoginFormDTO user) {
-        if(StrUtil.isBlank(user.getPassword())||StrUtil.isBlank(user.getUsername())){
+        String password = user.getPassword();
+        String username = user.getUsername();
+        if(StrUtil.isBlank(password)||StrUtil.isBlank(username)){
             return Result.fail("账号或密码不能为空");
+        }
+        if(RegexUtil.isPasswordInvalid(password)){
+            return Result.fail("密码格式无效,4~32位有效数字");
+        }
+        if(RegexUtil.isUsernameInvalid(username)){
+            return Result.fail("用户名格式无效,24位有效数字");
         }
         log.debug("用户登录请求: {}", user);
         
-        User userByName = userMapper.selectByUsername(user.getUsername());
+        User userByName = userMapper.selectByUsername(username);
         
         // 账号不存在或密码错误，返回相同的错误提示（防止账号枚举攻击）
-        if (userByName == null || !PwdUtil.match(user.getPassword(), userByName.getPassword())) {
-            log.warn("登录失败: 账号或密码错误 - {}", user.getUsername());
+        if (userByName == null || !PwdUtil.match(password, userByName.getPassword())) {
+            log.warn("登录失败: 账号或密码错误 - {}", username);
             return Result.fail("账号或密码错误");
         }
         // 检查账号状态
         if (userByName.getStatus() == 0) {
-            log.warn("登录失败: 账号被禁用 - {}", user.getUsername());
+            log.warn("登录失败: 账号被禁用 - {}", username);
             return Result.fail("账号已被禁用");
         }
         
@@ -67,7 +75,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         String accessToken = JwtUtil.createToken(String.valueOf(userByName.getId()));
         String refreshToken = JwtUtil.createRefreshToken(String.valueOf(userByName.getId()));
         
-        log.info("用户登录成功: {}, userId: {}", user.getUsername(), userByName.getId());
+        log.info("用户登录成功: {}, userId: {}", username, userByName.getId());
         LoginVO loginVO = new LoginVO(accessToken, refreshToken);
         return Result.ok(loginVO);
     }
