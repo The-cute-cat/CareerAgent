@@ -86,6 +86,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         String password = user.getPassword();
         String username = user.getUsername();
         String email = user.getEmail();
+        if(StrUtil.isBlank(password)||StrUtil.isBlank(username)){
+            return Result.fail("账号或密码不能为空");
+        }
         if (!password.equals(user.getPasswordConfirm())) {
             return Result.fail("两次输入的密码不一致");
         }
@@ -101,9 +104,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         User ByEmail = userMapper.selectByEmail(email);
         if(ByEmail!=null){
             return Result.fail("邮箱已经存在");
-        }
-        if(StrUtil.isBlank(password)||StrUtil.isBlank(username)){
-            return Result.fail("账号或密码不能为空");
         }
         User userByName = userMapper.selectByUsername(user.getUsername());
         if(userByName!=null){
@@ -143,23 +143,21 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     public Result forget(LoginFormDTO user) {
         log.debug("用户修改密码请求: {}", user);
         String username = user.getUsername();
+        String password = user.getPassword();
         String email = user.getEmail();
-        if (!user.getPassword().equals(user.getPasswordConfirm())) {
+        if (StrUtil.hasBlank(user.getUsername(), user.getEmail(), user.getPassword())) {
+            return Result.fail("用户名、邮箱或密码不能为空");
+        }
+        if (!password.equals(user.getPasswordConfirm())) {
             return Result.fail("两次输入的密码不一致");
         }
         if (RegexUtil.isEmailInvalid(email)) {
             return Result.fail("邮箱格式无效");
         }
         User ByEmail = userMapper.selectByEmail(email);
-        if(ByEmail==null){
-            return Result.fail("邮箱不存在");
-        }
         User userByName = userMapper.selectByUsername(user.getUsername());
-        if (userByName == null) {
-            return Result.fail("用户名不存在");
-        }
-        if (!userByName.getEmail().equals(email)) {
-            return Result.fail("邮箱与用户名不匹配");
+        if (userByName == null||ByEmail==null||!userByName.getEmail().equals(email)) {
+            return Result.fail("用户名或邮箱信息不匹配");
         }
 
         // 2. 校验验证码 (直接调用本类重构后的方法)
@@ -176,24 +174,24 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             return Result.fail("验证码错误");
         }
         //加密
-        String encode = PwdUtil.encode(user.getPassword());
+        String encode = PwdUtil.encode(password);
         user.setPassword(encode);
 
         //忘记密码的功能实现
         int login = userMapper.forget(user);
         if (login == 0) {
-            return Result.fail("重置密码错误");
+            return Result.fail("重置失败，请稍后再试");
         }
         // 4. 验证成功后立即删除，防止同一验证码被二次使用（幂等性）
         stringRedisTemplate.delete(codeKey);
         stringRedisTemplate.delete(sentKey);
-       
+        
         return Result.ok();
     }
 
     /**
      * 发送验证码 （带防刷）
-     * @param user
+     * @param  user*(LoginFormDTO)
      * @return
      */
     @Override
@@ -214,9 +212,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             return Result.fail("60秒之内已经发送了一条验证码");
         }
         try {
-            // 邮箱打印 3402351070@qq.com
-            System.out.println(fromEmail);
             String code= VerificationCode.generateVerificationCode();
+            log.info("code:{}",code);
             System.out.println(code);
             //存入验证码到 redis 里面
             String codeKey= RedisConstant.EMAIL_CODE + ":" + username + ":" + toEmail;
@@ -229,7 +226,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             SimpleMailMessage msg = new SimpleMailMessage();
             msg.setFrom(fromEmail);
             msg.setTo(toEmail);
-            msg.setSubject("Hope外卖-使命必达");
+            msg.setSubject("AI 职业规划助手，助你开启未来之门！");
             msg.setText("您的验证码是：" + code + "，5分钟内有效，请勿泄露");
             sender.send(msg);
             return Result.ok();
