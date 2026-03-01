@@ -10,9 +10,12 @@ import java.util.List;
 @AllArgsConstructor
 @NoArgsConstructor
 public class Result<T> {
-    private int code;// 成功为 --200  失败为 401
-    private String msg;// 提示消息
-    private T data;// 返回数据
+    // 成功为 --200  失败为 401
+    private int code;
+    // 提示消息
+    private String msg;
+    // 返回数据
+    private T data;
 
     /*   返回一个正确的消息   */
     public static Result ok(){

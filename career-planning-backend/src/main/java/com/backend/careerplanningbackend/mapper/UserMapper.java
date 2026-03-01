@@ -18,7 +18,7 @@ public interface UserMapper extends BaseMapper<User> {
 
     int edit(User user);
 
-    User getUserAllInfo(Long id);
+    User getUserOneInfo(Long id);
 
     UserDTO getUserInfo(Long id);
 

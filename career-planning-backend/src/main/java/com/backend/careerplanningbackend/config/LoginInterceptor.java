@@ -54,6 +54,7 @@ public class LoginInterceptor implements HandlerInterceptor {
     @Override
     public void afterCompletion(HttpServletRequest request, HttpServletResponse response,
                                 Object handler, Exception ex) throws Exception {
+        System.err.println("afterCompletion");
         ThreadLocalUtil.remove(); // 无论请求成功与否，最终都清理
     }
 }
