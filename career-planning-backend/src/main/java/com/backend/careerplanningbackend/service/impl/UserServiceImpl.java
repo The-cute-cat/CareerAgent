@@ -246,11 +246,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         if(user==null){
             return Result.fail("前端传输过来的是空的东西或者邮箱为空");
         }
-        Long currentId = ThreadLocalUtil.getCurrentUserId();
-        if (!currentId.equals(user.getId())) {
-            return Result.fail("非法操作：你只能修改自己的资料");
-        }
-        log.info("userinfo==== {}",user);
+        System.out.println("userinfo===="+user);
         String username = user.getUsername();
         String email = user.getEmail();
         String nickname = user.getNickname();
@@ -275,7 +271,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
     /**
      * 刷新短token
-     * @param refreshToken
+     * @param accessToken
      * @param response
      * @return
      */
