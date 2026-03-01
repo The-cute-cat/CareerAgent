@@ -1,5 +1,7 @@
 package com.backend.careerplanningbackend.util;
 
+import cn.hutool.core.util.StrUtil;
+
 public class ThreadLocalUtil {
     //提供ThreadLocal对象  key - value 类型
     private static final ThreadLocal userThreadLocal = new ThreadLocal();
@@ -22,4 +24,12 @@ public class ThreadLocalUtil {
     public static void remove() {
         userThreadLocal.remove();
     }
+
+    public static Long getCurrentUserId() {
+        String idStr = ThreadLocalUtil.get();
+        if (StrUtil.isBlank(idStr)) {
+            throw new RuntimeException("用户未登录");
+        }
+        return Long.parseLong(idStr);
+    } 
 }

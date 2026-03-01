@@ -2,6 +2,7 @@ package com.backend.careerplanningbackend.util;
 
 import com.aliyun.oss.OSS;
 import com.aliyun.oss.OSSClientBuilder;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
@@ -13,6 +14,7 @@ import java.util.UUID;
  * 阿里云 OSS 工具类
  * 因为不属于controller层，也不属于service层，所以用component注解来存放到IOC容器里
  */
+@Slf4j
 @Component
 public class AliOSSUtils {
     @Autowired
@@ -42,8 +44,8 @@ public class AliOSSUtils {
 
         // 关闭ossClient
         ossClient.shutdown();
-
-        System.out.println("url=" + url);
+        log.info("阿里云url: {}" , url);
+        System.out.println("阿里云url=" + url);
         return url; // 把上传到oss的路径返回
     }
 

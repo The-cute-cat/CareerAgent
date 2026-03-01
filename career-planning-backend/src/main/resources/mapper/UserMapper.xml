@@ -8,10 +8,22 @@
         VALUES (#{username}, #{password}, #{email})
     </insert>
     <update id="forget">
-        
+        update user
+        set password=#{password}
+        where username=#{username} and email=#{email}
     </update>
     <update id="edit">
-        
+        update user
+        <set>
+            <if test="username != null">username = #{username},</if>
+            <if test="nickname != null">nickname = #{nickname},</if>
+            <if test="avatar != null">avatar = #{avatar},</if>
+            <if test="email != null">email = #{email},</if>
+            <if test="info != null">info = #{info},</if>
+        </set>
+        <where>
+            id = #{id}
+        </where>
     </update>
     <update id="updateAvatar">
         
@@ -19,12 +31,7 @@
     <!--    <sql id="baseColumn">-->
 <!--        id, username, nickname, email, avatar, status, create_time, update_time-->
 <!--    </sql>-->
-
-    <select id="login" resultType="com.backend.careerplanningbackend.domain.po.User">
-        SELECT id, username, password, email
-        FROM user
-        WHERE username = #{username} AND password = #{password}
-    </select>
+    
     <select id="selectByUsername" resultType="com.backend.careerplanningbackend.domain.po.User">
         SELECT id, username, password, email,status
         FROM user
@@ -35,11 +42,15 @@
         FROM user
         WHERE email = #{email}
     </select>
-    <select id="getUserAllInfo" resultType="com.backend.careerplanningbackend.domain.po.User">
-        
+    <select id="getUserOneInfo" resultType="com.backend.careerplanningbackend.domain.po.User">
+        select id, username
+        from user
+        where id = #{id}
     </select>
     <select id="getUserInfo" resultType="com.backend.careerplanningbackend.domain.dto.UserDTO">
-        
+        select id, username, nickname, email, avatar
+        from user
+        where id = #{id}
     </select>
     <!--    <update id="edit">-->
 <!--        UPDATE user-->
