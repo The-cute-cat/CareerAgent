@@ -8,7 +8,9 @@
         VALUES (#{username}, #{password}, #{email})
     </insert>
     <update id="forget">
-        
+        update user
+        set password=#{password}
+        where username=#{username} and email=#{email}
     </update>
     <update id="edit">
         
@@ -19,16 +21,11 @@
     <!--    <sql id="baseColumn">-->
 <!--        id, username, nickname, email, avatar, status, create_time, update_time-->
 <!--    </sql>-->
-
-    <select id="login" resultType="com.backend.careerplanningbackend.domain.po.User">
-        SELECT id, username, password, email
-        FROM user
-        WHERE username = #{username} AND password = #{password}
-    </select>
+    
     <select id="selectByUsername" resultType="com.backend.careerplanningbackend.domain.po.User">
-        SELECT id, username, password, email,status
-        FROM user
-        WHERE username = #{username}
+#         SELECT id, username, password, email,status
+#         FROM user
+#         WHERE username = #{username}
     </select>
     <select id="selectByEmail" resultType="com.backend.careerplanningbackend.domain.po.User">
         SELECT id, username, password, email
