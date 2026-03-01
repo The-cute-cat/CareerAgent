@@ -19,14 +19,13 @@ public interface UserService extends IService<User> {
 
     Result sendCode(LoginFormDTO user);
 
-
     Result edit(User user);
 
     Result refreshToken(String accessToken, HttpServletResponse response);
 
     Result getUserInfo();
 
-    String updateAvatar(MultipartFile avatar, Long id) throws IOException;
+    Result updateAvatar(MultipartFile avatar) throws IOException;
 
 //    void modify(ModifyFormDTO user);    
 }

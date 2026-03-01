@@ -246,7 +246,11 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         if(user==null){
             return Result.fail("前端传输过来的是空的东西或者邮箱为空");
         }
-        System.out.println("userinfo===="+user);
+        Long currentId = ThreadLocalUtil.getCurrentUserId();
+        if (!currentId.equals(user.getId())) {
+            return Result.fail("非法操作：你只能修改自己的资料");
+        }
+        log.info("userinfo==== {}",user);
         String username = user.getUsername();
         String email = user.getEmail();
         String nickname = user.getNickname();
@@ -271,23 +275,22 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
     /**
      * 刷新短token
-     * @param accessToken
+     * @param refreshToken
      * @param response
      * @return
      */
     @Override
-    public Result refreshToken(String accessToken, HttpServletResponse response) {
+    public Result refreshToken(String refreshToken, HttpServletResponse response) {
         Claims claims = null;
         try {
-            claims = JwtUtil.parseToken(accessToken);
+            claims = JwtUtil.parseToken(refreshToken);
             System.out.println(claims);
         } catch (Exception e) {
             System.out.println(claims);
             System.out.println("长token过期了,token expired");
             return Result.fail(401,"长token过期了,token expired");
         }
-        System.out.println(claims.getId());
-        System.out.println(222);
+        log.info("登录的账号为 : {}", claims.getId());
         Long id = Long.valueOf(claims.getSubject());
         System.out.println(id);
         User user = userMapper.getUserAllInfo(id);
@@ -297,10 +300,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         //更新双 token 回去
         String AccessToken = JwtUtil.createToken(String.valueOf(id));
         String RefreshToken = JwtUtil.createRefreshToken(String.valueOf(id));
-        response.setHeader("AccessToken", AccessToken);
-        response.setHeader("RefreshToken",RefreshToken);
-        System.out.println(AccessToken);
-        System.out.println(RefreshToken);
+//        response.setHeader("AccessToken", AccessToken);
+//        response.setHeader("RefreshToken",RefreshToken);
+        log.info("AccessToken: {},RefreshToken: {}", AccessToken, RefreshToken);
 
         LoginVO loginVO = new LoginVO(AccessToken, RefreshToken);
         return Result.ok(loginVO);
@@ -312,47 +314,48 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
      */
     @Override
     public Result getUserInfo() {
-        Long id=Long.parseLong(ThreadLocalUtil.get());
-        if(id == null||id==0) {
+        Long currentUserId = ThreadLocalUtil.getCurrentUserId();
+        if(currentUserId == 0) {
             return Result.fail("id为空");
         }
-        UserDTO user = userMapper.getUserInfo(id);
+        UserDTO user = userMapper.getUserInfo(currentUserId);
         if(user==null){
-            return Result.fail("未查到id为"+id+"用户");
+            return Result.fail("未查到id为"+currentUserId+"用户");
         }
         return Result.ok(user);
     }
 
     @Override
-    public String updateAvatar(MultipartFile avatar, Long id) throws IOException {
+    public Result updateAvatar(MultipartFile avatar) throws IOException {
+        Long currentUserId = ThreadLocalUtil.getCurrentUserId();
         String upload = aliOSSUtils.upload(avatar);
-        int i = userMapper.updateAvatar(upload,id);
+        int i = userMapper.updateAvatar(upload,currentUserId);
         if(i==0){
             throw new RuntimeException("未更新成功");
         }
         log.info("用户头像url {}",upload);
-        return upload;
+        return Result.ok(upload);
     }
 
-//    @Override
-//    public void modify(ModifyFormDTO user) {
-//        System.out.println("user---" + user);
-//        if(user==null){
-//            throw new BusinessException("输入的是空的重置密码错误");
-//        }
-//        long id = Long.parseLong(ThreadLocalUtil.get());
-//        User userByName = userMapper.selectById(id);
-//        if (userByName == null) {
-//            throw new BusinessException("用户名不存在");
-//        }
-//        //比较密码 加密算法bcrypt hash算法
-//        if (!PwdUtil.match(user.getPassword(), userByName.getPassword())) {
-//            throw new BusinessException("密码有误");
-//        }
-//        if (!user.getPassword().equals(user.getPasswordConfirm())) {
-//            throw new BusinessException("两次输入的密码不一致");
-//        }
-//        String encode = PwdUtil.encode(user.getPassword());
-//        userMapper.modifyPassword(id,encode);
-//    }
+    /*@Override
+    public void modify(ModifyFormDTO user) {
+        System.out.println("user---" + user);
+        if(user==null){
+            throw new BusinessException("输入的是空的重置密码错误");
+        }
+        Long currentUserId = ThreadLocalUtil.getCurrentUserId();
+        User userByName = userMapper.selectById(currentUserId);
+        if (userByName == null) {
+            throw new BusinessException("用户名不存在");
+        }
+        //比较密码 加密算法bcrypt hash算法
+        if (!PwdUtil.match(user.getPassword(), userByName.getPassword())) {
+            throw new BusinessException("密码有误");
+        }
+        if (!user.getPassword().equals(user.getPasswordConfirm())) {
+            throw new BusinessException("两次输入的密码不一致");
+        }
+        String encode = PwdUtil.encode(user.getPassword());
+        userMapper.modifyPassword(currentUserId,encode);
+    }*/
 }
