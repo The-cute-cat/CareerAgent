@@ -1,10 +1,9 @@
 HELP.md
+application-dev.yaml
 target/
 .mvn/
 !**/src/main/**/target/
 !**/src/test/**/target/
-
-application.yml
 ### STS ###
 .apt_generated
 .classpath

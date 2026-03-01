@@ -6,7 +6,7 @@ import com.backend.careerplanningbackend.domain.po.User;
 import com.backend.careerplanningbackend.domain.vo.LoginVO;
 import com.backend.careerplanningbackend.service.UserService;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -18,10 +18,9 @@ import java.io.IOException;
  */
 @RestController
 @RequestMapping("/user")
+@RequiredArgsConstructor
 public class UserController {
-    @Autowired
-    private UserService userService;
-    // apifox 的注解方法模板
+    private final UserService userService;
     /**
      * 登录
      *

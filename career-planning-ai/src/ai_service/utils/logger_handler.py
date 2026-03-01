@@ -13,14 +13,15 @@ DEFAULT_LOG_FORMAT = logging.Formatter(
 )
 
 
-def get_logger(name: str = "agent", console_level: int = logging.INFO, file_level=logging.DEBUG,
+def get_logger(name: str = "default", console_level: int = logging.INFO, file_level=logging.DEBUG,
                log_file=None) -> logging.Logger:
     """
     创建并配置一个日志记录器，同时支持控制台和文件输出。
 
     该函数会创建一个指定名称的logger，并配置两个handler：
-    1. 控制台输出handler：输出指定级别的日志到控制台
-    2. 文件输出handler：输出指定级别的日志到文件中
+
+    1. 控制台输出handler：输出指定级别的日志到控制台\n
+    2. 文件输出handler：输出指定级别的日志到文件中\n
 
     Args:
         name (str, optional): 日志记录器的名称，默认为"agent"。名称用于区分不同模块的日志。

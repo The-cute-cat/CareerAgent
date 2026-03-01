@@ -1,5 +1,6 @@
 package com.backend.careerplanningbackend.service.impl;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.mail.javamail.JavaMailSender;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.extra.mail.MailException;
@@ -15,7 +16,6 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.mail.SimpleMailMessage;
@@ -29,19 +29,16 @@ import static com.backend.careerplanningbackend.util.RedisConstant.EXPIRE_TIME;
 import static com.backend.careerplanningbackend.util.RedisConstant.SENT_TIME;
 
 @Slf4j
-@Service     
+@Service
+@RequiredArgsConstructor
 public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements UserService {
     //导入application.yml里面的发件人邮箱
     @Value("${spring.mail.username}")
     private String fromEmail;
-    @Autowired
-    JavaMailSender sender;
-    @Autowired
-    private UserMapper userMapper;
-    @Autowired
-    private StringRedisTemplate stringRedisTemplate;
-    @Autowired
-    private AliOSSUtils aliOSSUtils;
+    private final JavaMailSender sender;
+    private final UserMapper userMapper;
+    private final StringRedisTemplate stringRedisTemplate;
+    private final AliOSSUtils aliOSSUtils;
 
     @Override
     public Result login(LoginFormDTO user) {
