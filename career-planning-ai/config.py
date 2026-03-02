@@ -15,7 +15,7 @@ class Database(BaseModel):
     user: str
     password: str
 
-    @field_validator("user") # 这两个装饰器不能调换位置，否则验证逻辑失效!!!
+    @field_validator("user")  # 这两个装饰器不能调换位置，否则验证逻辑失效!!!
     @classmethod
     def validate_user(cls, v):
         if v == "<USER>":
@@ -30,6 +30,14 @@ class Database(BaseModel):
         return v
 
 
+class Communication(BaseModel):
+    """通信配置嵌套类"""
+    class Token(BaseModel):
+        secret: str
+        expire: int
+    token: Token
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -38,7 +46,7 @@ class Settings(BaseSettings):
         extra="ignore",
     )
     database: Database = Database(host="", port=0, database="", user="", password="")
-
+    communication: Communication = Communication(token=Communication.Token(secret="", expire=1800))
     @classmethod
     def settings_customise_sources(
             cls,

@@ -4,3 +4,7 @@ database:
   database: career_agent
   user: <USER>
   password: <PASSWORD>
+communication:
+  token:
+    secret: <SECRET>
+    expire: 1800

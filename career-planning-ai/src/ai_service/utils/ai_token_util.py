@@ -1,9 +1,12 @@
 import base64
 import time
 from typing import Optional
-
+from config import settings
 from ai_service.utils.encrypt_sensitive_data import hash_data, check_data
 
+
+
+__all__ = ["create_token", "check_token"]
 
 def create_token() -> str:
     """
@@ -19,12 +22,14 @@ def create_token() -> str:
     :return: 新生成的、唯一的 AI 令牌字符串。
     """
     timestamp = int(time.time() * 1000)
-    raw_str = f"{timestamp}|CareerAgent"
+    raw_str = f"{timestamp}|{settings.communication.token.secret}"
     raw_bytes = raw_str.encode('utf-8')
     b64_bytes = base64.b64encode(raw_bytes)
     str_base64 = b64_bytes.decode('utf-8')
 
     encrypt_str = hash_data(raw_str)
+    if encrypt_str.startswith("$2b$"):
+        encrypt_str = "$2a$" + encrypt_str[4:]
     token = (
             encrypt_str[:7] +
             str(len(str_base64)) +
@@ -62,9 +67,12 @@ def check_token(token: Optional[str]) -> bool:
         time_str = pre_str[:pipe_index]
         time_val = int(time_str)
         current_time_ms = int(time.time() * 1000)
-        if current_time_ms - time_val > 1800 * 1000:
+        if current_time_ms - time_val > settings.communication.token.expire * 1000:
             return False
         wait_check_str = token[:7] + token[end_idx:]
         return check_data(pre_str, wait_check_str)
     except (ValueError, IndexError, Exception):
         return False
+
+if __name__ == '__main__':
+    print(create_token())
