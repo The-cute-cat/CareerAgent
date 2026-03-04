@@ -63,3 +63,4 @@ if __name__ == '__main__':
     log.error("错误日志")
     log.warning("警告日志")
     log.debug("调试日志")
+    log.error("包含完整信息的错误日志", exc_info=True)
