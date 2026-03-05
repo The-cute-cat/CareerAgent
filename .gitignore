@@ -14,10 +14,7 @@
 .sts4-cache
 
 ### IntelliJ IDEA ###
-.idea/modules.xml
-.idea/jarRepositories.xml
-.idea/compiler.xml
-.idea/libraries/
+.idea/
 *.iws
 *.iml
 *.ipr
@@ -34,9 +31,22 @@ build/
 
 ### VS Code ###
 .vscode/
-/src/test/
-/src/main/java/com/MeowVerse/test/
+
 
 .venv/
+.jbeval/
+logs/
 *.pyc
 __pycache__/
+node_modules/
+
+.env
+.env.local
+.env.*.local
+
+# 环境变量文件模板
+!.env.example
+
+HELP.md
+application-dev.yaml
+target/

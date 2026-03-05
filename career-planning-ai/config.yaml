@@ -4,3 +4,13 @@ database:
   database: career_agent
   user: <USER>
   password: <PASSWORD>
+communication:
+  token:
+    secret: <SECRET>
+    expire: 1800
+llm:
+  model_name: qwen3.5-plus
+  timeout: 30 # 超时时间
+  max_retries: 3 # 最大重试次数
+  extra: # 额外参数
+    temperature: 0.7
