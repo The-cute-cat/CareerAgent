@@ -23,8 +23,13 @@ const router = createRouter({
       path: '/forgot-password',
       name: 'forget-password',
       component: () => import('../components/ForgetPassword.vue'),
+    },
+    {
+      path: '/:pathMatch(.*)*',
+      name: 'NotFound',
+      component: () => import('../components/404.vue')
     }
-   
+
   ],
 })
 
