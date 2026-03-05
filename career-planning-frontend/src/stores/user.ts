@@ -1,13 +1,13 @@
 // src/stores/user.ts（持久化设计）
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
-
+import type{ UserInfo } from '@/types/type'
 export const useUserStore = defineStore(
   'user',
   () => {
     // 从 localStorage 或 sessionStorage 初始化 token（根据是否勾选“记住我”）
     const token = ref(localStorage.getItem('token') || sessionStorage.getItem('token') || '')
-    const userInfo = ref<any>(null)
+    const userInfo = ref<UserInfo | null>(null)
 
     const isAuthenticated = computed(() => !!token.value)
 
@@ -43,5 +43,5 @@ export const useUserStore = defineStore(
   },
   {
     persist: true, // 一键开启持久化（会保存整个 state，但注意 token 我们已经手动管理，这里保存是为了跨页面刷新不丢失）
-  }
+  },
 )

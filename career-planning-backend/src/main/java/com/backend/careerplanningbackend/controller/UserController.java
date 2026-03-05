@@ -7,6 +7,7 @@ import com.backend.careerplanningbackend.domain.vo.LoginVO;
 import com.backend.careerplanningbackend.service.UserService;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -16,6 +17,7 @@ import java.io.IOException;
  * UserController
  * @module UserController
  */
+@Slf4j
 @RestController
 @RequestMapping("/user")
 @RequiredArgsConstructor
@@ -29,6 +31,7 @@ public class UserController {
      */
     @PostMapping("/login")
     public Result login(@RequestBody LoginFormDTO user) {
+        log.info("接收到的登录参数: {}", user.toString()); // 需要在 DTO 中重写 toString()
         return userService.login(user);
     }
     /**
@@ -46,11 +49,18 @@ public class UserController {
         return userService.forget(user);
     }
     /**
-     * 发送验证码
+     * 发送注册验证码
      */
-    @PostMapping("/send-code")
-    public Result sendCode(@RequestBody LoginFormDTO user) {
-        return userService.sendCode(user);
+    @PostMapping("/send-code-register")
+    public Result sendCodeRegister(@RequestBody LoginFormDTO user) {
+        return userService.sendCodeRegister(user);
+    }
+    /**
+     * 发送注册验证码
+     */
+    @PostMapping("/send-code-forget")
+    public Result sendCodeForget(@RequestBody LoginFormDTO user) {
+        return userService.sendCodeForget(user);
     }
     /**
      * 修改个人信息
