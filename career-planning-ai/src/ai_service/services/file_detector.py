@@ -10,7 +10,7 @@ from ai_service.utils.magic_numbers import (
     DANGEROUS_EXTENSIONS,
     SAFE_EXTENSIONS,
 )
-from ai_service.utils.path_tool import abs_path, get_abs_path
+from ai_service.utils.path_tool import abs_path
 
 __all__ = ["file_detector"]
 

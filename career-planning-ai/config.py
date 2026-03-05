@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, SecretStr
 from pydantic_settings import BaseSettings, YamlConfigSettingsSource, SettingsConfigDict
 
 __all__ = ["settings"]
@@ -32,10 +32,36 @@ class Database(BaseModel):
 
 class Communication(BaseModel):
     """通信配置嵌套类"""
+
     class Token(BaseModel):
         secret: str
         expire: int
+
+        @field_validator("password")
+        @classmethod
+        def validate_secret(cls, v):
+            if v == "<SECRET>":
+                raise ValueError("请在.env文件中配置通信密钥")
+            return v
+
     token: Token
+
+
+class LLM(BaseModel):
+    """大模型通用配置"""
+    api_key: SecretStr  # 敏感信息，使用时调用 .get_secret_value() 方法获取
+    base_url: str # 大模型服务器地址
+    model_name: str # 大模型名称
+    timeout: float # 超时时间
+    max_retries: int # 最大重试次数
+    extra: dict # 额外参数
+
+    @field_validator("api_key", mode="before")
+    @classmethod
+    def validate_api_key(cls, v):
+        if not v or v == "<api_key>":
+            raise ValueError("请在 .env 文件中配置正确的 LLM API Key")
+        return v
 
 
 class Settings(BaseSettings):
@@ -47,6 +73,9 @@ class Settings(BaseSettings):
     )
     database: Database = Database(host="", port=0, database="", user="", password="")
     communication: Communication = Communication(token=Communication.Token(secret="", expire=1800))
+    llm: LLM = LLM(api_key=SecretStr(""), base_url="", model_name="", timeout=30.0, max_retries=3,
+                   extra={})
+
     @classmethod
     def settings_customise_sources(
             cls,
