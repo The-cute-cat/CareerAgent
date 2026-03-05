@@ -42,11 +42,6 @@
                 </div>
                 <div class="form-group d-md-flex">
                   <div class="w-50 text-left">
-                    <label class="checkbox-wrap checkbox-primary mb-0">
-                      记住我
-                      <input type="checkbox" v-model="loginform.rememberMe" />
-                      <span class="checkmark"></span>
-                    </label>
                   </div>
                   <div class="w-50 text-md-right">
                     <router-link to="/forgot-password">忘记密码</router-link>
@@ -98,6 +93,7 @@ const handleLogin = async () => {
     loading.value = false
   }
 }
+
 </script>
 
 <style>
