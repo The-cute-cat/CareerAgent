@@ -13,6 +13,9 @@ import pymupdf
 from langchain_core.messages import HumanMessage
 from langchain_openai import ChatOpenAI
 
+from langchain_core.messages import HumanMessage
+from openai import OpenAI
+
 from ai_service.models.pdf import PDFType
 from ai_service.services.prompt_loader import prompt_loader
 from ai_service.utils.logger_handler import log
@@ -276,6 +279,27 @@ class PDFExtractor:
         except Exception as e:
             log.warning(f"Failed to extract page content: {e}", exc_info=True)
             return None
+
+
+    @staticmethod
+    def _image_to_base64(image_bytes: bytes) -> str:
+        """图片转 Base64"""
+        return base64.b64encode(image_bytes).decode("utf-8")
+
+    def _extract_page_content(self, image_bytes: bytes) -> str | None:
+        raise Exception("正在开发中")
+        """识别单页图片的内容"""
+        prompt = prompt_loader.pdf_recognition
+        base64_image = self._image_to_base64(image_bytes)
+        message = HumanMessage(
+            content=[
+                {"type": "text", "text": prompt},
+                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{base64_image}"}}
+            ]
+        )
+        response = self.llm.invoke([message])
+        print(response)
+        return response.content
 
 
 pdf_extractor = PDFExtractor()
