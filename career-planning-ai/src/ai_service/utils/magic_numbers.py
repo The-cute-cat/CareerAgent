@@ -1,7 +1,14 @@
 from dataclasses import dataclass
 from typing import List, Dict
 
-__all__ = ["FileSignature", "FILE_SIGNATURES", "DANGEROUS_EXTENSIONS", "SAFE_EXTENSIONS"]
+__all__ = [
+    "FileSignature",
+    "FILE_SIGNATURES",
+    "DANGEROUS_EXTENSIONS",
+    "SAFE_EXTENSIONS",
+    "OLE2_SIGNATURES",
+    "ZIP_SIGNATURES",
+]
 
 
 @dataclass
@@ -14,6 +21,16 @@ class FileSignature:
     max_offset: int = 0  # 最大偏移量
 
 
+@dataclass
+class DeepCheckSignature:
+    """深度检测签名定义"""
+    extension: str
+    mime_type: str
+    description: str
+    markers: List[bytes]  # 文件内部特征标记
+
+
+# noinspection SpellCheckingInspection
 FILE_SIGNATURES: Dict[str, FileSignature] = {
     # PDF
     "pdf": FileSignature(
@@ -52,7 +69,19 @@ FILE_SIGNATURES: Dict[str, FileSignature] = {
         extension="webp",
         mime_type="image/webp",
         description="WebP Image",
-        magic_bytes=[b"RIFF", b"WEBP"]
+        magic_bytes=[b"RIFF\x00\x00\x00\x00WEBP"]  # RIFF + 4字节大小 + WEBP
+    ),
+    "ico": FileSignature(
+        extension="ico",
+        mime_type="image/x-icon",
+        description="Icon Image",
+        magic_bytes=[b"\x00\x00\x01\x00"]
+    ),
+    "tiff": FileSignature(
+        extension="tiff",
+        mime_type="image/tiff",
+        description="TIFF Image",
+        magic_bytes=[b"II*\x00", b"MM\x00*"]  # 小端/大端
     ),
 
     # 文档
@@ -140,11 +169,17 @@ FILE_SIGNATURES: Dict[str, FileSignature] = {
         description="Comma-Separated Values",
         magic_bytes=[]
     ),
+    "rtf": FileSignature(
+        extension="rtf",
+        mime_type="application/rtf",
+        description="Rich Text Format",
+        magic_bytes=[b"{\\rtf"]
+    ),
     "json": FileSignature(
         extension="json",
         mime_type="application/json",
         description="JSON Data",
-        magic_bytes=[b"{", b"["]
+        magic_bytes=[]  # JSON 无固定魔数，由后续检测
     ),
     "xml": FileSignature(
         extension="xml",
@@ -168,8 +203,55 @@ DANGEROUS_EXTENSIONS = {
 
 # 安全文件类型 (允许上传)
 SAFE_EXTENSIONS = {
-    "pdf", "png", "jpg", "jpeg", "gif", "bmp", "webp",
-    "doc", "docx", "xls", "xlsx", "ppt", "pptx",
+    "pdf", "png", "jpg", "jpeg", "gif", "bmp", "webp", "ico", "tiff",
+    "doc", "docx", "xls", "xlsx", "ppt", "pptx", "rtf",
     "txt", "csv", "json", "xml", "html",
     "zip", "rar", "7z", "gz"
+}
+
+OLE2_SIGNATURES: Dict[str, DeepCheckSignature] = {
+    "xls": DeepCheckSignature(
+        extension="xls",
+        mime_type="application/vnd.ms-excel",
+        description="Microsoft Excel 97-2003",
+        markers=[b"Workbook", b"\x00W\x00o\x00r\x00k\x00b\x00o\x00o\x00k", b"Book"]
+    ),
+    "doc": DeepCheckSignature(
+        extension="doc",
+        mime_type="application/msword",
+        description="Microsoft Word 97-2003",
+        markers=[b"WordDocument", b"\x00W\x00o\x00r\x00d\x00D\x00o\x00c\x00u\x00m\x00e\x00n\x00t"]
+    ),
+    "ppt": DeepCheckSignature(
+        extension="ppt",
+        mime_type="application/vnd.ms-powerpoint",
+        description="Microsoft PowerPoint 97-2003",
+        markers=[
+            b"PowerPoint Document",
+            b"Current User",
+            b"\x00P\x00o\x00w\x00e\x00r\x00P\x00o\x00i\x00n\x00t\x00 \x00D\x00o\x00c\x00u\x00m\x00e\x00n\x00t",
+        ]
+    ),
+}
+
+# noinspection SpellCheckingInspection
+ZIP_SIGNATURES: Dict[str, DeepCheckSignature] = {
+    "xlsx": DeepCheckSignature(
+        extension="xlsx",
+        mime_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        description="Microsoft Excel Spreadsheet",
+        markers=[b"xl/workbook.xml"]
+    ),
+    "docx": DeepCheckSignature(
+        extension="docx",
+        mime_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        description="Microsoft Word Document",
+        markers=[b"word/document.xml"]
+    ),
+    "pptx": DeepCheckSignature(
+        extension="pptx",
+        mime_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        description="Microsoft PowerPoint Presentation",
+        markers=[b"ppt/presentation.xml"]
+    ),
 }

@@ -1,6 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 import yaml
 from pydantic import BaseModel, field_validator, SecretStr, Field
@@ -62,6 +62,9 @@ class LLM(BaseModel):
     max_retries: int = 3  # 最大重试次数
     extra: Dict[str, Any] = {}  # 额外参数
 
+    def __repr__(self):
+        return f"LLM(api_key={self.api_key}, base_url={self.base_url}, model_name={self.model_name}, timeout={self.timeout}, max_retries={self.max_retries}, extra={self.extra})"
+
     @field_validator("api_key", mode="after")
     @classmethod
     def validate_api_key(cls, v: SecretStr) -> SecretStr:
@@ -72,6 +75,14 @@ class LLM(BaseModel):
 
 class PDF(BaseModel):
     model_name: str = ""
+    extra: Dict[str, Any] = {}
+
+
+class Image(BaseModel):
+    model_name: str = ""
+    suffix: List[str] = []
+    max_size: int = 0  # 单位 MB
+    max_dimension: int = 0  # 单位 px
     extra: Dict[str, Any] = {}
 
 
@@ -86,6 +97,7 @@ class Settings(BaseSettings):
     communication: Communication = Field(default_factory=Communication)
     llm: LLM = Field(default_factory=LLM)
     pdf: PDF = Field(default_factory=PDF)
+    image: Image = Field(default_factory=Image)
 
     @classmethod
     def settings_customise_sources(
