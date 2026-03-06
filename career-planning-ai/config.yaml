@@ -19,3 +19,10 @@ pdf:
   model_name: qwen-vl-plus
   extra:
     temperature: 0.1
+image:
+  model_name: qwen-vl-plus
+  suffix: [".jpg", ".jpeg", ".png", ".bmp", ".gif"]
+  max_size: 10 # 最大尺寸 MB
+  max_dimension: 4096 # 最大尺寸
+  extra:
+    temperature: 0.1
