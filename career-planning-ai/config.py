@@ -60,6 +60,7 @@ class LLM(BaseModel):
     model_name: str = ""  # 大模型名称
     timeout: float = 30.0  # 超时时间
     max_retries: int = 3  # 最大重试次数
+    max_concurrent_requests: int = 3  # 最大并发请求数
     extra: Dict[str, Any] = {}  # 额外参数
 
     def __repr__(self):
@@ -72,6 +73,9 @@ class LLM(BaseModel):
             raise ValueError("请在 .env 文件中配置正确的 LLM API Key")
         return v
 
+class PathConfig(BaseModel):
+    """路径配置嵌套类"""
+    temp: str = ""  # 临时文件路径
 
 class PDF(BaseModel):
     model_name: str = ""
