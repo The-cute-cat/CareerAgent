@@ -76,7 +76,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
         log.info("用户登录成功: {}, userId: {}", username, userByName.getId());
         LoginVO loginVO = new LoginVO(
-                accessToken, refreshToken,
+                accessToken,
+                refreshToken,
                 userDTO
         );
         return Result.ok(loginVO);

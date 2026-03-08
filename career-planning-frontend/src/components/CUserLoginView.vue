@@ -1,3 +1,52 @@
+<script setup lang="ts">
+import { ref, reactive } from 'vue'
+import { ElMessage } from 'element-plus'
+import type { LoginFormDTO } from '@/types/type'
+import { userLoginService } from '@/api/user/user'
+import { useRouter } from 'vue-router'
+import { useUserStore } from '@/stores'
+
+const router = useRouter()   // 等同于以前的 this.$router
+// import { useRoute } from 'vue-router'
+// const route = useRoute()
+
+// 登录表单数据
+const loginform = reactive<LoginFormDTO>({})
+const userStore = useUserStore()
+const showPassword = ref(false)
+const loading = ref(false)
+// const rememberMe = ref(false) // 对应“记住我”复选框
+
+const handleLogin = async () => {
+  loading.value = true
+  try {
+    console.log("loginform 参数", loginform);
+    const result = await userLoginService(loginform)
+    console.log("result 结果", result);
+
+    userStore.setUserALLInfo(
+      result.data.data.accessToken,
+      result.data.data.refreshToken,
+      result.data.data.userInfo
+    )
+
+    // sessionStorage.setItem('accessToken', result.data.data.accessToken)
+    // sessionStorage.setItem('refreshToken', result.data.data.refreshToken)
+    // sessionStorage.setItem('userInfo', JSON.stringify(result.data.data.userInfo))
+
+    // const redirect = (route.query.redirect as string) || '/'
+    // router.push(redirect)
+    router.push('/')
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : '登录失败'
+    ElMessage.error(errorMessage)
+    console.log("登录失败", error);
+  } finally {
+    loading.value = false
+  }
+}
+</script>
+
 <template>
   <link href="https://fonts.googleapis.com/css?family=Lato:300,400,700&display=swap" rel="stylesheet">
   <section class="ftco-section">
@@ -40,11 +89,6 @@
                 </div>
                 <div class="form-group d-md-flex">
                   <div class="w-50 text-left">
-                    <label class="checkbox-wrap checkbox-primary mb-0">
-                      记住我
-                      <input type="checkbox" v-model="loginform.rememberMe" />
-                      <span class="checkmark"></span>
-                    </label>
                   </div>
                   <div class="w-50 text-md-right">
                     <router-link to="/forgot-password">忘记密码</router-link>
@@ -62,42 +106,6 @@
     </div>
   </section>
 </template>
-
-<script setup lang="ts">
-import { ref, reactive } from 'vue'
-import { ElMessage } from 'element-plus'
-// import { useRouter, useRoute } from 'vue-router'
-import type { LoginFormDTO } from '@/types/type'
-import { login } from '@/api/user/user'
-// const router = useRouter()
-// const route = useRoute()
-
-// 登录表单数据
-const loginform = reactive<LoginFormDTO>({})
-
-const showPassword = ref(false)
-const loading = ref(false)
-
-const handleLogin = async () => {
-  loading.value = true
-  try {
-    console.log("loginform 参数", loginform);
-    const result = await login(loginform)
-    console.log("result 结果", result);
-    localStorage.setItem('accessToken', result.data.data.accessToken)
-    localStorage.setItem('refreshToken', result.data.data.refreshToken)
-    // const redirect = (route.query.redirect as string) || '/'
-    // router.push(redirect)
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : '登录失败'
-    ElMessage.error(errorMessage)
-    console.log("登录失败", error);
-  } finally {
-    loading.value = false
-  }
-}
-
-</script>
 
 <style>
 @import '/public/css/style.css';

@@ -4,12 +4,12 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 
 import type { LoginFormDTO } from '@/types/type'
-import { register, sendCode } from '@/api/user/user'
-import { log } from 'echarts/types/src/util/log.js'
+import { userRegisterService, userSendCodeRegisterService } from '@/api/user/user'
+import { useUserStore } from '@/stores'
 
 const form = ref<LoginFormDTO>({})
 const router = useRouter()
-
+const userStore = useUserStore()
 const showPassword = ref(false)
 const showConfirmPassword = ref(false)
 const loading = ref(false)
@@ -17,18 +17,18 @@ const loading = ref(false)
 // 验证码相关状态
 const codeSending = ref(false)
 const codeCountdown = ref(0)
-let countdownTimer: NodeJS.Timeout | null = null
+let countdownTimer: number | null = null
 
 // 发送验证码函数
 const sendVerificationCode = async () => {
   // 简单的邮箱格式校验
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   if (!form.value.email) {
-    alert('请输入邮箱地址')
+    ElMessage.warning('请输入邮箱地址')
     return
   }
   if (!emailRegex.test(form.value.email)) {
-    alert('请输入有效的邮箱格式')
+    ElMessage.warning('请输入有效的邮箱格式')
     return
   }
 
@@ -36,13 +36,12 @@ const sendVerificationCode = async () => {
   try {
     console.log('发送验证码至邮箱:', form.value.email)
     // 模拟API调用发送验证码
-    const res = await sendCode(form.value) // 这里可以调用实际的发送验证码API
+    const res = await userSendCodeRegisterService(form.value) // 这里可以调用实际的发送验证码API
     console.log('验证码发送结果:', res)
     if (res.data.code !== 200) {
-      throw new Error(res.data.message || '验证码发送失败')
+      ElMessage.error(res.data.message || '验证码发送失败')
     }
-    alert(`验证码已发送至 ${form.value.email}，请查收`)
-
+    ElMessage.success(`验证码已发送至 ${form.value.email}，请查收`)
     // 启动倒计时 60 秒
     codeCountdown.value = 60
     if (countdownTimer) clearInterval(countdownTimer)
@@ -67,27 +66,26 @@ const sendVerificationCode = async () => {
 const handleRegister = async () => {
   // 前端验证：密码一致
   if (form.value.password !== form.value.passwordConfirm) {
-    alert('两次输入的密码不一致')
+    ElMessage.warning('两次输入的密码不一致')
     return
   }
   // 验证码不能为空
   if (!form.value.code) {
-    alert('请输入验证码')
+    ElMessage.warning('请输入验证码')
     return
   }
 
   loading.value = true
   try {
     // 模拟注册请求
-    console.log('注册信息', {
-      username: form.value.username,
-      email: form.value.email,
-      verificationCode: form.value.code,
-      password: form.value.password,
-    })
-
+    const res = await userRegisterService(form.value)
+    console.log('注册结果:', res)
+    if (res.data.code !== 200) {
+      ElMessage.error(res.data.message || '注册失败')
+    }
+    userStore.clearUserALLInfo() // 清除用户信息，确保注册流程干净
+    ElMessage.success('注册成功，请登录')
     await new Promise(resolve => setTimeout(resolve, 1000))
-    alert('注册成功，请登录')
     router.push('/login')
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : '注册失败'

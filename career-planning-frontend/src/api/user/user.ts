@@ -3,18 +3,18 @@ import request from '@/utils/request'
 // import { API } from '@/api/user/index'
 import type { LoginFormDTO } from '../../types/type'
 // 用户登录接口 -maq
-export const login = (loginInfo: LoginFormDTO) => {
+export const userLoginService = (loginInfo: LoginFormDTO) => {
   return request.post('/user/login', loginInfo)
 }
-export const register = (loginInfo: LoginFormDTO) => {
+export const userRegisterService = (loginInfo: LoginFormDTO) => {
   return request.post('/user/register', loginInfo)
 }
-export const forgetPassword = (loginInfo: LoginFormDTO) => {
-  return request.post('/user/forge', loginInfo)
+export const userForgetPasswordService = (loginInfo: LoginFormDTO) => {
+  return request.post('/user/forget-password', loginInfo)
 }
-export const sendCodeRegister = (loginInfo: LoginFormDTO) => {
+export const userSendCodeRegisterService = (loginInfo: LoginFormDTO) => {
   return request.post('/user/send-code-register', loginInfo)
 }
-export const sendCodeForget = (loginInfo: LoginFormDTO) => {
+export const userSendCodeForgetService = (loginInfo: LoginFormDTO) => {
   return request.post('/user/send-code-forget', loginInfo)
 }

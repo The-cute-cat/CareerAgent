@@ -46,10 +46,12 @@ npm run build
 npm run lint
 ```
 
-项目依赖
+项目依赖 pinia 全局管理 element mkcert
 
 ```sh
 npm install element-plus
 npm install pinia
 npm install pinia-plugin-persistedstate
+npm install vite-plugin-mkcert --save-dev
+
 ```

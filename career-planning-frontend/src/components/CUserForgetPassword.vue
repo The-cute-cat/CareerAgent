@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import type { LoginFormDTO } from '@/types/type'
-import { sendCodeForget, forgetPassword } from '@/api/user/user'
+import { userSendCodeForgetService, userForgetPasswordService } from '@/api/user/user'
 const router = useRouter()
 
 // 步骤控制
@@ -14,12 +14,6 @@ const form = ref<LoginFormDTO>({})
 
 const sending = ref(false)
 
-// 重置密码表单
-const form = reactive({
-  code: '',
-  newPassword: '',
-  confirmPassword: '',
-})
 const resetting = ref(false)
 
 // 密码可见性
@@ -30,7 +24,7 @@ const showConfirmPassword = ref(false)
 const sendCode = async () => {
   sending.value = true
   try {
-    const res = await sendCodeForget(form)
+    const res = await userSendCodeForgetService(form.value)
     console.log('发送验证码结果:', res)
     if (res.data.code !== 200) {
       throw new Error(res.data.message || '验证码发送失败')
@@ -47,18 +41,22 @@ const sendCode = async () => {
 
 // 重置密码
 const resetPassword = async () => {
-  if (form.newPassword !== form.confirmPassword) {
+  if (form.value.password !== form.value.passwordConfirm) {
     alert('两次输入的密码不一致')
     return
   }
   resetting.value = true
   try {
-    // 模拟重置密码 API 调用
-    // await userStore.resetPassword({ email: form.email, code: form.code, newPassword: form.newPassword })
-    alert('密码重置成功，请使用新密码登录')
+    const res = await userForgetPasswordService(form.value)
+    console.log('重置密码结果:', res)
+    if (res.data.code !== 200) {
+      ElMessage.error(res.data.message || '重置失败')
+    }
     router.push('/login')
-  } catch (error: any) {
-    alert(error.message || '重置失败')
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : '重置失败'
+    ElMessage.error(errorMessage)
+    console.log("重置失败", error);
   } finally {
     resetting.value = false
   }
@@ -95,8 +93,8 @@ const resetPassword = async () => {
               <!-- 步骤1：发送验证码 -->
               <form v-if="step === 1" class="signin-form" @submit.prevent="sendCode">
                 <div class="form-group mb-3">
-                  <label class="label" for="email">用户名</label>
-                  <input type="email" class="form-control" placeholder="请输入注册用户名" id="email" v-model="form.username"
+                  <label class="label" for="username">用户名</label>
+                  <input type="text" class="form-control" placeholder="请输入注册用户名" id="username" v-model="form.username"
                     required />
                 </div>
                 <div class="form-group mb-3">
@@ -125,7 +123,7 @@ const resetPassword = async () => {
                   <label class="label" for="newPassword">新密码</label>
                   <div class="position-relative">
                     <input :type="showNewPassword ? 'text' : 'password'" class="form-control" placeholder="至少6位"
-                      id="newPassword" v-model="form.newPassword" required minlength="6" />
+                      id="newPassword" v-model="form.password" required minlength="6" />
                     <span class="fa fa-fw" :class="showNewPassword ? 'fa-eye-slash' : 'fa-eye'"
                       @click="showNewPassword = !showNewPassword"
                       style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer;"></span>
@@ -135,7 +133,7 @@ const resetPassword = async () => {
                   <label class="label" for="confirmPassword">确认密码</label>
                   <div class="position-relative">
                     <input :type="showConfirmPassword ? 'text' : 'password'" class="form-control" placeholder="再次输入新密码"
-                      id="confirmPassword" v-model="form.confirmPassword" required />
+                      id="confirmPassword" v-model="form.passwordConfirm" required />
                     <span class="fa fa-fw" :class="showConfirmPassword ? 'fa-eye-slash' : 'fa-eye'"
                       @click="showConfirmPassword = !showConfirmPassword"
                       style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer;"></span>

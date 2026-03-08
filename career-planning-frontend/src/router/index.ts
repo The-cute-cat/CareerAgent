@@ -1,27 +1,27 @@
 // 引入路由器
 import { createRouter, createWebHistory } from 'vue-router'
-import { useUserStore } from '@/stores/user'
+import { useUserStore } from '@/stores/modules/user'
 
 const routes = [
   {
     path: '/',
     name: 'home',
-    component: () => import('../components/LoginView.vue'), // 首页直接显示登录页
+    component: () => import('../components/CUserLoginView.vue'), // 首页直接显示登录页
   },
   {
     path: '/register',
     name: 'register',
-    component: () => import('../components/Register.vue'),
+    component: () => import('../components/CUserRegister.vue'),
   },
   {
     path: '/login',
     name: 'login',
-    component: () => import('../components/LoginView.vue'),
+    component: () => import('../components/CUserLoginView.vue'),
   },
   {
     path: '/forgot-password',
     name: 'forget-password',
-    component: () => import('../components/ForgetPassword.vue'),
+    component: () => import('../components/CUserForgetPassword.vue'),
   },
 ]
 
@@ -34,12 +34,12 @@ const router = createRouter({
 router.beforeEach((to, _from, next) => {
   try {
     const userStore = useUserStore()
-    if (to.name === 'login' && userStore.isAuthenticated) {
+    if (to.name === 'login' && userStore.isLoggedIn) {
       const redirect = to.query.redirect as string
       next(redirect || { name: 'home' })
       return
     }
-    if (to.meta.requiresAuth && !userStore.isAuthenticated) {
+    if (to.meta.requiresAuth && !userStore.isLoggedIn) {
       next({ name: 'login', query: { redirect: to.fullPath } })
     } else {
       next()
