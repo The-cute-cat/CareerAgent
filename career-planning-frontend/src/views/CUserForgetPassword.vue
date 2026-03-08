@@ -1,10 +1,79 @@
+<script setup lang="ts">
+import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import type { LoginFormDTO } from '@/types/type'
+import { userSendCodeForgetService, userForgetPasswordService } from '@/api/user/user'
+const router = useRouter()
+
+// 步骤控制
+const step = ref(1)
+
+// 发送验证码表单
+const form = ref<LoginFormDTO>({})
+
+const sending = ref(false)
+
+const resetting = ref(false)
+
+
+
+// 密码可见性
+const showNewPassword = ref(false)
+const showConfirmPassword = ref(false)
+
+
+
+// 发送验证码
+const sendCode = async () => {
+  sending.value = true
+  try {
+    // const res = await userSendCodeForgetService(form.value)
+    // console.log('发送验证码结果:', res)
+    // if (res.data.code !== 200) {
+      // throw new Error(res.data.message || '验证码发送失败')
+    // }
+    step.value = 2
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : '注册失败'
+    ElMessage.error(errorMessage)
+    console.log("注册失败", error);
+  } finally {
+    sending.value = false
+  }
+}
+
+// 重置密码
+const resetPassword = async () => {
+  if (form.value.password !== form.value.passwordConfirm) {
+    alert('两次输入的密码不一致')
+    return
+  }
+  resetting.value = true
+  try {
+    const res = await userForgetPasswordService(form.value)
+    console.log('重置密码结果:', res)
+    if (res.data.code !== 200) {
+      ElMessage.error(res.data.message || '重置失败')
+    }
+    router.push('/login')
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : '重置失败'
+    ElMessage.error(errorMessage)
+    console.log("重置失败", error);
+  } finally {
+    resetting.value = false
+  }
+}
+</script>
+
 <template>
   <link href="https://fonts.googleapis.com/css?family=Lato:300,400,700&display=swap" rel="stylesheet" />
   <section class="ftco-section">
     <div class="container">
       <div class="row justify-content-center">
         <div class="col-md-6 text-center mb-5">
-          <h2 class="heading-section">职业规划</h2>
+          <h2 class="heading-section">职业规划AI智能体</h2>
         </div>
       </div>
       <div class="row justify-content-center">
@@ -57,7 +126,7 @@
                     class="form-control"
                     placeholder="请输入邮箱收到的验证码"
                     id="code"
-                    v-model="resetForm.code"
+                    v-model="form.code"
                     required
                   />
                 </div>
@@ -69,7 +138,7 @@
                       class="form-control"
                       placeholder="至少6位"
                       id="newPassword"
-                      v-model="resetForm.newPassword"
+                      v-model="form.password"
                       required
                       minlength="6"
                     />
@@ -89,7 +158,7 @@
                       class="form-control"
                       placeholder="再次输入新密码"
                       id="confirmPassword"
-                      v-model="resetForm.confirmPassword"
+                      v-model="form.passwordConfirm"
                       required
                     />
                     <span
@@ -119,69 +188,98 @@
   </section>
 </template>
 
-<script setup lang="ts">
-import { ref, reactive } from 'vue'
-import { useRouter } from 'vue-router'
-
-const router = useRouter()
-
-// 步骤控制
-const step = ref(1)
-
-// 发送验证码表单
-const form = reactive({
-  email: '',
-})
-const sending = ref(false)
-
-// 重置密码表单
-const resetForm = reactive({
-  code: '',
-  newPassword: '',
-  confirmPassword: '',
-})
-const resetting = ref(false)
-
-// 密码可见性
-const showNewPassword = ref(false)
-const showConfirmPassword = ref(false)
-
-// 发送验证码
-const sendCode = async () => {
-  sending.value = true
-  try {
-    // 模拟发送验证码 API 调用
-    // await userStore.sendResetCode(form.email)
-    alert('验证码已发送至 ' + form.email)
-    step.value = 2
-  } catch (error: any) {
-    alert(error.message || '发送失败')
-  } finally {
-    sending.value = false
-  }
-}
-
-// 重置密码
-const resetPassword = async () => {
-  if (resetForm.newPassword !== resetForm.confirmPassword) {
-    alert('两次输入的密码不一致')
-    return
-  }
-  resetting.value = true
-  try {
-    // 模拟重置密码 API 调用
-    // await userStore.resetPassword({ email: form.email, code: resetForm.code, newPassword: resetForm.newPassword })
-    alert('密码重置成功，请使用新密码登录')
-    router.push('/login')
-  } catch (error: any) {
-    alert(error.message || '重置失败')
-  } finally {
-    resetting.value = false
-  }
-}
-</script>
 
 <style scoped>
+@import '/css/style.css';
+
+/* 全局居中布局 */
+.ftco-section {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  width: 100vw;
+  background: linear-gradient(135deg, #7b7474 0%, #b0b2b4 50%, #7b7d7e 100%);
+}
+
+.ftco-section .container {
+  width: 100% !important;
+  max-width: 1200px !important;
+  margin: 0 auto !important;
+  padding-left: 20px;
+  padding-right: 20px;
+}
+
+/* 增大的内容框 */
+.wrap {
+  min-height: 600px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+}
+
+.wrap .img,
+.wrap .login-wrap {
+  width: 50%;
+}
+
+.wrap .img {
+  min-height: 600px;
+}
+
+.wrap .login-wrap {
+  padding: 50px !important;
+}
+
+/* 表单元素增大 */
+.form-control {
+  height: 54px;
+  font-size: 16px;
+  padding: 12px 16px;
+}
+
+.form-group .label {
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.btn-primary {
+  height: 54px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+h3.mb-4 {
+  font-size: 28px;
+  margin-bottom: 30px !important;
+}
+
+/* 步骤指示器增大 */
+.steps {
+  font-size: 15px;
+  padding: 15px 0;
+  margin-bottom: 30px !important;
+}
+
+/* 响应式调整 */
+@media (max-width: 991.98px) {
+  .wrap .img,
+  .wrap .login-wrap {
+    width: 100%;
+  }
+  
+  .wrap .img {
+    min-height: 200px;
+    height: 200px;
+  }
+}
+
+.heading-section {
+  font-size: 30px;
+  font-weight: 600;
+  color: #201f1f;
+  margin-bottom: 20px;
+}
+
 /* 步骤指示器样式 */
 .steps {
   font-size: 1rem;
@@ -196,8 +294,4 @@ const resetPassword = async () => {
 .fa-eye-slash {
   font-family: 'FontAwesome';
 }
-</style>
-
-<style>
-@import '/public/css/style.css';
 </style>
