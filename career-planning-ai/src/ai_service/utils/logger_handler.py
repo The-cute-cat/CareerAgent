@@ -2,12 +2,11 @@ import logging
 import os
 from datetime import datetime
 
-from src.ai_service.utils.path_tool import abs_path
+from config import settings
 
 __all__ = ["log", "LOG_ROOT"]
 
-LOG_ROOT = abs_path("logs")
-os.makedirs(LOG_ROOT, exist_ok=True)
+LOG_ROOT = settings.path_config.log
 DEFAULT_LOG_FORMAT = logging.Formatter(
     '%(asctime)s %(name)-12s %(levelname)-8s - %(filename)s:%(lineno)d - %(message)s'
 )

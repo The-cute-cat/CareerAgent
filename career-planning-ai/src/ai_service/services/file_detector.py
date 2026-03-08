@@ -215,7 +215,7 @@ class FileDetector:
             return temp
         raise FileDetectorError(f"未知文件类型: {filepath}")
 
-    def is_dangerous_file(self, filepath: str) -> bool:
+    def is_dangerous_file(self, filepath: str) -> tuple[bool, Dict[str, str]]:
         """
         检查文件是否属于危险类型
 
@@ -225,17 +225,27 @@ class FileDetector:
             filepath: 文件路径
 
         Returns:
+            Tuple[bool, Dict[str, str]]
+
             True 表示危险文件，False 表示非危险文件
-            当检测失败时默认返回 True（安全优先原则）
+            当检测失败时默认返回 True（危险优先原则）
+
+            包含文件类型信息的字典:
+                - method: 检测方法，如 "magic_numbers"
+                - mime_type: MIME 类型，如 "application/pdf"
+                - extension: 文件扩展名，如 "pdf"
+                - description: 文件类型描述，如 "Portable Document Format"
+                - file_name: 文件名称，如 "example.pdf"
+                - size: 文件大小，如 "1.50 MB"
         """
         try:
             file_info = self.get_file_info(filepath)
-            return file_info["extension"] in DANGEROUS_EXTENSIONS
+            return file_info["extension"] in DANGEROUS_EXTENSIONS, file_info
         except Exception as e:
             log.warning(f"is_dangerous_file error: {e}")
-            return True  # 检测失败时保守处理，视为危险文件
+            return True, {}  # 检测失败时保守处理，视为危险文件
 
-    def is_safe_file(self, filepath: str) -> bool:
+    def is_safe_file(self, filepath: str) -> tuple[bool, Dict[str, str]]:
         """
         检查文件是否属于安全类型
 
@@ -245,15 +255,25 @@ class FileDetector:
             filepath: 文件路径
 
         Returns:
+            Tuple[bool, Dict[str, str]]
+
             True 表示安全文件，False 表示非安全文件
             当检测失败时默认返回 False（安全优先原则）
+
+            包含文件类型信息的字典:
+                - method: 检测方法，如 "magic_numbers"
+                - mime_type: MIME 类型，如 "application/pdf"
+                - extension: 文件扩展名，如 "pdf"
+                - description: 文件类型描述，如 "Portable Document Format"
+                - file_name: 文件名称，如 "example.pdf"
+                - size: 文件大小，如 "1.50 MB"
         """
         try:
             file_info = self.get_file_info(filepath)
-            return file_info["extension"] in SAFE_EXTENSIONS
+            return file_info["extension"] in SAFE_EXTENSIONS, file_info
         except Exception as e:
             log.warning(f"is_safe_file error: {e}")
-            return False  # 检测失败时保守处理，视为不安全文件
+            return False, {}  # 检测失败时保守处理，视为不安全文件
 
 
 class FileDetectorError(Exception):

@@ -3,6 +3,7 @@
 .vscode/
 .jbeval/
 logs/
+data/
 temp/
 *.pyc
 __pycache__/
