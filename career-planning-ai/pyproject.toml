@@ -28,6 +28,8 @@ dependencies = [
     "python-multipart (>=0.0.22,<0.0.23)",  # 文件上传支持
     "puremagic (>=2.0.0,<3.0.0)",      # 纯 Python 文件类型检测（无需 libmagic）
     "binaryornot (>=0.4.4,<0.5.0)",    # 二进制/文本文件判断
+    "sqlalchemy[asyncio] (>=2.0.48,<3.0.0)",
+    "aiomysql (>=0.3.2,<0.4.0)",
 ]
 
 
