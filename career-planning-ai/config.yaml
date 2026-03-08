@@ -10,7 +10,19 @@ communication:
     expire: 1800
 llm:
   model_name: qwen3.5-plus
+  base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
   timeout: 30 # 超时时间
   max_retries: 3 # 最大重试次数
   extra: # 额外参数
     temperature: 0.7
+pdf:
+  model_name: qwen-vl-plus
+  extra:
+    temperature: 0.1
+image:
+  model_name: qwen-vl-plus
+  suffix: [".jpg", ".jpeg", ".png", ".bmp", ".gif"]
+  max_size: 10 # 最大尺寸 MB
+  max_dimension: 4096 # 最大尺寸
+  extra:
+    temperature: 0.1

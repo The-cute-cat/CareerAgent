@@ -44,7 +44,7 @@ public class UserController {
     /**
      * 忘记密码
      */
-    @PutMapping("/forget")
+    @PutMapping("/forget-password")
     public Result forget(@RequestBody LoginFormDTO user) {
         return userService.forget(user);
     }
