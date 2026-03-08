@@ -1,3 +1,7 @@
+import atexit
+import os.path
+import shutil
+import tempfile
 from functools import lru_cache
 from pathlib import Path
 from typing import Dict, Any, List
@@ -9,7 +13,7 @@ from pydantic_settings.sources import InitSettingsSource
 
 __all__ = ["settings"]
 
-from ai_service.utils.path_tool import abs_path
+from ai_service.utils.path_tool import abs_path, get_project_root, get_abs_path
 
 
 class Database(BaseModel):
@@ -86,6 +90,50 @@ class Image(BaseModel):
     extra: Dict[str, Any] = {}
 
 
+class PathConfig(BaseModel):
+    temp: str = ""
+    is_clean: bool = True
+    log: str = ""
+    prompt: str = ""
+    data: str = ""
+
+    @field_validator("temp")
+    @classmethod
+    def validate_temp(cls, v):
+        if v == "<TEMP_PATH>" or not v or not Path(v).exists():
+            v = tempfile.gettempdir()
+        path = os.path.join(v, "career_agent", "ai_service", "temp")
+        os.makedirs(path, exist_ok=True)
+        return str(Path(path))
+
+    @field_validator("log")
+    @classmethod
+    def validate_log(cls, v):
+        if v == "<LOG_PATH>" or not v or not Path(v).exists():
+            v = get_project_root()
+        path = os.path.join(v, "logs")
+        os.makedirs(path, exist_ok=True)
+        return str(Path(path))
+
+    @field_validator("prompt")
+    @classmethod
+    def validate_prompt(cls, v):
+        if v == "<PROMPT_PATH>" or not v or not Path(v).exists():
+            v = get_abs_path("")
+        path = os.path.join(v, "prompts")
+        os.makedirs(path, exist_ok=True)
+        return str(Path(path))
+
+    @field_validator("data")
+    @classmethod
+    def validate_data(cls, v):
+        if v == "<DATA_PATH>" or not v or not Path(v).exists():
+            v = get_project_root()
+        path = os.path.join(v, "data")
+        os.makedirs(path, exist_ok=True)
+        return str(Path(path))
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=abs_path(".env"),
@@ -98,6 +146,7 @@ class Settings(BaseSettings):
     llm: LLM = Field(default_factory=LLM)
     pdf: PDF = Field(default_factory=PDF)
     image: Image = Field(default_factory=Image)
+    path_config: PathConfig = Field(default_factory=PathConfig)
 
     @classmethod
     def settings_customise_sources(
@@ -128,8 +177,15 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     return Settings()
 
+def program_exit():
+    """程序退出前执行的操作"""
+    if settings.path_config.is_clean: # 是否清理临时文件
+        temp_path = settings.path_config.temp
+        if Path(temp_path).exists():
+            shutil.rmtree(temp_path, ignore_errors=True)
 
 settings = get_settings()
+atexit.register(program_exit)
 
 if __name__ == "__main__":
     print(f"\n数据库配置:")
