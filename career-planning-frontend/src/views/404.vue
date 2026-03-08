@@ -10,7 +10,7 @@
       <p class="description">抱歉，您访问的页面不存在或已被移除</p>
       <div class="actions">
         <router-link to="/" class="btn-home">
-          <span class="icon"></span>
+          <span class="icon">←</span>
           返回首页
         </router-link>
       </div>
