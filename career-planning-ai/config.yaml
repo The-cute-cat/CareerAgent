@@ -1,7 +1,7 @@
 database:
-  host: 127.0.0.1
-  port: 3306
-  database: career_agent
+  host: mysql6.sqlpub.com
+  port: 3311
+  database: career_backend
   user: <USER>
   password: <PASSWORD>
 communication:
