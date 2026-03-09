@@ -19,8 +19,10 @@ export default defineConfig({
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
+    extensions: ['.ts', '.tsx', '.mjs', '.js', '.jsx', '.json'],
   },
   server: {
+    // 代理配置
     proxy: {
       '/api': {
         target: 'http://localhost:8080',
@@ -28,8 +30,7 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
     },
-  },
-  server: {
+    // 开发服务器配置
     open: true,
     port: 8081,
     https: {},

@@ -61,14 +61,13 @@ export interface LoginVO {
 }
 
 export interface UserInfo {
-  userId: number
-  avatar: string
+  id: number
+  nickname: string
   username: string
-  password: string
-  desc: string
+  avatar: string
   email: string
+  info: string
   phone: string
-  role: string[]
   createTime: string
   updateTime: string
   accessToken: string

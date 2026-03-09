@@ -1,18 +1,20 @@
 import os
 
-from ai_service.utils.path_tool import get_abs_path
+from config import settings
 
 
 class PromptLoader:
     pdf_recognition: str
+    image_extract_text: str
 
     def __init__(self, prompt_path: str):
         with open(os.path.join(prompt_path, "pdf_recognition.txt"), "r", encoding="utf-8") as f:
             self.pdf_recognition = f.read()
+        with open(os.path.join(prompt_path, "image_extract_text.txt"), "r", encoding="utf-8") as f:
+            self.image_extract_text = f.read()
 
 
-prompt_loader = PromptLoader(get_abs_path("prompts"))
-
+prompt_loader = PromptLoader(settings.path_config.prompt)
 
 if __name__ == "__main__":
     print(prompt_loader.pdf_recognition)

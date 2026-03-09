@@ -38,3 +38,7 @@ __screenshots__/
 
 # Vite
 *.timestamp-*-*.mjs
+
+# Add this line to ignore .history directory
+# 添加此行以忽略 .history 目录
+.history/
