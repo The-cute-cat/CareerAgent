@@ -129,6 +129,45 @@ class ImageExtractor:
         """将图片字节数据转换为 Base64 编码字符串"""
         return base64.b64encode(image_bytes).decode("utf-8")
 
+    def _identify_image(self, image_path: str = None, image_bytes: bytes = None, prompt: str = "",
+                        llm: ChatOpenAI = None) -> str | None:
+        if not image_path and not image_bytes:
+            log.warning("请传入图片路径或图片字节数组")
+            raise ValueError("请传入图片路径或图片字节数组")
+        if not llm:
+            log.warning("请传入 LLM 实例")
+            raise ValueError("请传入 LLM 实例")
+        if not prompt:
+            log.warning("请传入提示词")
+            raise ValueError("请传入提示词")
+
+        start_time = time.time()
+
+        # 从文件读取图片数据
+        if not image_bytes and image_path:
+            with open(image_path, "rb") as f:
+                image_bytes = f.read()
+
+        base64_image = self._image_to_base64(image_bytes)
+
+        # 构造多模态消息（文本 + 图片）
+        message = HumanMessage(
+            content=[
+                {"type": "text", "text": prompt},
+                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{base64_image}"}}
+            ]
+        )
+        try:
+            # 调用视觉模型提取文本
+            response = llm.invoke([message])
+            end_time = time.time()
+
+            log.info(f"耗时: {end_time - start_time}秒；response_metadata:{response.response_metadata}")
+            return response.content
+        except Exception as e:
+            log.warning(f"Failed to extract page content: {e}", exc_info=True)
+            return None
+
     def extract_text(self, image_path: str = None, image_bytes: bytes = None, prompt: str = "",
                      llm: ChatOpenAI = None) -> str | None:
         """
@@ -149,40 +188,30 @@ class ImageExtractor:
         if not image_path and not image_bytes:
             log.warning("请传入图片路径或图片字节数组")
             raise ValueError("请传入图片路径或图片字节数组")
-
-        start_time = time.time()
-
-        # 从文件读取图片数据
-        if not image_bytes and image_path:
-            with open(image_path, "rb") as f:
-                image_bytes = f.read()
-
-        base64_image = self._image_to_base64(image_bytes)
-
-        # 构造多模态消息（文本 + 图片）
-        message = HumanMessage(
-            content=[
-                {"type": "text", "text": prompt if prompt else prompt_loader.image_extract_text},
-                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{base64_image}"}}
-            ]
+        return self._identify_image(
+            image_path,
+            image_bytes,
+            prompt if prompt else prompt_loader.image_extract_text,
+            llm if llm else self.llm
         )
-        try:
-            # 调用视觉模型提取文本
-            response = llm.invoke([message]) if llm else self.llm.invoke([message])
-            end_time = time.time()
 
-            log.info(f"耗时: {end_time - start_time}秒；response_metadata:{response.response_metadata}")
-            return response.content
-        except Exception as e:
-            log.warning(f"Failed to extract page content: {e}", exc_info=True)
-            return None
+    def extract_visual_content(self, image_path: str = None, image_bytes: bytes = None, prompt: str = "",
+                        llm: ChatOpenAI = None):
+        if not image_path and not image_bytes:
+            log.warning("请传入图片路径或图片字节数组")
+            raise ValueError("请传入图片路径或图片字节数组")
+        return self._identify_image(
+            image_path,
+            image_bytes,
+            prompt if prompt else prompt_loader.image_extract_visual_content,
+            llm if llm else self.llm
+        )
 
 
 image_extractor = ImageExtractor()
 
 if __name__ == "__main__":
-    # test_image_path = r"D:\文件\bizhihui_com_20231111174635169969599518568.jpg"
-    # print(settings.path_config.temp)
-    # print(image_extractor.validate_image(test_image_path))
-    # print(image_extractor.extract_text(image_path=test_image_path))
+    test_image_path = r"D:\文件\Hello world.html"
+    print(image_extractor.validate_image(test_image_path))
+    #print(image_extractor.extract_visual_content(image_path=test_image_path))
     pass
