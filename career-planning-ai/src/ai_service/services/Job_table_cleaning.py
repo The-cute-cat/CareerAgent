@@ -1,14 +1,223 @@
-__all__ = ['clean_job_excel','read_excel_to_jobinfo']
+__all__ = ['filter_computer_jobs_excel','clean_job_excel','read_excel_to_jobinfo']
 # 清洗招聘数据 Excel 文件（支持.xls 和.xlsx 格式）
 #从文件中读取数据，并转换为JobInfo/字典实体对象列表
 from pathlib import Path
 from typing import List, Dict, Any, Optional
-
-import pandas as pd
 from datetime import datetime
 import re
-import os
+
+from dotenv import load_dotenv
+
 from ai_service.models.job_info import JobInfo  # 替换为您的实际导入路径
+from pydantic import BaseModel, Field
+import os
+import pandas as pd
+from typing import Optional, List, Dict
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_community.chat_models.tongyi import ChatTongyi
+from langchain_core.output_parsers import PydanticOutputParser
+
+
+
+load_dotenv()
+
+class JobClassificationItem(BaseModel):
+    job_title: str = Field(description="岗位名称")
+    is_computer_related: bool = Field(description="是否为计算机相关岗位，true 为是，false 为否")
+
+
+class JobClassificationResult(BaseModel):
+    """大模型返回的岗位分类结果列表"""
+    classifications: List[JobClassificationItem] = Field(description="岗位分类列表")
+
+
+# --- 删除与计算机不相干的岗位 ---
+def filter_computer_jobs_excel(
+        file_path: str,
+        api_key: Optional[str] = None,
+        model_name: str = "qwq-plus-latest",
+        batch_size: int = 50  # 每次发送给大模型的唯一岗位数量
+) -> str:
+    """
+    读取 Excel -> 提取岗位 -> 去重 -> 大模型批量分类 -> 过滤原表 -> 覆盖保存
+
+    Args:
+        file_path (str): Excel 文件路径
+        api_key (str, optional): API Key
+        model_name (str, optional): 模型名称
+        batch_size (int, optional): 大模型批量处理的岗位数量，防止 Token 超限
+
+    Returns:
+        str: 处理后的文件路径
+    """
+    # 1. 基础检查
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"文件不存在：{file_path}")
+
+    if not api_key:
+        api_key = os.getenv("LLM__API_KEY")
+    if not api_key:
+        raise ValueError("请提供 API Key 或设置环境变量 LLM__API_KEY")
+
+    # 2. 读取 Excel 数据
+    print(f"正在读取文件：{file_path} ...")
+    try:
+        df = pd.read_excel(file_path)
+    except Exception as e:
+        raise ValueError(f"读取 Excel 失败：{e}")
+
+    if df.empty:
+        print("表格为空，无需处理。")
+        return file_path
+
+    # 3. 识别岗位列
+    target_col = None
+    possible_names = ["岗位名称", "岗位", "职位名称", "职位", "Job Title", "Position"]
+    # 标准化列名（去除空格）
+    df.columns = df.columns.str.strip()
+
+    for name in possible_names:
+        if name in df.columns:
+            target_col = name
+            break
+
+    if not target_col:
+        raise ValueError(f"未找到岗位列，请确保包含以下列名之一：{possible_names}")
+
+    # 4. 【核心步骤】提取岗位并去重
+    print(f"正在提取唯一岗位名称（原数据行数：{len(df)}）...")
+    # 转为字符串并去除首尾空格，去除空值
+    unique_jobs = df[target_col].astype(str).str.strip().replace('', pd.NA).dropna().unique().tolist()
+    print(f"去重后唯一岗位数量：{len(unique_jobs)}")
+
+    if not unique_jobs:
+        print("未发现有效岗位数据，直接返回。")
+        return file_path
+
+    # 5. 初始化 LLM 与解析器
+    llm = ChatTongyi(
+        api_key=api_key,
+        model=model_name,
+        temperature=0.1,
+        streaming=True  # qwq-plus-latest 只支持流式模式
+    )
+    parser = PydanticOutputParser(pydantic_object=JobClassificationResult)
+
+    # 6. 构建 Prompt 模板
+    prompt_template = ChatPromptTemplate.from_messages([
+        ("system", """你是一名资深人力资源数据清洗专家，专门负责从岗位名称中精准识别计算机/软件相关岗位。
+
+## 🎯 核心任务
+仅根据「岗位名称」文本，判断该岗位是否属于【计算机/软件】相关领域。
+
+## 🔍 判断标准（满足任一即为"相关"）
+
+### ✅ 明确相关的关键词（正向匹配）：
+- 开发类：开发、工程师、程序、代码、架构、后端、前端、全栈、移动端、嵌入式、算法、AI、大模型
+- 技术类：技术、技术支撑、研发、R&D、DevOps、SRE、运维、测试、测试开发、质量、效能
+- 数据类：数据、大数据、数仓、ETL、数据挖掘、数据分析、BI、算法工程
+- 基础设施：云、云计算、容器、K8s、Docker、网络、安全、信息安全、渗透、漏洞
+- 产品/项目（技术向）：技术产品经理、研发项目经理、敏捷教练、Scrum Master
+- 其他技术岗：爬虫、逆向、自动化、脚本、工具链、中间件、数据库、DBA
+
+### ❌ 明确不相关的关键词（负向排除）：
+- 纯业务/职能：销售、客服、行政、人事、财务、法务、采购、物流、仓管、司机、保安、保洁
+- 纯运营/市场（无技术前缀）：运营、市场、推广、策划、文案、设计（除非带"UI/前端"等技术词）
+- 传统行业岗位：教师、医生、护士、厨师、工人、技工、服务员、导购、顾问（除非明确带"技术"前缀）
+
+### ⚠️ 模糊岗位处理策略（关键！）：
+【高召回原则】当岗位名称存在歧义时，只要包含任何技术相关词汇，或无法100%确定无关，一律判定为 "related": true
+示例：
+- "技术顾问" → related: true（含"技术"）
+- "IT支持" → related: true
+- "系统专员" → related: true（"系统"在中文语境常指计算机系统）
+- "项目助理" → related: false（无技术前缀）
+- "技术支持工程师" → related: true
+
+## 📦 输出格式（严格JSON，无额外内容）
+{format_instructions}
+
+## ⚡ 执行要求
+1. 仅分析岗位名称，不推测职责、不依赖外部信息
+2. 输出必须为合法JSON，字段：job_name(原名称), related(bool), reason(10字内简述)
+3. 保持高召回：宁可误判为相关，绝不漏判真正技术岗
+4. 不输出思考过程，只返回JSON结果"""),
+        ("user",
+         """请分析以下岗位列表，返回 JSON 格式结果。\n\n# 输出格式说明\n{format_instructions}\n\n# 待分析岗位列表\n{job_list}""")
+    ])
+    prompt = prompt_template.partial(format_instructions=parser.get_format_instructions())
+    chain = prompt | llm | parser
+
+    # 7. 【核心步骤】分批调用大模型进行分类
+    # 避免一次性发送过多岗位导致 Token 超限或超时
+    classification_map: Dict[str, bool] = {}
+    total_batches = (len(unique_jobs) + batch_size - 1) // batch_size
+
+    print(f"正在调用大模型进行分类（共分 {total_batches} 批）...")
+
+    for i in range(0, len(unique_jobs), batch_size):
+        batch_jobs = unique_jobs[i:i + batch_size]
+        job_list_text = "\n".join([f"- {job}" for job in batch_jobs])
+
+        max_retries = 3
+        retry_count = 0
+        success = False
+
+        while retry_count < max_retries and not success:
+            try:
+                result = chain.invoke({"job_list": job_list_text})
+                # 将结果存入映射表
+                for item in result.classifications:
+                    # 确保 key 也是.strip() 过的，方便后续匹配
+                    classification_map[item.job_title.strip()] = item.is_computer_related
+                print(f"  - 完成批次 {i // batch_size + 1}/{total_batches}")
+                success = True
+            except Exception as e:
+                retry_count += 1
+                import traceback
+                error_type = type(e).__name__
+                error_msg = str(e)
+                error_detail = traceback.format_exc() if retry_count == max_retries else ""
+
+                if retry_count < max_retries:
+                    print(f"  - 批次 {i // batch_size + 1} 处理失败（重试 {retry_count}/{max_retries}）")
+                    print(f"    错误类型: {error_type}")
+                    print(f"    错误信息: {error_msg}")
+                    import time
+                    time.sleep(2)  # 等待2秒后重试
+                else:
+                    print(f"  - 批次 {i // batch_size + 1} 处理失败（已重试{max_retries}次）")
+                    print(f"    错误类型: {error_type}")
+                    print(f"    错误信息: {error_msg}")
+                    if error_detail:
+                        print(f"    详细堆栈:\n{error_detail}")
+                    # 失败则该批次岗位默认视为非计算机岗（保守策略）
+                    continue
+
+    # 8. 【核心步骤】根据映射表过滤原 DataFrame
+    print("正在应用过滤规则到原表格...")
+
+    # 定义一个映射函数
+    def map_job_status(job_title):
+        if not isinstance(job_title, str):
+            return False
+        clean_title = job_title.strip()
+        # 如果大模型判断过，返回判断结果；如果没判断过（漏网之鱼），默认返回 False
+        return classification_map.get(clean_title, False)
+
+    # 创建掩码
+    mask = df[target_col].apply(map_job_status)
+    filtered_df = df[mask]
+
+    # 9. 覆盖保存原文件
+    try:
+        filtered_df.to_excel(file_path, index=False, engine='openpyxl')
+        print(f"处理完成！原始行数：{len(df)}, 保留行数：{len(filtered_df)}, 删除行数：{len(df) - len(filtered_df)}")
+        print(f"文件已覆盖保存：{file_path}")
+        return file_path
+    except Exception as e:
+        raise RuntimeError(f"保存文件失败，请检查文件是否被占用：{e}")
+
 
 # Excel表头到JobInfo字段的映射关系
 EXCEL_TO_MODEL_MAPPING = {
@@ -585,10 +794,9 @@ def clean_job_excel_advanced(file_path,
 
 # ========== 使用示例 ==========
 if __name__ == "__main__":
-    file_path = r"E:\软件工程相关资料\项目比赛\服创2026\a13基于AI的大学生职业规划智能体-JD采样数据  - 副本.xls"
-    # clean_job_excel_advanced(file_path)
+    file_path = r"E:\软件工程相关资料\项目比赛\服创2026\a13基于AI的大学生职业规划智能体-JD采样数据.xls"
+    # clean_job_excel(file_path)
+    # read_excel_to_jobinfo(file_path)
+    job_list=filter_computer_jobs_excel(file_path)
 
-    job_list=read_excel_to_jobinfo(file_path)
-    for job in job_list:
-        print(job.to_json())
 
