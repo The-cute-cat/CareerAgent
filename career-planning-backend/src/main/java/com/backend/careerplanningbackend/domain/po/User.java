@@ -34,6 +34,8 @@ public class User {
 
     /** 账号状态：0-禁用，1-启用 */
     private Integer status;
+    
+    private String info;
 
     /** 注册时间 */
     private LocalDateTime createdAt;

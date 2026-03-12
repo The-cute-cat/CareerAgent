@@ -1,3 +1,4 @@
+// 引入路由器
 import { createRouter, createWebHistory } from 'vue-router'
 import { useUserStore } from '@/stores/modules/user'
 
@@ -52,12 +53,12 @@ const router = createRouter({
 router.beforeEach((to, _from, next) => {
   try {
     const userStore = useUserStore()
-    if (to.name === 'login' && userStore.isAuthenticated) {
+    if (to.name === 'login' && userStore.isLoggedIn) {
       const redirect = to.query.redirect as string
       next(redirect || { name: 'home' })
       return
     }
-    if (to.meta.requiresAuth && !userStore.isAuthenticated) {
+    if (to.meta.requiresAuth && !userStore.isLoggedIn) {
       next({ name: 'login', query: { redirect: to.fullPath } })
     } else {
       next()
@@ -68,4 +69,5 @@ router.beforeEach((to, _from, next) => {
   }
 })
 
+//到处路由
 export default router

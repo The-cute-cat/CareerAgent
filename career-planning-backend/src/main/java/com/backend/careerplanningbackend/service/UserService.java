@@ -18,7 +18,11 @@ public interface UserService extends IService<User> {
     Result forget(LoginFormDTO user);
 
     Result sendCode(LoginFormDTO user);
+    
+    Result sendCodeRegister(LoginFormDTO user);
 
+    Result sendCodeForget(LoginFormDTO user);
+    
     Result edit(User user);
 
     Result refreshToken(String accessToken, HttpServletResponse response);

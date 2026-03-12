@@ -1,9 +1,28 @@
-from fastapi import FastAPI
+
+
+from fastapi import FastAPI, Request
+from fastapi.encoders import jsonable_encoder
 from starlette.middleware.cors import CORSMiddleware
+from starlette.responses import JSONResponse
+
+from ai_service.exceptions import ApiException
+from ai_service.routers import parse
 
 app = FastAPI()
 
-#app.include_router()
+app.include_router(parse.router)
+
+@app.exception_handler(ApiException)
+async def api_exception_handler(_: Request, exc: ApiException):
+    return JSONResponse(
+        status_code=200,
+        content=jsonable_encoder({
+            "code": exc.code,
+            "state": exc.code < 400,
+            "msg": exc.msg,
+            "data": exc.data
+        })
+    )
 
 app.add_middleware(
     CORSMiddleware,

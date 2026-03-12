@@ -33,12 +33,12 @@
 <!--    </sql>-->
     
     <select id="selectByUsername" resultType="com.backend.careerplanningbackend.domain.po.User">
-        SELECT id, username, password, email,status
+        SELECT id, username, password, nickname, avatar, info, email, status
         FROM user
         WHERE username = #{username}
     </select>
     <select id="selectByEmail" resultType="com.backend.careerplanningbackend.domain.po.User">
-        SELECT id, username, password, email
+        SELECT id, username, password, nickname, avatar, email, status
         FROM user
         WHERE email = #{email}
     </select>

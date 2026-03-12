@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Optional
 
 __all__ = ["success", "success_msg", "error", "error_msg"]
 
@@ -15,6 +15,9 @@ class Result:
 
     def __str__(self):
         return f"<Result: code={self.code}, state={self.state}, msg={self.msg}, data={self.data}>"
+
+    def __repr__(self):
+        return self.__str__()
 
     def __setMessage(self) -> str:
         if self.code == 200:
@@ -35,11 +38,11 @@ class Result:
             return "What! o(^・x・^)o"
 
 
-def success(data: Any = None) -> JSONResponse:
+def success(data: Optional[Any] = None) -> JSONResponse:
     return JSONResponse(content=jsonable_encoder(Result(200, data)))
 
 
-def success_msg(msg: str, data: Any):
+def success_msg(msg: str, data: Optional[Any] = None):
     return JSONResponse(content=jsonable_encoder(Result(200, data, msg)))
 
 
@@ -47,5 +50,5 @@ def error(code: int = 500):
     return JSONResponse(content=jsonable_encoder(Result(code, None)))
 
 
-def error_msg(code: int, msg: str):
+def error_msg(msg: str, code: int = 500):
     return JSONResponse(content=jsonable_encoder(Result(code, None, msg)))

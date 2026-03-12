@@ -1,6 +1,7 @@
 # Logs
 logs/
 *.log
+.github/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -38,3 +39,7 @@ __screenshots__/
 
 # Vite
 *.timestamp-*-*.mjs
+
+# Add this line to ignore .history directory
+# 添加此行以忽略 .history 目录
+.history/

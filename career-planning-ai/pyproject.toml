@@ -21,13 +21,23 @@ dependencies = [
     "pymupdf (>=1.27.1,<2.0.0)",       # PDF 文本提取与渲染（高性能）
 
     # ========== AI/LLM ==========
-    "langchain (>=1.2.10,<2.0.0)",     # LLM 应用开发框架
+    "langchain (>=1.2.7,<2.0.0)",
     "langchain-community (>=0.4.1,<0.5.0)",  # LangChain 社区集成
 
     # ========== 文件处理 ==========
     "python-multipart (>=0.0.22,<0.0.23)",  # 文件上传支持
     "puremagic (>=2.0.0,<3.0.0)",      # 纯 Python 文件类型检测（无需 libmagic）
     "binaryornot (>=0.4.4,<0.5.0)",    # 二进制/文本文件判断
+
+    "openai (>=2.24.0,<3.0.0)",
+
+    "langchain-openai (>=1.1.10,<2.0.0)",
+
+    "chardet (>=3.0.2,<6.0.0)", # 不要更新这个依赖的版本!!!
+
+    "pillow (>=12.1.1,<13.0.0)",
+
+    "dashscope (>=1.25.13)",
 ]
 
 
