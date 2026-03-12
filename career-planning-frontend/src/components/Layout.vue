@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import Sidebar from '@/components/Sidebar.vue'
 import Header from '@/components/Header.vue'
+import ChatBot from '@/components/ChatBot.vue'
 </script>
 
 <template>
@@ -26,6 +27,9 @@ import Header from '@/components/Header.vue'
         </div>
       </el-main>
     </el-container>
+
+    <!-- AI 助手悬浮窗 -->
+    <ChatBot />
   </el-container>
 </template>
 
