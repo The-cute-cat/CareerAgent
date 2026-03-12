@@ -28,11 +28,11 @@ const showConfirmPassword = ref(false)
 const sendCode = async () => {
   sending.value = true
   try {
-    // const res = await userSendCodeForgetService(form.value)
-    // console.log('发送验证码结果:', res)
-    // if (res.data.code !== 200) {
-      // throw new Error(res.data.message || '验证码发送失败')
-    // }
+    const res = await userSendCodeForgetService(form.value)
+    console.log('发送验证码结果:', res)
+    if (res.data.code !== 200) {
+      throw new Error(res.data.message || '验证码发送失败')
+    }
     step.value = 2
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : '注册失败'
