@@ -1,15 +1,17 @@
 import './assets/main.css'
 import { createApp } from 'vue'
-import pinia from './stores/index'
+import { createPinia } from 'pinia'
+import ElementPlus from 'element-plus'
 import App from './App.vue'
 import router from './router'
 //引入echarts
-import * as echarts from 'echarts'
+import * as echarts from 'echarts';
+import 'element-plus/dist/index.css'                            
 
 const app = createApp(App)
 
 app.use(router)
-app.use(pinia)
+app.use(ElementPlus)
 
 //放入全局
 app.config.globalProperties.$echarts = echarts
