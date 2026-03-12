@@ -1,3 +1,4 @@
+// 引入路由器
 import { createRouter, createWebHistory } from 'vue-router'
 import { useUserStore } from '@/stores/modules/user'
 
@@ -38,16 +39,6 @@ const router = createRouter({
           name: 'report',
           component: () => import('../views/Report.vue'),
         },
-        {
-          path: 'development-map',
-          name: 'development-map',
-          component: () => import('../views/DevelopmentMap.vue'),
-        },
-        {
-          path: 'profile',
-          name: 'profile',
-          component: () => import('../views/Profile.vue'),
-        }
       ],
     },
     {
@@ -62,35 +53,21 @@ const router = createRouter({
 router.beforeEach((to, _from, next) => {
   try {
     const userStore = useUserStore()
-
-    // 延迟执行以确保 Pinia 持久化状态已恢复
-    const checkAuth = () => {
-      const isLoggedIn = userStore.isLoggedIn
-
-      // 已登录用户访问登录页，重定向到首页或指定页面
-      if (to.name === 'login' && isLoggedIn) {
-        const redirect = to.query.redirect as string
-        next(redirect || { name: 'home' })
-        return
-      }
-
-      // 需要认证但未登录，重定向到登录页
-      if (to.meta.requiresAuth && !isLoggedIn) {
-        next({ name: 'login', query: { redirect: to.fullPath } })
-        return
-      }
-
-      // 其他情况正常放行
+    if (to.name === 'login' && userStore.isLoggedIn) {
+      const redirect = to.query.redirect as string
+      next(redirect || { name: 'home' })
+      return
+    }
+    if (to.meta.requiresAuth && !userStore.isLoggedIn) {
+      next({ name: 'login', query: { redirect: to.fullPath } })
+    } else {
       next()
     }
-
-    // 使用微任务队列确保状态恢复后再检查
-    Promise.resolve().then(checkAuth)
   } catch (error) {
     console.error('路由守卫错误:', error)
-    // 发生错误时放行，避免用户被卡在空白页
     next()
   }
 })
 
+//到处路由
 export default router
