@@ -1,1 +1,3 @@
-__all__ = ["result"]
+__all__ = [
+    "result",
+]

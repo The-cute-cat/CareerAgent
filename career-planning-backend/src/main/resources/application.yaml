@@ -71,5 +71,12 @@ mybatis-plus:
     mapper-locations: classpath:mapper/*.xml
 communication:
   token:
-    secret: <SECRET>
+    secret: ${<SECRET>}
     expire: 1800
+alipay:
+  app-id: ${<APP_ID>}
+  private-key: ${<PRIVATE_KEY>}
+  public-key: ${<PUBLIC_KEY>}
+  gateway: ${<GATEWAY>} # 支付结果异步通知地址
+  notify-url: ${<NOTIFY_URL>} # 支付完成后跳转的页面
+  return-url: ${<RETURN_URL>}

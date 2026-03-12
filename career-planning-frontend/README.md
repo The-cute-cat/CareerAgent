@@ -1,48 +1,57 @@
 # career-planning-frontend
 
-This template should help get you started developing with Vue 3 in Vite.
+这个模板应该可以帮助您开始在 Vite 中使用 Vue 3 进行开发。
 
-## Recommended IDE Setup
+## 推荐的 IDE 设置 (vue 和 vscode的安装网址)
 
 [VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
 
-## Recommended Browser Setup
+## 推荐的浏览器设置
 
-- Chromium-based browsers (Chrome, Edge, Brave, etc.):
-  - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd)
-  - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
-- Firefox:
-  - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
-  - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
+-基于 Chromium 的浏览器（Chrome、Edge、Brave 等）：-[Vue.js 开发工具](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd) -[在 Chrome DevTools 中打开自定义对象格式化程序](http://bit.ly/object-formatters) -火狐：-[Vue.js 开发工具](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/) -[在 Firefox DevTools 中打开自定义对象格式化程序](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
 
 ## Type Support for `.vue` Imports in TS
 
+## TS 中对 `.vue` 导入的类型支持
+
+默认情况下，TypeScript 无法处理“.vue”导入的类型信息，因此我们将“tsc”CLI 替换为“vue-tsc”来进行类型检查。在编辑器中，我们需要 Volar 来让 TypeScript 语言服务识别 `.vue` 类型。
+
 TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) to make the TypeScript language service aware of `.vue` types.
 
-## Customize configuration
+## 自定义配置
 
-See [Vite Configuration Reference](https://vite.dev/config/).
+参见【Vite配置参考】(https://vite.dev/config/).
 
-## Project Setup
+## 项目设置
 
 ```sh
 npm install
 ```
 
-### Compile and Hot-Reload for Development
+### 编译和运行以进行开发
 
 ```sh
 npm run dev
 ```
 
-### Type-Check, Compile and Minify for Production
+### 类型检查、编译和缩小以用于生产
 
 ```sh
 npm run build
 ```
 
-### Lint with [ESLint](https://eslint.org/)
+### 使用 [ESLint] [ESLint](https://eslint.org/)
 
 ```sh
 npm run lint
+```
+
+项目依赖 pinia 全局管理 element mkcert
+
+```sh
+npm install element-plus
+npm install pinia
+npm install pinia-plugin-persistedstate
+npm install vite-plugin-mkcert --save-dev
+
 ```

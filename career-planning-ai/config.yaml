@@ -1,7 +1,7 @@
 database:
-  host: 127.0.0.1
-  port: 3306
-  database: career_agent
+  host: mysql6.sqlpub.com
+  port: 3311
+  database: career_backend
   user: <USER>
   password: <PASSWORD>
 communication:
@@ -10,7 +10,25 @@ communication:
     expire: 1800
 llm:
   model_name: qwen3.5-plus
+  base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
   timeout: 30 # 超时时间
   max_retries: 3 # 最大重试次数
   extra: # 额外参数
     temperature: 0.7
+pdf:
+  model_name: qwen-vl-plus
+  extra:
+    temperature: 0.1
+image:
+  model_name: qwen-vl-plus
+  suffix: ["JPG", "JPEG", "PNG", "BMP", "GIF"]
+  max_size: 10 # 最大尺寸 MB
+  max_dimension: 4096 # 最大尺寸
+  extra:
+    temperature: 0.7
+path_config: # 路径配置，需要绝对路径，否则使用默认路径
+  temp: <TEMP_PATH>
+  is_clean: true # 程序退出时是否清理临时文件
+  log: <LOG_PATH>
+  prompt: <PROMPT_PATH>
+  data: <DATA_PATH>

@@ -1,5 +1,6 @@
 package com.backend.careerplanningbackend.service.impl;
 
+import cn.hutool.core.bean.BeanUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.mail.javamail.JavaMailSender;
 import cn.hutool.core.util.StrUtil;
@@ -44,19 +45,19 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     public Result login(LoginFormDTO user) {
         String password = user.getPassword();
         String username = user.getUsername();
-        if(StrUtil.isBlank(password)||StrUtil.isBlank(username)){
+        if (StrUtil.isBlank(password) || StrUtil.isBlank(username)) {
             return Result.fail("账号或密码不能为空");
         }
-        if(RegexUtil.isPasswordInvalid(password)){
+        if (RegexUtil.isPasswordInvalid(password)) {
             return Result.fail("密码格式无效,4~32位有效数字");
         }
-        if(RegexUtil.isUsernameInvalid(username)){
+        if (RegexUtil.isUsernameInvalid(username)) {
             return Result.fail("用户名格式无效,24位有效数字");
         }
         log.debug("用户登录请求: {}", user);
-        
+
         User userByName = userMapper.selectByUsername(username);
-        
+
         // 账号不存在或密码错误，返回相同的错误提示（防止账号枚举攻击）
         if (userByName == null || !PwdUtil.match(password, userByName.getPassword())) {
             log.warn("登录失败: 账号或密码错误 - {}", username);
@@ -67,43 +68,48 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             log.warn("登录失败: 账号被禁用 - {}", username);
             return Result.fail("账号已被禁用");
         }
-        
+
         // 生成 Token
         String accessToken = JwtUtil.createToken(String.valueOf(userByName.getId()));
         String refreshToken = JwtUtil.createRefreshToken(String.valueOf(userByName.getId()));
-        
+        UserDTO userDTO = BeanUtil.copyProperties(userByName, UserDTO.class);
+
         log.info("用户登录成功: {}, userId: {}", username, userByName.getId());
-        LoginVO loginVO = new LoginVO(accessToken, refreshToken);
+        LoginVO loginVO = new LoginVO(
+                accessToken,
+                refreshToken,
+                userDTO
+        );
         return Result.ok(loginVO);
     }
-    
+
     @Override
     public Result register(LoginFormDTO user) {
         log.debug("用户注册请求: {}", user);
         String password = user.getPassword();
         String username = user.getUsername();
         String email = user.getEmail();
-        if(StrUtil.isBlank(password)||StrUtil.isBlank(username)){
+        if (StrUtil.isBlank(password) || StrUtil.isBlank(username)) {
             return Result.fail("账号或密码不能为空");
         }
         if (!password.equals(user.getPasswordConfirm())) {
             return Result.fail("两次输入的密码不一致");
         }
-        if(RegexUtil.isPasswordInvalid(password)){
+        if (RegexUtil.isPasswordInvalid(password)) {
             return Result.fail("密码格式无效,4~32位有效数字");
         }
-        if(RegexUtil.isUsernameInvalid(username)){
+        if (RegexUtil.isUsernameInvalid(username)) {
             return Result.fail("用户名格式无效,24位有效数字");
         }
         if (RegexUtil.isEmailInvalid(email)) {
             return Result.fail("邮箱格式无效");
         }
         User ByEmail = userMapper.selectByEmail(email);
-        if(ByEmail!=null){
+        if (ByEmail != null) {
             return Result.fail("邮箱已经存在");
         }
         User userByName = userMapper.selectByUsername(user.getUsername());
-        if(userByName!=null){
+        if (userByName != null) {
             return Result.fail("用户名已被占用");
         }
 
@@ -120,7 +126,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         if (!cachedCode.equals(user.getCode())) {
             return Result.fail("验证码错误");
         }
-       
+
         //加密
         String encode = PwdUtil.encode(password);
         user.setPassword(encode);
@@ -153,7 +159,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         }
         User ByEmail = userMapper.selectByEmail(email);
         User userByName = userMapper.selectByUsername(user.getUsername());
-        if (userByName == null||ByEmail==null||!userByName.getEmail().equals(email)) {
+        if (userByName == null || ByEmail == null || !userByName.getEmail().equals(email)) {
             return Result.fail("用户名或邮箱信息不匹配");
         }
 
@@ -182,13 +188,14 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         // 4. 验证成功后立即删除，防止同一验证码被二次使用（幂等性）
         stringRedisTemplate.delete(codeKey);
         stringRedisTemplate.delete(sentKey);
-        
+
         return Result.ok();
     }
 
     /**
      * 发送验证码 （带防刷）
-     * @param  user*(LoginFormDTO)
+     *
+     * @param user*(LoginFormDTO)
      * @return
      */
     @Override
@@ -196,7 +203,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         String username = user.getUsername();
         String toEmail = user.getEmail();
         // 判断参数不合法
-        if(StrUtil.isEmpty(username)){
+        if (StrUtil.isEmpty(username)) {
             return Result.fail("用户名无效");
         }
         if (RegexUtil.isEmailInvalid(toEmail)) {
@@ -205,19 +212,19 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         // 2. 防刷校验：使用 ":" 分隔符规范 Key 结构
         // 建议格式：项目名:模块:业务:标识 这个用来计算60秒内是否重置 
         String sentKey = RedisConstant.EMAIL_SENT + ":" + username + ":" + toEmail;
-        if(Boolean.TRUE.equals(stringRedisTemplate.hasKey(sentKey))){
+        if (Boolean.TRUE.equals(stringRedisTemplate.hasKey(sentKey))) {
             return Result.fail("60秒之内已经发送了一条验证码");
         }
         try {
-            String code= VerificationCode.generateVerificationCode();
-            log.info("code:{}",code);
+            String code = VerificationCode.generateVerificationCode();
+            log.info("code:{}", code);
             System.out.println(code);
             //存入验证码到 redis 里面
-            String codeKey= RedisConstant.EMAIL_CODE + ":" + username + ":" + toEmail;
+            String codeKey = RedisConstant.EMAIL_CODE + ":" + username + ":" + toEmail;
 
-            stringRedisTemplate.opsForValue().set(codeKey,code,EXPIRE_TIME, TimeUnit.SECONDS);
+            stringRedisTemplate.opsForValue().set(codeKey, code, EXPIRE_TIME, TimeUnit.SECONDS);
             //存入 防刷标记 到 redis 里面
-            stringRedisTemplate.opsForValue().set(sentKey,"1",SENT_TIME,TimeUnit.SECONDS);
+            stringRedisTemplate.opsForValue().set(sentKey, "1", SENT_TIME, TimeUnit.SECONDS);
 
             //发送邮件验证码
             SimpleMailMessage msg = new SimpleMailMessage();
@@ -233,6 +240,120 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         }
     }
 
+    /**
+     * 发送注册验证码 （带防刷）
+     *
+     * @param user*(LoginFormDTO)
+     * @return
+     */
+    @Override
+    public Result sendCodeRegister(LoginFormDTO user) {
+        User userByName = userMapper.selectByUsername(user.getUsername());
+        if (userByName != null) {
+            return Result.fail("用户名已被占用");
+        }
+        User ByEmail = userMapper.selectByEmail(user.getEmail());
+        if (ByEmail != null) {
+            return Result.fail("邮箱已经存在");
+        }
+        
+        String username = user.getUsername();
+        String toEmail = user.getEmail();
+        // 判断参数不合法
+        if (StrUtil.isEmpty(username)) {
+            return Result.fail("用户名无效");
+        }
+        if (RegexUtil.isEmailInvalid(toEmail)) {
+            return Result.fail("邮箱格式无效");
+        }
+        // 2. 防刷校验：使用 ":" 分隔符规范 Key 结构
+        // 建议格式：项目名:模块:业务:标识 这个用来计算60秒内是否重置 
+        String sentKey = RedisConstant.EMAIL_SENT + ":" + username + ":" + toEmail;
+        if (Boolean.TRUE.equals(stringRedisTemplate.hasKey(sentKey))) {
+            return Result.fail("60秒之内已经发送了一条验证码");
+        }
+        try {
+            String code = VerificationCode.generateVerificationCode();
+            log.info("code:{}", code);
+            System.out.println(code);
+            //存入验证码到 redis 里面
+            String codeKey = RedisConstant.EMAIL_CODE + ":" + username + ":" + toEmail;
+
+            stringRedisTemplate.opsForValue().set(codeKey, code, EXPIRE_TIME, TimeUnit.SECONDS);
+            //存入 防刷标记 到 redis 里面
+            stringRedisTemplate.opsForValue().set(sentKey, "1", SENT_TIME, TimeUnit.SECONDS);
+
+            //发送邮件验证码
+            SimpleMailMessage msg = new SimpleMailMessage();
+            msg.setFrom(fromEmail);
+            msg.setTo(toEmail);
+            msg.setSubject("AI 职业规划助手，助你开启未来之门！");
+            msg.setText("您的验证码是：" + code + "，5分钟内有效，请勿泄露");
+            sender.send(msg);
+            return Result.ok();
+        } catch (MailException e) {
+            e.printStackTrace();
+            return Result.fail("重置密码错误");
+        }
+    }
+
+    /**
+     * 发送忘记密码验证码 （带防刷）
+     *
+     * @param user*(LoginFormDTO)
+     * @return
+     */
+    @Override
+    public Result sendCodeForget(LoginFormDTO user) {
+        User userByName = userMapper.selectByUsername(user.getUsername());
+        if (userByName == null) {
+            return Result.fail("用户名不存在");
+        }
+        User ByEmail = userMapper.selectByEmail(user.getEmail());
+        if (ByEmail == null) {
+            return Result.fail("邮箱不存在");
+        }
+        
+        String username = user.getUsername();
+        String toEmail = user.getEmail();
+        // 判断参数不合法
+        if (StrUtil.isEmpty(username)) {
+            return Result.fail("用户名无效");
+        }
+        if (RegexUtil.isEmailInvalid(toEmail)) {
+            return Result.fail("邮箱格式无效");
+        }
+        // 2. 防刷校验：使用 ":" 分隔符规范 Key 结构
+        // 建议格式：项目名:模块:业务:标识 这个用来计算60秒内是否重置 
+        String sentKey = RedisConstant.EMAIL_SENT + ":" + username + ":" + toEmail;
+        if (Boolean.TRUE.equals(stringRedisTemplate.hasKey(sentKey))) {
+            return Result.fail("60秒之内已经发送了一条验证码");
+        }
+        try {
+            String code = VerificationCode.generateVerificationCode();
+            log.info("code:{}", code);
+            System.out.println(code);
+            //存入验证码到 redis 里面
+            String codeKey = RedisConstant.EMAIL_CODE + ":" + username + ":" + toEmail;
+
+            stringRedisTemplate.opsForValue().set(codeKey, code, EXPIRE_TIME, TimeUnit.SECONDS);
+            //存入 防刷标记 到 redis 里面
+            stringRedisTemplate.opsForValue().set(sentKey, "1", SENT_TIME, TimeUnit.SECONDS);
+
+            //发送邮件验证码
+            SimpleMailMessage msg = new SimpleMailMessage();
+            msg.setFrom(fromEmail);
+            msg.setTo(toEmail);
+            msg.setSubject("AI 职业规划助手，助你开启未来之门！");
+            msg.setText("您的验证码是：" + code + "，5分钟内有效，请勿泄露");
+            sender.send(msg);
+            return Result.ok();
+        } catch (MailException e) {
+            e.printStackTrace();
+            return Result.fail("重置密码错误");
+        }
+    }
+    
     /***
      * 修改用户的资料
      * @param user
@@ -240,26 +361,26 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
      */
     @Override
     public Result edit(User user) {
-        if(user==null){
+        if (user == null) {
             return Result.fail("前端传输过来的是空的东西或者邮箱为空");
         }
-        System.out.println("userinfo===="+user);
+        System.out.println("userinfo====" + user);
         String username = user.getUsername();
         String email = user.getEmail();
         String nickname = user.getNickname();
-        if(StrUtil.isBlank(username)||StrUtil.isBlank(email)||StrUtil.isBlank(nickname)){
+        if (StrUtil.isBlank(username) || StrUtil.isBlank(email) || StrUtil.isBlank(nickname)) {
             return Result.fail("用户有一个值是空的东西");
         }
         User byUsername = userMapper.selectByUsername(username);
-        if(byUsername!=null && !byUsername.getId().equals(user.getId())){
+        if (byUsername != null && !byUsername.getId().equals(user.getId())) {
             return Result.fail("用户名已经存在");
         }
         User byEmail = userMapper.selectByEmail(email);
-        if(byEmail!=null && !byEmail.getId().equals(user.getId())){
+        if (byEmail != null && !byEmail.getId().equals(user.getId())) {
             return Result.fail("邮箱已经存在");
         }
         int rows = userMapper.edit(user);
-        if(rows==0) {
+        if (rows == 0) {
             return Result.fail("userService.edit数据库更新失败");
         }
         log.info("用户ID: {} 的信息更新成功", user.getId());
@@ -268,13 +389,14 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
     /**
      * 刷新短token
-     * @param accessToken
+     *
+     * @param refreshToken
      * @param response
      * @return
      */
     @Override
     public Result refreshToken(String refreshToken, HttpServletResponse response) {
-        log.info("refreshToken={}",refreshToken);
+        log.info("refreshToken={}", refreshToken);
         Claims claims = null;
         try {
             claims = JwtUtil.parseToken(refreshToken);
@@ -282,14 +404,14 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         } catch (Exception e) {
             System.out.println(claims);
             System.out.println("长token过期了,token expired");
-            return Result.fail(401,"长token过期了,token expired");
+            return Result.fail(401, "长token过期了,token expired");
         }
         log.info("登录的账号为 : {}", claims.getId());
         Long id = Long.valueOf(claims.getSubject());
         System.out.println(id);
         User user = userMapper.getUserOneInfo(id);
-        if(user==null){
-            return Result.fail(401,"用户不存在,你竟然测试我");
+        if (user == null) {
+            return Result.fail(401, "用户不存在,你竟然测试我");
         }
         //更新双 token 回去
         String AccessToken = JwtUtil.createToken(String.valueOf(id));
@@ -304,17 +426,18 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
     /**
      * 获取用户的资料（只能自己获取）
+     *
      * @return
      */
     @Override
     public Result getUserInfo() {
         Long currentUserId = ThreadLocalUtil.getCurrentUserId();
-        if(currentUserId == 0) {
+        if (currentUserId == 0) {
             return Result.fail("id为空");
         }
         UserDTO user = userMapper.getUserInfo(currentUserId);
-        if(user==null){
-            return Result.fail("未查到id为"+currentUserId+"用户");
+        if (user == null) {
+            return Result.fail("未查到id为" + currentUserId + "用户");
         }
         return Result.ok(user);
     }
@@ -323,12 +446,12 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     public Result updateAvatar(MultipartFile avatar) throws IOException {
         Long currentUserId = ThreadLocalUtil.getCurrentUserId();
         String upload = aliOSSUtils.upload(avatar);
-        int i = userMapper.updateAvatar(upload,currentUserId);
-        if(i==0){
+        int i = userMapper.updateAvatar(upload, currentUserId);
+        if (i == 0) {
             throw new RuntimeException("未更新成功");
         }
-        log.info("用户头像url {}",upload);
+        log.info("用户头像url {}", upload);
         return Result.ok(upload);
     }
-    
+
 }
