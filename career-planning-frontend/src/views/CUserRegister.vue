@@ -105,7 +105,10 @@ onUnmounted(() => {
 })
 </script>
 
+<<<<<<<< HEAD:career-planning-frontend/src/components/CUserRegister.vue
+========
 
+>>>>>>>> b49329c (功能: 添加用户登录和注册视图，包含表单验证和通知功能):career-planning-frontend/src/views/CUserRegister.vue
 <template>
   <link href="https://fonts.googleapis.com/css?family=Lato:300,400,700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
@@ -206,6 +209,10 @@ onUnmounted(() => {
   </section>
 </template>
 
+<<<<<<<< HEAD:career-planning-frontend/src/components/CUserRegister.vue
+<style>
+@import '/public/css/style.css';
+========
 
 <style scoped>
 @import '/css/style.css';
@@ -294,6 +301,7 @@ h3.mb-4 {
   color: #201f1f;
   margin-bottom: 20px;
 }
+>>>>>>>> b49329c (功能: 添加用户登录和注册视图，包含表单验证和通知功能):career-planning-frontend/src/views/CUserRegister.vue
 
 /* 补充样式，确保发送验证码按钮与输入框对齐 */
 .d-flex.gap-2 {
