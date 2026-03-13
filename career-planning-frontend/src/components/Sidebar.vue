@@ -8,7 +8,8 @@ import {
   DataAnalysis,
   User,
   Menu as IconMenu,
-  TrendCharts
+  TrendCharts,
+  Setting
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
@@ -30,7 +31,8 @@ const menuItems = [
   { index: '/upload', icon: Document, text: '能力画像' },
   { index: '/match', icon: TrendCharts, text: '人岗匹配' },
   { index: '/report', icon: DataAnalysis, text: '生涯报告' },
-  { index: '/development', icon: User, text: '发展图谱' }
+  { index: '/development-map', icon: User, text: '发展图谱' },
+  { index: '/profile', icon: Setting, text: '个人中心' }
 ]
 </script>
 

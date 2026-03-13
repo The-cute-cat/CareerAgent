@@ -18,6 +18,8 @@
     "test:coverage": "vitest --coverage"
   },
   "dependencies": {
+    "@antv/x6": "^3.1.6",
+    "@antv/x6-vue-shape": "^3.0.2",
     "@element-plus/icons-vue": "^2.3.2",
     "@fortawesome/fontawesome-free": "^7.2.0",
     "axios": "^1.13.6",
@@ -31,6 +33,8 @@
     "pinia-plugin-persistedstate": "^4.7.1",
     "popper.js": "^1.16.1",
     "vue": "^3.5.29",
+    "vue-markdown": "^2.2.4",
+    "vue-markdown-render": "^2.3.0",
     "vue-router": "^4.6.4"
   },
   "devDependencies": {
