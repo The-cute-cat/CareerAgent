@@ -11,10 +11,12 @@ from pathlib import Path
 from typing import List, Optional, Any, Awaitable
 from docx import Document
 from langchain_core.output_parsers import StrOutputParser
+from langchain_core.messages import BaseMessage, SystemMessage, HumanMessage
 from ai_service.models.word import WordType
 from ai_service.utils.logger_handler import log
 from config import settings
-from tests.testAI import TestAI, TestPrompt
+from ai_service.engine.ai_engine import AIEngine
+from concurrent.futures import ThreadPoolExecutor
 
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 from docling.document_converter import DocumentConverter, FormatOption
@@ -25,18 +27,18 @@ from docling_core.types.doc.document import DoclingDocument
 from docling.pipeline.simple_pipeline import SimplePipeline
 
 
+__all__ = ["WordExtractor"]
+
 class WordExtractor:
     max_concurrent_requests: int = settings.llm.max_concurrent_requests  # 最大并发请求数
 
+    # 设置线程池，用于处理同步阻塞方法（如Docling的convert方法），避免阻塞事件循环，同时限制最大并发请求数以防止过载
+    _executor = ThreadPoolExecutor(max_workers=max_concurrent_requests)
+
+
     # 初始化大模型客户端
     def __init__(self):
-        self.llm = TestAI(
-            api_key=settings.llm.api_key.get_secret_value(),
-            base_url=settings.llm.base_url,
-            timeout=settings.llm.timeout,
-            max_retries=settings.llm.max_retries,
-            model=settings.pdf.model_name,
-        )
+        self.llm = AIEngine().pick_brain(settings.llm)
         self.output_parser = StrOutputParser()
 
         # 配置专门为 Word 优化的 Docling 转换器，确保能够处理 Word 文档中的复杂布局、表格和图片等内容，并且能够将表格精准转为 Markdown 格式以保留原有的格式信息
@@ -66,7 +68,8 @@ class WordExtractor:
 
     # 解析word文件(文字、图片转文字)，最后返回增强markdown格式的纯文本
     async def detect_word_to_enhance_text(
-        self, word: str | bytes, password: Optional[str] = None
+        self, word: str | bytes | Path,
+        password: Optional[str] = None
     ) -> Optional[str]:
         """
         解析word文件(文字、图片转文字),最后返回增强markdown格式的纯文本
@@ -88,6 +91,8 @@ class WordExtractor:
             # 1. 文件通用校验，检测是否为有效的Word文件
             if isinstance(word, str):
                 word_path = word
+            elif isinstance(word, Path):
+                word_path = str(word)
             else:
                 # 如果是字节数据，先保存到临时文件
                 with tempfile.NamedTemporaryFile(
@@ -106,7 +111,7 @@ class WordExtractor:
                 return None
 
             # 3. 通过word文件的魔数来判断word文件类型,目前只支持.docx/.dotx/.docm/.dotm的具体类型判断,其他类型需在之后补充
-            word_type = self._detect_word_type(word_path)
+            word_type = self.detect_word_type(word_path)
             if word_type == WordType.UNKNOWN:
                 log.error(f"无法识别的Word文件类型: {word_path}")
                 return None
@@ -114,7 +119,8 @@ class WordExtractor:
             log.info(f"检测到的Word文件类型: {word_type}")
 
             # 4. 使用 Docling 进行深度解析，Docling 会分析布局、表格和图片位置等信息，并按顺序提取文本和图片内容描述
-            conversation = self.docling_converter.convert(source=word_path)
+            loop = asyncio.get_event_loop()
+            conversation = await loop.run_in_executor(self._executor, self.docling_converter.convert, word_path)
             if conversation is None or conversation.status not in [
                 ConversionStatus.SUCCESS,
                 ConversionStatus.PARTIAL_SUCCESS,
@@ -337,7 +343,7 @@ class WordExtractor:
 
     # 通过word文件的魔数来判断word文件类型,目前只支持.docx/.dotx/.docm/.dotm的具体类型判断,其他类型需在之后补充
     @staticmethod
-    def _detect_word_type(word_path: str) -> WordType:
+    def detect_word_type(word_path: str) -> WordType:
         """
         通过word文件的魔数来判断word文件类型
         input:
@@ -542,11 +548,32 @@ class WordExtractor:
             # 将图片的二进制数据转化为base64字符串列表,以便传递给API
             image_data_base64 = base64.b64encode(image_data).decode("utf-8")
 
-            # 获取提示语
-            prompt = TestPrompt()
-            message = prompt.image_prompt(image_suffix, image_data_base64)
+            # 构造文件头信息,以便API正确识别图片格式
+            file_header = f"data:image/{image_suffix};base64,{image_data_base64}"
+            # 构造信息提示语,以便API正确理解任务需求
+            # --- 核心修复点：遵循 OpenAI Vision 标准格式 ---
+            message: List[BaseMessage] = [
+                HumanMessage(
+                    content=[
+                        {
+                            "type": "text",
+                            "text": "描述图片,要保留数据和格式.",
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": file_header
+                            },
+                        }
+                    ]
+                )
+            ]
+
             # 调用阿里云多模态API进行图片内容检测
-            response = await self.llm.run(message)
+            response = await self.llm \
+                .add_langchain_message(message) \
+                .next_step().next_step() \
+                .into_text().do()  # 获取文本输出结果
             if response is None:
                 log.error("调用阿里云多模态API检测图片内容失败: API返回了None")
                 return None
