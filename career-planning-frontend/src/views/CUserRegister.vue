@@ -105,6 +105,10 @@ onUnmounted(() => {
 })
 </script>
 
+<<<<<<<< HEAD:career-planning-frontend/src/components/CUserRegister.vue
+========
+
+>>>>>>>> b49329c (功能: 添加用户登录和注册视图，包含表单验证和通知功能):career-planning-frontend/src/views/CUserRegister.vue
 <template>
   <link href="https://fonts.googleapis.com/css?family=Lato:300,400,700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
@@ -113,7 +117,7 @@ onUnmounted(() => {
     <div class="container">
       <div class="row justify-content-center">
         <div class="col-md-6 text-center mb-5">
-          <h2 class="heading-section">职业规划</h2>
+          <h2 class="heading-section">职业规划AI智能体</h2>
         </div>
       </div>
       <div class="row justify-content-center">
@@ -205,27 +209,136 @@ onUnmounted(() => {
   </section>
 </template>
 
+<<<<<<<< HEAD:career-planning-frontend/src/components/CUserRegister.vue
 <style>
 @import '/public/css/style.css';
+========
+
+<style scoped>
+@import '/css/style.css';
+
+/* 全局居中布局 */
+.ftco-section {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  width: 100vw;
+  background: linear-gradient(135deg, #7b7474 0%, #b0b2b4 50%, #7b7d7e 100%);
+}
+
+.ftco-section .container {
+  width: 100% !important;
+  max-width: 1200px !important;
+  margin: 0 auto !important;
+  padding-left: 20px;
+  padding-right: 20px;
+}
+
+/* 增大的内容框 */
+.wrap {
+  min-height: 650px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+}
+
+.wrap .img,
+.wrap .login-wrap {
+  width: 50%;
+}
+
+.wrap .img {
+  min-height: 650px;
+}
+
+.wrap .login-wrap {
+  padding: 45px !important;
+}
+
+/* 表单元素增大 */
+.form-control {
+  height: 52px;
+  font-size: 15px;
+  padding: 10px 14px;
+}
+
+.form-group .label {
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+.form-group {
+  margin-bottom: 16px !important;
+}
+
+.btn-primary {
+  height: 52px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+h3.mb-4 {
+  font-size: 26px;
+  margin-bottom: 25px !important;
+}
+
+/* 响应式调整 */
+@media (max-width: 991.98px) {
+  .wrap .img,
+  .wrap .login-wrap {
+    width: 100%;
+  }
+  
+  .wrap .img {
+    min-height: 180px;
+    height: 180px;
+  }
+}
+
+.heading-section {
+  font-size: 30px;
+  font-weight: 600;
+  color: #201f1f;
+  margin-bottom: 20px;
+}
+>>>>>>>> b49329c (功能: 添加用户登录和注册视图，包含表单验证和通知功能):career-planning-frontend/src/views/CUserRegister.vue
 
 /* 补充样式，确保发送验证码按钮与输入框对齐 */
 .d-flex.gap-2 {
-  gap: 0.5rem !important;
+  gap: 12px !important;
 }
 
+/* 发送验证码按钮样式 */
 .btn-outline-secondary {
-  border-color: #ced4da;
-  color: #6c757d;
+  height: 52px !important;
+  padding: 0 16px;
+  background: transparent;
+  border: 1px solid #d1d5db !important;
+  border-radius: 10px;
+  color: #6b7280 !important;
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-.btn-outline-secondary:hover {
-  background-color: #e9ecef;
-  color: #343a40;
+.btn-outline-secondary:hover:not(:disabled) {
+  border-color: #9ca3af !important;
+  color: #4b5563 !important;
+  background: #f9fafb;
+}
+
+.btn-outline-secondary:disabled {
+  border-color: #e5e7eb !important;
+  color: #d1d5db !important;
+  cursor: not-allowed;
+  background: transparent;
 }
 
 /* 保持按钮与输入框高度一致 */
 .form-group .btn {
-  height: calc(1.5em + 0.75rem + 2px);
+  height: 52px;
   line-height: 1.5;
 }
 </style>

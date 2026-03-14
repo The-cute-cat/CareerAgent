@@ -2,6 +2,7 @@
 .idea/
 .vscode/
 .jbeval/
+node_modules/
 logs/
 data/
 temp/
