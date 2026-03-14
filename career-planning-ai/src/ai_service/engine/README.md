@@ -14,7 +14,12 @@
 - [高级用法](#高级用法)
 - [最佳实践](#最佳实践)
 - [设计原理](#设计原理)
+- [可扩展性](#可扩展性)
+- [性能优化](#性能优化)
+- [调试与排错](#调试与排错)
+- [快速参考卡片](#快速参考卡片)
 - [常见问题](#常见问题)
+- [更新日志](#更新日志)
 
 ---
 
@@ -947,6 +952,171 @@ def evolve(self, action_type: ActionType, data: Any) -> "AIState":
 
 ---
 
+## 可扩展性
+
+框架设计时充分考虑了扩展需求，以下是主要的扩展点：
+
+### 1. 添加新的模型提供商
+
+通过 LiteLLM 的统一接口，只需配置即可支持新模型：
+
+```python
+# config.py 中定义新的模型配置
+class LLM(BaseModel):
+    model_name: str      # 格式: "provider/model-name"
+    api_key: SecretStr
+    base_url: str
+    timeout: int = 60
+    max_retries: int = 3
+
+# 支持的提供商前缀
+# openai/      - OpenAI GPT 系列
+# azure/       - Azure OpenAI
+# anthropic/   - Claude 系列
+# qwen/        - 通义千问
+# deepseek/    - DeepSeek
+# gemini/      - Google Gemini
+# ollama/      - 本地 Ollama 模型
+# ... 更多见 LiteLLM 文档
+```
+
+### 2. 自定义 ActionType 扩展
+
+如需添加新的状态演化操作：
+
+```python
+# 1. 扩展 ActionType 枚举
+class ActionType(str, Enum):
+    # ... 现有类型 ...
+    ADD_AUDIO = "ADD_AUDIO"           # 新增：音频输入
+    ADD_TOOL_CALL = "ADD_TOOL_CALL"   # 新增：工具调用
+
+# 2. 在 AIState 中添加对应字段和处理逻辑
+class AIState(BaseModel):
+    # ... 现有字段 ...
+    audio_data: List[Dict[str, Any]] = Field(default_factory=list)
+    
+    # 更新映射关系
+    _MAP = {
+        # ... 现有映射 ...
+        ActionType.ADD_AUDIO: "audio_data",
+    }
+    
+    def _normalize_data(self, action_type: ActionType, data: Any) -> Any:
+        # ... 现有逻辑 ...
+        if action_type == ActionType.ADD_AUDIO:
+            return {"type": "audio_url", "audio_url": {"url": str(data)}}
+```
+
+### 3. 自定义输出格式
+
+可扩展 `ShapeStep` 支持新的输出类型：
+
+```python
+# 示例：添加 JSON 原始输出
+class ShapeStep(BaseStep):
+    def into_json(self) -> "JSONActionStep":
+        """返回原始 JSON 字符串"""
+        return JSONActionStep(self._state, self._engine)
+
+class JSONActionStep(BaseStep):
+    async def do(self) -> str:
+        kwargs = self._state.to_litellm_params()
+        kwargs["response_format"] = {"type": "json_object"}
+        response = await self._engine.text_client(**kwargs)
+        return response.choices[0].message.content
+```
+
+### 4. 自定义消息编译器
+
+如需修改消息组装逻辑，可重写 `_compile_messages`：
+
+```python
+class AIState(BaseModel):
+    # ... 
+    
+    def _compile_messages(self) -> List[Dict[str, Any]]:
+        """自定义消息编译逻辑"""
+        messages = []
+        
+        # 示例：添加自定义 System Prompt 格式
+        if self.system_role:
+            messages.append({
+                "role": "system",
+                "content": f"[SYSTEM]\n{self.system_role}\n[/SYSTEM]"
+            })
+        
+        # ... 其他自定义逻辑 ...
+        return messages
+```
+
+### 5. 中间件/钩子机制
+
+可通过继承实现请求拦截和后处理：
+
+```python
+class AIEngine:
+    async def _pre_call(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """调用前钩子：可用于日志、监控、参数修改"""
+        log.info(f"Calling model: {params['model']}")
+        return params
+    
+    async def _post_call(self, result: Any, params: Dict[str, Any]) -> Any:
+        """调用后钩子：可用于结果缓存、格式转换"""
+        return result
+
+# 使用装饰器模式扩展
+class CachedAIEngine(AIEngine):
+    def __init__(self, cache_client):
+        super().__init__()
+        self.cache = cache_client
+    
+    async def _pre_call(self, params):
+        # 检查缓存
+        cache_key = self._make_cache_key(params)
+        cached = await self.cache.get(cache_key)
+        if cached:
+            return None  # 标记命中缓存
+        return params
+```
+
+### 6. 领域特化封装
+
+针对特定业务场景封装高层 API：
+
+```python
+class DocumentAnalysisEngine(AIEngine):
+    """文档分析特化引擎"""
+    
+    async def extract_entities(self, text: str) -> EntityList:
+        """实体提取"""
+        return await (
+            self.pick_brain(self._get_model())
+            .set_system_role("你是一个专业的实体识别专家")
+            .add_instruction("从文本中提取所有实体")
+            .add_text(text)
+            .next_step()
+            .next_step()
+            .into_struct(EntityList)
+            .do()
+        )
+    
+    async def summarize(self, text: str, max_length: int = 200) -> str:
+        """文档摘要"""
+        return await (
+            self.pick_brain(self._get_model())
+            .set_system_role("你是一个专业的文档摘要专家")
+            .add_instruction(f"生成不超过 {max_length} 字的摘要")
+            .add_text(text)
+            .next_step()
+            .next_step()
+            .into_text()
+            .do()
+        )
+```
+
+---
+
 ## 常见问题
 
 ### Q1: 为什么必须调用 `next_step()`？
@@ -1005,6 +1175,239 @@ except Exception as e:
 
 ---
 
+## 性能优化
+
+### 并发控制
+
+在处理大量请求时，需要控制并发数以避免 API 限流：
+
+```python
+import asyncio
+from typing import List
+
+async def batch_process(items: List[str], max_concurrency: int = 5):
+    """并发处理多个请求"""
+    semaphore = asyncio.Semaphore(max_concurrency)
+    
+    async def process_one(item: str):
+        async with semaphore:
+            return await (
+                engine.pick_brain(model)
+                .add_text(item)
+                .next_step()
+                .next_step()
+                .into_text()
+                .do()
+            )
+    
+    return await asyncio.gather(*[process_one(item) for item in items])
+
+# 使用示例
+results = await batch_process(data_list, max_concurrency=3)
+```
+
+### 连接复用
+
+`AIEngine` 实例可以复用，避免重复初始化开销：
+
+```python
+# ✅ 推荐：单例复用
+engine = AIEngine()  # 应用启动时创建一次
+
+async def handle_request(text: str):
+    return await engine.pick_brain(model).add_text(text)...
+
+# ❌ 不推荐：每次请求都创建新实例
+async def handle_request(text: str):
+    engine = AIEngine()  # 造成不必要的开销
+    return await engine.pick_brain(model)...
+```
+
+### 流式输出性能
+
+对于长文本生成，优先使用流式输出：
+
+```python
+# 流式输出可以提前开始响应，改善用户体验
+async def generate_long_content(prompt: str):
+    async for chunk in (
+        engine.pick_brain(model)
+        .add_text(prompt)
+        .next_step()
+        .next_step()
+        .into_text()
+        .stream()
+    ):
+        yield chunk  # 边生成边返回，减少首字延迟
+```
+
+### 缓存策略
+
+对于重复查询，建议在业务层实现缓存：
+
+```python
+from functools import lru_cache
+import hashlib
+
+def make_cache_key(prompt: str, model: str) -> str:
+    return hashlib.md5(f"{model}:{prompt}".encode()).hexdigest()
+
+class CachedEngine:
+    def __init__(self, engine: AIEngine, cache_ttl: int = 3600):
+        self.engine = engine
+        self.cache = {}  # 实际项目中使用 Redis 等
+        self.cache_ttl = cache_ttl
+    
+    async def get_or_compute(self, prompt: str, model) -> str:
+        key = make_cache_key(prompt, str(model))
+        if key in self.cache:
+            return self.cache[key]
+        
+        result = await (
+            self.engine.pick_brain(model)
+            .add_text(prompt)
+            .next_step().next_step().into_text().do()
+        )
+        self.cache[key] = result
+        return result
+```
+
+---
+
+## 调试与排错
+
+### 日志配置
+
+框架使用内置日志模块记录关键操作：
+
+```python
+from ai_service.utils.logger_handler import log
+
+# 日志级别配置（在应用启动时设置）
+import logging
+logging.getLogger("ai_service").setLevel(logging.DEBUG)
+
+# 日志输出示例
+# [INFO] 结构化提取开始: Schema=PersonModel
+# [ERROR] 结构化提取失败[PersonModel]: API rate limit exceeded
+```
+
+### 常见错误排查
+
+| 错误信息 | 可能原因 | 解决方案 |
+|----------|----------|----------|
+| `必须指定一个有效的模型名称` | 未传入模型配置 | 检查 `pick_brain()` 参数 |
+| `必须至少注入 指令、数据 或 历史记录 中的一项` | InputStep 为空 | 添加 `add_text()` 或 `add_instruction()` |
+| `模型配置不存在` | model 属性为 None | 检查 LLM 配置是否正确加载 |
+| `API rate limit exceeded` | 触发 API 限流 | 降低并发数、增加重试间隔 |
+| `结构化提取失败` | 输出格式不匹配 | 检查 Schema 定义、降低 temperature |
+
+### 调试技巧
+
+```python
+# 1. 查看编译后的消息内容
+state = AIState(model=model)
+state = state.evolve(ActionType.ADD_TEXT, "测试")
+messages = state._compile_messages()
+print(messages)  # 查看最终发送给 LLM 的消息
+
+# 2. 查看 LiteLLM 参数
+params = state.to_litellm_params()
+print(params)  # 查看实际调用参数
+
+# 3. 捕获完整错误栈
+import traceback
+try:
+    result = await pipeline.into_struct(Schema).do()
+except Exception as e:
+    traceback.print_exc()  # 打印完整错误信息
+```
+
+### 使用 LiteLLM 调试模式
+
+```python
+import litellm
+
+# 开启 LiteLLM 调试日志
+litellm.set_verbose = True
+
+# 查看完整的 API 请求和响应
+```
+
+---
+
+## 快速参考卡片
+
+### 基础模板
+
+```python
+# 文本生成
+result = await (
+    AIEngine().pick_brain(model)
+    .set_system_role("角色")
+    .add_instruction("指令")
+    .add_text("数据")
+    .next_step().next_step().into_text().do()
+)
+
+# 结构化输出
+result = await (
+    AIEngine().pick_brain(model)
+    .add_text("数据")
+    .next_step().next_step().into_struct(Schema).do()
+)
+
+# 流式输出
+async for chunk in (
+    AIEngine().pick_brain(model)
+    .add_text("数据")
+    .next_step().next_step().into_text().stream()
+):
+    print(chunk, end="")
+```
+
+### 阶段速查
+
+```python
+# Stage 1: Compute
+.pick_brain(model, model_fallbacks=[...])
+
+# Stage 2: Ingestion
+.set_system_role("...")      # 身份
+.add_instruction("...")       # 指令
+.add_context("...")           # 上下文
+.add_example(in_, out)        # 示例
+.add_text("...")              # 文本数据
+.add_image_url("...")         # 图像数据
+.set_history([...])           # 对话历史
+.next_step()
+
+# Stage 3: Alignment (可选)
+.set_llm_params(temperature=0.1, max_tokens=500)
+.with_metadata(request_id="...")
+.next_step()
+
+# Stage 4: Projection
+.into_struct(Schema)          # 结构化
+.into_text()                  # 文本
+
+# Stage 5: Evaluation
+.do()                         # 执行
+.stream()                     # 流式（仅文本）
+```
+
+### 温度参数速查
+
+```
+结构化提取 → temperature=0.0~0.2
+分类任务    → temperature=0.0~0.1
+RAG 问答    → temperature=0.1~0.3
+翻译任务    → temperature=0.2~0.4
+创意写作    → temperature=0.7~1.0
+```
+
+---
+
 ## 更新日志
 
 ### v1.0.0 (2024-01)
@@ -1016,17 +1419,3 @@ except Exception as e:
 - 支持流式输出
 
 ---
-
-## 贡献指南
-
-欢迎提交 Issue 和 Pull Request。在提交代码前，请确保：
-
-1. 通过所有单元测试
-2. 新增代码有完整的类型注解
-3. 新增功能有对应的文档说明
-
----
-
-## 许可证
-
-MIT License
