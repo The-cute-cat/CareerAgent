@@ -909,3 +909,21 @@ h1, h2, h3, h4, h5,
   background: #e3b04b;
   color: #fff;
 }
+
+
+/* 修复图片显示 */
+.wrap .img {
+  min-height: 300px;                /* 确保容器至少有一定高度 */
+  background-size: cover;            /* 背景图片覆盖整个容器 */
+  background-position: center;       /* 背景居中 */
+  background-repeat: no-repeat;      /* 防止重复 */
+}
+
+
+/* 移动端适配（保持原有 250px 高度，并覆盖背景设置） */
+@media (max-width: 767.98px) {
+  .wrap .img {
+    height: 250px;                   /* 覆盖 min-height，保持原有响应式 */
+    min-height: auto;
+  }
+}

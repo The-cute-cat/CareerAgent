@@ -37,6 +37,8 @@ async function fetchPage(url) {
     return cheerio.load(html);
 }
 
+const html_url = fs.existsSync('./temp/csv/url.txt') ? fs.readFileSync('./temp/csv/url.txt', 'utf8').split('\n') : [];
+const fail_url = [];
 
 async function get_data(url) {
     const allData = [];
@@ -46,6 +48,7 @@ async function get_data(url) {
         $doc = await fetchPage(url);
     } catch (e) {
         console.error(e, "url:" + url);
+        fail_url.push(url);
         return {
             data: [],
             job_id: ""
@@ -61,12 +64,13 @@ async function get_data(url) {
         }
     });
     for (const url of urls) {
-        await delay(1000, 2000);
+        await delay(600, 1000);
         let $$doc;
         try {
             $$doc = await fetchPage(url);
         } catch (e) {
             console.error(e, "url:" + url);
+            fail_url.push(url);
             continue;
         }
         const links = [];
@@ -77,12 +81,17 @@ async function get_data(url) {
             }
         });
         for (const link of links) {
-            await delay(800, 1500);
+            if (html_url.includes(link)) {
+                continue;
+            }
+            html_url.push(link);
+            await delay(800, 1200);
             let $$$doc;
             try {
                 $$$doc = await fetchPage(link);
             } catch (e) {
                 console.error(e, "url:" + link);
+                fail_url.push(link);
                 continue;
             }
             const itemData = parse_content($$$doc);
@@ -181,9 +190,10 @@ function parse_content($doc) {
     return result;
 }
 
-function saveToCSV(data, filepath = 'temp') {
+function saveToCSV(data, filepath = 'temp/csv') {
     const csv = convertToCSV(data["data"]);
-    const filename = `${data["job_id"]}-${new Date().getTime()}.csv`;
+    const safeJobId = data["job_id"].replace(/[\/\\:*?"<>|]/g, '-');
+    const filename = `${safeJobId}-${new Date().getTime()}.csv`;
     if (!fs.existsSync(filepath)) {
         fs.mkdirSync(filepath);
     }
@@ -198,9 +208,46 @@ const list = ["kw01500O80EO062", "kw00N00JG08K058", "kw011G08O",
     "kwBL652PAV1U7MUJNMBS057K8", "kwG4D6EB2V019T2", "kwIS06OGII0PJP0NF5F85LS20", "kwI56NURJRK5Q0C",
     "kwFJTNTNSMOPH10", "kw9Q8ON8BRIS", "kwHFMPFSO05U4SD64H00NLDVIVC9FG0KUH", "kw012G0KG0A1H80PPF00NLT53L50",
     "kw01400L009K04O01L"
+    /*]
+    const list1 = [*/
+    , "kw01500O80EO06202J01HG0SG0D407003K", "kwA96NLRQV019T2", "kw010G0RG0CG07403F01KG0P0",
+    "kw01KG0JO0AC", "kw01AG0CO08G", "kw01AG0H806G", "kw011G0JO08C04U02J00P00H00B0", "kwBG7MSE321TFG0KUH",
+    "kwBUN4VOAV019T2", "kwBG7NK2QUHTFG0KUH", "kwF7TL5A2V019T2", "kwJOVO96AV019T2NF5F85LS20",
+    "kwCLO66RJ32PHPG", "kwCLO66RIV019T2", "kwCLO66RKHOUBCC", "kwCLO66RIEQDF96", "kwCLO66RIUIDFG0KUH",
+    "kwCLO66RJ7MPJO8NG8", "kw012G0L009HEUAUGBBO40", "kw01100I8", "kwE8M8CQO", "kwCLO66RII0PJP0NG8",
+    "kwI78OF3B5E1HMSKG6CU80", "kw9OQ5T2J5E1HMSKG6CU80"
+    /*]
+    const list2 = [*/
+    , "kwCST5CQ49OQ4SI", "kwARV51JSBOP92M", "kwG7L72DKBTM500M84EG30", "kwHFMPFSSBOP92M", "kwCST5CQ2EN9TPER6L",
+    "kwBFU84AJRITMDA", "kwCST5CQ2RCP760", "kwDNOLT9IRCP760", "kwCEK86K3RITMDA", "kwCGE7Q8JRITMDA",
+    "kwAF6MMEKBP002V66ECEJNN5RCQK", "kwFEBMPLATSLT0MNG8", "kwCPT81VCQFQD7CV7RFRFLRPBQ1DF0G",
+    "kwCUR6F12U10", "kwF0A57KBUPTQ0C", "kw014G0L32G1JIU01FF0A57KB07DRD2", "kw011G0L009S", "kw011G0I809S",
+    "kwHTNKTTJD9E5TA", "kwAAFO1VBD9E5TA", "kwG7L55A2J2PMKN2UL", "kwDL5ONLAV019T2", "kwC0JO1VBD9E5TA", "kwF7TL5A3QTTMKN2UL"
+    /*]
+    const list3 = [*/
+    , "kwDOBP03RD9E5TA", "kwDOS643RD9E5TA", "kwF1M4TTJD9E5TA", "kwI0D4VOBD9E5TA", "kwCNG4TEJ779VC9265DL5ONL8",
+    "kwDL5ONLATSLT0MNG8", "kwDL5ONLBUPTQ0C", "kwHV87TT2TSLT0MNG8", "kwHV87TT2V019T2NF5F85LS20", "kwHV87TT307DRD2",
+    "kwFJTNTNQTSLT0MNG8", "kwFT8NTN2TSLT0MNG8", "kwFT8NTN4FQ1VF8", "kwFT8NTN2FS5G6UMS9A5K5RPBQ1DF0G", "kwFJTNTNQRH58MG",
+    "kwFJTNTNRRK5Q0CL2O", "kwFT8KU62TSLT0MNG8", "kw01200GG084", "kw01400P80DG07003401IG0SO0DC", "kw012G0KG0A1DPSPDTJ1V9BRG",
+    "kw014G0L32G1JIUP9FCC0G", "kw014G0L4D528SUUT1EG30", "kw9VGM0RR2G1JIUJGJAHC0", "kw9VGM0RR2G1JIUVMFEG300BQE7DTQ2"
+    /*]
+    const list4 = [*/
+    , "kwD03L3HIJ2PEUAUGBBO40", "kwEEO5EEIUIHQIGNF5F85LS27V1004C021012VU28", "kwHEV5I1RUUHHA8NF5F85LS20",
+    "kwHEGNN5R779S6OJNMFRQ6592TSLT0MNG8", "kwAKN583J2G1JIUP9FCC0G", "kwAKN54JB2G1JIUP9FCC0G", "kwH7HL3CR5N5K4GNF5F85LS20",
+    "kwCA06EBR55THG2NF5F85LS20", "kwBEF6BFCOFQAUS", "kwBEF6BFATSLT0MNG8"
 ]
 for (const item of list) {
     const data = await get_data(`https://www.zhaopin.com/sou/jl489/${item}`);
-    saveToCSV(data)
+    try {
+        saveToCSV(data)
+    } catch (e) {
+        fs.writeFileSync(`temp/csv/${item}.json`, JSON.stringify(data, null, 2), 'utf-8');
+        console.error(e, "保存失败");
+    }
 }
+if (!fs.existsSync("temp/csv")) {
+    fs.mkdirSync("temp/csv");
+}
+fs.writeFileSync(`temp/csv/fail_url.txt`, fail_url.join("\n"), 'utf-8');
+fs.writeFileSync(`temp/csv/url.txt`, html_url.join("\n"), 'utf-8');
 
