@@ -1745,13 +1745,100 @@ RAG 问答    → temperature=0.1~0.3
 
 ## 更新日志
 
-### v1.0.0 (2024-01)
+### 并发控制
 
-- 初始版本发布
-- 支持五阶段流水线架构
-- 支持结构化输出和文本输出
-- 支持多模态输入
-- 支持流式输出
+在处理大量请求时，需要控制并发数以避免 API 限流：
+
+```python
+import asyncio
+from typing import List
+
+async def batch_process(items: List[str], max_concurrency: int = 5):
+    """并发处理多个请求"""
+    semaphore = asyncio.Semaphore(max_concurrency)
+    
+    async def process_one(item: str):
+        async with semaphore:
+            return await (
+                engine.pick_brain(model)
+                .add_text(item)
+                .next_step()
+                .next_step()
+                .into_text()
+                .do()
+            )
+    
+    return await asyncio.gather(*[process_one(item) for item in items])
+
+# 使用示例
+results = await batch_process(data_list, max_concurrency=3)
+```
+
+### 连接复用
+
+`AIEngine` 实例可以复用，避免重复初始化开销：
+
+```python
+# ✅ 推荐：单例复用
+engine = AIEngine()  # 应用启动时创建一次
+
+async def handle_request(text: str):
+    return await engine.pick_brain(model).add_text(text)...
+
+# ❌ 不推荐：每次请求都创建新实例
+async def handle_request(text: str):
+    engine = AIEngine()  # 造成不必要的开销
+    return await engine.pick_brain(model)...
+```
+
+### 流式输出性能
+
+对于长文本生成，优先使用流式输出：
+
+```python
+# 流式输出可以提前开始响应，改善用户体验
+async def generate_long_content(prompt: str):
+    async for chunk in (
+        engine.pick_brain(model)
+        .add_text(prompt)
+        .next_step()
+        .next_step()
+        .into_text()
+        .stream()
+    ):
+        yield chunk  # 边生成边返回，减少首字延迟
+```
+
+### 缓存策略
+
+对于重复查询，建议在业务层实现缓存：
+
+```python
+from functools import lru_cache
+import hashlib
+
+def make_cache_key(prompt: str, model: str) -> str:
+    return hashlib.md5(f"{model}:{prompt}".encode()).hexdigest()
+
+class CachedEngine:
+    def __init__(self, engine: AIEngine, cache_ttl: int = 3600):
+        self.engine = engine
+        self.cache = {}  # 实际项目中使用 Redis 等
+        self.cache_ttl = cache_ttl
+    
+    async def get_or_compute(self, prompt: str, model) -> str:
+        key = make_cache_key(prompt, str(model))
+        if key in self.cache:
+            return self.cache[key]
+        
+        result = await (
+            self.engine.pick_brain(model)
+            .add_text(prompt)
+            .next_step().next_step().into_text().do()
+        )
+        self.cache[key] = result
+        return result
+```
 
 ---
 
