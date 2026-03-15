@@ -4,16 +4,16 @@
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.backend.careerplanningbackend.mapper.UserMapper">
     <insert id="register">
-        INSERT INTO user (username, password, email)
+        INSERT INTO user_stu (username, password, email)
         VALUES (#{username}, #{password}, #{email})
     </insert>
     <update id="forget">
-        update user
+        update user_stu
         set password=#{password}
         where username=#{username} and email=#{email}
     </update>
     <update id="edit">
-        update user
+        update user_stu
         <set>
             <if test="username != null">username = #{username},</if>
             <if test="nickname != null">nickname = #{nickname},</if>
@@ -34,22 +34,22 @@
     
     <select id="selectByUsername" resultType="com.backend.careerplanningbackend.domain.po.User">
         SELECT id, username, password, nickname, avatar, info, email, status
-        FROM user
+        FROM user_stu
         WHERE username = #{username}
     </select>
     <select id="selectByEmail" resultType="com.backend.careerplanningbackend.domain.po.User">
         SELECT id, username, password, nickname, avatar, email, status
-        FROM user
+        FROM user_stu
         WHERE email = #{email}
     </select>
     <select id="getUserOneInfo" resultType="com.backend.careerplanningbackend.domain.po.User">
         select id, username
-        from user
+        from user_stu
         where id = #{id}
     </select>
     <select id="getUserInfo" resultType="com.backend.careerplanningbackend.domain.dto.UserDTO">
         select id, username, nickname, email, avatar
-        from user
+        from user_stu
         where id = #{id}
     </select>
     <!--    <update id="edit">-->

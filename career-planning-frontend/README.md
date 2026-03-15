@@ -53,5 +53,5 @@ npm install element-plus
 npm install pinia
 npm install pinia-plugin-persistedstate
 npm install vite-plugin-mkcert --save-dev
-
+npm install vue-markdown-render markdown-it
 ```
