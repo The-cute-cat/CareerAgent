@@ -10,7 +10,9 @@ from ai_service.routers import parse
 
 app = FastAPI()
 
-app.include_router(parse.router)
+app.include_router(
+    parse.router
+)
 
 @app.exception_handler(ApiException)
 async def api_exception_handler(_: Request, exc: ApiException):

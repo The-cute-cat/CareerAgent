@@ -24,51 +24,31 @@ public class JwtUtil {
         Map<String, Object> claims =new HashMap<>();
         claims.put("createToken","createToken");
         claims.put("id",id);
-        JwtBuilder jwtBuilder = Jwts.builder();
-
-        return jwtBuilder
-                //头部
-                .setClaims(claims)
-                .setHeaderParam("typ", "jwp")
-                .setHeaderParam("alg", "HS256")
-                //载荷
-                .setId(UUID.randomUUID().toString())
-                .setSubject(id)
-                .setIssuedAt(new Date())//签发时间
-                .setExpiration(new Date(System.currentTimeMillis() + ACCESS_TOKEN_EXPIRE))//截止时间
-                //签名
+        return  Jwts.builder()
+                .header().type("JWT").and()
+                .header().keyId(UUID.randomUUID().toString()).and()
+                .expiration(new Date(System.currentTimeMillis() + ACCESS_TOKEN_EXPIRE))
+                .claims(claims)
                 .signWith(secret)
                 .compact();
     }
-    //只携带基础信息
     public static String createRefreshToken(String id) {
         Map<String, Object> claims =new HashMap<>();
         claims.put("createToken","createToken");
         claims.put("id",id);
         claims.put("reason","i don't know");
-        JwtBuilder jwtBuilder = Jwts.builder();
-        return jwtBuilder
-                //头部
-                .setClaims(claims)
-                .setHeaderParam("typ", "jwp")
-                .setHeaderParam("alg", "HS256")
-                //载荷
-                .setId(UUID.randomUUID().toString())
-                .setSubject(id)//主题
-                .setIssuedAt(new Date())//签发时间
-                .setExpiration(new Date(System.currentTimeMillis() + REFRESH_TOKEN_EXPIRE))//截止时间
-                //签名
+        return Jwts.builder()
+                .header().type("JWT").and()
+                .header().keyId(UUID.randomUUID().toString()).and()
+                .expiration(new Date(System.currentTimeMillis() + REFRESH_TOKEN_EXPIRE))
+                .claims(claims)
                 .signWith(secret)
                 .compact();
     }
 
     // 解析Token
     public static Claims parseToken(String jwtToken) {
-        return Jwts.parserBuilder()
-                .setSigningKey(secret)
-                .build()
-                .parseClaimsJws(jwtToken)
-                .getBody();
+        return Jwts.parser().verifyWith(secret).build().parseSignedClaims(jwtToken).getPayload();
     }
     // 验证Token是否过期
     //判断现在的时间

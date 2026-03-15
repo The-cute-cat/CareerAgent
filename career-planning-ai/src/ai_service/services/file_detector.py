@@ -240,6 +240,7 @@ class FileDetector:
         """
         try:
             file_info = self.get_file_info(filepath)
+            log.info(f"文件信息: {file_info}")
             return file_info["extension"] in DANGEROUS_EXTENSIONS, file_info
         except Exception as e:
             log.warning(f"is_dangerous_file error: {e}")
@@ -270,6 +271,7 @@ class FileDetector:
         """
         try:
             file_info = self.get_file_info(filepath)
+            log.info(f"文件信息: {file_info}")
             return file_info["extension"] in SAFE_EXTENSIONS, file_info
         except Exception as e:
             log.warning(f"is_safe_file error: {e}")
@@ -289,5 +291,5 @@ class FileDetectorError(Exception):
 file_detector = FileDetector()
 
 if __name__ == '__main__':
-    test_file_path = abs_path("./main.py")
+    test_file_path = r"C:\Users\The_cute_cat\Desktop\CareerAgent\第十七届中国大学生服务外包创新创业大赛A13赛题.pdf"
     print(file_detector.get_file_info(test_file_path))
