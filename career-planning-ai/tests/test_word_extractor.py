@@ -15,121 +15,52 @@ TEST_DOC_PATH = Path(__file__).parent / "关于向量数据库的选择.docx"
 
 def test_detect_word_to_enhance_text():
     """
-    测试detect_word_to_enhance_text函数是否能正常运行（包含详细步骤输出）
+    测试detect_word_to_enhance_text完整流程（直接调用主方法）
     测试用例：tests目录下的"关于向量数据库的选择.docx"
     """
-    # 获取测试文档路径
     test_file_path = TEST_DOC_PATH
 
     print(f"\n测试文件路径: {test_file_path}")
     print(f"文件是否存在: {test_file_path.exists()}")
 
-    # 测试文件是否存在
     if not test_file_path.exists():
         print("❌ 错误：测试文件不存在！")
         return False
 
-    # 步骤1: 检测文件类型
     print("\n" + "=" * 60)
-    print("步骤1: 检测文件类型")
+    print("调用 detect_word_to_enhance_text 完整流程")
     print("=" * 60)
+
     try:
-        word_type = WordExtractor._detect_word_type(str(test_file_path))
-        print(f"✅ 文件类型: {word_type}")
+        # 直接调用完整的文档处理方法
+        extractor = WordExtractor()
+        result = asyncio.run(extractor.detect_word_to_enhance_text(str(test_file_path)))
+
+        if result is None:
+            print("❌ 错误：提取结果为None！")
+            return False
+
+        print(f"✅ 文档处理成功")
+        print(f"✅ 提取内容长度: {len(result)} 字符")
+
+        print("\n" + "=" * 60)
+        print("提取内容预览（前500字符）")
+        print("=" * 60)
+        print(result[:500])
+        print("=" * 60)
+
+        # 保存完整结果到文件
+        output_path = Path(__file__).parent / "test_output.txt"
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write(result)
+        print(f"\n✅ 完整提取内容已保存到: {output_path}")
+
+        return True
+
     except Exception as e:
-        print(f"❌ 文件类型检测失败: {e}")
+        print(f"❌ 文档处理失败: {e}")
+        log.error(f"文档处理异常: {e}", exc_info=True)
         return False
-
-    # 步骤2: 提取文本内容
-    print("\n" + "=" * 60)
-    print("步骤2: 提取文本内容")
-    print("=" * 60)
-    try:
-        texts = WordExtractor._extract_text(str(test_file_path), word_type)
-        print(f"✅ 提取到 {len(texts)} 个段落")
-        if texts:
-            print(f"   首段预览: {texts[0][:50]}...")
-    except Exception as e:
-        print(f"❌ 文本提取失败: {e}")
-        log.error(f"文本提取异常: {e}", exc_info=True)
-        return False
-
-    # 步骤3: 提取图片
-    print("\n" + "=" * 60)
-    print("步骤3: 提取图片")
-    print("=" * 60)
-    try:
-        images = WordExtractor._extract_images_bytes(str(test_file_path), word_type)
-        print(f"✅ 提取到 {len(images)} 张图片")
-        for i, (img_bytes, suffix) in enumerate(images):
-            print(f"   图片{i+1}: {len(img_bytes)} 字节, 格式: {suffix}")
-    except Exception as e:
-        print(f"❌ 图片提取失败: {e}")
-        log.error(f"图片提取异常: {e}", exc_info=True)
-        return False
-
-    # 步骤4: 调用阿里云API识别图片中的文字
-    print("\n" + "=" * 60)
-    print("步骤4: 调用阿里云API识别图片中的文字")
-    print("=" * 60)
-    try:
-        if len(images) == 0:
-            print("ℹ️  文档中没有图片，跳过图片识别步骤")
-            descriptions = []
-        else:
-            print(f"开始调用API识别 {len(images)} 张图片...")
-            extractor = WordExtractor()
-            descriptions = []
-            for img_bytes, suffix in images:
-                desc = asyncio.run(extractor._detect_images(img_bytes, suffix))
-                if desc:
-                    descriptions.append(desc)
-            print(f"✅ 成功识别 {len(descriptions)} 张图片")
-            for i, desc in enumerate(descriptions):
-                print(f"   图片{i+1}识别结果预览: {desc[:80]}...")
-    except Exception as e:
-        print(f"❌ 阿里云API调用失败: {e}")
-        log.error(f"API调用异常: {e}", exc_info=True)
-        print("\n详细错误信息:")
-        print(f"  错误类型: {type(e).__name__}")
-        print(f"  错误消息: {str(e)}")
-        # 即使API调用失败，我们也可以继续，只是没有图片识别结果
-        descriptions = []
-
-    # 步骤5: 合并文本和图片识别结果
-    print("\n" + "=" * 60)
-    print("步骤5: 合并文本和图片识别结果")
-    print("=" * 60)
-    try:
-        combined_texts = texts + descriptions
-        print(
-            f"✅ 合并完成: {len(texts)} 段文本 + " f"{len(descriptions)} 张图片识别结果"
-        )
-        result = WordExtractor.list_to_string(combined_texts)
-        print(f"✅ 最终文本长度: {len(result)} 字符")
-    except Exception as e:
-        print(f"❌ 合并失败: {e}")
-        log.error(f"合并异常: {e}", exc_info=True)
-        return False
-
-    # 检查结果
-    if result is None:
-        print("❌ 错误：提取结果为None！")
-        return False
-
-    print("\n" + "=" * 60)
-    print("提取内容预览（前500字符）")
-    print("=" * 60)
-    print(result[:500])
-    print("=" * 60)
-
-    # 保存完整结果到文件
-    output_path = Path(__file__).parent / "test_output.txt"
-    with open(output_path, "w", encoding="utf-8") as f:
-        f.write(result)
-    print(f"\n✅ 完整提取内容已保存到: {output_path}")
-
-    return True
 
 
 def test_word_type_detection():
@@ -143,7 +74,7 @@ def test_word_type_detection():
         return False
 
     print("\n检测Word文档类型...")
-    word_type = WordExtractor._detect_word_type(str(test_file_path))
+    word_type = WordExtractor.detect_word_type(str(test_file_path))
 
     print(f"✅ 文档类型: {word_type}")
     return True
@@ -168,7 +99,8 @@ def test_has_images():
 
 def test_extract_text():
     """
-    测试文本提取功能
+    测试文本提取功能（已弃用方法 - 仅用于向后兼容测试）
+    注意：_extract_text 已弃用，推荐使用 detect_word_to_enhance_text
     """
     test_file_path = TEST_DOC_PATH
 
@@ -176,13 +108,14 @@ def test_extract_text():
         print("❌ 错误：测试文件不存在！")
         return False
 
-    print("\n提取文档文本...")
-    word_type = WordExtractor._detect_word_type(str(test_file_path))
+    print("\n⚠️  测试已弃用的 _extract_text 方法...")
+    word_type = WordExtractor.detect_word_type(str(test_file_path))
     texts = WordExtractor._extract_text(str(test_file_path), word_type)
 
     print(f"✅ 提取到 {len(texts)} 个段落")
     if texts:
         print(f"第一个段落预览: {texts[0][:100]}...")
+    print("ℹ️  提示：此方法已弃用，请使用 detect_word_to_enhance_text")
     return True
 
 
@@ -197,7 +130,7 @@ def test_extract_images():
         return False
 
     print("\n提取文档图片...")
-    word_type = WordExtractor._detect_word_type(str(test_file_path))
+    word_type = WordExtractor.detect_word_type(str(test_file_path))
     images = WordExtractor._extract_images_bytes(str(test_file_path), word_type)
 
     print(f"✅ 提取到 {len(images)} 张图片")
@@ -276,7 +209,7 @@ def test_detect_images_api():
     # 提取图片
     print("\n1. 提取图片...")
     try:
-        word_type = WordExtractor._detect_word_type(str(test_file_path))
+        word_type = WordExtractor.detect_word_type(str(test_file_path))
         images = WordExtractor._extract_images_bytes(str(test_file_path), word_type)
         print(f"✅ 提取到 {len(images)} 张图片")
 
@@ -298,14 +231,15 @@ def test_detect_images_api():
         print(f"❌ 图片提取失败: {e}")
         log.error(f"图片提取异常: {e}", exc_info=True)
         return False
-
+    
+    from config import settings
     # 初始化WordExtractor
     print("\n2. 初始化WordExtractor和AI服务...")
     try:
         extractor = WordExtractor()
         print("✅ 初始化成功")
-        print(f"   模型名称: {extractor.llm.model}")
-        print(f"   API URL: {extractor.llm.base_url}")
+        print(f"   模型名称: {settings.llm.model_name}")
+        print(f"   API URL: {settings.llm.base_url}")
     except Exception as e:
         print(f"❌ 初始化失败: {e}")
         log.error(f"初始化异常: {e}", exc_info=True)
@@ -356,11 +290,11 @@ def run_all_tests():
         ("魔数获取测试", test_magic_number),
         ("Word类型检测测试", test_word_type_detection),
         ("图片检测测试", test_has_images),
-        ("文本提取测试", test_extract_text),
         ("图片提取测试", test_extract_images),
         ("列表转字符串测试", test_list_to_string),
         ("阿里云API图片识别测试", test_detect_images_api),
-        ("完整文档提取测试", test_detect_word_to_enhance_text),
+        ("完整文档提取测试（主方法）", test_detect_word_to_enhance_text),
+        ("文本提取测试（已弃用）", test_extract_text),
     ]
 
     results = []
