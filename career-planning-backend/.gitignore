@@ -1,6 +1,7 @@
 HELP.md
 application-dev.yaml
 target/
+temp/
 .mvn/
 !**/src/main/**/target/
 !**/src/test/**/target/
