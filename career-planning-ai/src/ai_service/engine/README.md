@@ -13,6 +13,7 @@
 - [API 参考](#api-参考)
 - [高级用法](#高级用法)
 - [最佳实践](#最佳实践)
+- **[架构约束与扩展规范](#架构约束与扩展规范)** ⭐ 团队协作必读
 - [设计原理](#设计原理)
 - [可扩展性](#可扩展性)
 - [性能优化](#性能优化)
@@ -20,6 +21,7 @@
 - [快速参考卡片](#快速参考卡片)
 - [常见问题](#常见问题)
 - [更新日志](#更新日志)
+- [附录：核心依赖契约](#附录核心依赖契约)
 
 ---
 
@@ -900,6 +902,339 @@ async def stream_with_timeout():
 
 ---
 
+## 架构约束与扩展规范
+
+> ⚠️ **团队协作必读**：本章节定义了框架的核心约束，违反这些约束将破坏框架的一致性和可维护性。
+
+### 一、架构骨架（不可变约束）
+
+以下设计原则是框架的核心，**任何情况下不得修改**：
+
+#### 1.1 五阶段流水线顺序
+
+```
+Compute → Ingestion → Alignment → Projection → Evaluation
+    ↓          ↓           ↓            ↓            ↓
+pick_brain  InputStep   TuneStep    ShapeStep    *ActionStep
+```
+
+**约束：**
+- 阶段顺序不可颠倒
+- 阶段不可跳过（Alignment 可通过 `next_step()` 直接跳过）
+- 每个阶段只能访问其前序阶段的数据
+
+**原因：** 强制阶段约束确保调用流程的可预测性和可调试性。
+
+#### 1.2 状态不可变原则
+
+```python
+# ✅ 正确：evolve() 返回新实例
+new_state = state.evolve(ActionType.ADD_TEXT, "内容")
+
+# ❌ 禁止：直接修改状态
+state.instructions.append("新指令")  # 绝对禁止！
+```
+
+**约束：**
+- `AIState` 的所有字段修改必须通过 `evolve()` 方法
+- 禁止直接修改状态对象的任何属性
+- 禁止在 `BaseModel` 上使用可变默认值
+
+**原因：** 不可变性是线程安全和状态追踪的基础。
+
+#### 1.3 态射类型封闭性
+
+```python
+# ActionType 枚举是封闭集合
+class ActionType(str, Enum):
+    SET_SYSTEM_ROLE = "SET_SYSTEM_ROLE"
+    ADD_INSTRUCTION = "ADD_INSTRUCTION"
+    # ... 所有合法操作都已定义
+```
+
+**约束：**
+- 所有状态演化操作必须在 `ActionType` 中预定义
+- 禁止使用字符串常量代替枚举值
+- 新增 ActionType 需要同步更新 `AIState._MAP` 映射
+
+**原因：** 类型安全，避免运行时错误。
+
+#### 1.4 单向数据流
+
+```
+InputStep → TuneStep → ShapeStep → ActionStep
+    ↓           ↓           ↓           ↓
+  evolve()   evolve()    evolve()    execute()
+    ↓           ↓           ↓           ↓
+           AIState (不可变状态容器)
+```
+
+**约束：**
+- 数据只能向后流动，禁止回溯修改
+- 后序阶段不能修改前序阶段已设置的数据
+- 所有修改操作返回新对象，不修改原对象
+
+**原因：** 确保状态演化路径可追溯。
+
+#### 1.5 执行方法的幂等性要求
+
+```python
+# do() 和 stream() 应该是幂等的（相同输入产生相同输出）
+# 除了温度等随机参数的影响
+```
+
+**约束：**
+- `do()` 方法不应有副作用
+- 不应在执行方法中修改全局状态
+- 流式输出和一次性输出应该产生相同的内容
+
+**原因：** 支持重试和测试。
+
+---
+
+### 二、扩展规范
+
+#### 2.1 新增 ActionType 的标准流程
+
+```python
+# Step 1: 在 action_type.py 中添加枚举值
+class ActionType(str, Enum):
+    # ... 现有类型 ...
+    ADD_VIDEO = "ADD_VIDEO"  # 新增
+
+# Step 2: 在 AIState 中添加对应字段
+class AIState(BaseModel):
+    # ... 现有字段 ...
+    video_data: List[Dict[str, Any]] = Field(default_factory=list)
+
+# Step 3: 更新映射关系
+class AIState(BaseModel):
+    _APPEND_LIST_ACTIONS = {
+        # ... 现有类型 ...
+        ActionType.ADD_VIDEO,
+    }
+    
+    _MAP = {
+        # ... 现有映射 ...
+        ActionType.ADD_VIDEO: "video_data",
+    }
+
+# Step 4: 添加数据规范化逻辑
+def _normalize_data(self, action_type: ActionType, data: Any) -> Any:
+    # ... 现有逻辑 ...
+    if action_type == ActionType.ADD_VIDEO:
+        return {"type": "video_url", "video_url": {"url": str(data)}}
+
+# Step 5: 在 InputStep 中添加便捷方法
+class InputStep(BaseStep):
+    def add_video(self, url: str) -> "InputStep":
+        return InputStep(
+            self._state.evolve(ActionType.ADD_VIDEO, url), 
+            self._engine
+        )
+
+# Step 6: 更新 _compile_messages() 处理新数据类型
+```
+
+**检查清单：**
+- [ ] ActionType 枚举已添加
+- [ ] AIState 字段已添加
+- [ ] _MAP 映射已更新
+- [ ] _APPEND_LIST_ACTIONS / _REPLACE_ACTIONS / _MERGE_DICT_ACTIONS 已更新
+- [ ] _normalize_data() 已实现
+- [ ] InputStep 便捷方法已添加
+- [ ] _compile_messages() 已更新（如需要）
+- [ ] 单元测试已添加
+
+#### 2.2 新增输出格式的标准流程
+
+```python
+# Step 1: 创建新的 ActionStep 类
+class AudioActionStep(BaseStep):
+    """音频输出执行步骤"""
+    
+    def __init__(self, state: AIState, engine: AIEngine):
+        super().__init__(state, engine)
+    
+    async def do(self) -> bytes:
+        """返回音频二进制数据"""
+        # 实现逻辑
+        pass
+
+# Step 2: 在 ShapeStep 中添加入口方法
+class ShapeStep(BaseStep):
+    def into_audio(self) -> AudioActionStep:
+        """投射为音频输出"""
+        return AudioActionStep(self._state, self._engine)
+
+# Step 3: 更新文档和测试
+```
+
+#### 2.3 新增阶段的标准流程（慎用）
+
+> ⚠️ 新增阶段是重大架构变更，需要团队评审
+
+```python
+# 例如：在 Alignment 和 Projection 之间新增 Validation 阶段
+
+# Step 1: 创建新的 Step 类
+class ValidationStep(BaseStep):
+    """验证步骤：在执行前校验输入"""
+    
+    def validate_schema(self, schema: Type[BaseModel]) -> "ValidationStep":
+        """验证输入是否符合目标 Schema"""
+        # 实现逻辑
+        return self
+    
+    def next_step(self) -> ShapeStep:
+        return ShapeStep(self._state, self._engine)
+
+# Step 2: 修改 TuneStep.next_step() 返回新阶段
+class TuneStep(BaseStep):
+    def next_step(self) -> ValidationStep:  # 原来返回 ShapeStep
+        return ValidationStep(self._state, self._engine)
+
+# Step 3: 更新所有相关文档和测试
+# Step 4: 团队 Code Review
+```
+
+---
+
+### 三、约定与禁忌
+
+#### 3.1 命名约定
+
+| 类型 | 约定 | 示例 |
+|------|------|------|
+| ActionType 枚举 | UPPER_SNAKE_CASE | `ADD_INSTRUCTION` |
+| Step 类 | *Step 后缀 | `InputStep`, `TuneStep` |
+| 状态字段 | snake_case | `system_role`, `llm_params` |
+| 私有方法 | _前缀 | `_compile_messages()`, `_normalize_data()` |
+| 类变量（配置） | _前缀大写 | `_MAP`, `_APPEND_LIST_ACTIONS` |
+
+#### 3.2 绝对禁忌
+
+```python
+# ❌ 禁止：绕过 evolve() 直接修改状态
+state.instructions.append("新指令")
+
+# ❌ 禁止：跳过阶段检查
+# （框架已通过类型系统阻止）
+
+# ❌ 禁止：在 ActionStep 中修改状态
+class TextActionStep(BaseStep):
+    async def do(self):
+        self._state.xxx = ...  # 禁止！
+
+# ❌ 禁止：使用未定义的 ActionType
+state.evolve("ADD_SOMETHING", data)  # 必须使用枚举
+
+# ❌ 禁止：捕获异常后静默处理
+try:
+    result = await pipeline.do()
+except Exception:
+    pass  # 至少要记录日志
+
+# ❌ 禁止：在多个请求间共享可变状态
+# AIState 是不可变的，可以安全共享
+# 但不要在 InputStep 等对象上存储请求特定数据
+
+# ❌ 禁止：在 AIState 中存储物理资源或长生命周期对象
+# 绝对禁止将 数据库连接、网络 Client（如 instructor_client）、文件句柄(File Object) 放入 AIState。
+class AIState(BaseModel):
+    db_conn: Any = None  # 致命错误！会导致 model_copy(deep=True) 栈溢出崩溃！
+    http_client: aiohttp.ClientSession  # 致命错误！深拷贝会递归复制连接池！
+
+# ✅ 正确：AIState 只能是纯净的 POJO（Plain Old Python Object）
+# 仅包含基础数据类型（str, int, list, dict, BaseModel 子类）
+# 物理资源必须由 AIEngine 实例持有（如 self.struct_client, self.text_client）
+```
+
+#### 3.3 推荐实践
+
+```python
+# ✅ 推荐：使用类型注解
+def process(text: str) -> Optional[MySchema]:
+    ...
+
+# ✅ 推荐：添加文档字符串
+class MyStep(BaseStep):
+    """步骤说明"""
+
+# ✅ 推荐：异常向上传播
+async def service_call():
+    result = await pipeline.into_struct(Schema).do()
+    if result is None:
+        raise ServiceError("提取失败")
+    return result
+
+# ✅ 推荐：使用 Field 添加描述
+class MySchema(BaseModel):
+    field: str = Field(description="字段说明")
+
+# ✅ 推荐：日志记录关键操作
+log.info(f"开始处理: model={model.model_name}")
+
+# ✅ 推荐：终端动作必须严格 await
+# 编译器无法拦截忘了写 await 的错误，务必在代码 review 时重点检查
+async def my_service():
+    # ❌ 错误：task 是一个 coroutine 对象，不是结果
+    task = engine.pick_brain(model).add_text("...").next_step().next_step().into_text().do()
+    print(task)  # <coroutine object TextActionStep.do at 0x...>
+    
+    # ✅ 正确：触发态射坍缩（执行调用）必须 await
+    result = await engine.pick_brain(model).add_text("...").next_step().next_step().into_text().do()
+    print(result)  # 实际的文本内容
+```
+
+---
+
+### 四、Code Review 检查清单
+
+在提交涉及 AI Engine 的代码变更时，请确认：
+
+**架构约束检查：**
+- [ ] 没有违反五阶段顺序
+- [ ] 没有直接修改 AIState 属性
+- [ ] 没有使用未定义的 ActionType
+- [ ] 没有违反单向数据流
+
+**扩展规范检查：**
+- [ ] 新增 ActionType 已完成所有 6 个步骤
+- [ ] 新增字段有正确的类型注解
+- [ ] 新增方法有文档字符串
+- [ ] 映射关系已正确更新
+
+**代码质量检查：**
+- [ ] 通过 mypy 类型检查
+- [ ] 通过单元测试
+- [ ] 没有静默捕获异常
+- [ ] 日志记录完整
+
+**大模型风控与成本检查：**
+- [ ] 动态拼接的用户输入（如简历、用户生成内容）是否已正确包裹在 XML 标签（如 `<data>...</data>`）中以防御 Prompt 注入？
+- [ ] 对于批量处理任务，是否正确使用了成本较低的模型（如 fast_cheap 模型），而非滥用推理大模型？
+- [ ] 结构化提取任务（`into_struct`）是否合理设置了 `max_retries`（建议不超过 3 次，防止 Token 连环消耗）？
+- [ ] 是否存在可能导致 Token 超限的超长上下文？（建议单次请求上下文 < 8000 tokens）
+- [ ] 是否正确使用了 `await` 等待终端动作？（未 `await` 会返回协程对象而非结果）
+
+---
+
+### 五、版本兼容性承诺
+
+| 变更类型 | 是否需要大版本升级 | 说明 |
+|----------|-------------------|------|
+| 新增 ActionType | 否 | 向后兼容 |
+| 新增 AIState 字段（带默认值） | 否 | 向后兼容 |
+| 新增 Step 方法 | 否 | 向后兼容 |
+| 新增输出格式 | 否 | 向后兼容 |
+| 删除 ActionType | **是** | 破坏性变更 |
+| 删除 AIState 字段 | **是** | 破坏性变更 |
+| 修改阶段顺序 | **是** | 破坏性变更 |
+| 修改 evolve() 签名 | **是** | 破坏性变更 |
+
+---
+
 ## 设计原理
 
 ### 范畴论视角
@@ -1410,12 +1745,146 @@ RAG 问答    → temperature=0.1~0.3
 
 ## 更新日志
 
-### v1.0.0 (2024-01)
+### 并发控制
 
-- 初始版本发布
-- 支持五阶段流水线架构
-- 支持结构化输出和文本输出
-- 支持多模态输入
-- 支持流式输出
+在处理大量请求时，需要控制并发数以避免 API 限流：
+
+```python
+import asyncio
+from typing import List
+
+async def batch_process(items: List[str], max_concurrency: int = 5):
+    """并发处理多个请求"""
+    semaphore = asyncio.Semaphore(max_concurrency)
+    
+    async def process_one(item: str):
+        async with semaphore:
+            return await (
+                engine.pick_brain(model)
+                .add_text(item)
+                .next_step()
+                .next_step()
+                .into_text()
+                .do()
+            )
+    
+    return await asyncio.gather(*[process_one(item) for item in items])
+
+# 使用示例
+results = await batch_process(data_list, max_concurrency=3)
+```
+
+### 连接复用
+
+`AIEngine` 实例可以复用，避免重复初始化开销：
+
+```python
+# ✅ 推荐：单例复用
+engine = AIEngine()  # 应用启动时创建一次
+
+async def handle_request(text: str):
+    return await engine.pick_brain(model).add_text(text)...
+
+# ❌ 不推荐：每次请求都创建新实例
+async def handle_request(text: str):
+    engine = AIEngine()  # 造成不必要的开销
+    return await engine.pick_brain(model)...
+```
+
+### 流式输出性能
+
+对于长文本生成，优先使用流式输出：
+
+```python
+# 流式输出可以提前开始响应，改善用户体验
+async def generate_long_content(prompt: str):
+    async for chunk in (
+        engine.pick_brain(model)
+        .add_text(prompt)
+        .next_step()
+        .next_step()
+        .into_text()
+        .stream()
+    ):
+        yield chunk  # 边生成边返回，减少首字延迟
+```
+
+### 缓存策略
+
+对于重复查询，建议在业务层实现缓存：
+
+```python
+from functools import lru_cache
+import hashlib
+
+def make_cache_key(prompt: str, model: str) -> str:
+    return hashlib.md5(f"{model}:{prompt}".encode()).hexdigest()
+
+class CachedEngine:
+    def __init__(self, engine: AIEngine, cache_ttl: int = 3600):
+        self.engine = engine
+        self.cache = {}  # 实际项目中使用 Redis 等
+        self.cache_ttl = cache_ttl
+    
+    async def get_or_compute(self, prompt: str, model) -> str:
+        key = make_cache_key(prompt, str(model))
+        if key in self.cache:
+            return self.cache[key]
+        
+        result = await (
+            self.engine.pick_brain(model)
+            .add_text(prompt)
+            .next_step().next_step().into_text().do()
+        )
+        self.cache[key] = result
+        return result
+```
+
+---
+
+## 附录：核心依赖契约
+
+本框架的不可变性、并发安全与多模态流转依赖于以下核心底层库，**严禁在未评估影响的情况下替换或降级**：
+
+### 必需依赖
+
+| 依赖库 | 最低版本 | 核心作用 | 不可替代原因 |
+|--------|----------|----------|--------------|
+| **Pydantic** | >= 2.0 | 数据模型与验证 | 提供 `model_copy(deep=True)` 实现不可变状态演化；V1 不兼容 |
+| **LiteLLM** | >= 1.0 | 统一模型网关 | 支持多模型 fallback、统一 API 格式；禁止绕过直接调用原生 SDK |
+| **Instructor** | >= 1.0 | 结构化输出 | 提供 MD_JSON 模式的强结构化输出与自愈重试机制 |
+| **langchain-core** | >= 0.1 | 消息协议兼容 | 提供 `BaseMessage` 类型用于消息格式转换 |
+
+### 禁止事项
+
+```python
+# ❌ 禁止：绕过 LiteLLM 直接使用原生 SDK
+import openai  # 错误！
+openai.chat.completions.create(...)
+
+# ❌ 禁止：使用 Pydantic V1 写法
+from pydantic import BaseModel  # 必须确保是 V2
+class MyModel(BaseModel):
+    class Config:  # V1 写法，V2 不支持
+        arbitrary_types_allowed = True
+
+# ✅ 正确：Pydantic V2 写法
+from pydantic import BaseModel, ConfigDict
+class MyModel(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+# ❌ 禁止：私自降级依赖版本
+# pyproject.toml 中锁定的版本是经过验证的，不得随意修改
+```
+
+### 版本升级评估流程
+
+当需要升级核心依赖时，必须：
+
+1. 在测试环境验证所有功能正常
+2. 运行完整的单元测试套件
+3. 检查 `model_copy(deep=True)` 行为是否正常
+4. 检查结构化输出的解析正确性
+5. 提交团队评审
 
 ---
