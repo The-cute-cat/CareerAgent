@@ -51,18 +51,12 @@ class DevelopmentPotential(BaseModel):
 class JobAttributes(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
     薪资竞争力:str = Field(alias="薪资竞争力", description="低/中/高")
-    工作地点:str = Field(alias="工作地点", description="城市分级")
-    企业性质:str = Field(alias="企业性质", description="国企/民企/外企/初创等")
-    公司规模:str = Field(alias="公司规模", description="大型/中型/小型")
     所属行业:str = Field(alias="所属行业", description="互联网/金融/制造等")
     垂直晋升路径:str = Field(alias="垂直晋升路径", description="文本列表 (如:初级->资深->组长)")
     前置岗位要求:str = Field(alias="前置岗位要求", description="文本列表")
     横向转岗方向:str = Field(alias="横向转岗方向", description="文本列表（至少 5 个）")
     社会需求度:str = Field(alias="社会需求度", description="高/中/低")
     行业发展趋势:str = Field(alias="行业发展趋势", description="朝阳/平稳/萎缩等")
-    工作强度与节奏:str = Field(alias="工作强度与节奏", description="大小周/双休/弹性/高频出差")
-    核心产出_KPI: str = Field(alias="核心产出/KPI", description="文本")
-    培训与带教机制:str = Field(alias="培训与带教机制", description="完善/一般/无等")
 
 class Profiles(BaseModel):
     model_config = ConfigDict(populate_by_name=True)

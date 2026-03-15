@@ -596,207 +596,287 @@ def clean_job_excel(file_path, clean_salary=False, clean_date=True, remove_dupli
     return df
 
 
-# ========== 进阶版本：支持更多自定义选项 ==========
-def clean_job_excel_advanced(file_path,
-                             clean_salary=False,
-                             clean_date=True,
-                             remove_duplicates=False,
-                             salary_unit='月',  # 薪资格式单位：'月' 或 '年'
-                             duplicate_cols=None,  # 去重依据列
-                             output_path=None,  # 输出路径（None 则覆盖原文件）
-                             output_format=None):  # 输出格式（'xls' 或 'xlsx'）
+def process_excel_jobs(file_path: str, url_column_name: str='岗位来源地址'):
     """
-    进阶版清洗函数，支持更多自定义选项（支持.xls 和.xlsx）
+    读取Excel，提取URL并抓取信息，最后写回原文件
 
     参数:
-        file_path: 文件路径
-        clean_salary: 是否统一薪资格式（默认 False）
-        clean_date: 是否统一日期格式为"YYYY年M月D日"（默认 True）
-        remove_duplicates: 是否删除重复记录（默认 False）
-        salary_unit: 薪资格式单位（'月' 或 '年'）
-        duplicate_cols: 去重依据列列表（默认 ['岗位编码']）
-        output_path: 输出路径（None 则覆盖原文件）
-        output_format: 输出格式（'xls' 或 'xlsx'，默认 None 保持原格式）
-
-    返回:
-        清洗后的 DataFrame
+        file_path: Excel文件的路径
+        url_column_name: Excel中存放职位URL的列名
     """
-
-    # 检查文件是否存在
+    # 1. 加载数据
     if not os.path.exists(file_path):
-        raise FileNotFoundError(f"文件不存在：{file_path}")
+        print(f"❌ 错误：找不到文件 {file_path}")
+        return
 
-    # 检查文件扩展名
-    file_ext = os.path.splitext(file_path)[1].lower()
-    if file_ext not in ['.xls', '.xlsx']:
-        raise ValueError(f"不支持的文件格式：{file_ext}，请使用.xls 或.xlsx")
-
-    # 读取 Excel 文件
+    # 根据后缀判断读取方式（pandas会自动处理）
     df = pd.read_excel(file_path)
 
-    # 定义需要保持格式的列
-    target_columns = [
-        '岗位名称', '地址', '薪资范围', '公司名称', '所属行业',
-        '公司规模', '公司类型', '岗位编码', '岗位详情'
-    ]
+    # 检查列名是否存在
+    if url_column_name not in df.columns:
+        print(f"❌ 错误：列名 '{url_column_name}' 不在表中，请检查！")
+        return
 
-    # 检查必要列是否存在
-    missing_cols = [col for col in target_columns if col not in df.columns]
-    if missing_cols:
-        raise ValueError(f"缺少必要列：{missing_cols}")
+    print(f"🚀 开始处理，共 {len(df)} 行数据...")
 
-    print(f"📊 原始数据行数：{len(df)}")
-    print(f"📁 文件格式：{file_ext}")
+    # 2. 遍历并抓取
+    for index, row in df.iterrows():
+        url = row[url_column_name]
 
-    # 1. 清洗岗位详情
-    df['岗位详情'] = df['岗位详情'].apply(
-        lambda x: re.sub(r'<br\s*/?>|\n|\r|\t', '', str(x) if pd.notna(x) else '').strip()
-    )
+        # 简单判断URL是否有效
+        if pd.isna(url) or str(url).strip() == "":
+            continue
 
-    # 2. 统一其他列格式
-    for col in target_columns:
-        if col != '岗位详情':
-            df[col] = df[col].apply(lambda x: '' if pd.isna(x) else str(x).strip())
+        print(f"🔍 正在抓取第 {index + 1} 行: {url}")
 
-    # 3. 统一薪资格式
-    if clean_salary:
-        print(f"🔧 正在统一薪资格式（单位：{salary_unit}）...")
+        try:
+            # 调用你提供的抓取函数
+            from ai_service.scripts.zhaopin_spider import fetch_job_info
+            job_info = fetch_job_info(url=url)
+            # print("11")
 
-        def standardize_salary(text):
-            if pd.isna(text) or str(text).strip() == '':
-                return '面议'
+            # 3. 判断字典是否为空（以及是否抓到了有效内容）
+            # 假设 fetch_job_info 返回 {} 或者 None 或者 字典值全为 None
+            if job_info and any(job_info.values()):
+                # 将获取到的信息填充到对应的列
+                for key, value in job_info.items():
+                    # 如果值为 None 或空字符串，则不修改也不添加
+                    if value is None or value == "":
+                        print(f"⚠️ 第 {index + 1} 行抓取结果为空，跳过修改。")
+                        continue
+                    # 如果列不存在，pandas会自动创建新列
+                    df.at[index, key] = value
+                print(f"✅ 抓取成功")
+            else:
+                print(f"⚠️ 第 {index + 1} 行抓取结果为空，跳过修改。")
 
-            text = str(text).strip()
+        except Exception as e:
+            print(f"❌ 处理第 {index + 1} 行时发生异常: {e}")
 
-            if '面议' in text:
-                return '面议'
+    # 4. 保存文件
+    output_path = file_path
+    _, ext = os.path.splitext(output_path)
+    output_format = ext.lower()
 
-            # 提取数字
-            match = re.search(r'(\d+\.?\d*)-?(\d*\.?\d*)', text)
-            if match:
-                min_val = float(match.group(1))
-                max_val = float(match.group(2)) if match.group(2) else min_val
-
-                # 处理"万"单位
-                if '万' in text:
-                    min_val *= 10000
-                    max_val *= 10000
-
-                # 处理"元/天"
-                if '元/天' in text:
-                    min_val *= 22
-                    max_val *= 22
-
-                # 处理"X 薪"
-                if '薪' in text:
-                    salary_match = re.search(r'(\d+) 薪', text)
-                    if salary_match:
-                        months = int(salary_match.group(1))
-                        if salary_unit == '年':
-                            min_val *= months
-                            max_val *= months
-                        # 否则保持月薪
-
-                min_val = int(min_val)
-                max_val = int(max_val)
-
-                if salary_unit == '年':
-                    return f'{min_val}-{max_val}元/年' if min_val != max_val else f'{min_val}元/年'
-                else:
-                    return f'{min_val}-{max_val}元/月' if min_val != max_val else f'{min_val}元/月'
-
-            return '面议'
-
-        df['薪资范围'] = df['薪资范围'].apply(standardize_salary)
-
-    # 3.5. 统一日期格式
-    if clean_date:
-
-        def standardize_date(text):
-            """统一日期格式为：YYYY年M月D日"""
-            if pd.isna(text) or str(text).strip() == '':
-                return ''
-
-            text = str(text).strip()
-
-            # 处理 "2025-07-27 00:13:40" 格式
-            match = re.search(r'(\d{4})-(\d{1,2})-(\d{1,2})', text)
-            if match:
-                year = match.group(1)
-                month = match.group(2)
-                day = match.group(3)
-                # 去掉月份和日期的前导零
-                month = str(int(month))
-                day = str(int(day))
-                return f'{year}年{month}月{day}日'
-
-            # 处理 "7月22日" 格式（需要补充年份，默认使用当前年份）
-            match = re.search(r'(\d{1,2})月(\d{1,2})日', text)
-            if match:
-                month = match.group(1)
-                day = match.group(2)
-                # 去掉月份和日期的前导零
-                month = str(int(month))
-                day = str(int(day))
-                # 默认使用2025年
-                return f'{datetime.now().year}年{month}月{day}日'
-
-            # 其他情况保留原样
-            return text
-
-        # 检查是否有日期相关的列
-        date_columns = [col for col in df.columns if '日期' in col or 'date' in col.lower() or '更新' in col]
-        if date_columns:
-            for date_col in date_columns:
-                print(f"  处理列: {date_col}")
-                df[date_col] = df[date_col].apply(standardize_date)
+    try:
+        if output_format == '.xls':
+            # .xls 格式使用 openpyxl 引擎（注意：openpyxl通常支持xlsx，老版xls可能需要xlwt，但依你要求写）
+            df.to_excel(output_path, index=False, engine='openpyxl')
+            print(f"💾 数据已保存至 {output_path}")
+            print("⚠️ 注意：.xls 格式最大支持 65536 行，如数据量大建议使用 .xlsx")
         else:
-            print("  未找到日期列，跳过日期格式统一")
+            # .xlsx 格式使用 openpyxl 引擎
+            df.to_excel(output_path, index=False, engine='openpyxl')
+            print(f"💾 数据已成功保存至 {output_path}")
 
-    # 4. 删除重复记录
-    if remove_duplicates:
-        original_count = len(df)
-
-        if duplicate_cols is None:
-            duplicate_cols = ['岗位编码'] if '岗位编码' in df.columns else ['岗位名称', '公司名称', '地址']
-
-        df = df.drop_duplicates(subset=duplicate_cols, keep='first')
-        print(f"✓ 删除重复记录：{original_count - len(df)}条")
-
-    # 5. 按岗位名称排序
-    df = df.sort_values(by='岗位名称', ascending=True, kind='stable').reset_index(drop=True)
-
-    # 6. 保存文件
-    if output_path is None:
-        save_path = file_path
-    else:
-        save_path = output_path
-
-    # 确定输出格式
-    if output_format is None:
-        save_format = os.path.splitext(save_path)[1].lower()
-    else:
-        save_format = '.' + output_format.lower().replace('.', '')
-        save_path = os.path.splitext(save_path)[0] + save_format
-
-    print(f"💾 保存格式：{save_format}")
-
-    # 根据格式选择引擎
-    if save_format == '.xls':
-        df.to_excel(save_path, index=False, engine='openpyxl')
-        if len(df) > 65536:
-            print("⚠️  警告：数据行数超过.xls 限制（65536 行），建议使用.xlsx 格式！")
-    else:
-        df.to_excel(save_path, index=False, engine='openpyxl')
-
-    return df
-
+    except Exception as e:
+        print(f"❌ 保存文件失败: {e}")
 
 # ========== 使用示例 ==========
 if __name__ == "__main__":
     file_path = r"E:\软件工程相关资料\项目比赛\服创2026\a13基于AI的大学生职业规划智能体-JD采样数据.xls"
-    # clean_job_excel(file_path)
+    filter_computer_jobs_excel(file_path)
+    clean_job_excel(file_path)
     # read_excel_to_jobinfo(file_path)
-    job_list=filter_computer_jobs_excel(file_path)
+    # process_excel_jobs(file_path)
+
+
+
+
+# # ========== 进阶版本：支持更多自定义选项 ==========
+# def clean_job_excel_advanced(file_path,
+#                              clean_salary=False,
+#                              clean_date=True,
+#                              remove_duplicates=False,
+#                              salary_unit='月',  # 薪资格式单位：'月' 或 '年'
+#                              duplicate_cols=None,  # 去重依据列
+#                              output_path=None,  # 输出路径（None 则覆盖原文件）
+#                              output_format=None):  # 输出格式（'xls' 或 'xlsx'）
+#     """
+#     进阶版清洗函数，支持更多自定义选项（支持.xls 和.xlsx）
+#
+#     参数:
+#         file_path: 文件路径
+#         clean_salary: 是否统一薪资格式（默认 False）
+#         clean_date: 是否统一日期格式为"YYYY年M月D日"（默认 True）
+#         remove_duplicates: 是否删除重复记录（默认 False）
+#         salary_unit: 薪资格式单位（'月' 或 '年'）
+#         duplicate_cols: 去重依据列列表（默认 ['岗位编码']）
+#         output_path: 输出路径（None 则覆盖原文件）
+#         output_format: 输出格式（'xls' 或 'xlsx'，默认 None 保持原格式）
+#
+#     返回:
+#         清洗后的 DataFrame
+#     """
+#
+#     # 检查文件是否存在
+#     if not os.path.exists(file_path):
+#         raise FileNotFoundError(f"文件不存在：{file_path}")
+#
+#     # 检查文件扩展名
+#     file_ext = os.path.splitext(file_path)[1].lower()
+#     if file_ext not in ['.xls', '.xlsx']:
+#         raise ValueError(f"不支持的文件格式：{file_ext}，请使用.xls 或.xlsx")
+#
+#     # 读取 Excel 文件
+#     df = pd.read_excel(file_path)
+#
+#     # 定义需要保持格式的列
+#     target_columns = [
+#         '岗位名称', '地址', '薪资范围', '公司名称', '所属行业',
+#         '公司规模', '公司类型', '岗位编码', '岗位详情'
+#     ]
+#
+#     # 检查必要列是否存在
+#     missing_cols = [col for col in target_columns if col not in df.columns]
+#     if missing_cols:
+#         raise ValueError(f"缺少必要列：{missing_cols}")
+#
+#     print(f"📊 原始数据行数：{len(df)}")
+#     print(f"📁 文件格式：{file_ext}")
+#
+#     # 1. 清洗岗位详情
+#     df['岗位详情'] = df['岗位详情'].apply(
+#         lambda x: re.sub(r'<br\s*/?>|\n|\r|\t', '', str(x) if pd.notna(x) else '').strip()
+#     )
+#
+#     # 2. 统一其他列格式
+#     for col in target_columns:
+#         if col != '岗位详情':
+#             df[col] = df[col].apply(lambda x: '' if pd.isna(x) else str(x).strip())
+#
+#     # 3. 统一薪资格式
+#     if clean_salary:
+#         print(f"🔧 正在统一薪资格式（单位：{salary_unit}）...")
+#
+#         def standardize_salary(text):
+#             if pd.isna(text) or str(text).strip() == '':
+#                 return '面议'
+#
+#             text = str(text).strip()
+#
+#             if '面议' in text:
+#                 return '面议'
+#
+#             # 提取数字
+#             match = re.search(r'(\d+\.?\d*)-?(\d*\.?\d*)', text)
+#             if match:
+#                 min_val = float(match.group(1))
+#                 max_val = float(match.group(2)) if match.group(2) else min_val
+#
+#                 # 处理"万"单位
+#                 if '万' in text:
+#                     min_val *= 10000
+#                     max_val *= 10000
+#
+#                 # 处理"元/天"
+#                 if '元/天' in text:
+#                     min_val *= 22
+#                     max_val *= 22
+#
+#                 # 处理"X 薪"
+#                 if '薪' in text:
+#                     salary_match = re.search(r'(\d+) 薪', text)
+#                     if salary_match:
+#                         months = int(salary_match.group(1))
+#                         if salary_unit == '年':
+#                             min_val *= months
+#                             max_val *= months
+#                         # 否则保持月薪
+#
+#                 min_val = int(min_val)
+#                 max_val = int(max_val)
+#
+#                 if salary_unit == '年':
+#                     return f'{min_val}-{max_val}元/年' if min_val != max_val else f'{min_val}元/年'
+#                 else:
+#                     return f'{min_val}-{max_val}元/月' if min_val != max_val else f'{min_val}元/月'
+#
+#             return '面议'
+#
+#         df['薪资范围'] = df['薪资范围'].apply(standardize_salary)
+#
+#     # 3.5. 统一日期格式
+#     if clean_date:
+#
+#         def standardize_date(text):
+#             """统一日期格式为：YYYY年M月D日"""
+#             if pd.isna(text) or str(text).strip() == '':
+#                 return ''
+#
+#             text = str(text).strip()
+#
+#             # 处理 "2025-07-27 00:13:40" 格式
+#             match = re.search(r'(\d{4})-(\d{1,2})-(\d{1,2})', text)
+#             if match:
+#                 year = match.group(1)
+#                 month = match.group(2)
+#                 day = match.group(3)
+#                 # 去掉月份和日期的前导零
+#                 month = str(int(month))
+#                 day = str(int(day))
+#                 return f'{year}年{month}月{day}日'
+#
+#             # 处理 "7月22日" 格式（需要补充年份，默认使用当前年份）
+#             match = re.search(r'(\d{1,2})月(\d{1,2})日', text)
+#             if match:
+#                 month = match.group(1)
+#                 day = match.group(2)
+#                 # 去掉月份和日期的前导零
+#                 month = str(int(month))
+#                 day = str(int(day))
+#                 # 默认使用2025年
+#                 return f'{datetime.now().year}年{month}月{day}日'
+#
+#             # 其他情况保留原样
+#             return text
+#
+#         # 检查是否有日期相关的列
+#         date_columns = [col for col in df.columns if '日期' in col or 'date' in col.lower() or '更新' in col]
+#         if date_columns:
+#             for date_col in date_columns:
+#                 print(f"  处理列: {date_col}")
+#                 df[date_col] = df[date_col].apply(standardize_date)
+#         else:
+#             print("  未找到日期列，跳过日期格式统一")
+#
+#     # 4. 删除重复记录
+#     if remove_duplicates:
+#         original_count = len(df)
+#
+#         if duplicate_cols is None:
+#             duplicate_cols = ['岗位编码'] if '岗位编码' in df.columns else ['岗位名称', '公司名称', '地址']
+#
+#         df = df.drop_duplicates(subset=duplicate_cols, keep='first')
+#         print(f"✓ 删除重复记录：{original_count - len(df)}条")
+#
+#     # 5. 按岗位名称排序
+#     df = df.sort_values(by='岗位名称', ascending=True, kind='stable').reset_index(drop=True)
+#
+#     # 6. 保存文件
+#     if output_path is None:
+#         save_path = file_path
+#     else:
+#         save_path = output_path
+#
+#     # 确定输出格式
+#     if output_format is None:
+#         save_format = os.path.splitext(save_path)[1].lower()
+#     else:
+#         save_format = '.' + output_format.lower().replace('.', '')
+#         save_path = os.path.splitext(save_path)[0] + save_format
+#
+#     print(f"💾 保存格式：{save_format}")
+#
+#     # 根据格式选择引擎
+#     if save_format == '.xls':
+#         df.to_excel(save_path, index=False, engine='openpyxl')
+#         if len(df) > 65536:
+#             print("⚠️  警告：数据行数超过.xls 限制（65536 行），建议使用.xlsx 格式！")
+#     else:
+#         df.to_excel(save_path, index=False, engine='openpyxl')
+#
+#     return df
+
 
 
