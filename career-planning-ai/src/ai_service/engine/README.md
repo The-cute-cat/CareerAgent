@@ -13,6 +13,7 @@
 - [API 参考](#api-参考)
 - [高级用法](#高级用法)
 - [最佳实践](#最佳实践)
+- [异常处理](#异常处理)
 - **[架构约束与扩展规范](#架构约束与扩展规范)** ⭐ 团队协作必读
 - [设计原理](#设计原理)
 - [可扩展性](#可扩展性)
@@ -898,6 +899,190 @@ async def stream_with_timeout():
         yield "\n[响应超时，请重试]"
     except Exception as e:
         yield f"\n[发生错误: {e}]"
+```
+
+---
+
+## 异常处理
+
+### 异常体系概览
+
+框架定义了完整的异常层次结构，便于上层捕获和处理特定类型的错误：
+
+```
+AIEngineError (基类)
+├── ConfigurationError (配置错误)
+│   ├── ModelNotSpecifiedError    # 模型未指定
+│   └── InvalidActionTypeError    # 无效的 ActionType
+├── ValidationError (验证错误)
+│   └── EmptyInputError           # 空输入
+├── ExecutionError (执行错误)
+│   ├── StructExtractionError     # 结构化提取失败
+│   ├── TextGenerationError       # 文本生成失败
+│   ├── StreamInterruptedError    # 流式输出中断
+│   └── ModelConfigNotFoundError  # 模型配置不存在
+└── ResourceError (资源错误)
+    └── StatePollutionError       # 状态污染（严重）
+```
+
+### 异常类型说明
+
+| 异常类 | 触发阶段 | 场景 | 严重程度 |
+|--------|----------|------|----------|
+| `ModelNotSpecifiedError` | Stage 1 | `pick_brain()` 未传入有效模型 | 高 |
+| `InvalidActionTypeError` | Stage 2-3 | `evolve()` 接收未定义的 ActionType | 高 |
+| `EmptyInputError` | Stage 2 | `next_step()` 时无任何输入 | 中 |
+| `ModelConfigNotFoundError` | Stage 5 | 调用时模型配置丢失 | 高 |
+| `StructExtractionError` | Stage 5 | 结构化提取失败 | 中 |
+| `TextGenerationError` | Stage 5 | 文本生成失败 | 中 |
+| `StreamInterruptedError` | Stage 5 | 流式输出中断 | 低 |
+| `StatePollutionError` | 任意 | AIState 存储物理资源 | 致命 |
+
+### 异常捕获策略
+
+#### 分层捕获
+
+```python
+from ai_service.engine import (
+    AIEngine,
+    AIEngineError,
+    ConfigurationError,
+    ExecutionError,
+)
+
+async def safe_generate(prompt: str):
+    """安全的生成函数，包含分层异常处理"""
+    try:
+        return await (
+            AIEngine().pick_brain(model)
+            .add_text(prompt)
+            .next_step().next_step().into_text().do()
+        )
+    
+    except ConfigurationError as e:
+        # 配置错误：通常是代码问题，需要修复
+        log.critical(f"配置错误: {e}")
+        raise  # 向上抛出，让运维处理
+        
+    except ExecutionError as e:
+        # 执行错误：可能是网络问题或模型问题，可以降级处理
+        log.error(f"执行失败: {e.message}, context: {e.context}")
+        return "服务暂时不可用，请稍后重试"
+        
+    except AIEngineError as e:
+        # 其他框架异常
+        log.error(f"未知框架错误: {e}")
+        raise
+```
+
+#### 结构化提取的错误处理
+
+```python
+from ai_service.engine import StructExtractionError
+
+async def extract_with_fallback(text: str, schema):
+    """带降级的结构化提取"""
+    try:
+        result = await (
+            engine.pick_brain(model)
+            .add_text(text)
+            .add_instruction("提取信息")
+            .next_step().next_step().into_struct(schema).do()
+        )
+        return result
+    
+    except StructExtractionError as e:
+        log.warning(f"结构化提取失败: {e.message}")
+        # 降级策略 1：尝试使用更强大的模型
+        try:
+            return await retry_with_better_model(text, schema)
+        except Exception:
+            pass
+        
+        # 降级策略 2：返回默认值
+        return schema.model_construct()
+```
+
+#### 流式输出的异常处理
+
+```python
+from ai_service.engine import StreamInterruptedError
+
+async def stream_with_recovery(prompt: str):
+    """带恢复机制的流式输出"""
+    try:
+        async for chunk in (
+            engine.pick_brain(model)
+            .add_text(prompt)
+            .next_step().next_step().into_text().stream()
+        ):
+            yield chunk
+    
+    except StreamInterruptedError as e:
+        # 流式中断：发送友好的错误提示
+        log.warning(f"流式输出中断: {e.context}")
+        yield "\n[连接中断，正在重试...]"
+        
+        # 可以选择重试或直接结束
+```
+
+### 异常上下文信息
+
+所有框架异常都包含上下文信息，便于调试：
+
+```python
+try:
+    result = await pipeline.into_struct(Schema).do()
+except StructExtractionError as e:
+    print(f"消息: {e.message}")        # 结构化提取失败[PersonModel]
+    print(f"上下文: {e.context}")      # {'schema': 'PersonModel', 'model': 'qwen-max'}
+    print(f"原因: {e.cause}")          # 原始异常对象
+    print(f"完整: {e}")                # 格式化后的完整消息
+```
+
+### 自定义异常处理
+
+在 Service 层封装统一的异常处理：
+
+```python
+from functools import wraps
+from ai_service.engine import AIEngineError
+
+def handle_ai_errors(fallback=None):
+    """AI 调用异常处理装饰器"""
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            try:
+                return await func(*args, **kwargs)
+            except AIEngineError as e:
+                log.error(f"AI 调用失败: {e}", exc_info=True)
+                if fallback is not None:
+                    return fallback
+                raise
+        return wrapper
+    return decorator
+
+# 使用示例
+@handle_ai_errors(fallback={"error": "服务不可用"})
+async def generate_summary(text: str):
+    return await pipeline.add_text(text).into_text().do()
+```
+
+### 异常与日志的配合
+
+```python
+import logging
+
+# 配置日志级别
+logging.getLogger("ai_service.engine").setLevel(logging.DEBUG)
+
+# 异常会自动记录到日志
+try:
+    result = await pipeline.do()
+except StructExtractionError as e:
+    # 异常已在内部记录，这里只需要处理业务逻辑
+    pass
 ```
 
 ---

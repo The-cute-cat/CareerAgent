@@ -1,6 +1,10 @@
-from pydantic import BaseModel, Field, SecretStr, ConfigDict
+from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
 from ai_service.engine.action_type import ActionType
+from ai_service.engine.exceptions import (
+    InvalidActionTypeError,
+    ModelConfigNotFoundError,
+)
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from config import LLM
 
@@ -107,7 +111,7 @@ class AIState(BaseModel):
         map = self._MAP
 
         if action_type not in map:
-            raise ValueError(f"未定义的演化动作: {action_type}")
+            raise InvalidActionTypeError(action_type)
 
         target_field = map[action_type]
         processed_val = self._normalize_data(action_type, data)
@@ -256,7 +260,9 @@ class AIState(BaseModel):
         """
         conf = self.model
         if not conf:
-            raise ValueError("模型配置不存在")
+            raise ModelConfigNotFoundError(
+                context={"state_id": id(self)}
+            )
         params = {
             "model": conf.model_name,
             "api_key": conf.api_key.get_secret_value(),
