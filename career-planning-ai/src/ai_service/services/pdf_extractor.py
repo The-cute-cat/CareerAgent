@@ -6,8 +6,6 @@ PDF 文档提取器模块
 """
 
 from pathlib import Path
-from typing import List, Tuple, Optional, Any, Dict
-
 import pymupdf
 from langchain_openai import ChatOpenAI
 
@@ -37,15 +35,12 @@ class PDFExtractor:
             timeout=settings.llm.timeout,
             max_retries=settings.llm.max_retries,
             model=settings.pdf.model_name,
-            temperature=settings.pdf.extra["temperature"]
+            temperature=settings.pdf.extra["temperature"],
         )
 
-    def detect_pdf_type(
-            self,
-            pdf_path: str,
-            min_chars_per_page: int = 50,
-            password: str = ""
-    ) -> Tuple[PDFType, PDFInfo]:
+    async def detect_pdf_type(
+            self, pdf_path: str, min_chars_per_page: int = 50, password: str | None = None
+    ) -> tuple[PDFType, PDFInfo]:
         """检测 PDF 文档类型
 
         Args:
@@ -66,7 +61,9 @@ class PDFExtractor:
                 info.total_pages = len(doc)
                 info.encrypted = doc.is_encrypted
                 if not self._try_decrypt_pdf(doc, password):
-                    log.warning(f"PDF file is encrypted and password is incorrect: {pdf_path}，password: {password}")
+                    log.warning(
+                        f"PDF file is encrypted and password is incorrect: {pdf_path}，password: {password}"
+                    )
                     return PDFType.ENCRYPTED, info
 
                 if doc.page_count == 0:
@@ -101,11 +98,13 @@ class PDFExtractor:
                 else:
                     return PDFType.MIXED, info
         except Exception as e:
-            log.error(f"Failed to detect PDF type: {pdf_path}，error: {e}", exc_info=True)
+            log.error(
+                f"Failed to detect PDF type: {pdf_path}，error: {e}", exc_info=True
+            )
             return PDFType.UNKNOWN, PDFInfo()
 
     @staticmethod
-    def _try_decrypt_pdf(doc: pymupdf.Document, password: str) -> bool:
+    def _try_decrypt_pdf(doc: pymupdf.Document, password: str | None = None) -> bool:
         """尝试解密 PDF 文档
 
         Args:
@@ -116,16 +115,18 @@ class PDFExtractor:
             未加密或解密成功返回 True；密码错误返回 False
         """
         if doc.is_encrypted:
-            if not doc.authenticate(password):  # authenticate如果解密成功，doc就是一个解密后的文档对象，返回一个不等于0的值
+            if not password or not doc.authenticate(
+                    password
+            ):  # authenticate如果解密成功，doc就是一个解密后的文档对象，返回一个不等于0的值
                 return False
         return True
 
-    def get_text_pdf(
+    async def get_text_pdf(
             self,
             pdf_path: str,
-            password: Optional[str] = None,
-            text_page_list: Optional[List[int]] = None
-    ) -> List[Dict[str, Any]]:
+            password: str | None = None,
+            text_page_list: list[int] | None = None,
+    ) -> list[dict[str, str | int]]:
         """提取文本型 PDF 内容
 
         Args:
@@ -139,37 +140,41 @@ class PDFExtractor:
         try:
             with pymupdf.open(pdf_path) as doc:
                 if not self._try_decrypt_pdf(doc, password):
-                    log.warning(f"PDF file is encrypted and password is incorrect: {pdf_path}，password: {password}")
+                    log.warning(
+                        f"PDF file is encrypted and password is incorrect: {pdf_path}，password: {password}"
+                    )
                     return []
                 text_list = []
-                page_num_list = text_page_list if text_page_list else range(doc.page_count)
+                page_num_list = (
+                    text_page_list if text_page_list else range(doc.page_count)
+                )
                 for page_num in page_num_list:
                     try:
                         page = doc.load_page(page_num)
                         text = page.get_text()
                         if text and text.strip():
-                            text_list.append({
-                                "page": page_num,
-                                "content": text
-                            })
+                            text_list.append({"page": page_num, "content": text})
                     except Exception as e:
-                        log.warning(f"Failed to get text from PDF page: {page_num}, error: {e}")
-                        text_list.append({
-                            "page": page_num,
-                            "content": None,
-                            "error": str(e)
-                        })
+                        log.warning(
+                            f"Failed to get text from PDF page: {page_num}, error: {e}"
+                        )
+                        text_list.append(
+                            {"page": page_num, "content": None, "error": str(e)}
+                        )
                 return text_list
         except Exception as e:
-            log.error(f"Failed to get text from PDF file: {pdf_path}，error: {e}", exc_info=True)
+            log.error(
+                f"Failed to get text from PDF file: {pdf_path}，error: {e}",
+                exc_info=True,
+            )
             return []
 
-    def get_scanned_pdf(
+    async def get_scanned_pdf(
             self,
             pdf_path: str,
-            password: Optional[str] = None,
-            scanned_page_list: Optional[List[int]] = None
-    ) -> List[Dict[str, Any]]:
+            password: str | None = None,
+            scanned_page_list: list[int] | None = None,
+    ) -> list[dict[str, str | int]]:
         """提取扫描型 PDF 内容
 
         将页面渲染为图片后使用 LLM 进行 OCR 识别。
@@ -186,7 +191,9 @@ class PDFExtractor:
             with pymupdf.open(pdf_path) as doc:
                 result = []
                 if not self._try_decrypt_pdf(doc, password):
-                    log.warning(f"PDF file is encrypted and password is incorrect: {pdf_path}，password: {password}")
+                    log.warning(
+                        f"PDF file is encrypted and password is incorrect: {pdf_path}，password: {password}"
+                    )
                     return []
                 if scanned_page_list:
                     page_num_list = scanned_page_list
@@ -199,30 +206,31 @@ class PDFExtractor:
                         mat = pymupdf.Matrix(1.5, 1.5)
                         pix = page.get_pixmap(matrix=mat)
                         img_bytes = pix.tobytes("png")
-                        content = self._extract_page_content(img_bytes)
-                        result.append({
-                            "page": page_num,
-                            "content": content
-                        })
+                        content = await self._extract_page_content(img_bytes)
+                        result.append({"page": page_num, "content": content})
                     except Exception as e:
-                        log.warning(f"Failed to get scanned image from PDF file: {pdf_path}，error: {e}", exc_info=True)
-                        result.append({
-                            "page": page_num,
-                            "content": None,
-                            "error": str(e)
-                        })
+                        log.warning(
+                            f"Failed to get scanned image from PDF file: {pdf_path}，error: {e}",
+                            exc_info=True,
+                        )
+                        result.append(
+                            {"page": page_num, "content": None, "error": str(e)}
+                        )
                 return result
         except Exception as e:
-            log.error(f"Failed to get scanned image from PDF file: {pdf_path}，error: {e}", exc_info=True)
+            log.error(
+                f"Failed to get scanned image from PDF file: {pdf_path}，error: {e}",
+                exc_info=True,
+            )
             return []
 
-    def get_mixed_pdf(
+    async def get_mixed_pdf(
             self,
             pdf_path: str,
-            text_page_list: List[int],
-            scanned_page_list: List[int],
-            password: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+            text_page_list: list[int],
+            scanned_page_list: list[int],
+            password: str | None = None,
+    ) -> list[dict[str, str | int]]:
         """提取混合型 PDF 内容
 
         对文本页直接提取文本，对扫描页使用 LLM 识别。
@@ -238,30 +246,50 @@ class PDFExtractor:
         """
         try:
             result = []
-            result.extend(self.get_text_pdf(pdf_path, password, text_page_list))
-            result.extend(self.get_scanned_pdf(pdf_path, password, scanned_page_list))
+            result.extend(await self.get_text_pdf(pdf_path, password, text_page_list))
+            result.extend(await self.get_scanned_pdf(pdf_path, password, scanned_page_list))
             return result
         except Exception as e:
-            log.error(f"Failed to get mixed image from PDF file: {pdf_path}，error: {e}", exc_info=True)
+            log.error(
+                f"Failed to get mixed image from PDF file: {pdf_path}，error: {e}",
+                exc_info=True,
+            )
             return []
 
-    def _extract_page_content(self, image_bytes: bytes) -> str | None:
+    async def _extract_page_content(self, image_bytes: bytes) -> str | None:
         """识别单页图片的内容"""
-        return image_extractor.extract_text(
-            image_bytes=image_bytes,
-            prompt=prompt_loader.pdf_recognition,
-            llm=self.llm
+        return await image_extractor.extract_text(
+            image_bytes=image_bytes, prompt=prompt_loader.pdf_recognition, llm=self.llm
         )
+
+    async def get_pdf_content(
+            self, pdf_path: str, password: str | None = None
+    ) -> list[dict[str, str | int]]:
+        """提取 PDF 内容
+        Args:
+            pdf_path: PDF 文件路径
+            password: 加密 PDF 的密码
+        Returns:
+            页面内容列表，每项包含 page 和 content 字段，若存在错误则包含 error 字段；
+            若为空则说明提取失败
+        """
+        pdf_type: tuple[PDFType, PDFInfo] = await self.detect_pdf_type(
+            pdf_path, password=password
+        )
+        if pdf_type[0] == PDFType.UNKNOWN:
+            return []
+        if pdf_type[0] == PDFType.TEXT_BASED:
+            return await self.get_text_pdf(pdf_path, password=password)
+        if pdf_type[0] == PDFType.SCANNED:
+            return await self.get_scanned_pdf(pdf_path, password=password)
+        if pdf_type[0] == PDFType.MIXED:
+            return await self.get_mixed_pdf(
+                pdf_path,
+                pdf_type[1].text_page_list,
+                pdf_type[1].scanned_page_list,
+                password,
+            )
+        return []
 
 
 pdf_extractor = PDFExtractor()
-
-if __name__ == '__main__':
-    test_pdf_path = r"C:\Users\The_cute_cat\Desktop\test.pdf"
-    pdf_type = pdf_extractor.detect_pdf_type(test_pdf_path)
-    print(pdf_type)
-    print(pdf_extractor.get_text_pdf(test_pdf_path)[0]["content"])
-    # print(pdf_extractor.get_scanned_pdf(test_pdf_path)[0]["content"])
-    # print(pdf_extractor.get_mixed_pdf(
-    #     test_pdf_path, pdf_type[1].text_page_list, pdf_type[1].scanned_page_list)[0]["content"])
-    ...

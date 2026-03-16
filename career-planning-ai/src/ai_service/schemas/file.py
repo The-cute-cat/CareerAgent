@@ -7,7 +7,6 @@
 """
 import os
 import uuid
-from typing import Dict, List
 
 from fastapi import UploadFile, Depends, File
 
@@ -23,18 +22,18 @@ __all__ = [
 ]
 
 
-async def handle_file(files: List[UploadFile] = File(...)) -> List[Dict[str, str]]:
+async def handle_file(files: list[UploadFile] = File(...)) -> list[dict[str, str]]:
     """验证上传文件的安全性和类型，返回文件信息字典"""
     return [await _validate_file(file) for file in files]
 
 
-async def _validate_file(file: UploadFile) -> Dict[str, str]:
+async def _validate_file(file: UploadFile) -> dict[str, str]:
     save_path = os.path.join(settings.path_config.temp, uuid.uuid4().hex)
     try:
         bytes_data = await file.read()
         with open(save_path, "wb") as f:
             f.write(bytes_data)
-        result = file_detector.is_safe_file(save_path)
+        result = await file_detector.is_safe_file(save_path)
         result[1]["save_path"] = save_path
         if result[0]:
             return result[1]
@@ -48,7 +47,7 @@ async def _validate_file(file: UploadFile) -> Dict[str, str]:
         raise FileValidationError(f"文件验证失败: {e}")
 
 
-async def validate_pdf(file_infos: List[Dict[str, str]] = Depends(handle_file)):
+async def validate_pdf(file_infos: list[dict[str, str]] = Depends(handle_file)):
     """
     验证文件是否为 PDF 类型。
 
@@ -69,7 +68,7 @@ async def validate_pdf(file_infos: List[Dict[str, str]] = Depends(handle_file)):
     return file_infos
 
 
-async def validate_docx(file_infos: List[Dict[str, str]] = Depends(handle_file)):
+async def validate_docx(file_infos: list[dict[str, str]] = Depends(handle_file)):
     """
     验证文件是否为 Word 文档类型（doc 或 docx）。
 

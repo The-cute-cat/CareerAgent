@@ -68,14 +68,17 @@ class FileDetector:
                     if file_bytes.startswith(magic_byte):
                         if magic_byte == b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1":
                             result["method"] = "ole2_pending"
+                            log.info(f"文件信息: {result}")
                             return result
                         if magic_byte == b"PK\x03\x04":
                             result["method"] = "zip_pending"
+                            log.info(f"文件信息: {result}")
                             return result
                         result["description"] = signature.description
                         result["mime_type"] = signature.mime_type
                         result["extension"] = ext
                         result["method"] = "magic_numbers"
+                        log.info(f"文件信息: {result}")
                         return result
         except Exception as e:
             log.warning(f"magic_string error: {e}")
@@ -89,6 +92,7 @@ class FileDetector:
                 result["extension"] = "txt"
                 result["description"] = "text file"
                 result["method"] = "binaryornot"
+                log.info(f"文件信息: {result}")
                 return result
         except Exception as e:
             log.warning(f"is_binary error: {e}")
@@ -117,6 +121,7 @@ class FileDetector:
                         result["mime_type"] = sig.mime_type
                         result["description"] = sig.description
                         result["method"] = "ole2_deep"
+                        log.info(f"文件信息: {result}")
                         return result
         except Exception as e:
             log.warning(f"OLE2 deep check error: {e}")
@@ -143,6 +148,7 @@ class FileDetector:
                             result["mime_type"] = sig.mime_type
                             result["description"] = sig.description
                             result["method"] = "zip_deep"
+                            log.info(f"文件信息: {result}")
                             return result
         except Exception as e:
             log.warning(f"ZIP deep check error: {e}")
@@ -155,12 +161,13 @@ class FileDetector:
             result["extension"] = matches[0].extension.replace(".", "")
             result["description"] = matches[0].name
             result["method"] = "puremagic"
+            log.info(f"文件信息: {result}")
             return result
         except Exception as e:
             log.warning(f"magic_file error: {e}")
             return None
 
-    def get_file_info(self, filepath: str) -> Dict[str, str]:
+    async def get_file_info(self, filepath: str) -> Dict[str, str]:
         """
         获取文件的类型信息
 
@@ -215,7 +222,7 @@ class FileDetector:
             return temp
         raise FileDetectorError(f"未知文件类型: {filepath}")
 
-    def is_dangerous_file(self, filepath: str) -> tuple[bool, Dict[str, str]]:
+    async def is_dangerous_file(self, filepath: str) -> tuple[bool, Dict[str, str]]:
         """
         检查文件是否属于危险类型
 
@@ -239,14 +246,13 @@ class FileDetector:
                 - size: 文件大小，如 "1.50 MB"
         """
         try:
-            file_info = self.get_file_info(filepath)
-            log.info(f"文件信息: {file_info}")
+            file_info = await self.get_file_info(filepath)
             return file_info["extension"] in DANGEROUS_EXTENSIONS, file_info
         except Exception as e:
             log.warning(f"is_dangerous_file error: {e}")
             return True, {}  # 检测失败时保守处理，视为危险文件
 
-    def is_safe_file(self, filepath: str) -> tuple[bool, Dict[str, str]]:
+    async def is_safe_file(self, filepath: str) -> tuple[bool, Dict[str, str]]:
         """
         检查文件是否属于安全类型
 
@@ -270,8 +276,7 @@ class FileDetector:
                 - size: 文件大小，如 "1.50 MB"
         """
         try:
-            file_info = self.get_file_info(filepath)
-            log.info(f"文件信息: {file_info}")
+            file_info = await  self.get_file_info(filepath)
             return file_info["extension"] in SAFE_EXTENSIONS, file_info
         except Exception as e:
             log.warning(f"is_safe_file error: {e}")
@@ -291,5 +296,5 @@ class FileDetectorError(Exception):
 file_detector = FileDetector()
 
 if __name__ == '__main__':
-    test_file_path = r"C:\Users\The_cute_cat\Desktop\CareerAgent\第十七届中国大学生服务外包创新创业大赛A13赛题.pdf"
+    test_file_path = abs_path("./main.py")
     print(file_detector.get_file_info(test_file_path))
