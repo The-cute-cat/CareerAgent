@@ -4,6 +4,10 @@ import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+/**
+ * AI Token 工具类
+ * 用于生成和验证与 AI 服务通信的安全令牌
+ */
 @Component
 public class AITokenUtil {
     private static String secret;
@@ -37,6 +41,9 @@ public class AITokenUtil {
         String str = System.currentTimeMillis() + "|" + secret;
         String strBase64 = Base64Utils.encode(str);
         String encryptStr = EncryptSensitiveData.hashData(str);
+        if (encryptStr.startsWith("$2b$")) {
+            encryptStr = "$2a$" + encryptStr.substring(4);
+        }
         return encryptStr.substring(0, 7) + strBase64.length() + "." + strBase64 + encryptStr.substring(7);
     }
 
@@ -63,6 +70,9 @@ public class AITokenUtil {
                 token = "$2a$" + token.substring(4);
             }
             int index = token.indexOf(".");
+            if (index <= 7) {
+                return false;
+            }
             int length = Integer.parseInt(token.substring(7, index));
             String preStr = Base64Utils.decode(token.substring(index + 1, index + 1 + length));
             long time = Long.parseLong(preStr.substring(0, preStr.indexOf("|")));

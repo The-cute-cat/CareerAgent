@@ -1,40 +1,40 @@
-import os
-import io
-import re
-import docx
-import base64
 import asyncio
-import zipfile
+import base64
+import io
+import os
+import re
 import tempfile
-
+import zipfile
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import List, Optional, Any, Awaitable
+from typing import Optional, Any, Awaitable
+
+import docx
 from docx import Document
+from langchain_core.messages import BaseMessage, HumanMessage
 from langchain_core.output_parsers import StrOutputParser
-from langchain_core.messages import BaseMessage, SystemMessage, HumanMessage
+
+from ai_service.engine.ai_engine import AIEngine
 from ai_service.models.word import WordType
 from ai_service.utils.logger_handler import log
 from config import settings
-from ai_service.engine.ai_engine import AIEngine
-from concurrent.futures import ThreadPoolExecutor
 
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 from docling.document_converter import DocumentConverter, FormatOption
 from docling.datamodel.base_models import InputFormat, ConversionStatus
-from docling.datamodel.pipeline_options import PipelineOptions, PdfPipelineOptions
+from docling.datamodel.pipeline_options import PdfPipelineOptions
 from docling.backend.msword_backend import MsWordDocumentBackend
 from docling_core.types.doc.document import DoclingDocument
 from docling.pipeline.simple_pipeline import SimplePipeline
 
+__all__ = ["WordExtractor", "word_extractor"]
 
-__all__ = ["WordExtractor"]
 
 class WordExtractor:
     max_concurrent_requests: int = settings.llm.max_concurrent_requests  # 最大并发请求数
 
     # 设置线程池，用于处理同步阻塞方法（如Docling的convert方法），避免阻塞事件循环，同时限制最大并发请求数以防止过载
     _executor = ThreadPoolExecutor(max_workers=max_concurrent_requests)
-
 
     # 初始化大模型客户端
     def __init__(self):
@@ -68,8 +68,8 @@ class WordExtractor:
 
     # 解析word文件(文字、图片转文字)，最后返回增强markdown格式的纯文本
     async def detect_word_to_enhance_text(
-        self, word: str | bytes | Path,
-        password: Optional[str] = None
+            self, word: str | bytes | Path,
+            password: Optional[str] = None
     ) -> Optional[str]:
         """
         解析word文件(文字、图片转文字),最后返回增强markdown格式的纯文本
@@ -96,7 +96,7 @@ class WordExtractor:
             else:
                 # 如果是字节数据，先保存到临时文件
                 with tempfile.NamedTemporaryFile(
-                    delete=False, suffix=".docx"
+                        delete=False, suffix=".docx"
                 ) as tmp_file:
                     tmp_file.write(word)
                     word_path = tmp_file.name
@@ -146,9 +146,9 @@ class WordExtractor:
         finally:
             # 如果输入是字节数据，处理完成后删除临时文件
             if (
-                isinstance(word, bytes)
-                and word_path is not None
-                and Path(word_path).exists()
+                    isinstance(word, bytes)
+                    and word_path is not None
+                    and Path(word_path).exists()
             ):
                 try:
                     os.remove(word_path)
@@ -157,7 +157,7 @@ class WordExtractor:
 
     # 对图片内容进行增强，将图片中的文字提取出来并替换原有的图片占位符
     async def _enhance_image_with_ai(
-        self, document: DoclingDocument, markdown_text: str
+            self, document: DoclingDocument, markdown_text: str
     ) -> str:
         """
         对图片内容进行增强，将图片中的文字提取出来并替换原有的图片占位符
@@ -181,14 +181,14 @@ class WordExtractor:
             task = []
 
             for i, image in enumerate(document.pictures):
-                log.info(f"正在增强图片 {i+1}")
+                log.info(f"正在增强图片 {i + 1}")
                 if image.image is None:
-                    log.error(f"图片对象中没有有效的图片数据: 图片索引 {i+1}")
+                    log.error(f"图片对象中没有有效的图片数据: 图片索引 {i + 1}")
                     continue
                 # 1.提取文件字节流
                 real_pil_image = image.image.pil_image
                 if real_pil_image is None:
-                    log.error(f"无法提取图片的PIL对象: 图片索引 {i+1}")
+                    log.error(f"无法提取图片的PIL对象: 图片索引 {i + 1}")
                     continue
 
                 image_bytes_io = io.BytesIO()
@@ -219,7 +219,7 @@ class WordExtractor:
 
     # 将字符串列表转化为纯字符串
     @staticmethod
-    def list_to_string(texts: List[str]) -> str:
+    def list_to_string(texts: list[str]) -> str:
         return "\n".join(texts)
 
     # 检查文档中是否有文本(通过扫描ZIP包判断)
@@ -285,7 +285,7 @@ class WordExtractor:
                 # 图片通常存储在"word/media/"目录下，文件扩展名通常是.png、.jpg、.jpeg、.bmp等
                 for zip_info in zf.infolist():
                     if zip_info.filename.startswith(
-                        "word/media/"
+                            "word/media/"
                     ) and zip_info.filename.endswith((".png", ".jpg", ".jpeg", ".bmp")):
                         return True
             return False
@@ -295,7 +295,7 @@ class WordExtractor:
 
     # 提取文档中所有图片的embed_ids
     @staticmethod
-    def _extract_image_embed_ids(word_path: str) -> List[str]:
+    def _extract_image_embed_ids(word_path: str) -> list[str]:
         """
         提取文档中所有图片的embed_ids
         input:
@@ -378,8 +378,8 @@ class WordExtractor:
                 # 检查是否含宏
                 with zipfile.ZipFile(word_path, "r") as zip_ref:
                     if any(
-                        name.startswith("word/vbaProject.bin")
-                        for name in zip_ref.namelist()
+                            name.startswith("word/vbaProject.bin")
+                            for name in zip_ref.namelist()
                     ):
                         return WordType.MACRO_ENABLED
 
@@ -424,7 +424,7 @@ class WordExtractor:
 
     # 从word文档的XML文件中提取文本(暂时弃用)
     @staticmethod
-    def _extract_text(word_path: str, word_type: WordType) -> List[str]:
+    def _extract_text(word_path: str, word_type: WordType) -> list[str]:
         """
         从文件中提取文本
         input:
@@ -474,8 +474,8 @@ class WordExtractor:
     # 从文件中提取图片
     @staticmethod
     def _extract_images_bytes(
-        word_path: str, word_type: WordType
-    ) -> List[tuple[bytes, str]]:
+            word_path: str, word_type: WordType
+    ) -> list[tuple[bytes, str]]:
         """
         从文件中提取图片
         input:
@@ -505,7 +505,7 @@ class WordExtractor:
                 with zipfile.ZipFile(word_path, "r") as zip_ref:
                     for zip_info in zip_ref.infolist():
                         if zip_info.filename.startswith(
-                            "word/media/"
+                                "word/media/"
                         ) and zip_info.filename.endswith(
                             (".png", ".jpg", ".jpeg", ".bmp")
                         ):
@@ -524,7 +524,7 @@ class WordExtractor:
 
     # 通过调用阿里云多模态AI服务来检测图片中的内容(单张图片的检测逻辑)
     async def _detect_images(
-        self, image_data: bytes, image_suffix: str
+            self, image_data: bytes, image_suffix: str
     ) -> Optional[str]:
         """通过调用阿里云多模态AI服务来检测图片中的内容
         input:
@@ -552,7 +552,7 @@ class WordExtractor:
             file_header = f"data:image/{image_suffix};base64,{image_data_base64}"
             # 构造信息提示语,以便API正确理解任务需求
             # --- 核心修复点：遵循 OpenAI Vision 标准格式 ---
-            message: List[BaseMessage] = [
+            message: list[BaseMessage] = [
                 HumanMessage(
                     content=[
                         {
@@ -594,3 +594,6 @@ class WordExtractor:
     @staticmethod
     def security_check(word_path: str) -> bool:
         return True
+
+
+word_extractor = WordExtractor()

@@ -1,15 +1,26 @@
 package com.backend.careerplanningbackend;
 
-import cn.hutool.crypto.digest.BCrypt;
-import lombok.extern.slf4j.Slf4j;
+import com.backend.careerplanningbackend.domain.dto.AiChatResponse;
+import com.backend.careerplanningbackend.util.AiServiceClient;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
 
-@Slf4j
-public class test {
-    public static void main(String[] args) {
-//        String hashed = BCrypt.hashpw("123456", BCrypt.gensalt());
-//        System.out.println(hashed);
-        // 输出的字符串通常是以 $2a$10$ 开头的
+import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 
-        log.error("sdfds");
+@SpringBootTest
+class AiServiceClientTest {
+
+    @Autowired
+    private AiServiceClient client;
+
+    @Test
+    void testChatWithMessage() {
+        List<File> files = new ArrayList<>();
+        files.add(new File("C:\\Users\\The_cute_cat\\Desktop\\CareerAgent\\第十七届中国大学生服务外包创新创业大赛A13赛题.pdf"));
+        AiChatResponse result = client.chatWithFiles("/parse/pdf", files, "12345");
+        System.out.println(result);
     }
 }
