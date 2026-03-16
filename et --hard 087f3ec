@@ -1,0 +1,102 @@
+*   [33mf8f708d[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mbranch-le[m[33m, [m[1;31morigin/branch-le[m[33m)[m Merge branch 'master' into branch-le
+[31m|[m[32m\[m  
+[31m|[m * [33m087f3ec[m feat: 增加爬虫数据持久化和错误处理 (#20)
+[31m|[m * [33me841f0b[m * feat(ai-service): 新增 AI 引擎模块，采用分段建造者模式， 在配置文件中增加并发限制，更新有关word文档的识别逻辑并提供配套的测试文件
+* [32m|[m   [33m01fdb2a[m Merge branch 'branch-le' of https://github.com/The-cute-cat/CareerAgent into branch-le
+[33m|[m[34m\[m [32m\[m  
+[33m|[m * [32m|[m [33m373beba[m Merge branch 'master' into branch-le
+[33m|[m [35m|[m[32m\[m[32m|[m 
+[33m|[m [35m|[m * [33ma5ef509[m feat(ai-service): 新增 AI 引擎模块，采用分段建造者模式
+* [35m|[m [36m|[m [33m37ca6e7[m 更新word测试文件以及增加一些ai_engine所需的配置
+* [35m|[m [36m|[m [33m76878d3[m 更新README文件，新增架构约束与扩展规范部分
+[35m|[m[35m/[m [36m/[m  
+* [36m|[m [33m9982b99[m docs: 更新 AI Engine 模块README文档
+* [36m|[m [33m4dfd6e7[m Merge branch 'master' into branch-le
+[1;31m|[m[36m\[m[36m|[m 
+[1;31m|[m * [33m117f84b[m[33m ([m[1;31morigin/branch-li[m[33m)[m refactor: 移除未使用的路由配置文件 (#17)
+[1;31m|[m * [33mcde2828[m chore: 移除未使用的组件文件
+[1;31m|[m * [33macacadd[m Branch li (#15)
+[1;31m|[m * [33m08430dd[m Branch li (#14)
+[1;31m|[m * [33m8be4613[m 新增初始界面，以及部分模拟数据
+[1;31m|[m * [33m2757597[m feat: 添加智联招聘数据爬取脚本 (#12)
+[1;31m|[m * [33m5ab4261[m 在配置文件中增加并发限制，增加有关word文档的识别逻辑并提供配套的测试文件
+[1;31m|[m * [33mbfc97e5[m feat: 新增临时文件处理工具和图片视觉内容提取功能
+* [1;32m|[m [33ma4baac2[m feat(ai-service): 新增 AI 引擎模块，采用分段建造者模式
+* [1;32m|[m [33m0cb764b[m Merge branch 'master' into branch-le
+[1;33m|[m[1;32m\[m[1;32m|[m 
+[1;33m|[m *   [33m19063d4[m Merge remote-tracking branch 'origin/master' into master_yuan
+[1;33m|[m [1;35m|[m[1;36m\[m  
+[1;33m|[m [1;35m|[m * [33m42b9e36[m feat: 新增文件上传验证与解析功能
+[1;33m|[m * [1;36m|[m [33m86ec13d[m chore: 更新数据库配置和依赖 完成岗位的储存和json格式的保存
+[1;33m|[m * [1;36m|[m [33m65e1318[m Merge remote-tracking branch 'origin/master' into master_yuan
+[1;33m|[m [31m|[m[1;36m\[m[1;36m|[m 
+[1;33m|[m [31m|[m * [33me354795[m[33m ([m[1;31morigin/branch-ma[m[33m)[m pinia+双token
+[1;33m|[m * [32m|[m [33md653f32[m feat: 添加Excel数据读取与日期清洗功能 增加将EXcel表格内容转换为jobinfo列表
+[1;33m|[m * [32m|[m   [33m9a8d454[m Merge remote-tracking branch 'origin/master' into master_yuan
+[1;33m|[m [33m|[m[34m\[m [32m\[m  
+[1;33m|[m * [34m\[m [32m\[m   [33m8369406[m Merge remote-tracking branch 'origin/master' into master_yuan
+[1;33m|[m [35m|[m[36m\[m [34m\[m [32m\[m  
+[1;33m|[m * [36m|[m [34m|[m [32m|[m [33m90baff3[m chore: 初始化空提交
+[1;33m|[m * [36m|[m [34m|[m [32m|[m   [33m98010c8[m Merge remote-tracking branch 'origin/master' into master_yuan
+[1;33m|[m [1;31m|[m[1;32m\[m [36m\[m [34m\[m [32m\[m  
+[1;33m|[m * [1;32m|[m [36m|[m [34m|[m [32m|[m [33m04dfb22[m 添加了sqlalchemy
+* [1;32m|[m [1;32m|[m [36m|[m [34m|[m [32m|[m [33m93fdc79[m 在配置文件中增加并发限制，增加有关word文档的识别逻辑并提供配套的测试文件
+[32m|[m [1;32m|[m[32m_[m[1;32m|[m[32m_[m[36m|[m[32m_[m[34m|[m[32m/[m  
+[32m|[m[32m/[m[1;32m|[m [1;32m|[m [36m|[m [34m|[m   
+* [1;32m|[m [1;32m|[m [36m|[m [34m|[m [33m0ad7dab[m feat: 新增图像提取器模块并增强文件类型检测能力
+* [1;32m|[m [1;32m|[m [36m|[m [34m|[m [33md0850e6[m Branch zhou (#6)
+* [1;32m|[m [1;32m|[m [36m|[m [34m|[m [33mf565329[m fix: 修复配置问题，并增加PDF识别功能
+* [1;32m|[m [1;32m|[m [36m|[m [34m|[m [33m22bddf1[m fix: 修复配置问题，并增加PDF识别功能
+[34m|[m [1;32m|[m[34m_[m[1;32m|[m[34m_[m[36m|[m[34m/[m  
+[34m|[m[34m/[m[1;32m|[m [1;32m|[m [36m|[m   
+* [1;32m|[m [1;32m|[m [36m|[m [33mef11af8[m 合井远程仓库的前后联调
+* [1;32m|[m [1;32m|[m [36m|[m   [33m12464f9[m 合并远程仓库的,前后联调
+[1;33m|[m[1;34m\[m [1;32m\[m [1;32m\[m [36m\[m  
+[1;33m|[m * [1;32m\[m [1;32m\[m [36m\[m   [33m817be25[m Merge pull request #3 from The-cute-cat/branch-li
+[1;33m|[m [36m|[m[1;36m\[m [1;32m\[m [1;32m\[m [36m\[m  
+[1;33m|[m [36m|[m [1;36m|[m[36m_[m[1;32m|[m[36m_[m[1;32m|[m[36m/[m  
+[1;33m|[m [36m|[m[36m/[m[1;36m|[m [1;32m|[m [1;32m|[m   
+[1;33m|[m [36m|[m * [1;32m|[m [1;32m|[m [33mb709461[m feat: 添加 Vue 类型声明和依赖锁定文件
+[1;33m|[m [36m|[m[36m/[m [1;32m/[m [1;32m/[m  
+[1;33m|[m * [1;32m|[m [1;32m|[m [33m57d24e5[m feat: 添加 LLM 配置和 PDF 提取器功能
+[1;33m|[m * [1;32m|[m [1;32m|[m [33m59cb74c[m feat: 添加文件类型检测和PDF类型识别功能
+[1;33m|[m [1;32m|[m [1;32m|[m[1;32m/[m  
+[1;33m|[m [1;32m|[m[1;32m/[m[1;32m|[m   
+[1;33m|[m * [1;32m|[m [33m75b0fee[m[33m ([m[1;31morigin/member_yuan[m[33m)[m feat: 添加通信服务令牌配置及验证功能
+* [1;36m|[m [1;32m|[m [33m2f90b85[m java前后端联调
+[1;36m|[m[1;36m/[m [1;32m/[m  
+* [1;32m|[m [33mdec3465[m 功能：新增注册组件与用户状态管理模块，移除未使用的组件
+* [1;32m|[m [33m00ca024[m feat: 添加AI令牌生成和验证功能
+* [1;32m|[m   [33m72a8bee[m Merge remote-tracking branch 'origin/branch-ma'
+[31m|[m[32m\[m [1;32m\[m  
+[31m|[m * [1;32m\[m   [33m7a8c4c1[m Merge remote-tracking branch 'origin/branch-ma' into branch-ma
+[31m|[m [33m|[m[34m\[m [1;32m\[m  
+[31m|[m [33m|[m * [1;32m|[m [33mc1ef744[m refactor--规范地完善了一下user的所有代码--maq
+[31m|[m * [34m|[m [1;32m|[m [33m80c98b6[m 新的提交描述
+[31m|[m [34m|[m[34m/[m [1;32m/[m  
+[31m|[m * [1;32m|[m [33m2c1f829[m 统一的Result应该改成这样子更好看一些
+[31m|[m * [1;32m|[m [33mc2aaee7[m 统一的Result应该改成这样子更好看一些
+[31m|[m * [1;32m|[m [33m9e3d58a[m 统一的Result应该改成这样子更好看一些
+[31m|[m * [1;32m|[m [33m5980d56[m BCrypt加密测试代码
+[31m|[m * [1;32m|[m [33m90e6ff8[m 在gitgnore里面设置将application.yml里面的东西设置不检查永远不上传到仓库里面去
+[31m|[m * [1;32m|[m [33m61cca18[m 先提交双token代码还没有测试
+[31m|[m * [1;32m|[m [33m399df93[m ce
+[31m|[m * [1;32m|[m [33md6c36db[m ce
+[31m|[m * [1;32m|[m [33m7608cd3[m ce
+[31m|[m * [1;32m|[m [33m270d4b4[m 添加了一些校验逻辑
+* [34m|[m [1;32m|[m [33m3916135[m BCrypt加密测试代码
+* [34m|[m [1;32m|[m [33mff5d552[m 在gitgnore里面设置将application.yml里面的东西设置不检查永远不上传到仓库里面去
+* [34m|[m [1;32m|[m [33mcd95263[m 先提交双token代码还没有测试
+* [34m|[m [1;32m|[m [33maac7116[m ce
+* [34m|[m [1;32m|[m [33m08e0c41[m ce
+* [34m|[m [1;32m|[m [33m94582bd[m ce
+* [34m|[m [1;32m|[m [33m3d659cc[m 添加了一些校验逻辑
+* [34m|[m [1;32m|[m   [33m03b7012[m Merge remote-tracking branch 'origin/master'
+[35m|[m[36m\[m [34m\[m [1;32m\[m  
+[35m|[m * [34m|[m [1;32m|[m [33mbd3985e[m application设置一下
+* [36m|[m [34m|[m [1;32m|[m [33md99b3f9[m 修复环境文件读取问题
+[36m|[m[36m/[m [34m/[m [1;32m/[m  
+* [34m|[m [1;32m|[m [33me4aa69f[m Merge remote-tracking branch 'origin/branch-ma'
+[1;31m|[m[34m\[m[34m|[m [1;32m|[m 
+[1;31m|[m * [1;32m|[m [33mcc14b06[m 测试分支
+[1;31m|[m * [1;32m|[m [33mf0f5eaf
