@@ -33,7 +33,7 @@ class ImageExtractor:
         )
 
     @staticmethod
-    def validate_image(image_path: str) -> dict:
+    async def validate_image(image_path: str) -> dict:
         """
         验证图片文件是否符合处理要求
 
@@ -98,7 +98,7 @@ class ImageExtractor:
         return result
 
     @staticmethod
-    def preprocess_image(image_path: str) -> None:
+    async def preprocess_image(image_path: str) -> None:
         """
         预处理图片：调整尺寸和压缩大小
 
@@ -129,7 +129,7 @@ class ImageExtractor:
         """将图片字节数据转换为 Base64 编码字符串"""
         return base64.b64encode(image_bytes).decode("utf-8")
 
-    def _identify_image(self, image_path: str = None, image_bytes: bytes = None, prompt: str = "",
+    async def _identify_image(self, image_path: str = None, image_bytes: bytes = None, prompt: str = "",
                         llm: ChatOpenAI = None) -> str | None:
         if not image_path and not image_bytes:
             log.warning("请传入图片路径或图片字节数组")
@@ -168,7 +168,7 @@ class ImageExtractor:
             log.warning(f"Failed to extract page content: {e}", exc_info=True)
             return None
 
-    def extract_text(self, image_path: str = None, image_bytes: bytes = None, prompt: str = "",
+    async def extract_text(self, image_path: str = None, image_bytes: bytes = None, prompt: str = "",
                      llm: ChatOpenAI = None) -> str | None:
         """
         使用视觉模型提取图片中的文本内容
@@ -188,19 +188,19 @@ class ImageExtractor:
         if not image_path and not image_bytes:
             log.warning("请传入图片路径或图片字节数组")
             raise ValueError("请传入图片路径或图片字节数组")
-        return self._identify_image(
+        return await self._identify_image(
             image_path,
             image_bytes,
             prompt if prompt else prompt_loader.image_extract_text,
             llm if llm else self.llm
         )
 
-    def extract_visual_content(self, image_path: str = None, image_bytes: bytes = None, prompt: str = "",
+    async def extract_visual_content(self, image_path: str = None, image_bytes: bytes = None, prompt: str = "",
                         llm: ChatOpenAI = None):
         if not image_path and not image_bytes:
             log.warning("请传入图片路径或图片字节数组")
             raise ValueError("请传入图片路径或图片字节数组")
-        return self._identify_image(
+        return await self._identify_image(
             image_path,
             image_bytes,
             prompt if prompt else prompt_loader.image_extract_visual_content,
@@ -209,9 +209,3 @@ class ImageExtractor:
 
 
 image_extractor = ImageExtractor()
-
-if __name__ == "__main__":
-    test_image_path = r"D:\文件\Hello world.html"
-    print(image_extractor.validate_image(test_image_path))
-    #print(image_extractor.extract_visual_content(image_path=test_image_path))
-    pass
