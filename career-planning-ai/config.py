@@ -11,7 +11,7 @@ from pydantic import BaseModel, field_validator, SecretStr, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic_settings.sources import InitSettingsSource
 
-__all__ = ["settings"]
+__all__ = ["settings", "LLM", "Database", "Communication", "PDF", "Image", "PathConfig"]
 
 from ai_service.utils.path_tool import abs_path, get_project_root, get_abs_path
 
@@ -77,9 +77,6 @@ class LLM(BaseModel):
             raise ValueError("请在 .env 文件中配置正确的 LLM API Key")
         return v
 
-class PathConfig(BaseModel):
-    """路径配置嵌套类"""
-    temp: str = ""  # 临时文件路径
 
 class PDF(BaseModel):
     model_name: str = ""
