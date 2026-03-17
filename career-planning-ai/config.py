@@ -11,7 +11,7 @@ from pydantic import BaseModel, field_validator, SecretStr, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic_settings.sources import InitSettingsSource
 
-__all__ = ["settings", "LLM", "Database", "Communication", "PDF", "Image", "PathConfig"]
+__all__ = ["settings","LLM"]
 
 from ai_service.utils.path_tool import abs_path, get_project_root, get_abs_path
 

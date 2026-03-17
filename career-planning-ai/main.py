@@ -1,16 +1,18 @@
-
-
 from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import JSONResponse
 
 from ai_service.exceptions import ApiException
+from ai_service.response.result import success
 from ai_service.routers import parse
 
 app = FastAPI()
 
-app.include_router(parse.router)
+app.include_router(
+    parse.router,
+)
+
 
 @app.exception_handler(ApiException)
 async def api_exception_handler(_: Request, exc: ApiException):
@@ -24,6 +26,7 @@ async def api_exception_handler(_: Request, exc: ApiException):
         })
     )
 
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # 允许所有来源
@@ -35,4 +38,4 @@ app.add_middleware(
 
 @app.get("/")
 async def root():
-    return "Emptiness is also an attitude!(=^･ω･^=)"
+    return success("Emptiness is also an attitude!(=^･ω･^=)")

@@ -8,16 +8,15 @@ from typing import (
     List,
     Generic,
 )
-import litellm
+
 import instructor
-from pydantic import BaseModel, Field
+import litellm
 from langchain_core.messages import (
     BaseMessage,
-    SystemMessage,
-    HumanMessage,
-    AIMessage,
 )
-from config import LLM
+from pydantic import BaseModel
+
+from ai_service.engine.action_type import ActionType
 from ai_service.engine.ai_state import AIState  # 引入 AIState 类
 from ai_service.utils.logger_handler import log
 from ai_service.engine.action_type import ActionType
@@ -28,6 +27,7 @@ from ai_service.engine.exceptions import (
     TextGenerationError,
     StreamInterruptedError,
 )
+from config import LLM
 
 __all__ = ["AIEngine"]
 

@@ -36,7 +36,7 @@ const goReport = () => {
   <div class="upload-page">
     <el-card class="box-card">
       <template #header>上传个人简历</template>
-      
+
       <!-- 步骤条 -->
       <el-steps :active="activeStep" finish-status="success" align-center>
         <el-step title="上传简历" />
