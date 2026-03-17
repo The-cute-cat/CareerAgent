@@ -1,4 +1,3 @@
-#file: noinspection SpellCheckingInspection
 server:
   port: 8080
 spring:
@@ -69,6 +68,7 @@ mybatis-plus:
   configuration:
     map-underscore-to-camel-case: true
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    mapper-locations: classpath:mapper/*.xml
 communication:
   token:
     secret: ${<SECRET>}
