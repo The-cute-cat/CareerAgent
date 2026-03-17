@@ -104,15 +104,6 @@ src/ai_service/engine/
 ```
 
 ---
-
-## 快速开始
-
-### 安装依赖
-
-```bash
-pip install litellm instructor pydantic langchain-core
-```
-
 ### 基础示例：文本生成
 
 ```python
