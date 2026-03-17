@@ -1,5 +1,5 @@
 //统一管理用户相关的接口
-import request from '@/utils/request3'
+import request from '@/utils/request'
 import type { loginForm, userInfoResponseData } from '../../types/type'
 
 // 定义接口枚举，方便管理和维护
@@ -19,7 +19,7 @@ export const register = (data: loginForm) => {
 
 // 获取用户信息接口
 export const getUserInfo = () => {
-  return request.get<any, userInfoResponseData>(API.GET_USER_INFO)
+  return request.get<userInfoResponseData>(API.GET_USER_INFO)
 }
 // 用户登出接口
 export const logout = () => {

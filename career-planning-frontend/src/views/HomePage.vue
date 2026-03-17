@@ -16,11 +16,11 @@ const radarChartRef = ref<HTMLElement | null>(null)
 // 快捷功能卡片数据
 const quickActions = [
   {
-    title: '上传简历',
+    title: '简历填写',
     icon: Upload,
-    desc: '点击上传简历',
+    desc: '点击填写简历信息',
     color: '#409eff',
-    route: '/upload'
+    route: '/career-form'
   },
   {
     title: '查看匹配',

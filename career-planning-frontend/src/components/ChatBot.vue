@@ -306,8 +306,8 @@ const handleKeydown = (e: KeyboardEvent) => {
   position: absolute;
   right: 0;
   bottom: 80px;
-  width: 380px;
-  height: 520px;
+  width: 450px;
+  height: 580px;
   background: white;
   border-radius: 16px;
   box-shadow: 0 8px 40px rgba(0, 0, 0, 0.15);
@@ -494,18 +494,31 @@ const handleKeydown = (e: KeyboardEvent) => {
 }
 
 .quick-tag {
-  padding: 6px 12px;
+  padding: 8px 14px;
   background: #f0f2f5;
-  border-radius: 16px;
+  border-radius: 18px;
   font-size: 12px;
   color: #606266;
   cursor: pointer;
   transition: all 0.2s;
+  white-space: nowrap;
+  flex: 0 0 auto;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
 }
 
 .quick-tag:hover {
   background: #e6f2ff;
   color: #409eff;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.2);
+}
+
+.quick-tag:active {
+  transform: translateY(0);
+  box-shadow: none;
 }
 
 /* 输入区域 */
