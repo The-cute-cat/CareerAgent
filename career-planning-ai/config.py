@@ -77,9 +77,6 @@ class LLM(BaseModel):
             raise ValueError("请在 .env 文件中配置正确的 LLM API Key")
         return v
 
-class PathConfig(BaseModel):
-    """路径配置嵌套类"""
-    temp: str = ""  # 临时文件路径
 
 class PDF(BaseModel):
     model_name: str = ""

@@ -19,7 +19,17 @@ from pydantic import BaseModel
 from ai_service.engine.action_type import ActionType
 from ai_service.engine.ai_state import AIState  # 引入 AIState 类
 from ai_service.utils.logger_handler import log
+from ai_service.engine.action_type import ActionType
+from ai_service.engine.exceptions import (
+    ModelNotSpecifiedError,
+    EmptyInputError,
+    StructExtractionError,
+    TextGenerationError,
+    StreamInterruptedError,
+)
 from config import LLM
+
+__all__ = ["AIEngine"]
 
 """
 AI引擎模块,封装了与大模型交互的逻辑，提供统一的接口供上层调用，
@@ -74,6 +84,7 @@ class BaseStep:
         """
         self._state = state
         self._engine = engine
+        log.debug(f"[阶段初始化] {self.__class__.__name__} 已创建")
 
 
 # =====================================================================
@@ -124,20 +135,40 @@ class StructActionStep(Generic[T], BaseStep):
             ...     .next_step().next_step().into_struct(Person).do()
         """
         try:
+            log.info(f"[结构化提取] 开始执行 | 模型: {self._state.model.model_name if self._state.model else 'unknown'} | Schema: {self.schema.__name__}")
+
             messages = self._state._compile_messages()
+            log.debug(f"[结构化提取] 消息编译完成 | 消息数量: {len(messages)}")
+
             # 准备参数字典，避免传递空的 fallbacks 报错
             kwargs = self._state.to_litellm_params()
             kwargs["response_model"] = (
                 self.schema
             )  # 直接传入 Pydantic 模型类，LiteLLM 会自动处理结构化输出
             kwargs["messages"] = messages  # 直接传入编译好的消息列表，避免重复处理
+
+            log.debug(f"[结构化提取] LLM参数: temperature={kwargs.get('temperature', 'default')}, max_tokens={kwargs.get('max_tokens', 'default')}")
+
             # 【核心修复点】: 显式指定模式为 MD_JSON
             # 这会告诉 Instructor：不要走脆弱的 tool_call 协议
             # 而是让 AI 输出 ```json ... ``` 块，然后我们来解析
-            return await self._engine.struct_client.chat.completions.create(**kwargs)
+            result = await self._engine.struct_client.chat.completions.create(**kwargs)
+
+            log.info(f"[结构化提取] 执行成功 | Schema: {self.schema.__name__}")
+            return result
+        except StructExtractionError:
+            log.error(f"[结构化提取] 框架异常 | Schema: {self.schema.__name__}")
+            # 已经是框架异常，直接向上抛出
+            raise
         except Exception as e:
-            log.error(f"结构化提取失败[{self.schema.__name__}]: {e}")
-            return None
+            log.error(f"[结构化提取] 执行失败 | Schema: {self.schema.__name__} | 错误: {str(e)}", exc_info=True)
+            # 包装为框架异常
+            raise StructExtractionError(
+                schema=self.schema,
+                message="结构化提取失败",
+                context={"model": self._state.model.model_name if self._state.model else "unknown"},
+                cause=e
+            ) from e
 
 
 class TextActionStep(BaseStep):
@@ -169,17 +200,34 @@ class TextActionStep(BaseStep):
             ...     .next_step().next_step().into_text().do()
         """
         try:
+            log.info(f"[文本生成] 开始执行 | 模型: {self._state.model.model_name if self._state.model else 'unknown'}")
+
             messages = self._state._compile_messages()
+            log.debug(f"[文本生成] 消息编译完成 | 消息数量: {len(messages)}")
+
             kwargs = self._state.to_litellm_params()
             kwargs["messages"] = messages  # 直接传入编译好的消息列表，避免重复处理
+
+            log.debug(f"[文本生成] LLM参数: temperature={kwargs.get('temperature', 'default')}, max_tokens={kwargs.get('max_tokens', 'default')}")
+
             response = await self._engine.text_client(**kwargs)
 
             content = response.choices[0].message.content
-            return content if content else "没有返回任何内容。"
+            result = content if content else "没有返回任何内容。"
+            log.info(f"[文本生成] 执行成功 | 返回长度: {len(result)} 字符")
+            return result
+        except TextGenerationError:
+            log.error(f"[文本生成] 框架异常")
+            # 已经是框架异常，直接向上抛出
+            raise
         except Exception as e:
-            # 建议：生产环境下不要吞掉异常，向上抛出让 Service 层决定如何降级
-            log.error(f"文本生成失败: {e}", exc_info=True)
-            raise  # 或者返回自定义的错误枚举
+            log.error(f"[文本生成] 执行失败 | 错误: {str(e)}", exc_info=True)
+            # 包装为框架异常
+            raise TextGenerationError(
+                message="文本生成失败",
+                context={"model": self._state.model.model_name if self._state.model else "unknown"},
+                cause=e
+            ) from e
 
     async def stream(self) -> AsyncIterable[str]:
         """
@@ -197,20 +245,36 @@ class TextActionStep(BaseStep):
             ...     print(chunk, end="", flush=True)
         """
         try:
+            log.info(f"[流式生成] 开始执行 | 模型: {self._state.model.model_name if self._state.model else 'unknown'}")
+
             messages = self._state._compile_messages()
+            log.debug(f"[流式生成] 消息编译完成 | 消息数量: {len(messages)}")
+
             kwargs = self._state.to_litellm_params()
             kwargs["stream"] = True  # 开启流式输出
             kwargs["messages"] = messages
 
             response = await self._engine.text_client(**kwargs)
             # 异步迭代生成器
+            chunk_count = 0
             async for chunk in response:
                 content = chunk.choices[0].delta.content
                 if content:
+                    chunk_count += 1
                     yield content
+            log.info(f"[流式生成] 执行完成 | 共生成 {chunk_count} 个片段")
+        except StreamInterruptedError:
+            log.error(f"[流式生成] 框架异常")
+            # 已经是框架异常，直接向上抛出
+            raise
         except Exception as e:
-            log.error(f"流式生成中断: {e}")
-            yield "\n[网络连接中断，请稍后重试]"
+            log.error(f"[流式生成] 执行中断 | 错误: {str(e)}", exc_info=True)
+            # 流式输出的异常处理：记录日志并抛出异常
+            raise StreamInterruptedError(
+                message="流式生成中断",
+                context={"model": self._state.model.model_name if self._state.model else "unknown"},
+                cause=e
+            ) from e
 
 
 # =====================================================================
@@ -242,12 +306,14 @@ class ShapeStep(BaseStep):
             >>> step = engine.pick_brain(model).add_text("...").next_step().next_step()
             >>> result = await step.into_struct(MySchema).do()
         """
+        log.info(f"[空间投射] 选择结构化输出 | Schema: {schema.__name__}")
         optimized_state = self._state
         if "temperature" not in optimized_state.llm_params:
+            log.debug(f"[空间投射] 自动优化: 设置 temperature=0.1 以提高结构化输出稳定性")
             optimized_state = optimized_state.evolve(
                 ActionType.SET_LLM_PARAMS, {"temperature": 0.1}
             )
-        return StructActionStep(self._state, self._engine, schema)
+        return StructActionStep(optimized_state, self._engine, schema)
 
     def into_text(self) -> TextActionStep:
         """
@@ -260,6 +326,7 @@ class ShapeStep(BaseStep):
             >>> step = engine.pick_brain(model).add_text("...").next_step().next_step()
             >>> result = await step.into_text().do()
         """
+        log.info(f"[空间投射] 选择文本输出")
         return TextActionStep(self._state, self._engine)
 
 
@@ -293,6 +360,7 @@ class TuneStep(BaseStep):
             >>> step = engine.pick_brain(model).add_text("...").next_step()\\
             ...     .set_llm_params(temperature=0.7, max_tokens=1000)
         """
+        log.debug(f"[行为对齐] 设置LLM参数: {params}")
         return TuneStep(self._state.evolve(ActionType.SET_LLM_PARAMS, params), self._engine)
 
     def with_metadata(self, **kwargs: Any) -> "TuneStep":
@@ -310,6 +378,7 @@ class TuneStep(BaseStep):
         Example:
             >>> step.with_metadata(request_id="req-123", user_id="user-456")
         """
+        log.debug(f"[行为对齐] 附加元数据: {kwargs}")
         return TuneStep(self._state.evolve(ActionType.WITH_METADATA, kwargs), self._engine)
 
     def next_step(self) -> ShapeStep:
@@ -319,6 +388,7 @@ class TuneStep(BaseStep):
         Returns:
             ShapeStep: 空间投射步骤实例
         """
+        log.info(f"[行为对齐] 完成对齐，进入投射阶段")
         return ShapeStep(self._state, self._engine)
 
 
@@ -352,6 +422,8 @@ class InputStep(BaseStep):
         Example:
             >>> engine.pick_brain(model).set_system_role("你是一个资深的 Python 开发专家")
         """
+        log.info(f"[上下文注入] 设置系统角色 | 长度: {len(role)} 字符")
+        log.debug(f"[上下文注入] 角色内容摘要: {role[:100]}..." if len(role) > 100 else f"[上下文注入] 角色内容: {role}")
         return InputStep(self._state.evolve(ActionType.SET_SYSTEM_ROLE, role), self._engine)
 
     def set_history(self, history: List[Dict[str, Any]]) -> "InputStep":
@@ -374,6 +446,7 @@ class InputStep(BaseStep):
             ... ]
             >>> engine.pick_brain(model).set_history(history)
         """
+        log.info(f"[上下文注入] 设置对话历史 | 历史消息数: {len(history)}")
         return InputStep(
             self._state.evolve(ActionType.SET_HISTORY, history), self._engine
         )
@@ -394,6 +467,7 @@ class InputStep(BaseStep):
             ...     .add_history_message("user", "什么是 Python？")\\
             ...     .add_history_message("assistant", "Python 是一种编程语言...")
         """
+        log.debug(f"[上下文注入] 追加历史消息 | 角色: {role} | 内容长度: {len(content)}")
         new_message = {"role": role, "content": content}
         return InputStep(
             self._state.evolve(ActionType.ADD_HISTORY_MESSAGE, new_message),
@@ -418,6 +492,8 @@ class InputStep(BaseStep):
             ...     .add_instruction("请分析以下文本的情感")\\
             ...     .add_instruction("输出格式：正面/负面/中性")
         """
+        log.info(f"[上下文注入] 添加任务指令 | 长度: {len(task)} 字符")
+        log.debug(f"[上下文注入] 指令内容摘要: {task[:100]}..." if len(task) > 100 else f"[上下文注入] 指令内容: {task}")
         return InputStep(
             self._state.evolve(ActionType.ADD_INSTRUCTION, task), self._engine
         )
@@ -439,6 +515,7 @@ class InputStep(BaseStep):
             >>> engine.pick_brain(model)\\
             ...     .add_context("公司背景：这是一家成立于 2020 年的 AI 初创公司...")
         """
+        log.info(f"[上下文注入] 添加上下文知识 | 长度: {len(knowledge)} 字符")
         return InputStep(
             self._state.evolve(ActionType.ADD_CONTEXT, knowledge), self._engine
         )
@@ -461,6 +538,7 @@ class InputStep(BaseStep):
             ...     .add_example("今天天气真好", "正面")\\
             ...     .add_example("我很难过", "负面")
         """
+        log.debug(f"[上下文注入] 添加Few-shot示例 | 输入长度: {len(input_val)} | 输出长度: {len(output_val)}")
         example_data = {"input": input_val, "output": output_val}
         return InputStep(
             self._state.evolve(ActionType.ADD_EXAMPLE, example_data), self._engine
@@ -483,6 +561,7 @@ class InputStep(BaseStep):
             >>> from langchain_core.messages import HumanMessage
             >>> engine.pick_brain(model).add_langChain_message([HumanMessage("你好")])
         """
+        log.info(f"[上下文注入] 注入LangChain消息 | 消息数: {len(msg)}")
         return InputStep(
             self._state.evolve(ActionType.ADD_LANGCHAIN_MESSAGE, msg), self._engine
         )
@@ -504,6 +583,8 @@ class InputStep(BaseStep):
             ...     .add_text("文章标题：AI 的未来")\\
             ...     .add_text("文章内容：人工智能正在改变世界...")
         """
+        log.info(f"[上下文注入] 添加文本数据 | 长度: {len(text)} 字符")
+        log.debug(f"[上下文注入] 文本摘要: {text[:100]}..." if len(text) > 100 else f"[上下文注入] 文本内容: {text}")
         return InputStep(
             self._state.evolve(ActionType.ADD_TEXT, text), self._engine
         )
@@ -526,6 +607,8 @@ class InputStep(BaseStep):
             ...     .add_text("请描述这张图片")\\
             ...     .add_image_url("https://example.com/image.jpg")
         """
+        is_url = base64_or_url.startswith("http")
+        log.info(f"[上下文注入] 添加图像 | 类型: {'URL' if is_url else 'Base64'} | 数据长度: {len(base64_or_url)}")
         return InputStep(
             self._state.evolve(ActionType.ADD_IMAGE_URL, base64_or_url), self._engine
         )
@@ -553,10 +636,18 @@ class InputStep(BaseStep):
             or self._state.instructions
             or self._state.history
         )
+
+        # 记录注入统计
+        log.info(f"[上下文注入] 注入完成 | 数据项: {len(self._state.user_data)} | 指令项: {len(self._state.instructions)} | 历史项: {len(self._state.history)}")
+
         if not has_input:
-            raise ValueError(
-                "编译错误：必须至少注入 指令、数据 或 历史记录 中的一项。"
+            log.error(f"[上下文注入] 编译错误: 未注入任何有效输入")
+            raise EmptyInputError(
+                "编译错误：必须至少注入 指令、数据 或 历史记录 中的一项。",
+                context={"user_data": len(self._state.user_data), "instructions": len(self._state.instructions), "history": len(self._state.history)}
             )
+
+        log.info(f"[上下文注入] 完成注入，进入行为对齐阶段")
         return TuneStep(self._state, self._engine)
 
 
@@ -635,12 +726,20 @@ class AIEngine:
             ...     model_fallbacks=[settings.llm.deepseek]
             ... )
         """
+        log.info(f"[算力锚定] 开启新流水线 | 主模型: {model.model_name if model else 'None'} | 备选模型数: {len(model_fallbacks) if model_fallbacks else 0}")
+        if model_fallbacks:
+            log.debug(f"[算力锚定] 备选模型: {[m.model_name for m in model_fallbacks]}")
+
         state = AIState(
             model=model,
             model_fallbacks=model_fallbacks or []
         )
 
         if not state.model:
-            raise ValueError("编译错误：必须指定一个有效的模型名称")
+            log.error(f"[算力锚定] 模型配置无效 | 收到类型: {type(model).__name__ if model else 'None'}")
+            raise ModelNotSpecifiedError(
+                context={"received_type": type(model).__name__ if model else "None"}
+            )
 
+        log.info(f"[算力锚定] 流水线创建成功，进入上下文注入阶段")
         return InputStep(state, self)
