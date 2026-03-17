@@ -31,7 +31,7 @@ const sendCode = async () => {
     const res = await userSendCodeForgetService(form.value)
     console.log('发送验证码结果:', res)
     if (res.data.code !== 200) {
-      throw new Error(res.data.message || '验证码发送失败')
+      throw new Error(res.data.msg || '验证码发送失败')
     }
     step.value = 2
   } catch (error) {
@@ -54,7 +54,7 @@ const resetPassword = async () => {
     const res = await userForgetPasswordService(form.value)
     console.log('重置密码结果:', res)
     if (res.data.code !== 200) {
-      ElMessage.error(res.data.message || '重置失败')
+      ElMessage.error(res.data.msg || '重置失败')
     }
     router.push('/login')
   } catch (error) {

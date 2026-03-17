@@ -29,9 +29,9 @@ const router = createRouter({
           component: () => import('../views/HomePage.vue'), // 首页
         },
         {
-          path: 'upload',
-          name: 'upload',
-          component: () => import('../views/Upload.vue'),
+          path: 'career-form',
+          name: 'career-form',
+          component: () => import('../views/CareerForm.vue'),
         },
         {
           path: 'report',

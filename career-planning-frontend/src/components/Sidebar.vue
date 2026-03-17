@@ -10,7 +10,7 @@ import {
   Menu as IconMenu,
   TrendCharts,
   Setting
-} from '@element-plus/icons-vue'
+} from '@element-plus/icons-vue'//element-plus自带的图标组件
 
 const route = useRoute()
 const router = useRouter()
@@ -28,7 +28,7 @@ const handleSelect = (index) => {
 // 菜单配置项 (方便后续扩展)
 const menuItems = [
   { index: '/', icon: House, text: '首页' },
-  { index: '/upload', icon: Document, text: '能力画像' },
+  { index: '/career-form', icon: Document, text: '能力画像' },
   { index: '/match', icon: TrendCharts, text: '人岗匹配' },
   { index: '/report', icon: DataAnalysis, text: '生涯报告' },
   { index: '/development-map', icon: User, text: '发展图谱' },

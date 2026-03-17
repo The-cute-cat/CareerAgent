@@ -1,4 +1,4 @@
-// src/utils/request.ts 导入axios
+
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/index'
@@ -33,7 +33,10 @@ instance.interceptors.request.use((config) => {
 
 //添加响应拦截器
 instance.interceptors.response.use(
-  (result) => result,
+  (result) => {
+    // 保持返回完整响应对象，不影响已对接的接口
+    return result
+  },
   async (err) => {
     console.log('登录错误', err.response)
     if (err.response.status === 401) {
@@ -107,3 +110,4 @@ function logout() {
 }
 
 export default instance
+

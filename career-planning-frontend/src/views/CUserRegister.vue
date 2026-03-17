@@ -39,7 +39,7 @@ const sendVerificationCode = async () => {
     const res = await userSendCodeRegisterService(form.value) // 这里可以调用实际的发送验证码API
     console.log('验证码发送结果:', res)
     if (res.data.code !== 200) {
-      ElMessage.error(res.data.message || '验证码发送失败')
+      ElMessage.error(res.data.msg || '验证码发送失败')
     }
     ElMessage.success(`验证码已发送至 ${form.value.email}，请查收`)
     // 启动倒计时 60 秒
@@ -81,7 +81,7 @@ const handleRegister = async () => {
     const res = await userRegisterService(form.value)
     console.log('注册结果:', res)
     if (res.data.code !== 200) {
-      ElMessage.error(res.data.message || '注册失败')
+      ElMessage.error(res.data.msg || '注册失败')
     }
     userStore.clearUserALLInfo() // 清除用户信息，确保注册流程干净
     ElMessage.success('注册成功，请登录')
@@ -105,10 +105,6 @@ onUnmounted(() => {
 })
 </script>
 
-<<<<<<<< HEAD:career-planning-frontend/src/components/CUserRegister.vue
-========
-
->>>>>>>> b49329c (功能: 添加用户登录和注册视图，包含表单验证和通知功能):career-planning-frontend/src/views/CUserRegister.vue
 <template>
   <link href="https://fonts.googleapis.com/css?family=Lato:300,400,700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
@@ -209,11 +205,6 @@ onUnmounted(() => {
   </section>
 </template>
 
-<<<<<<<< HEAD:career-planning-frontend/src/components/CUserRegister.vue
-<style>
-@import '/public/css/style.css';
-========
-
 <style scoped>
 @import '/css/style.css';
 
@@ -301,7 +292,6 @@ h3.mb-4 {
   color: #201f1f;
   margin-bottom: 20px;
 }
->>>>>>>> b49329c (功能: 添加用户登录和注册视图，包含表单验证和通知功能):career-planning-frontend/src/views/CUserRegister.vue
 
 /* 补充样式，确保发送验证码按钮与输入框对齐 */
 .d-flex.gap-2 {
