@@ -2,6 +2,7 @@
 import { ref, nextTick } from 'vue'
 import { ChatDotRound, Close, Promotion } from '@element-plus/icons-vue'
 import VueMarkdown from 'vue-markdown-render'
+import { chatBotWelcomeMessage, chatBotReplies } from '@/mock/data'
 
 // 控制对话框显示
 const dialogVisible = ref(false)
@@ -19,7 +20,7 @@ interface Message {
 const messages = ref<Message[]>([
   {
     role: 'ai',
-    content: '你好！我是你的 AI 职业规划助手。我可以帮你：\n• 分析简历优缺点\n• 评估岗位匹配度\n• 提供职业发展建议\n• 解答职业规划相关问题\n\n请问有什么可以帮你的吗？',
+    content: chatBotWelcomeMessage,
     time: getCurrentTime()
   }
 ])
@@ -83,59 +84,22 @@ const generateAIReply = (question: string): string => {
   const lowerQ = question.toLowerCase()
 
   if (lowerQ.includes('简历') && (lowerQ.includes('不好') || lowerQ.includes('缺点') || lowerQ.includes('问题'))) {
-    return `根据常见的简历问题，我建议你检查以下几点：
-
-1. **突出量化成果**：用数字展示成绩，比如"提升效率 30%"
-2. **针对性修改**：根据目标岗位调整关键词
-3. **简洁明了**：控制在一页纸内，重点突出
-4. **格式统一**：保持字体、间距一致
-
-你可以先上传简历，我可以帮你做更详细的分析！`
+    return chatBotReplies.resume
   }
 
   if (lowerQ.includes('岗位') && (lowerQ.includes('适合') || lowerQ.includes('匹配'))) {
-    return `判断岗位是否适合，可以从这几个维度考虑：
-
-1. **技能匹配度**：你的核心技能是否满足岗位要求
-2. **发展空间**：这个岗位能否帮助你成长
-3. **兴趣契合**：工作内容是否符合你的职业兴趣
-4. **薪资期望**：是否符合你的预期
-
-建议你先去"人岗匹配"页面查看详细的匹配分析报告！`
+    return chatBotReplies.jobMatch
   }
 
   if (lowerQ.includes('发展') || lowerQ.includes('晋升') || lowerQ.includes('职业规划')) {
-    return `职业发展规划建议：
-
-**短期（1-2 年）**：
-- 夯实专业技能，成为团队骨干
-- 建立良好的工作口碑
-
-**中期（3-5 年）**：
-- 向管理岗或专家岗发展
-- 扩大行业人脉网络
-
-**长期（5 年以上）**：
-- 成为领域专家或中高层管理者
-- 或者考虑创业/转型
-
-你可以查看"发展图谱"了解更详细的晋升路线！`
+    return chatBotReplies.careerPlan
   }
 
   if (lowerQ.includes('你好') || lowerQ.includes('在吗')) {
-    return '你好！我在的😊 有什么职业规划相关的问题，随时可以问我！'
+    return chatBotReplies.greeting
   }
 
-  return `这是一个很好的问题！
-
-作为你的 AI 职业规划助手，我建议你可以：
-
-1. 先上传简历，获取能力画像
-2. 查看人岗匹配结果
-3. 阅读生涯报告
-4. 探索职业发展图谱
-
-如果你有更具体的问题，比如简历修改建议、岗位评估等，欢迎继续提问！`
+  return chatBotReplies.default
 }
 
 // 滚动到底部
