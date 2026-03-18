@@ -7,17 +7,17 @@ const router = createRouter({
     {
       path: '/login',
       name: 'login',
-      component: () => import('../views/CUserLogin.vue'),//登录
+      component: () => import('../views/CUserLogin.vue'), //登录
     },
     {
       path: '/register',
       name: 'register',
-      component: () => import('../views/CUserRegister.vue'),//注册
+      component: () => import('../views/CUserRegister.vue'), //注册
     },
     {
       path: '/forgot-password',
       name: 'forget-password',
-      component: () => import('../views/CUserForgetPassword.vue'),//忘记密码
+      component: () => import('../views/CUserForgetPassword.vue'), //忘记密码
     },
     {
       path: '/',
@@ -26,7 +26,7 @@ const router = createRouter({
         {
           path: '',
           name: 'home',
-          component: () => import('../views/HomePage.vue'), // 首页
+          component: () => import('../views/CHomePage.vue'), // 首页
         },
         {
           path: 'career-form',
@@ -36,7 +36,7 @@ const router = createRouter({
         {
           path: 'report',
           name: 'report',
-          component: () => import('../views/Report.vue'),
+          component: () => import('../views/CReport.vue'),
         },
         {
           path: 'development-map',
@@ -46,14 +46,14 @@ const router = createRouter({
         {
           path: 'profile',
           name: 'profile',
-          component: () => import('../views/Profile.vue'),
-        }
+          component: () => import('../views/CProfile.vue'),
+        },
       ],
     },
     {
       path: '/:pathMatch(.*)*',
       name: 'NotFound',
-      component: () => import('../views/404.vue')//404错误
+      component: () => import('../views/404.vue'), //404错误
     },
   ],
 })
