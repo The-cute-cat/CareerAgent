@@ -9,37 +9,45 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from ai_service.exceptions import TokenValidationError, ConversationIDValidationError
 from ai_service.utils.ai_token_util import check_token
+from ai_service.utils.logger_handler import log
 
-# HTTP Bearer 认证方案，auto_error=True 表示未提供 Token 时自动返回 403 错误
-security = HTTPBearer(auto_error=True)
+security = HTTPBearer(auto_error=False)
 
-__all__ = ["validate_token"]
+__all__ = [
+    "validate_token",
+    "validate_conversation_id",
+]
 
 
 async def validate_token(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    conversation_id: Optional[str] = Form(None, alias="conversationId")
-) -> str:
+        credentials: HTTPAuthorizationCredentials = Depends(security)
+) -> bool:
     """
-    验证请求的 Token 和会话 ID。
+    验证请求的 Token。
 
-    作为 FastAPI 依赖使用，从 Authorization Header 提取 Token 进行验证，
-    并从 Multipart Form 中提取 conversationId。
+    作为 FastAPI 依赖使用，从 Authorization Header 提取 Token 进行验证。
 
     Args:
         credentials: HTTP Bearer 认证凭据，由 FastAPI 自动注入
-        conversation_id: 会话 ID，从 Multipart Form 的 conversationId 字段获取
 
     Returns:
-        验证通过后返回 conversation_id 字符串
+        验证通过后返回 True
 
     Raises:
         TokenValidationError: Token 无效或已过期
-        ConversationIDValidationError: conversationId 缺失
     """
+    if not credentials:
+        raise TokenValidationError("未提供认证Token")
     token = credentials.credentials
     if not check_token(token):
         raise TokenValidationError()
+    return True
+
+
+async def validate_conversation_id(
+        conversation_id: Optional[str] = Form(None, alias="conversationId"),
+        _: bool = Depends(validate_token)
+) -> str:
     if not conversation_id:
         raise ConversationIDValidationError()
     return conversation_id

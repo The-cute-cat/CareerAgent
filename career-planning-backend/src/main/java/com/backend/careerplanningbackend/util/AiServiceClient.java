@@ -8,6 +8,7 @@ import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.MultipartBodyBuilder;
 import org.springframework.stereotype.Component;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
@@ -17,7 +18,6 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
-
 
 /**
  * AI 服务客户端
@@ -155,8 +155,20 @@ public class AiServiceClient {
             builder.part("conversationId", aiChatRequest.getConversationId());
         }
         if (aiChatRequest.getFiles() != null && !aiChatRequest.getFiles().isEmpty()) {
-            for (File file : aiChatRequest.getFiles()) {
-                builder.part("files", new FileSystemResource(file));
+            if (aiChatRequest.getFiles().size() > 1) {
+                for (File file : aiChatRequest.getFiles()) {
+                    builder.part("files", new FileSystemResource(file));
+                }
+            } else {
+                builder.part("file", new FileSystemResource(aiChatRequest.getFiles().getFirst()));
+            }
+        } else if (aiChatRequest.getMultipartFiles() != null && !aiChatRequest.getMultipartFiles().isEmpty()) {
+            if (aiChatRequest.getMultipartFiles().size() > 1) {
+                for (MultipartFile multipartFile : aiChatRequest.getMultipartFiles()) {
+                    builder.part("files", multipartFile.getResource());
+                }
+            } else {
+                builder.part("file", aiChatRequest.getMultipartFiles().getFirst().getResource());
             }
         }
         return builder;
@@ -201,7 +213,7 @@ public class AiServiceClient {
      * @return AI 响应结果
      */
     public AiChatResponse chatWithMessage(String url, String message, String conversationId) {
-        AiChatRequest request = new AiChatRequest(conversationId, message, null);
+        AiChatRequest request = new AiChatRequest(conversationId, message);
         return callAiService(url, request);
     }
 
@@ -210,11 +222,27 @@ public class AiServiceClient {
      *
      * @param url            请求的 API 路径
      * @param files          文件列表
-     * @param conversationId 对话 ID
+     * @param conversationId 对话 ID，若为空则不传递
      * @return AI 响应结果
      */
     public AiChatResponse chatWithFiles(String url, List<File> files, String conversationId) {
-        AiChatRequest request = new AiChatRequest(conversationId, null, files);
+        AiChatRequest request = AiChatRequest.ofFiles(conversationId, null, files);
+        return callAiService(url, request);
+    }
+
+    /**
+     * MultipartFile 文件上传对话（同步方式）
+     * <p>
+     * 用于处理前端直接上传的 MultipartFile 文件
+     *
+     * @param url            请求的 API 路径
+     * @param multipartFiles MultipartFile 文件列表
+     * @param conversationId 对话 ID，若为空则不传递
+     * @return AI 响应结果
+     */
+    public AiChatResponse chatWithMultipartFiles(String url, List<MultipartFile> multipartFiles,
+            String conversationId) {
+        AiChatRequest request = AiChatRequest.ofMultipartFiles(conversationId, null, multipartFiles);
         return callAiService(url, request);
     }
 
@@ -227,8 +255,26 @@ public class AiServiceClient {
      * @param conversationId 对话 ID
      * @return AI 响应结果
      */
-    public AiChatResponse chatWithMessageAndFiles(String url, String message, List<File> files, String conversationId) {
-        AiChatRequest request = new AiChatRequest(conversationId, message, files);
+    public AiChatResponse chatWithMessageAndFiles(String url, String message, List<File> files, 
+                                                  String conversationId) {
+        AiChatRequest request = AiChatRequest.ofFiles(conversationId, message, files);
+        return callAiService(url, request);
+    }
+
+    /**
+     * 消息和 MultipartFile 文件同时上传对话（同步方式）
+     * <p>
+     * 用于处理前端直接上传的 MultipartFile 文件并附带消息
+     *
+     * @param url            请求的 API 路径
+     * @param message        消息内容
+     * @param files          MultipartFile 文件列表
+     * @param conversationId 对话 ID
+     * @return AI 响应结果
+     */
+    public AiChatResponse chatWithMessageAndMultipartFiles(String url, String message, List<MultipartFile> files,
+            String conversationId) {
+        AiChatRequest request = AiChatRequest.ofMultipartFiles(conversationId, message, files);
         return callAiService(url, request);
     }
 
@@ -246,7 +292,6 @@ public class AiServiceClient {
         return universalAiService(url, buildOtherBody(params));
     }
 
-
     /**
      * 纯文本消息对话（流式方式）
      *
@@ -256,7 +301,7 @@ public class AiServiceClient {
      * @return 响应数据流
      */
     public Flux<String> chatWithMessageStream(String url, String message, String conversationId) {
-        AiChatRequest request = new AiChatRequest(conversationId, message, null);
+        AiChatRequest request = new AiChatRequest(conversationId, message);
         return callAiServiceStream(url, request);
     }
 
@@ -265,11 +310,27 @@ public class AiServiceClient {
      *
      * @param url            请求的 API 路径
      * @param files          文件列表
-     * @param conversationId 对话 ID
+     * @param conversationId 对话 ID，若为空则不传递
      * @return 响应数据流
      */
     public Flux<String> chatWithFilesStream(String url, List<File> files, String conversationId) {
-        AiChatRequest request = new AiChatRequest(conversationId, null, files);
+        AiChatRequest request = AiChatRequest.ofFiles(conversationId, null, files);
+        return callAiServiceStream(url, request);
+    }
+
+    /**
+     * MultipartFile 文件上传对话（流式方式）
+     * <p>
+     * 用于处理前端直接上传的 MultipartFile 文件并接收流式响应
+     *
+     * @param url            请求的 API 路径
+     * @param files          MultipartFile 文件列表
+     * @param conversationId 对话 ID，若为空则不传递
+     * @return 响应数据流
+     */
+
+    public Flux<String> chatWithMultipartFilesStream(String url, List<MultipartFile> files, String conversationId) {
+        AiChatRequest request = AiChatRequest.ofMultipartFiles(conversationId, null, files);
         return callAiServiceStream(url, request);
     }
 
@@ -282,8 +343,26 @@ public class AiServiceClient {
      * @param conversationId 对话 ID
      * @return 响应数据流
      */
-    public Flux<String> chatWithMessageAndFilesStream(String url, String message, List<File> files, String conversationId) {
-        AiChatRequest request = new AiChatRequest(conversationId, message, files);
+    public Flux<String> chatWithMessageAndFilesStream(String url, String message, List<File> files,
+            String conversationId) {
+        AiChatRequest request = AiChatRequest.ofFiles(conversationId, message, files);
+        return callAiServiceStream(url, request);
+    }
+
+    /**
+     * 消息和 MultipartFile 文件同时上传对话（流式方式）
+     * <p>
+     * 用于处理前端直接上传的 MultipartFile 文件并附带消息，同时接收流式响应
+     *
+     * @param url            请求的 API 路径
+     * @param message        消息内容
+     * @param files          MultipartFile 文件列表
+     * @param conversationId 对话 ID
+     * @return 响应数据流
+     */
+    public Flux<String> chatWithMessageAndMultipartFilesStream(String url, String message, List<MultipartFile> files,
+            String conversationId) {
+        AiChatRequest request = AiChatRequest.ofMultipartFiles(conversationId, message, files);
         return callAiServiceStream(url, request);
     }
 

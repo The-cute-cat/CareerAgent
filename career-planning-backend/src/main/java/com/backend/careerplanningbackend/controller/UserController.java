@@ -1,6 +1,7 @@
 package com.backend.careerplanningbackend.controller;
 
 import com.backend.careerplanningbackend.domain.dto.LoginFormDTO;
+import com.backend.careerplanningbackend.domain.dto.UserDTO;
 import com.backend.careerplanningbackend.domain.po.Result;
 import com.backend.careerplanningbackend.domain.po.User;
 import com.backend.careerplanningbackend.domain.vo.LoginVO;
@@ -15,7 +16,6 @@ import java.io.IOException;
 
 /**
  * UserController
- * @module UserController
  */
 @Slf4j
 @RestController
@@ -30,7 +30,7 @@ public class UserController {
      * @return 创建成功的用户信息
      */
     @PostMapping("/login")
-    public Result login(@RequestBody LoginFormDTO user) {
+    public Result<LoginVO> login(@RequestBody LoginFormDTO user) {
         log.info("接收到的登录参数: {}", user.toString()); // 需要在 DTO 中重写 toString()
         return userService.login(user);
     }
@@ -38,35 +38,35 @@ public class UserController {
      * 注册
      */
     @PostMapping("/register")
-    public Result register(@RequestBody LoginFormDTO user) {
+    public Result<String> register(@RequestBody LoginFormDTO user) {
         return userService.register(user);
     }
     /**
      * 忘记密码
      */
     @PutMapping("/forget-password")
-    public Result forget(@RequestBody LoginFormDTO user) {
+    public Result<String> forget(@RequestBody LoginFormDTO user) {
         return userService.forget(user);
     }
     /**
      * 发送注册验证码
      */
     @PostMapping("/send-code-register")
-    public Result sendCodeRegister(@RequestBody LoginFormDTO user) {
+    public Result<String> sendCodeRegister(@RequestBody LoginFormDTO user) {
         return userService.sendCodeRegister(user);
     }
     /**
      * 发送注册验证码
      */
     @PostMapping("/send-code-forget")
-    public Result sendCodeForget(@RequestBody LoginFormDTO user) {
+    public Result<String> sendCodeForget(@RequestBody LoginFormDTO user) {
         return userService.sendCodeForget(user);
     }
     /**
      * 修改个人信息
      */
     @PutMapping("/edit")
-    public Result edit(@RequestBody User user) {
+    public Result<String> edit(@RequestBody User user) {
         return userService.edit(user);
     }
     
@@ -74,21 +74,21 @@ public class UserController {
      * 查询用户信息
      */
     @GetMapping("/info")
-    public Result getUserInfo() {
+    public Result<UserDTO> getUserInfo() {
         return userService.getUserInfo();
     }
     /**
      * 更换头像
      */
     @GetMapping("/avatar")
-    public Result updateAvatar(MultipartFile avatar) throws IOException {
+    public Result<String> updateAvatar(MultipartFile avatar) throws IOException {
         return userService.updateAvatar(avatar);
     }
     /**
      * 更新 双token
      */
     @PostMapping("refreshToken")
-    public Result refreshToken(@RequestBody LoginVO loginVO, HttpServletResponse response){
+    public Result<LoginVO> refreshToken(@RequestBody LoginVO loginVO, HttpServletResponse response){
         String refreshToken=loginVO.getRefreshToken();
         return userService.refreshToken(refreshToken,response);
     }

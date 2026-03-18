@@ -1,12 +1,11 @@
 from typing import AsyncGenerator
+
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-from sqlalchemy.orm import DeclarativeBase
 
 # 假设你的配置类在这里
 from config import settings
 
-# 1. 动态构建数据库连接 URL
-# 改进：保留了 settings 动态配置，同时加上了必须的 charset=utf8mb4 防止中文/Emoji乱码
+# 动态构建数据库连接 URL
 DATABASE_URL = (
     f"mysql+aiomysql://{settings.database.user}:{settings.database.password}"
     f"@{settings.database.host}:{settings.database.port}/{settings.database.database}"

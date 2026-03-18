@@ -5,6 +5,7 @@ __all__ = [
     "FileValidationError",
     "TokenValidationError",
     "ConversationIDValidationError",
+    "CommonHandleError",
 ]
 
 
@@ -30,6 +31,11 @@ class TokenValidationError(ApiException):
     def __init__(self, msg: str = "Token验证失败"):
         super().__init__(code=401, msg=msg)
 
+
+class CommonHandleError(ApiException):
+    """通用处理异常"""
+    def __init__(self, msg: str = "通用处理异常"):
+        super().__init__(code=500, msg=msg)
 
 class ConversationIDValidationError(ApiException):
     """

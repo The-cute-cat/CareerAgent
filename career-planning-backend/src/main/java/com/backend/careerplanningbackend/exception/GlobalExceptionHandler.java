@@ -16,7 +16,7 @@ public class GlobalExceptionHandler {
      * 处理运行时异常
      */
     @ExceptionHandler(RuntimeException.class)
-    public Result handleRuntimeException(RuntimeException e) {
+    public Result<String> handleRuntimeException(RuntimeException e) {
         log.error("【运行时异常】{}", e.getMessage());
         return Result.fail(401, e.getMessage());
     }
@@ -25,7 +25,7 @@ public class GlobalExceptionHandler {
      * 处理所有未捕获的异常
      */
     @ExceptionHandler(Exception.class)
-    public Result handleException(Exception e) {
+    public Result<String> handleException(Exception e) {
         log.error("【系统异常】{}", e.getMessage());
         return Result.fail(401, "系统异常，请稍后重试");
     }

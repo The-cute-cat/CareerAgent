@@ -11,20 +11,36 @@ import uuid
 from fastapi import UploadFile, Depends, File
 
 from ai_service.exceptions import FileValidationError
+from ai_service.schemas.auth import validate_token
 from ai_service.services.file_detector import file_detector
 from ai_service.utils.logger_handler import log
 from config import settings
 
 __all__ = [
     "handle_file",
+    "handle_files",
     "validate_pdf",
+    "validate_some_pdf",
     "validate_docx",
+    "validate_some_docx",
+    "validate_image",
+    "validate_some_image",
 ]
 
 
-async def handle_file(files: list[UploadFile] = File(...)) -> list[dict[str, str]]:
+async def handle_files(
+        files: list[UploadFile] = File(...),
+        _: bool = Depends(validate_token)
+) -> list[dict[str, str]]:
     """验证上传文件的安全性和类型，返回文件信息字典"""
     return [await _validate_file(file) for file in files]
+
+
+async def handle_file(
+        file: UploadFile = File(...),
+        _: bool = Depends(validate_token)
+) -> dict[str, str]:
+    return await _validate_file(file)
 
 
 async def _validate_file(file: UploadFile) -> dict[str, str]:
@@ -47,7 +63,9 @@ async def _validate_file(file: UploadFile) -> dict[str, str]:
         raise FileValidationError(f"文件验证失败: {e}")
 
 
-async def validate_pdf(file_infos: list[dict[str, str]] = Depends(handle_file)):
+async def validate_some_pdf(
+        file_infos: list[dict[str, str]] = Depends(handle_files)
+) -> list[dict[str, str]]:
     """
     验证文件是否为 PDF 类型。
 
@@ -64,11 +82,19 @@ async def validate_pdf(file_infos: list[dict[str, str]] = Depends(handle_file)):
     """
     for file_info in file_infos:
         if file_info["extension"] != "pdf":
-            raise FileValidationError(f"File type is not pdf, file name:{file_info['file_name']}")
+            raise FileValidationError(f"File type is not pdf, file info:{file_info}")
     return file_infos
 
 
-async def validate_docx(file_infos: list[dict[str, str]] = Depends(handle_file)):
+async def validate_pdf(file_info: dict[str, str] = Depends(handle_file)) -> dict[str, str]:
+    if file_info["extension"] != "pdf":
+        raise FileValidationError(f"File type is not pdf, file info:{file_info}")
+    return file_info
+
+
+async def validate_some_docx(
+        file_infos: list[dict[str, str]] = Depends(handle_files)
+) -> list[dict[str, str]]:
     """
     验证文件是否为 Word 文档类型（doc 或 docx）。
 
@@ -85,5 +111,29 @@ async def validate_docx(file_infos: list[dict[str, str]] = Depends(handle_file))
     """
     for file_info in file_infos:
         if file_info["extension"] not in ["docx", "doc"]:
-            raise FileValidationError(f"File type is not docx, file name:{file_info['file_name']}")
+            raise FileValidationError(f"File type is not docx, file info:{file_info}")
     return file_infos
+
+
+async def validate_docx(file_info: dict[str, str] = Depends(handle_file)) -> dict[str, str]:
+    if file_info["extension"] not in ["docx", "doc"]:
+        raise FileValidationError(f"File type is not docx, file info:{file_info}")
+    return file_info
+
+
+async def validate_some_image(
+        file_infos: list[dict[str, str]] = Depends(handle_files)
+) -> list[dict[str, str]]:
+    """
+    验证文件是否为图片类型（png、jpg、jpeg）。
+    """
+    for file_info in file_infos:
+        if file_info["extension"] not in ["png", "jpg", "jpeg"]:
+            raise FileValidationError(f"File type is not image, file info:{file_info}")
+    return file_infos
+
+
+async def validate_image(file_info: dict[str, str] = Depends(handle_file)) -> dict[str, str]:
+    if file_info["extension"] not in ["png", "jpg", "jpeg"]:
+        raise FileValidationError(f"File type is not image, file info:{file_info}")
+    return file_info
