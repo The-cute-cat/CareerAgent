@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import Sidebar from '@/components/Sidebar.vue'
-import Header from '@/components/Header.vue'
+import CHeader from '@/components/CHeader.vue'
 import ChatBot from '@/components/ChatBot.vue'
 </script>
 
@@ -10,12 +10,12 @@ import ChatBot from '@/components/ChatBot.vue'
     <el-aside width="220px" class="sidebar-wrapper">
       <Sidebar />
     </el-aside>
-    
+
     <!-- 右侧主内容区 -->
     <el-container class="main-wrapper">
-      <!-- 顶部 Header -->
-      <Header />
-      
+      <!-- 顶部 CHeader -->
+      <CHeader />
+
       <!-- 页面内容 -->
       <el-main class="main-content">
         <div class="content-wrapper">

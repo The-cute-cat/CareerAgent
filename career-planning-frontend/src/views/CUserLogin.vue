@@ -95,9 +95,9 @@ const showSuccessNotification = () => {
               </div>
               <form class="signin-form" @submit.prevent="handleLogin">
                 <div class="form-group mb-3">
-                  <label class="label" for="username">邮箱</label>
-                  <input type="text" class="form-control" placeholder="请输入邮箱地址" id="username" v-model="loginform.username"
-                    required />
+                  <label class="label" for="username">用户名</label>
+                  <input type="text" class="form-control" placeholder="请输入邮箱地址" id="username"
+                    v-model="loginform.username" required />
                 </div>
                 <div class="form-group mb-3">
                   <label class="label" for="password">密码</label>
@@ -146,7 +146,7 @@ const showSuccessNotification = () => {
   padding: 20px;
   width: 100vw;
   background: linear-gradient(135deg, #7b7474 0%, #b0b2b4 50%, #7b7d7e 100%);
-} 
+}
 
 .ftco-section .container {
   width: 100% !important;
@@ -200,11 +200,12 @@ h3.mb-4 {
 
 /* 响应式调整 */
 @media (max-width: 991.98px) {
+
   .wrap .img,
   .wrap .login-wrap {
     width: 100%;
   }
-  
+
   .wrap .img {
     min-height: 200px;
     height: 200px;

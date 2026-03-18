@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import { computed, h } from 'vue'
+import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/modules/user'
-import { ArrowDown, User, UserFilled, SwitchButton } from '@element-plus/icons-vue'
+import { ArrowDown, User, SwitchButton } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
@@ -36,6 +35,7 @@ const confirmLogout = () => {
     }
   )
     .then(() => {
+      userStore.clearUserALLInfo();
       ElMessage({
         type: 'success',
         message: '退出成功',
@@ -67,17 +67,23 @@ const confirmLogout = () => {
             {{ userName.charAt(0) }}
           </div>
           <span class="user-name">{{ userName }}</span>
-          <el-icon class="dropdown-icon"><ArrowDown /></el-icon>
+          <el-icon class="dropdown-icon">
+            <ArrowDown />
+          </el-icon>
         </div>
         <template #dropdown>
           <el-dropdown-menu>
             <el-dropdown-item command="profile">
-              <el-icon><User /></el-icon>
+              <el-icon>
+                <User />
+              </el-icon>
               个人中心
             </el-dropdown-item>
 
             <el-dropdown-item divided command="logout">
-              <el-icon><SwitchButton /></el-icon>
+              <el-icon>
+                <SwitchButton />
+              </el-icon>
               退出登录
             </el-dropdown-item>
 

@@ -20,7 +20,7 @@ let graph: Graph | null = null
 // 当前选中节点详情
 const selectedNode = ref<any>(null)
 
-// 用户数据（来自 Report.vue）
+// 用户数据（来自 CReport.vue）
 const userData = {
   name: '李明',
   school: 'XX 大学 (985/211)',
@@ -37,7 +37,7 @@ const userData = {
   improvements: '缺乏高并发生产环境经验，大型分布式系统实战较少'
 }
 
-// 职业发展阶段数据（与 Report.vue 对应）
+// 职业发展阶段数据（与 CReport.vue 对应）
 const careerStages = [
   { stage: '入职 0-1 年', level: '初级工程师', score: 60, ability: '基础夯实期' },
   { stage: '入职 1-3 年', level: '中级工程师', score: 75, ability: '快速成长 期' },
@@ -107,7 +107,7 @@ const loadVerticalPath = () => {
   graph.clearCells()
   selectedNode.value = null
 
-  // 节点数据 - 与 Report 数据对应
+  // 节点数据 - 与 CReport 数据对应
   const nodes = [
     {
       id: '1',
@@ -475,7 +475,9 @@ onBeforeUnmount(() => {
     <!-- 页面标题区 -->
     <div class="page-header">
       <div class="header-left">
-        <el-icon :size="28" color="#1890FF"><TrendCharts /></el-icon>
+        <el-icon :size="28" color="#1890FF">
+          <TrendCharts />
+        </el-icon>
         <div class="title-section">
           <h2>职业发展路径图谱</h2>
           <span class="subtitle">基于个人能力画像的智能职业规划</span>
@@ -483,15 +485,21 @@ onBeforeUnmount(() => {
       </div>
       <div class="header-actions">
         <el-button type="primary" @click="loadVerticalPath">
-          <el-icon><TrendCharts /></el-icon>
+          <el-icon>
+            <TrendCharts />
+          </el-icon>
           垂直晋升路径
         </el-button>
         <el-button type="success" @click="loadTransferPath">
-          <el-icon><ArrowRight /></el-icon>
+          <el-icon>
+            <ArrowRight />
+          </el-icon>
           横向换岗路径
         </el-button>
         <el-button @click="exportImage">
-          <el-icon><Check /></el-icon>
+          <el-icon>
+            <Check />
+          </el-icon>
           导出图片
         </el-button>
         <el-button type="warning" plain @click="resetGraph">重置</el-button>
@@ -512,16 +520,14 @@ onBeforeUnmount(() => {
 
           <div class="position-info">
             <el-tag type="primary" effect="dark" size="large">
-              <el-icon><OfficeBuilding /></el-icon>
+              <el-icon>
+                <OfficeBuilding />
+              </el-icon>
               {{ userData.position }}
             </el-tag>
             <div class="match-rate">
               <span class="label">岗位匹配度</span>
-              <el-progress
-                :percentage="userData.matchRate"
-                :color="progressColors"
-                :stroke-width="10"
-              />
+              <el-progress :percentage="userData.matchRate" :color="progressColors" :stroke-width="10" />
             </div>
           </div>
         </el-card>
@@ -530,7 +536,9 @@ onBeforeUnmount(() => {
         <el-card class="skills-card" shadow="hover">
           <template #header>
             <div class="card-header">
-              <el-icon><Star /></el-icon>
+              <el-icon>
+                <Star />
+              </el-icon>
               <span>能力维度评估</span>
             </div>
           </template>
@@ -549,7 +557,9 @@ onBeforeUnmount(() => {
         <el-card class="analysis-card" shadow="hover">
           <template #header>
             <div class="card-header">
-              <el-icon><Check /></el-icon>
+              <el-icon>
+                <Check />
+              </el-icon>
               <span>核心优势</span>
             </div>
           </template>
@@ -559,7 +569,9 @@ onBeforeUnmount(() => {
         <el-card class="analysis-card warning" shadow="hover">
           <template #header>
             <div class="card-header">
-              <el-icon><Warning /></el-icon>
+              <el-icon>
+                <Warning />
+              </el-icon>
               <span>待提升项</span>
             </div>
           </template>
@@ -570,17 +582,15 @@ onBeforeUnmount(() => {
         <el-card class="stages-card" shadow="hover">
           <template #header>
             <div class="card-header">
-              <el-icon><TrendCharts /></el-icon>
+              <el-icon>
+                <TrendCharts />
+              </el-icon>
               <span>职业发展阶段</span>
             </div>
           </template>
           <el-timeline>
-            <el-timeline-item
-              v-for="(stage, index) in careerStages"
-              :key="index"
-              :type="index <= 1 ? 'primary' : index === 2 ? 'warning' : 'success'"
-              :timestamp="stage.stage"
-            >
+            <el-timeline-item v-for="(stage, index) in careerStages" :key="index"
+              :type="index <= 1 ? 'primary' : index === 2 ? 'warning' : 'success'" :timestamp="stage.stage">
               <div class="stage-content">
                 <strong>{{ stage.level }}</strong>
                 <p class="stage-ability">{{ stage.ability }}</p>
@@ -600,7 +610,9 @@ onBeforeUnmount(() => {
           <div v-if="selectedNode" class="node-detail-panel">
             <div class="detail-header">
               <h4>{{ selectedNode.label }}</h4>
-              <el-icon class="close-btn" @click="selectedNode = null"><Close /></el-icon>
+              <el-icon class="close-btn" @click="selectedNode = null">
+                <Close />
+              </el-icon>
             </div>
             <div class="detail-content">
               <p class="desc">{{ selectedNode.desc }}</p>
