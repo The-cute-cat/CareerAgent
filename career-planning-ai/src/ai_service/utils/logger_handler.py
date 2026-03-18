@@ -4,7 +4,7 @@ from datetime import datetime
 
 from config import settings
 
-__all__ = ["log", "LOG_ROOT"]
+__all__ = ["log", "LOG_ROOT", "get_logger"]
 
 LOG_ROOT = settings.path_config.log
 DEFAULT_LOG_FORMAT = logging.Formatter(
