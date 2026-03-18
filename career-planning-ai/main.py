@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import JSONResponse
 
@@ -14,6 +15,20 @@ app = FastAPI()
 app.include_router(
     parse.router,
 )
+
+
+@app.exception_handler(StarletteHTTPException)
+async def starlette_http_exception_handler(_: Request, exc: StarletteHTTPException):
+    """处理所有 Starlette HTTP 异常（包括 405 Method Not Allowed）"""
+    return JSONResponse(
+        status_code=200,
+        content=jsonable_encoder({
+            "code": exc.status_code,
+            "state": False,
+            "msg": exc.detail,
+            "data": None
+        })
+    )
 
 
 @app.exception_handler(ApiException)
