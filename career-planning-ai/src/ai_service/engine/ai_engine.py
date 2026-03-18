@@ -8,19 +8,16 @@ from typing import (
     List,
     Generic,
 )
-import litellm
+
 import instructor
-from pydantic import BaseModel, Field
+import litellm
 from langchain_core.messages import (
     BaseMessage,
-    SystemMessage,
-    HumanMessage,
-    AIMessage,
 )
-from config import LLM
-from ai_service.engine.ai_state import AIState  # 引入 AIState 类
-from ai_service.utils.logger_handler import log
+from pydantic import BaseModel
+
 from ai_service.engine.action_type import ActionType
+from ai_service.engine.ai_state import AIState  # 引入 AIState 类
 from ai_service.engine.exceptions import (
     ModelNotSpecifiedError,
     EmptyInputError,
@@ -28,8 +25,11 @@ from ai_service.engine.exceptions import (
     TextGenerationError,
     StreamInterruptedError,
 )
+from ai_service.utils.logger_handler import log
+from config import LLM
 
 __all__ = ["AIEngine"]
+litellm.drop_params = True
 
 """
 AI引擎模块,封装了与大模型交互的逻辑，提供统一的接口供上层调用，

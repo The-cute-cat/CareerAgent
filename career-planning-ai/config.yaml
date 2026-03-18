@@ -1,3 +1,4 @@
+#file: noinspection SpellCheckingInspection
 database:
   host: mysql6.sqlpub.com
   port: 3311
@@ -9,12 +10,26 @@ communication:
     secret: <SECRET>
     expire: 1800
 llm:
-  model_name: qwen3.5-plus
+  model_name: dashscope/qwen3.5-plus
   base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
   timeout: 30 # 超时时间
   max_retries: 3 # 最大重试次数
   extra: # 额外参数
     temperature: 0.7
+  qwen:
+    model_name: dashscope/qwen3.5-plus
+    base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+    timeout: 30
+    max_retries: 3
+    extra:
+      temperature: 0.7
+  deepseek:
+    model_name: dashscope/deepseek-v3-plus
+    base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+    timeout: 30
+    max_retries: 3
+    extra:
+      temperature: 0.7
 pdf:
   model_name: qwen-vl-plus
   extra:

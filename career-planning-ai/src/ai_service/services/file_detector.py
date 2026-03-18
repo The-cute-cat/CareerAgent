@@ -5,7 +5,7 @@ from typing import Dict
 import puremagic
 from binaryornot.check import is_binary
 
-from ai_service.utils.logger_handler import log
+from ai_service.services import log
 from ai_service.utils.magic_numbers import (
     FILE_SIGNATURES,
     DANGEROUS_EXTENSIONS,

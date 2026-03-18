@@ -5,6 +5,7 @@
 node_modules/
 logs/
 data/
+tests/
 temp/
 *.pyc
 __pycache__/
