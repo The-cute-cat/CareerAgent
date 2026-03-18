@@ -2,48 +2,11 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import * as echarts from 'echarts'
-import {
-  Upload,
-  DocumentChecked,
-  DataLine,
-  MapLocation,
-  Warning
-} from '@element-plus/icons-vue'
+import { Warning } from '@element-plus/icons-vue'
+import { quickActions, homeRadarData } from '@/mock/data'
 
 const router = useRouter()
 const radarChartRef = ref<HTMLElement | null>(null)
-
-// 快捷功能卡片数据
-const quickActions = [
-  {
-    title: '简历填写',
-    icon: Upload,
-    desc: '点击填写简历信息',
-    color: '#409eff',
-    route: '/career-form'
-  },
-  {
-    title: '查看匹配',
-    icon: DocumentChecked,
-    desc: '岗位匹配',
-    color: '#67c23a',
-    route: '/report'
-  },
-  {
-    title: '生成报告',
-    icon: DataLine,
-    desc: '生成我的生涯报告',
-    color: '#e6a23c',
-    route: '/report'
-  },
-  {
-    title: '职业地图',
-    icon: MapLocation,
-    desc: '查看岗位晋升路线',
-    color: '#f56c6c',
-    route: '/development-map'
-  }
-]
 
 
 // 跳转到对应页面
@@ -57,14 +20,7 @@ onMounted(() => {
     const chart = echarts.init(radarChartRef.value)
     const option = {
       radar: {
-        indicator: [
-          { name: '沟通能力', max: 100 },
-          { name: '专业技能', max: 100 },
-          { name: '团队协作', max: 100 },
-          { name: '学习能力', max: 100 },
-          { name: '领导力', max: 100 },
-          { name: '创新思维', max: 100 }
-        ],
+        indicator: homeRadarData.indicator,
         radius: '65%',
         center: ['50%', '55%'],
         axisName: {
@@ -80,8 +36,8 @@ onMounted(() => {
       series: [{
         type: 'radar',
         data: [{
-          value: [75, 85, 70, 80, 60, 72],
-          name: '当前能力',
+          value: homeRadarData.value,
+          name: homeRadarData.name,
           areaStyle: {
             color: 'rgba(64, 158, 255, 0.3)'
           },
