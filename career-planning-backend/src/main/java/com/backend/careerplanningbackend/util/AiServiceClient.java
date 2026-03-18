@@ -255,7 +255,8 @@ public class AiServiceClient {
      * @param conversationId 对话 ID
      * @return AI 响应结果
      */
-    public AiChatResponse chatWithMessageAndFiles(String url, String message, List<File> files, String conversationId) {
+    public AiChatResponse chatWithMessageAndFiles(String url, String message, List<File> files, 
+                                                  String conversationId) {
         AiChatRequest request = AiChatRequest.ofFiles(conversationId, message, files);
         return callAiService(url, request);
     }
