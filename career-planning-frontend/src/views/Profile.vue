@@ -18,55 +18,27 @@ import {
   TrendCharts
 } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/modules/user'
-
-// 进度条颜色配置（Element Plus 格式）
-const progressColors = [
-  { color: '#409eff', percentage: 0 },
-  { color: '#67c23a', percentage: 100 }
-]
+import {
+  educationLevels,
+  graduationYearOptions,
+  profileFormData,
+  privacySettingsData,
+  progressColors
+} from '@/mock/data'
 
 const userStore = useUserStore()
 
 // 编辑状态
 const isEditing = ref(false)
 
-// 学历选项
-const educationLevels = [
-  { label: '专科', value: 'college' },
-  { label: '本科', value: 'bachelor' },
-  { label: '硕士', value: 'master' },
-  { label: '博士', value: 'doctor' }
-]
-
-// 毕业年份选项（2024-2035年）
-const graduationYearOptions = Array.from({ length: 12 }, (_, i) => {
-  const year = 2024 + i
-  return {
-    label: `${year} 年`,
-    value: year
-  }
-})
-
 // 个人档案表单
-const profileForm = reactive({
-  name: '李明',
-  school: 'XX 大学',
-  major: '计算机科学与技术',
-  graduationYear: 2025,
-  education: 'bachelor' as 'college' | 'bachelor' | 'master' | 'doctor',
-  email: 'liming@example.com',
-  phone: '138****8888',
-  github: 'https://github.com/liming',
-  bio: '985 院校背景，GPA 前 5%，热爱编程和技术研究'
-})
+const profileForm = reactive({ ...profileFormData })
 
 // 原始数据（用于取消编辑）
 let originalProfile = { ...profileForm }
 
 // 隐私设置
-const privacySettings = reactive({
-  // 简历可见性
-  resumeVisibility: 'private' as 'public' | 'private',
+const privacySettings = reactive({ ...privacySettingsData,
   // 能力画像可见性
   profileVisibility: 'private' as 'public' | 'private',
   // 职业路径可见性

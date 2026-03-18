@@ -29,9 +29,10 @@ export interface LoginFormDTO {
 }
 
 /**
- * Result
+ * 通用响应结果
+ * @template T 响应数据的类型
  */
-export interface Result {
+export interface Result<T = unknown> {
   /**
    * 成功为 --200  失败为 401
    */
@@ -39,11 +40,86 @@ export interface Result {
   /**
    * 返回数据
    */
-  data?: { [key: string]: unknown } | null
+  data?: T | null
   /**
    * 提示消息
    */
   msg?: string | null
+}
+
+// ==================== 能力评估报告类型定义 ====================
+
+/** 能力评估分数（雷达图数据） */
+export interface AbilityScores {
+  /** 专业能力分数 (0-100) */
+  专业: number
+  /** 创新能力分数 (0-100) */
+  创新: number
+  /** 学习能力分数 (0-100) */
+  学习: number
+  /** 抗压能力分数 (0-100) */
+  抗压: number
+  /** 沟通能力分数 (0-100) */
+  沟通: number
+  /** 实习能力分数 (0-100) */
+  实习: number
+}
+
+/** 总体评价 */
+export interface OverallAssessment {
+  /** 综合等级：优秀/良好/待提升 */
+  level: string
+  /** 总体评价摘要 */
+  summary: string
+  /** 优势维度列表 */
+  strengths: string[]
+  /** 待提升维度列表 */
+  weaknesses: string[]
+}
+
+/** 单维度分析 */
+export interface DimensionAnalysis {
+  /** 该维度分数 */
+  score: number
+  /** 分析评价 */
+  analysis: string
+  /** 改进建议列表 */
+  suggestions: string[]
+}
+
+/** 职业规划报告 */
+export interface CareerReport {
+  /** 任务ID */
+  taskId: string
+  /** 能力评估分数（雷达图数据） */
+  abilityScores: AbilityScores
+  /** 总体评价 */
+  overallAssessment: OverallAssessment
+  /** 各维度详细分析 */
+  dimensionAnalysis: {
+    专业: DimensionAnalysis
+    创新: DimensionAnalysis
+    学习: DimensionAnalysis
+    抗压: DimensionAnalysis
+    沟通: DimensionAnalysis
+    实习: DimensionAnalysis
+  }
+  /** 报告生成时间 */
+  generatedAt: string
+}
+
+/** 报告状态查询响应 */
+export interface CareerReportStatus {
+  /** 任务ID */
+  taskId: string
+  /** 报告生成状态 */
+  status: 'pending' | 'processing' | 'completed' | 'failed'
+  /** 进度百分比 (0-100) */
+  progress?: number
+  /** 预计剩余时间（秒） */
+  estimatedTimeRemaining?: number
+  /** 失败原因（当 status 为 failed 时） */
+  errorMessage?: string
 }
 
 /**
@@ -112,6 +188,12 @@ export interface UploadResponse {
       education: string      // 学历
       confidence_score: number // 解析置信度 (0-1)
     }
+    
+    // 能力评估分数（与表单提交返回的 abilityScores 格式一致）
+    abilityScores?: AbilityScores
+    
+    // 完整报告（与表单提交流程返回的 CareerReport 格式一致）
+    report?: CareerReport
   }
 }
 
@@ -275,4 +357,18 @@ export interface CareerFormSubmitResult {
   status: 'pending' | 'processing' | 'completed' | 'failed'
   /** 预估完成时间（秒） */
   estimatedTime?: number
+}
+
+/** 报告状态查询响应 */
+export interface CareerReportStatus {
+  /** 任务ID */
+  taskId: string
+  /** 报告生成状态 */
+  status: 'pending' | 'processing' | 'completed' | 'failed'
+  /** 进度百分比 (0-100) */
+  progress?: number
+  /** 预计剩余时间（秒） */
+  estimatedTimeRemaining?: number
+  /** 失败原因（当 status 为 failed 时） */
+  errorMessage?: string
 }

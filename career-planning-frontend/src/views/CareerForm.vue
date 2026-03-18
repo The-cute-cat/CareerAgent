@@ -19,11 +19,37 @@ import {
   Document,
   Loading,
   Warning,
-  Rank
+  Rank,
+  Folder,
+  Briefcase,
+  OfficeBuilding,
+  User,
+  Calendar,
+  Edit,
+  EditPen,
+  Switch,
+  Medal
 } from '@element-plus/icons-vue'
 import CareerFormUpload from '@/components/CareerForm_Upload.vue'
-import { submitCareerFormApi, convertToSubmitDTO } from '@/api/career-form/formdata'
-import type { CareerFormData } from '@/types/type'
+import CareerFormRadar from '@/components/CareerForm_Radar.vue'
+import type { RadarScores, MissingItem } from '@/components/CareerForm_Radar.vue'
+import { submitCareerFormApi, convertToSubmitDTO, getCareerReportStatusApi, getCareerReportApi } from '@/api/career-form/formdata'
+import { getResumeReportApi, getResumeParseStatusApi } from '@/api/career-form/resume'
+import type { CareerFormData, CareerFormSubmitResult } from '@/types/type'
+import {
+  majorOptions,
+  communicationQuestions,
+  stressQuestions,
+  learningQuestions,
+  pythonQuestions,
+  javaQuestions,
+  cppQuestions,
+  gitQuestions,
+  dockerQuestions,
+  getRandomQuestion,
+  calculateRadarScores,
+  fetchMockAbilityReport
+} from '@/mock/mockdata/CareerForm_mockdata'
 
 
 // --- 状态定义 ---
@@ -61,6 +87,199 @@ const currentQuizType = ref('')
 /** 拖拽排序相关状态 */
 const dragIndex = ref(-1)
 const dragOverIndex = ref(-1)
+
+/** 控制雷达图弹窗显示/隐藏 */
+const showRadarDialog = ref(false)
+
+/** 雷达图加载状态 */
+const radarLoading = ref(false)
+
+/** 控制项目经历弹窗显示/隐藏 */
+const showProjectDialog = ref(false)
+
+/** 控制实践经历弹窗显示/隐藏 */
+const showInternshipDialog = ref(false)
+
+/** 项目经历弹窗表单数据 */
+const projectForm = reactive({
+  isCompetition: false,
+  name: '',
+  desc: ''
+})
+
+/** 实践经历弹窗表单数据 */
+const internshipForm = reactive({
+  company: '',
+  role: '',
+  date: [] as Date[],
+  desc: ''
+})
+
+/** 雷达图能力分数 */
+const radarScores = reactive<RadarScores>({
+  专业: 0,
+  创新: 0,
+  学习: 0,
+  抗压: 0,
+  沟通: 0,
+  实习: 0
+})
+
+/** 画像完整度 (0-100) */
+const profileCompleteness = computed(() => {
+  let total = 0
+  let completed = 0
+
+  // 基本信息项
+  const basicItems = [
+    !!formData.education,
+    formData.major.length > 0,
+    !!formData.graduationDate
+  ]
+  total += basicItems.length
+  completed += basicItems.filter(Boolean).length
+
+  // 技能与证书项
+  const skillItems = [
+    formData.languages.some(l => l.type && l.level),
+    formData.certificates.length > 0,
+    formData.skills.length > 0,
+    formData.tools.length > 0
+  ]
+  total += skillItems.length
+  completed += skillItems.filter(Boolean).length
+
+  // 经历与项目项
+  const expItems = [
+    formData.projects.length > 0,
+    formData.internships.length > 0
+  ]
+  total += expItems.length
+  completed += expItems.filter(Boolean).length
+
+  // 素质测评项
+  const quizItems = [
+    formData.scores.communication,
+    formData.scores.stress,
+    formData.scores.learning,
+    !!formData.innovation
+  ]
+  total += quizItems.length
+  completed += quizItems.filter(Boolean).length
+
+  // 职业意向项
+  const careerItems = [
+    !!formData.targetJob,
+    formData.targetIndustries.length > 0
+  ]
+  total += careerItems.length
+  completed += careerItems.filter(Boolean).length
+
+  return Math.round((completed / total) * 100)
+})
+
+/** 缺失项列表 */
+const missingItems = computed<MissingItem[]>(() => {
+  const items: MissingItem[] = []
+
+  // 检查证书
+  if (formData.certificates.length === 0) {
+    items.push({
+      field: 'certificates',
+      label: '缺少专业证书',
+      icon: 'certificate',
+      priority: 'medium'
+    })
+  }
+
+  // 检查实习经历
+  if (formData.internships.length === 0) {
+    items.push({
+      field: 'internships',
+      label: '缺少实习经历',
+      icon: 'internship',
+      priority: 'high'
+    })
+  }
+
+  // 检查项目经历
+  if (formData.projects.length === 0) {
+    items.push({
+      field: 'projects',
+      label: '缺少项目经历',
+      icon: 'project',
+      priority: 'high'
+    })
+  }
+
+  // 检查语言能力
+  if (!formData.languages.some(l => l.type && l.level)) {
+    items.push({
+      field: 'languages',
+      label: '缺少语言能力',
+      icon: 'language',
+      priority: 'medium'
+    })
+  }
+
+  // 检查技能
+  if (formData.skills.length === 0) {
+    items.push({
+      field: 'skills',
+      label: '缺少专业技能',
+      icon: 'skill',
+      priority: 'high'
+    })
+  }
+
+  // 检查工具
+  if (formData.tools.length === 0) {
+    items.push({
+      field: 'tools',
+      label: '缺少工具掌握',
+      icon: 'tool',
+      priority: 'low'
+    })
+  }
+
+  // 检查素质测评
+  if (!formData.scores.communication) {
+    items.push({
+      field: 'quiz-communication',
+      label: '未完成沟通能力测评',
+      icon: 'quiz',
+      priority: 'medium'
+    })
+  }
+  if (!formData.scores.stress) {
+    items.push({
+      field: 'quiz-stress',
+      label: '未完成抗压能力测评',
+      icon: 'quiz',
+      priority: 'medium'
+    })
+  }
+  if (!formData.scores.learning) {
+    items.push({
+      field: 'quiz-learning',
+      label: '未完成学习能力测评',
+      icon: 'quiz',
+      priority: 'medium'
+    })
+  }
+
+  // 检查创新案例
+  if (!formData.innovation) {
+    items.push({
+      field: 'innovation',
+      label: '缺少创新案例',
+      icon: 'innovation',
+      priority: 'low'
+    })
+  }
+
+  return items
+})
 
 
 // --- 表单数据 ---
@@ -187,142 +406,7 @@ const isStepCompleted = (step: number) => {
  * 专业级联选择器的数据源
  * 用于学历信息中的专业选择
  */
-const majorOptions = [
- {
-    "value": "计算机类",
-    "label": "计算机类",
-    "children": [
-      { "value": "软件工程", "label": "软件工程" },
-      { "value": "计算机科学与技术", "label": "计算机科学与技术" },
-      { "value": "网络工程", "label": "网络工程" },
-      { "value": "信息安全", "label": "信息安全" },
-      { "value": "物联网工程", "label": "物联网工程" },
-      { "value": "数字媒体技术", "label": "数字媒体技术" },
-      { "value": "智能科学与技术", "label": "智能科学与技术" },
-      { "value": "空间信息与数字技术", "label": "空间信息与数字技术" },
-      { "value": "电子与计算机工程", "label": "电子与计算机工程" },
-      { "value": "数据科学与大数据技术", "label": "数据科学与大数据技术" },
-      { "value": "网络空间安全", "label": "网络空间安全" },
-      { "value": "新媒体技术", "label": "新媒体技术" },
-      { "value": "电影制作", "label": "电影制作" },
-      { "value": "保密技术", "label": "保密技术" },
-      { "value": "服务科学与工程", "label": "服务科学与工程" },
-      { "value": "虚拟现实技术", "label": "虚拟现实技术" },
-      { "value": "区块链工程", "label": "区块链工程" },
-      { "value": "密码科学与技术", "label": "密码科学与技术" }
-    ]
-  },
-  {
-    "value": "电子信息类",
-    "label": "电子信息类",
-    "children": [
-      { "value": "电子信息工程", "label": "电子信息工程" },
-      { "value": "电子科学与技术", "label": "电子科学与技术" },
-      { "value": "通信工程", "label": "通信工程" },
-      { "value": "微电子科学与工程", "label": "微电子科学与工程" },
-      { "value": "光电信息科学与工程", "label": "光电信息科学与工程" },
-      { "value": "信息工程", "label": "信息工程" },
-      { "value": "广播电视工程", "label": "广播电视工程" },
-      { "value": "水声工程", "label": "水声工程" },
-      { "value": "电子封装技术", "label": "电子封装技术" },
-      { "value": "集成电路设计与集成系统", "label": "集成电路设计与集成系统" },
-      { "value": "医学信息工程", "label": "医学信息工程" },
-      { "value": "电磁场与无线技术", "label": "电磁场与无线技术" },
-      { "value": "电波传播与天线", "label": "电波传播与天线" },
-      { "value": "电子信息科学与技术", "label": "电子信息科学与技术" },
-      { "value": "电信工程及管理", "label": "电信工程及管理" },
-      { "value": "应用电子技术教育", "label": "应用电子技术教育" },
-      { "value": "人工智能", "label": "人工智能" },
-      { "value": "海洋信息工程", "label": "海洋信息工程" },
-      { "value": "柔性电子学", "label": "柔性电子学" },
-      { "value": "智能测控工程", "label": "智能测控工程" }
-    ]
-  },
-  {
-    "value": "自动化类",
-    "label": "自动化类",
-    "children": [
-      { "value": "自动化", "label": "自动化" },
-      { "value": "轨道交通信号与控制", "label": "轨道交通信号与控制" },
-      { "value": "机器人工程", "label": "机器人工程" },
-      { "value": "邮政工程", "label": "邮政工程" },
-      { "value": "核电技术与控制工程", "label": "核电技术与控制工程" },
-      { "value": "智能装备与系统", "label": "智能装备与系统" },
-      { "value": "工业智能", "label": "工业智能" },
-      { "value": "智能工程与创意设计", "label": "智能工程与创意设计" }
-    ]
-  },
-  {
-    "value": "数学类",
-    "label": "数学类",
-    "children": [
-      { "value": "数学与应用数学", "label": "数学与应用数学" },
-      { "value": "信息与计算科学", "label": "信息与计算科学" },
-      { "value": "数理基础科学", "label": "数理基础科学" },
-      { "value": "数据计算及应用", "label": "数据计算及应用" }
-    ]
-  },
-  {
-    "value": "统计学类",
-    "label": "统计学类",
-    "children": [
-      { "value": "统计学", "label": "统计学" },
-      { "value": "应用统计学", "label": "应用统计学" },
-      { "value": "数据科学", "label": "数据科学" },
-      { "value": "生物统计学", "label": "生物统计学" }
-    ]
-  },
-  {
-    "value": "集成电路科学与工程类",
-    "label": "集成电路科学与工程类",
-    "children": [
-      { "value": "集成电路设计与集成系统", "label": "集成电路设计与集成系统" }
-    ]
-  },
-  {
-    "value": "国家安全学类",
-    "label": "国家安全学类",
-    "children": [
-      { "value": "信息安全", "label": "信息安全" }
-    ]
-  },
-  {
-    "value": "交叉工程类",
-    "label": "交叉工程类",
-    "children": [
-      { "value": "碳中和科学与工程", "label": "碳中和科学与工程" },
-      { "value": "低空技术与工程", "label": "低空技术与工程" },
-      { "value": "智能分子工程", "label": "智能分子工程" },
-      { "value": "时空信息工程", "label": "时空信息工程" },
-      { "value": "智慧应急", "label": "智慧应急" },
-      { "value": "工业软件", "label": "工业软件" }
-    ]
-  },
-  {
-    "value": "管理科学与工程类",
-    "label": "管理科学与工程类",
-    "children": [
-      { "value": "信息管理与信息系统", "label": "信息管理与信息系统" },
-      { "value": "大数据管理与应用", "label": "大数据管理与应用" },
-      { "value": "计算金融", "label": "计算金融" }
-    ]
-  },
-  {
-    "value": "电子商务类",
-    "label": "电子商务类",
-    "children": [
-      { "value": "电子商务", "label": "电子商务" },
-      { "value": "跨境电子商务", "label": "跨境电子商务" }
-    ]
-  },
-  {
-    "value": "物流管理与工程类",
-    "label": "物流管理与工程类",
-    "children": [
-      { "value": "物流工程", "label": "物流工程" }
-    ]
-  }
-]
+
 
 
 // --- 方法 ---
@@ -408,8 +492,28 @@ const addTool = () => {
 const removeTool = (index: number) => formData.tools.splice(index, 1)
 
 
-/** 添加新项目经历，默认为非竞赛项目 */
-const addProject = () => formData.projects.push({ isCompetition: false, name: '', desc: '' })
+/** 打开项目经历弹窗 */
+const openProjectDialog = () => {
+  projectForm.isCompetition = false
+  projectForm.name = ''
+  projectForm.desc = ''
+  showProjectDialog.value = true
+}
+
+/** 确认添加项目经历 */
+const confirmAddProject = () => {
+  if (!projectForm.name.trim()) {
+    ElMessage.warning('请输入项目名称')
+    return
+  }
+  formData.projects.push({
+    isCompetition: projectForm.isCompetition,
+    name: projectForm.name,
+    desc: projectForm.desc
+  })
+  showProjectDialog.value = false
+  ElMessage.success('添加成功')
+}
 
 /**
  * 移除指定索引的项目经历
@@ -417,15 +521,60 @@ const addProject = () => formData.projects.push({ isCompetition: false, name: ''
  */
 const removeProject = (index: number) => formData.projects.splice(index, 1)
 
+/** 打开实践经历弹窗 */
+const openInternshipDialog = () => {
+  internshipForm.company = ''
+  internshipForm.role = ''
+  internshipForm.date = []
+  internshipForm.desc = ''
+  showInternshipDialog.value = true
+}
 
-/** 添加新实习经历 */
-const addInternship = () => formData.internships.push({ company: '', role: '', date: [], desc: '' })
+/** 确认添加实践经历 */
+const confirmAddInternship = () => {
+  if (!internshipForm.company.trim()) {
+    ElMessage.warning('请输入公司名称')
+    return
+  }
+  if (!internshipForm.role.trim()) {
+    ElMessage.warning('请输入担任岗位')
+    return
+  }
+  formData.internships.push({
+    company: internshipForm.company,
+    role: internshipForm.role,
+    date: internshipForm.date,
+    desc: internshipForm.desc
+  })
+  showInternshipDialog.value = false
+  ElMessage.success('添加成功')
+}
 
 /**
  * 移除指定索引的实习经历
  * @param index - 要移除的实习索引
  */
 const removeInternship = (index: number) => formData.internships.splice(index, 1)
+
+/**
+ * 格式化日期范围显示
+ * @param dateRange - 日期范围数组 [开始日期, 结束日期]
+ * @returns 格式化后的日期字符串
+ */
+const formatDateRange = (dateRange: Date[]) => {
+  if (!dateRange || dateRange.length !== 2) return ''
+  const startDate = dateRange[0]
+  const endDate = dateRange[1]
+  if (!startDate || !endDate) return ''
+  const start = new Date(startDate)
+  const end = new Date(endDate)
+  const format = (date: Date) => {
+    const y = date.getFullYear()
+    const m = String(date.getMonth() + 1).padStart(2, '0')
+    return `${y}.${m}`
+  }
+  return `${format(start)} - ${format(end)}`
+}
 
 
 /**
@@ -505,6 +654,16 @@ const getPriorityClass = (index: number) => {
   return 'priority-third'
 }
 
+/**
+ * 获取优先级提示文字
+ * @param index - 序号索引（0开始）
+ */
+const getPriorityHint = (index: number) => {
+  if (index === 0) return '最优先考虑'
+  if (index === 1) return '次要因素'
+  return '第三因素'
+}
+
 
 // --- 测试弹窗逻辑 ---
 
@@ -535,472 +694,6 @@ interface QuizQuestion {
   correctAnswer?: string
 }
 
-/** 沟通能力测评题库 */
-const communicationQuestions: QuizQuestion[] = [
-  {
-    id: 1,
-    question: '当团队成员之间产生分歧时，你会如何处理？',
-    options: [
-      { label: 'A', value: 'A', text: '主动协调，倾听各方意见，寻求共识' },
-      { label: 'B', value: 'B', text: '保持中立，让团队自行解决' },
-      { label: 'C', value: 'C', text: '支持最有说服力的观点' },
-      { label: 'D', value: 'D', text: '向上级汇报，请求决策' }
-    ]
-  },
-  {
-    id: 2,
-    question: '在跨部门协作中，遇到对方不配合的情况，你会？',
-    options: [
-      { label: 'A', value: 'A', text: '了解对方需求，寻找双赢方案' },
-      { label: 'B', value: 'B', text: '坚持原则，按流程推进' },
-      { label: 'C', value: 'C', text: '寻求上级介入协调' },
-      { label: 'D', value: 'D', text: '暂时搁置，等待时机' }
-    ]
-  },
-  {
-    id: 3,
-    question: '向领导汇报工作时，你更倾向于？',
-    options: [
-      { label: 'A', value: 'A', text: '先说结果，再补充关键细节' },
-      { label: 'B', value: 'B', text: '按时间顺序详细描述过程' },
-      { label: 'C', value: 'C', text: '准备书面材料，让领导自己看' },
-      { label: 'D', value: 'D', text: '等领导询问再回答' }
-    ]
-  },
-  {
-    id: 4,
-    question: '客户提出不合理需求时，你会如何回应？',
-    options: [
-      { label: 'A', value: 'A', text: '耐心解释，提供替代方案' },
-      { label: 'B', value: 'B', text: '直接拒绝，说明原因' },
-      { label: 'C', value: 'C', text: '先答应下来，再内部协商' },
-      { label: 'D', value: 'D', text: '请示上级如何处理' }
-    ]
-  },
-  {
-    id: 5,
-    question: '在会议中，你发现有人误解了你的观点，你会？',
-    options: [
-      { label: 'A', value: 'A', text: '立即澄清，确保理解一致' },
-      { label: 'B', value: 'B', text: '会后单独沟通解释' },
-      { label: 'C', value: 'C', text: '通过他人转达正确信息' },
-      { label: 'D', value: 'D', text: '不解释，用行动证明' }
-    ]
-  }
-]
-
-/** 抗压能力测评题库 */
-const stressQuestions: QuizQuestion[] = [
-  {
-    id: 1,
-    question: '面对紧急且困难的任务 deadline，你的应对方式是？',
-    options: [
-      { label: 'A', value: 'A', text: '立即制定计划，分解任务，加班加点完成' },
-      { label: 'B', value: 'B', text: '评估可行性，必要时申请延期或求助' },
-      { label: 'C', value: 'C', text: '保持冷静，按部就班推进' },
-      { label: 'D', value: 'D', text: '焦虑但强迫自己硬撑完成' }
-    ]
-  },
-  {
-    id: 2,
-    question: '当工作出现重大失误时，你的第一反应是？',
-    options: [
-      { label: 'A', value: 'A', text: '立即承认错误，积极寻找补救方案' },
-      { label: 'B', value: 'B', text: '分析原因，避免类似问题再次发生' },
-      { label: 'C', value: 'C', text: '担心被批评，想办法掩盖' },
-      { label: 'D', value: 'D', text: '情绪低落，需要时间恢复' }
-    ]
-  },
-  {
-    id: 3,
-    question: '连续加班一周后，你会如何调整自己？',
-    options: [
-      { label: 'A', value: 'A', text: '适当休息，运动放松，保持工作生活平衡' },
-      { label: 'B', value: 'B', text: '坚持完成工作，结束后再好好休息' },
-      { label: 'C', value: 'C', text: '向领导反映情况，申请调休' },
-      { label: 'D', value: 'D', text: '抱怨但继续硬撑' }
-    ]
-  },
-  {
-    id: 4,
-    question: '面对多方同时施压的情况，你会？',
-    options: [
-      { label: 'A', value: 'A', text: '按优先级排序，逐一沟通处理' },
-      { label: 'B', value: 'B', text: '先处理最紧急的事项' },
-      { label: 'C', value: 'C', text: '同时推进所有事项' },
-      { label: 'D', value: 'D', text: '感到 overwhelmed，不知从何开始' }
-    ]
-  },
-  {
-    id: 5,
-    question: '项目失败后，你的态度是？',
-    options: [
-      { label: 'A', value: 'A', text: '总结经验教训，为下一次做准备' },
-      { label: 'B', value: 'B', text: '分析责任归属，明确改进方向' },
-      { label: 'C', value: 'C', text: '沮丧一段时间，然后重新振作' },
-      { label: 'D', value: 'D', text: '怀疑自己的能力' }
-    ]
-  }
-]
-
-/** 学习能力测评题库 */
-const learningQuestions: QuizQuestion[] = [
-  {
-    id: 1,
-    question: '遇到不熟悉的技术领域需要快速上手，你会怎么做？',
-    options: [
-      { label: 'A', value: 'A', text: '系统学习基础，边学边实践' },
-      { label: 'B', value: 'B', text: '直接找相关项目练手，遇到问题再查资料' },
-      { label: 'C', value: 'C', text: '请教有经验的同事，快速入门' },
-      { label: 'D', value: 'D', text: '阅读官方文档和优质教程' }
-    ]
-  },
-  {
-    id: 2,
-    question: '学习新技术时，你更喜欢的方式是？',
-    options: [
-      { label: 'A', value: 'A', text: '看视频教程，跟着做项目' },
-      { label: 'B', value: 'B', text: '阅读书籍和文档，深入理解原理' },
-      { label: 'C', value: 'C', text: '参加培训课程，系统学习' },
-      { label: 'D', value: 'D', text: '加入技术社区，与他人交流学习' }
-    ]
-  },
-  {
-    id: 3,
-    question: '当学习遇到瓶颈时，你通常会？',
-    options: [
-      { label: 'A', value: 'A', text: '换个角度思考，尝试不同方法' },
-      { label: 'B', value: 'B', text: '暂时放下，过一段时间再回来' },
-      { label: 'C', value: 'C', text: '寻求他人帮助，讨论解决方案' },
-      { label: 'D', value: 'D', text: '反复练习，直到突破' }
-    ]
-  },
-  {
-    id: 4,
-    question: '对于技术更新迭代，你的态度是？',
-    options: [
-      { label: 'A', value: 'A', text: '保持好奇心，主动学习新技术' },
-      { label: 'B', value: 'B', text: '等技术成熟稳定后再学习' },
-      { label: 'C', value: 'C', text: '根据工作需求选择性学习' },
-      { label: 'D', value: 'D', text: '专注于精通现有技术栈' }
-    ]
-  },
-  {
-    id: 5,
-    question: '如何检验自己是否真正掌握了一项新技术？',
-    options: [
-      { label: 'A', value: 'A', text: '能独立完成一个实际项目' },
-      { label: 'B', value: 'B', text: '能向他人讲解清楚技术原理' },
-      { label: 'C', value: 'C', text: '通过相关认证考试' },
-      { label: 'D', value: 'D', text: '能解决实际工作中遇到的问题' }
-    ]
-  }
-]
-
-/**
- * 从题库中随机获取一道题目
- * @param questions - 题目数组
- * @returns 随机选中的题目
- */
-const getRandomQuestion = (questions: QuizQuestion[]): QuizQuestion => {
-  const randomIndex = Math.floor(Math.random() * questions.length)
-  return questions[randomIndex]!
-}
-
-/** 专业技能题库 - Python */
-const pythonQuestions: QuizQuestion[] = [
-  {
-    id: 1,
-    question: 'Python 中，以下哪个函数用于获取列表的长度？',
-    options: [
-      { label: 'A', value: 'A', text: 'size()' },
-      { label: 'B', value: 'B', text: 'len()' },
-      { label: 'C', value: 'C', text: 'length()' },
-      { label: 'D', value: 'D', text: 'count()' }
-    ],
-    correctAnswer: 'B'
-  },
-  {
-    id: 2,
-    question: 'Python 中，以下哪个不是可变数据类型？',
-    options: [
-      { label: 'A', value: 'A', text: 'list' },
-      { label: 'B', value: 'B', text: 'dict' },
-      { label: 'C', value: 'C', text: 'tuple' },
-      { label: 'D', value: 'D', text: 'set' }
-    ],
-    correctAnswer: 'C'
-  },
-  {
-    id: 3,
-    question: 'Python 中，以下哪个关键字用于定义函数？',
-    options: [
-      { label: 'A', value: 'A', text: 'func' },
-      { label: 'B', value: 'B', text: 'def' },
-      { label: 'C', value: 'C', text: 'function' },
-      { label: 'D', value: 'D', text: 'define' }
-    ],
-    correctAnswer: 'B'
-  },
-  {
-    id: 4,
-    question: 'Python 中，以下哪个方法用于向列表末尾添加元素？',
-    options: [
-      { label: 'A', value: 'A', text: 'add()' },
-      { label: 'B', value: 'B', text: 'append()' },
-      { label: 'C', value: 'C', text: 'push()' },
-      { label: 'D', value: 'D', text: 'insert()' }
-    ],
-    correctAnswer: 'B'
-  },
-  {
-    id: 5,
-    question: 'Python 中，以下哪个符号用于表示注释？',
-    options: [
-      { label: 'A', value: 'A', text: '//' },
-      { label: 'B', value: 'B', text: '/* */' },
-      { label: 'C', value: 'C', text: '#' },
-      { label: 'D', value: 'D', text: '--' }
-    ],
-    correctAnswer: 'C'
-  }
-]
-
-/** 专业技能题库 - Java */
-const javaQuestions: QuizQuestion[] = [
-  {
-    id: 1,
-    question: 'Java 中，以下哪个关键字用于创建类的实例？',
-    options: [
-      { label: 'A', value: 'A', text: 'new' },
-      { label: 'B', value: 'B', text: 'create' },
-      { label: 'C', value: 'C', text: 'instance' },
-      { label: 'D', value: 'D', text: 'make' }
-    ],
-    correctAnswer: 'A'
-  },
-  {
-    id: 2,
-    question: 'Java 中，以下哪个不是访问修饰符？',
-    options: [
-      { label: 'A', value: 'A', text: 'public' },
-      { label: 'B', value: 'B', text: 'private' },
-      { label: 'C', value: 'C', text: 'protected' },
-      { label: 'D', value: 'D', text: 'static' }
-    ],
-    correctAnswer: 'D'
-  },
-  {
-    id: 3,
-    question: 'Java 中，String 类存储在哪个区域？',
-    options: [
-      { label: 'A', value: 'A', text: '栈内存' },
-      { label: 'B', value: 'B', text: '堆内存' },
-      { label: 'C', value: 'C', text: '字符串常量池' },
-      { label: 'D', value: 'D', text: '方法区' }
-    ],
-    correctAnswer: 'C'
-  },
-  {
-    id: 4,
-    question: 'Java 中，以下哪个接口用于实现列表数据结构？',
-    options: [
-      { label: 'A', value: 'A', text: 'Set' },
-      { label: 'B', value: 'B', text: 'Map' },
-      { label: 'C', value: 'C', text: 'List' },
-      { label: 'D', value: 'D', text: 'Queue' }
-    ],
-    correctAnswer: 'C'
-  },
-  {
-    id: 5,
-    question: 'Java 中，以下哪个关键字用于处理异常？',
-    options: [
-      { label: 'A', value: 'A', text: 'throw' },
-      { label: 'B', value: 'B', text: 'try-catch' },
-      { label: 'C', value: 'C', text: 'throws' },
-      { label: 'D', value: 'D', text: '以上都是' }
-    ],
-    correctAnswer: 'D'
-  }
-]
-
-/** 专业技能题库 - C++ */
-const cppQuestions: QuizQuestion[] = [
-  {
-    id: 1,
-    question: 'C++ 中，以下哪个符号用于表示指针？',
-    options: [
-      { label: 'A', value: 'A', text: '&' },
-      { label: 'B', value: 'B', text: '*' },
-      { label: 'C', value: 'C', text: '@' },
-      { label: 'D', value: 'D', text: '%' }
-    ],
-    correctAnswer: 'B'
-  },
-  {
-    id: 2,
-    question: 'C++ 中，以下哪个不是构造函数的特性？',
-    options: [
-      { label: 'A', value: 'A', text: '与类名相同' },
-      { label: 'B', value: 'B', text: '没有返回值' },
-      { label: 'C', value: 'C', text: '可以被继承' },
-      { label: 'D', value: 'D', text: '可以重载' }
-    ],
-    correctAnswer: 'C'
-  },
-  {
-    id: 3,
-    question: 'C++ 中，以下哪个关键字用于动态内存分配？',
-    options: [
-      { label: 'A', value: 'A', text: 'malloc' },
-      { label: 'B', value: 'B', text: 'new' },
-      { label: 'C', value: 'C', text: 'alloc' },
-      { label: 'D', value: 'D', text: 'create' }
-    ],
-    correctAnswer: 'B'
-  },
-  {
-    id: 4,
-    question: 'C++ 中，以下哪个概念用于实现运行时多态？',
-    options: [
-      { label: 'A', value: 'A', text: '函数重载' },
-      { label: 'B', value: 'B', text: '运算符重载' },
-      { label: 'C', value: 'C', text: '虚函数' },
-      { label: 'D', value: 'D', text: '模板' }
-    ],
-    correctAnswer: 'C'
-  },
-  {
-    id: 5,
-    question: 'C++ 中，以下哪个容器属于 STL 标准库？',
-    options: [
-      { label: 'A', value: 'A', text: 'ArrayList' },
-      { label: 'B', value: 'B', text: 'vector' },
-      { label: 'C', value: 'C', text: 'LinkedList' },
-      { label: 'D', value: 'D', text: 'HashMap' }
-    ],
-    correctAnswer: 'B'
-  }
-]
-
-/** 工具题库 - Git */
-const gitQuestions: QuizQuestion[] = [
-  {
-    id: 1,
-    question: 'Git 中，以下哪个命令用于将文件添加到暂存区？',
-    options: [
-      { label: 'A', value: 'A', text: 'git commit' },
-      { label: 'B', value: 'B', text: 'git add' },
-      { label: 'C', value: 'C', text: 'git push' },
-      { label: 'D', value: 'D', text: 'git pull' }
-    ],
-    correctAnswer: 'B'
-  },
-  {
-    id: 2,
-    question: 'Git 中，以下哪个命令用于创建新的分支？',
-    options: [
-      { label: 'A', value: 'A', text: 'git branch <branch-name>' },
-      { label: 'B', value: 'B', text: 'git checkout <branch-name>' },
-      { label: 'C', value: 'C', text: 'git merge <branch-name>' },
-      { label: 'D', value: 'D', text: 'git switch <branch-name>' }
-    ],
-    correctAnswer: 'A'
-  },
-  {
-    id: 3,
-    question: 'Git 中，以下哪个命令用于查看当前仓库的状态？',
-    options: [
-      { label: 'A', value: 'A', text: 'git log' },
-      { label: 'B', value: 'B', text: 'git status' },
-      { label: 'C', value: 'C', text: 'git diff' },
-      { label: 'D', value: 'D', text: 'git show' }
-    ],
-    correctAnswer: 'B'
-  },
-  {
-    id: 4,
-    question: 'Git 中，以下哪个命令用于将本地提交推送到远程仓库？',
-    options: [
-      { label: 'A', value: 'A', text: 'git commit' },
-      { label: 'B', value: 'B', text: 'git merge' },
-      { label: 'C', value: 'C', text: 'git push' },
-      { label: 'D', value: 'D', text: 'git fetch' }
-    ],
-    correctAnswer: 'C'
-  },
-  {
-    id: 5,
-    question: 'Git 中，以下哪个命令用于切换分支？',
-    options: [
-      { label: 'A', value: 'A', text: 'git branch' },
-      { label: 'B', value: 'B', text: 'git checkout' },
-      { label: 'C', value: 'C', text: 'git merge' },
-      { label: 'D', value: 'D', text: 'git stash' }
-    ],
-    correctAnswer: 'B'
-  }
-]
-
-/** 工具题库 - Docker */
-const dockerQuestions: QuizQuestion[] = [
-  {
-    id: 1,
-    question: 'Docker 中，以下哪个命令用于运行一个容器？',
-    options: [
-      { label: 'A', value: 'A', text: 'docker build' },
-      { label: 'B', value: 'B', text: 'docker run' },
-      { label: 'C', value: 'C', text: 'docker create' },
-      { label: 'D', value: 'D', text: 'docker start' }
-    ],
-    correctAnswer: 'B'
-  },
-  {
-    id: 2,
-    question: 'Docker 中，以下哪个命令用于查看正在运行的容器？',
-    options: [
-      { label: 'A', value: 'A', text: 'docker ps' },
-      { label: 'B', value: 'B', text: 'docker images' },
-      { label: 'C', value: 'C', text: 'docker list' },
-      { label: 'D', value: 'D', text: 'docker show' }
-    ],
-    correctAnswer: 'A'
-  },
-  {
-    id: 3,
-    question: 'Docker 中，用于构建镜像的文件通常叫什么名字？',
-    options: [
-      { label: 'A', value: 'A', text: 'docker.yml' },
-      { label: 'B', value: 'B', text: 'Dockerfile' },
-      { label: 'C', value: 'C', text: 'docker.conf' },
-      { label: 'D', value: 'D', text: 'docker.json' }
-    ],
-    correctAnswer: 'B'
-  },
-  {
-    id: 4,
-    question: 'Docker 中，以下哪个命令用于停止一个正在运行的容器？',
-    options: [
-      { label: 'A', value: 'A', text: 'docker kill' },
-      { label: 'B', value: 'B', text: 'docker stop' },
-      { label: 'C', value: 'C', text: 'docker pause' },
-      { label: 'D', value: 'D', text: 'docker exit' }
-    ],
-    correctAnswer: 'B'
-  },
-  {
-    id: 5,
-    question: 'Docker 中，以下哪个命令用于从镜像仓库拉取镜像？',
-    options: [
-      { label: 'A', value: 'A', text: 'docker fetch' },
-      { label: 'B', value: 'B', text: 'docker download' },
-      { label: 'C', value: 'C', text: 'docker pull' },
-      { label: 'D', value: 'D', text: 'docker get' }
-    ],
-    correctAnswer: 'C'
-  }
-]
 
 /** 当前测试的技能/工具名称 */
 const currentTestSkill = ref('')
@@ -1284,22 +977,110 @@ const confirmTest = () => {
 // --- 简历上传处理 ---
 
 /**
+ * 轮询获取简历解析报告
+ * 等待后端生成报告并返回能力分数
+ * @param taskId 简历解析任务ID
+ * @returns 能力评估分数
+ */
+const pollForResumeReport = async (taskId: string): Promise<RadarScores> => {
+  const maxAttempts = 30 // 最大轮询次数
+  const interval = 2000 // 轮询间隔 2秒
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      // 查询简历解析状态
+      const statusRes = await getResumeParseStatusApi(taskId)
+
+      if (statusRes.data.code === 200) {
+        const status = statusRes.data.data?.status
+
+        if (status === 'completed') {
+          // 报告已生成，获取报告数据
+          const reportRes = await getResumeReportApi(taskId)
+
+          if (reportRes.data.code === 200 && reportRes.data.data) {
+            const report = reportRes.data.data
+
+            // 从报告中提取能力分数
+            if (report.abilityScores) {
+              return report.abilityScores as RadarScores
+            }
+          }
+
+          // 如果后端没有返回 abilityScores，使用模拟数据
+          console.warn('后端简历报告未包含能力分数，使用模拟数据')
+          return calculateRadarScores(formData)
+        } else if (status === 'failed') {
+          throw new Error('简历解析报告生成失败')
+        }
+        // 状态为 processing 或 pending，继续轮询
+      }
+    } catch (error) {
+      console.error(`轮询简历报告状态失败 (尝试 ${attempt + 1}/${maxAttempts}):`, error)
+    }
+
+    // 等待下一轮轮询
+    await new Promise(resolve => setTimeout(resolve, interval))
+  }
+
+  throw new Error('获取简历报告超时，请稍后重试')
+}
+
+/**
  * 处理简历解析完成后的数据
- * 自动将解析出的技能填充到表单中
+ * 自动将解析出的技能填充到表单中，并展示能力评估雷达图
  * @param parsedData - 简历解析后的数据对象
  */
-const handleResumeParsed = (parsedData: any) => {
+const handleResumeParsed = async (parsedData: any) => {
   hasUploadedResume.value = true
   showUploadDialog.value = false
   ElMessage.success('简历解析成功！已自动填充部分信息')
-  
+
   // 将解析出的技能添加到技能列表，默认熟练度70
-  if (parsedData?.skills && parsedData.skills.length > 0) {
-    parsedData.skills.forEach((skill: string) => {
+  if (parsedData?.profile?.skills && parsedData.profile.skills.length > 0) {
+    parsedData.profile.skills.forEach((skill: string) => {
       if (!formData.skills.find(s => s.name === skill)) {
         formData.skills.push({ name: skill, credibility: 70 })
       }
     })
+  }
+
+  // 情况1: 如果后端直接返回了 abilityScores，直接展示
+  if (parsedData?.abilityScores) {
+    Object.assign(radarScores, parsedData.abilityScores)
+    showRadarDialog.value = true
+    ElMessage.success('简历能力评估报告已生成！')
+    return
+  }
+
+  // 情况2: 如果后端返回了完整报告，提取 abilityScores
+  if (parsedData?.report?.abilityScores) {
+    Object.assign(radarScores, parsedData.report.abilityScores)
+    showRadarDialog.value = true
+    ElMessage.success('简历能力评估报告已生成！')
+    return
+  }
+
+  // 情况3: 如果有 task_id，需要轮询获取报告
+  if (parsedData?.task_id) {
+    showRadarDialog.value = true
+    radarLoading.value = true
+
+    try {
+      const scores = await pollForResumeReport(parsedData.task_id)
+      Object.assign(radarScores, scores)
+      ElMessage.success('简历能力评估报告生成完成！')
+    } catch (error: any) {
+      console.error('获取简历报告失败:', error)
+      ElMessage.error(error.message || '获取报告失败，请稍后重试')
+
+      // 降级使用模拟数据
+      console.warn('后端调用失败，降级使用模拟数据')
+      const mockReport = await fetchMockAbilityReport(formData)
+      Object.assign(radarScores, mockReport.abilityScores)
+    } finally {
+      radarLoading.value = false
+    }
   }
 }
 
@@ -1341,51 +1122,200 @@ const formRules = reactive<FormRules>({
 
 
 /**
+ * 轮询获取能力评估报告
+ * 等待后端生成报告并返回能力分数
+ * @param taskId 任务ID
+ * @returns 能力评估分数
+ */
+const pollForAbilityReport = async (taskId: string): Promise<RadarScores> => {
+  const maxAttempts = 30 // 最大轮询次数
+  const interval = 2000 // 轮询间隔 2秒
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      // 查询报告状态
+      const statusRes = await getCareerReportStatusApi(taskId)
+
+      if (statusRes.data.code === 200) {
+        const status = statusRes.data.data?.status
+
+        if (status === 'completed') {
+          // 报告已生成，获取报告数据
+          const reportRes = await getCareerReportApi(taskId)
+
+          if (reportRes.data.code === 200 && reportRes.data.data) {
+            const report = reportRes.data.data
+
+            // 从报告中提取能力分数
+            if (report.abilityScores) {
+              return report.abilityScores as RadarScores
+            }
+          }
+
+          // 如果后端没有返回 abilityScores，使用模拟数据
+          console.warn('后端报告未包含能力分数，使用模拟数据')
+          return calculateRadarScores(formData)
+        } else if (status === 'failed') {
+          throw new Error('报告生成失败')
+        }
+        // 状态为 processing 或 pending，继续轮询
+      }
+    } catch (error) {
+      console.error(`轮询报告状态失败 (尝试 ${attempt + 1}/${maxAttempts}):`, error)
+    }
+
+    // 等待下一轮轮询
+    await new Promise(resolve => setTimeout(resolve, interval))
+  }
+
+  throw new Error('获取报告超时，请稍后重试')
+}
+
+/**
+ * 处理跳转到指定字段
+ * @param field - 字段标识
+ */
+const handleJumpToField = (field: string) => {
+  // 根据字段跳转到对应步骤
+  switch (field) {
+    case 'education':
+    case 'major':
+      activeMenu.value = '1'
+      break
+    case 'languages':
+    case 'certificates':
+    case 'skills':
+    case 'tools':
+      activeMenu.value = '2'
+      break
+    case 'projects':
+    case 'internships':
+      activeMenu.value = '3'
+      break
+    case 'quiz-communication':
+    case 'quiz-stress':
+    case 'quiz-learning':
+    case 'innovation':
+      activeMenu.value = '4'
+      // 如果是素质测评，自动打开对应测评弹窗
+      if (field === 'quiz-communication') {
+        openQuizModal('communication')
+      } else if (field === 'quiz-stress') {
+        openQuizModal('stress')
+      } else if (field === 'quiz-learning') {
+        openQuizModal('learning')
+      }
+      break
+    case 'targetJob':
+    case 'targetIndustries':
+      activeMenu.value = '5'
+      break
+  }
+}
+
+/**
  * 提交表单
- * 验证表单数据，验证通过后调用API提交
+ * 验证表单数据，提交到后端并等待返回能力评估报告
  */
 const submitForm = async () => {
   if (!formRef.value) return
-  
+
   await formRef.value.validate(async (valid) => {
     if (!valid) {
       ElMessage.error('请完善必填信息')
       return
     }
-    
+
     submitting.value = true
-    
+    radarLoading.value = true
+    showRadarDialog.value = true
+
     try {
       // 转换表单数据为提交格式
       const submitData = convertToSubmitDTO(formData)
-      
-      // 调用API提交
+
+      // 调用API提交表单
       const res = await submitCareerFormApi(submitData)
-      
+
       if (res.data.code === 200) {
-        ElMessage.success('画像提交成功，正在生成规划报告...')
-        
-        // 可以在这里处理提交成功的后续逻辑
-        // 比如跳转到报告页面或显示任务状态
-        const result = res.data.data as { taskId: string; status: string; estimatedTime?: number }
-        console.log('任务ID:', result?.taskId)
-        
-        // 可选：保存任务ID到本地存储，用于后续查询
+        ElMessage.success('画像提交成功，正在生成能力评估报告...')
+
+        const result = res.data.data as CareerFormSubmitResult
+
         if (result?.taskId) {
+          // 保存任务ID到本地存储
           localStorage.setItem('careerFormTaskId', result.taskId)
+
+          // 轮询获取报告数据（包含能力评估分数）
+          const scores = await pollForAbilityReport(result.taskId)
+
+          // 更新雷达图分数
+          Object.assign(radarScores, scores)
+
+          ElMessage.success('能力评估报告生成完成！')
+          console.log('【后端返回】雷达图分数:', scores)
+        } else {
+          // 后端未返回任务ID，使用模拟数据
+          console.warn('后端未返回任务ID，使用模拟数据')
+          const mockReport = await fetchMockAbilityReport(formData)
+          Object.assign(radarScores, mockReport.abilityScores)
         }
       } else {
         ElMessage.error(res.data.msg || '提交失败，请稍后重试')
+        // 提交失败，关闭弹窗
+        showRadarDialog.value = false
       }
     } catch (error: any) {
-      console.error('提交表单失败:', error)
-      ElMessage.error(error.response?.data?.msg || '网络错误，请稍后重试')
+      console.error('提交表单或获取报告失败:', error)
+      ElMessage.error(error.message || '网络错误，请稍后重试')
+
+      // 后端调用失败，降级使用模拟数据（便于演示）
+      console.warn('后端调用失败，降级使用模拟数据')
+      const mockReport = await fetchMockAbilityReport(formData)
+      Object.assign(radarScores, mockReport.abilityScores)
     } finally {
       submitting.value = false
+      radarLoading.value = false
     }
   })
 }
 
+/**
+ * 使用模拟数据生成能力评估（调试/预览模式）
+ * 当后端服务不可用时，可调用此方法使用前端模拟数据
+ */
+const submitFormWithMockData = async () => {
+  if (!formRef.value) return
+
+  await formRef.value.validate(async (valid) => {
+    if (!valid) {
+      ElMessage.error('请完善必填信息')
+      return
+    }
+
+    submitting.value = true
+    radarLoading.value = true
+    showRadarDialog.value = true
+
+    try {
+      // 使用模拟数据生成能力评估报告
+      const mockReport = await fetchMockAbilityReport(formData)
+
+      // 更新雷达图分数
+      Object.assign(radarScores, mockReport.abilityScores)
+
+      console.log('【模拟模式】雷达图分数:', mockReport.abilityScores)
+      ElMessage.success('能力评估报告生成完成（模拟数据）！')
+    } catch (error) {
+      console.error('生成模拟报告失败:', error)
+      ElMessage.error('生成报告失败，请稍后重试')
+      showRadarDialog.value = false
+    } finally {
+      submitting.value = false
+      radarLoading.value = false
+    }
+  })
+}
 
 /**
  * 重置表单
@@ -1785,84 +1715,67 @@ const resetForm = () => {
             <div v-show="activeMenu === '3'" class="section-content">
               <div class="form-section-title">项目经历</div>
               <el-form-item label="项目或竞赛">
-                <div 
-                  v-for="(proj, index) in formData.projects" 
-                  :key="index" 
-                  class="project-card"
-                >
-                  <div class="project-header">
-                    <el-switch 
-                      v-model="proj.isCompetition" 
-                      active-text="竞赛" 
-                      inactive-text="项目"
-                      inline-prompt
-                      style="--el-switch-on-color: #e6a23c; --el-switch-off-color: #409eff"
-                    />
-                    <el-button text type="danger" :icon="Delete" @click="removeProject(index)">
-                      删除
-                    </el-button>
-                  </div>
-                  <el-input 
-                    v-model="proj.name" 
-                    placeholder="项目名称 / 竞赛名称" 
-                    style="flex: 1; min-width: 250px"
-                  />
-                  <el-input 
-                    v-model="proj.desc" 
-                    type="textarea" 
-                    :rows="3"
-                    placeholder="详细描述项目内容、你的职责和取得的成果"
-                  />
-                  <div class="project-actions">
-                    <el-upload action="#" :auto-upload="false" :limit="1" class="upload-inline">
-                      <el-button type="info" plain size="small" :icon="Upload">上传附件</el-button>
-                    </el-upload>
+                <div class="experience-list">
+                  <div 
+                    v-for="(proj, index) in formData.projects" 
+                    :key="index" 
+                    class="experience-card"
+                    :class="{ 'is-competition': proj.isCompetition }"
+                  >
+                    <div class="experience-card-header">
+                      <div class="experience-type-badge">
+                        <el-icon v-if="proj.isCompetition"><Trophy /></el-icon>
+                        <el-icon v-else><Folder /></el-icon>
+                        <span>{{ proj.isCompetition ? '竞赛' : '项目' }}</span>
+                      </div>
+                      <el-button text type="danger" :icon="Delete" @click="removeProject(index)">
+                        删除
+                      </el-button>
+                    </div>
+                    <div class="experience-card-body preview-mode">
+                      <h4 class="preview-title">{{ proj.name }}</h4>
+                      <p class="preview-desc" v-if="proj.desc">{{ proj.desc }}</p>
+                    </div>
                   </div>
                 </div>
-                <el-button class="add-item-btn" type="primary" plain :icon="Plus" @click="addProject">
-                  添加项目
+                <el-button class="add-experience-btn" type="primary" plain :icon="Plus" @click="openProjectDialog">
+                  <span class="btn-text">添加项目/竞赛</span>
+                  <span class="btn-hint">记录你的精彩作品</span>
                 </el-button>
               </el-form-item>
 
               <div class="form-section-title">实践经历</div>
               <el-form-item label="实习/工作" prop="internships">
-                <div 
-                  v-for="(intern, index) in formData.internships" 
-                  :key="index" 
-                  class="project-card"
-                >
-                  <div class="internship-row">
-                    <el-input 
-                      v-model="intern.company" 
-                      placeholder="公司全称" 
-                      style="flex: 2; min-width: 200px"
-                    />
-                    <el-input 
-                      v-model="intern.role" 
-                      placeholder="担任岗位" 
-                      style="flex: 1; min-width: 150px"
-                    />
-                    <el-button text type="danger" :icon="Delete" @click="removeInternship(index)">
-                      删除
-                    </el-button>
+                <div class="experience-list">
+                  <div 
+                    v-for="(intern, index) in formData.internships" 
+                    :key="index" 
+                    class="experience-card internship-card"
+                  >
+                    <div class="experience-card-header">
+                      <div class="experience-type-badge work-badge">
+                        <el-icon><Briefcase /></el-icon>
+                        <span>工作/实习</span>
+                      </div>
+                      <el-button text type="danger" :icon="Delete" @click="removeInternship(index)">
+                        删除
+                      </el-button>
+                    </div>
+                    <div class="experience-card-body preview-mode">
+                      <div class="info-row">
+                        <span class="info-company">{{ intern.company }}</span>
+                        <span class="info-role">{{ intern.role }}</span>
+                      </div>
+                      <div class="info-date" v-if="intern.date && intern.date.length === 2">
+                        {{ formatDateRange(intern.date) }}
+                      </div>
+                      <p class="preview-desc" v-if="intern.desc">{{ intern.desc }}</p>
+                    </div>
                   </div>
-                  <el-date-picker 
-                    v-model="intern.date" 
-                    type="daterange" 
-                    range-separator="至" 
-                    start-placeholder="开始时间" 
-                    end-placeholder="结束时间"
-                    style="width: 100%"
-                  />
-                  <el-input 
-                    v-model="intern.desc" 
-                    type="textarea" 
-                    :rows="4"
-                    placeholder="详细描述工作内容、承担的责任和取得的成果"
-                  />
                 </div>
-                <el-button class="add-item-btn" type="primary" plain :icon="Plus" @click="addInternship">
-                  添加经历
+                <el-button class="add-experience-btn" type="primary" plain :icon="Plus" @click="openInternshipDialog">
+                  <span class="btn-text">添加实践经历</span>
+                  <span class="btn-hint">丰富你的职场履历</span>
                 </el-button>
               </el-form-item>
             </div>
@@ -1954,45 +1867,86 @@ const resetForm = () => {
                 </el-col>
               </el-row>
 
-              <div class="form-section-title">发展优先级</div>
+              <div class="form-section-title">
+                <el-icon><Medal /></el-icon>
+                发展优先级
+              </div>
               <el-form-item label="优先级排序" prop="priorities">
-                <div class="priority-desc">请根据你的职业期望，拖拽调整以下因素的优先顺序（第1位为最重要）：</div>
-                <div class="sort-list">
-                  <div 
-                    v-for="(item, index) in formData.priorities" 
-                    :key="item.value" 
-                    class="sort-item"
-                    :class="{ 
-                      'is-dragging': dragIndex === index,
-                      'is-drag-over': dragOverIndex === index 
-                    }"
-                    draggable="true"
-                    @dragstart="handleDragStart(index)"
-                    @dragover="handleDragOver($event, index)"
-                    @dragleave="handleDragLeave"
-                    @drop="handleDrop(index)"
-                    @dragend="handleDragEnd"
-                  >
-                    <div class="sort-item-left">
-                      <el-icon class="drag-handle"><Rank /></el-icon>
-                      <span class="sort-number" :class="getPriorityClass(index)">{{ index + 1 }}</span>
-                      <span class="sort-label">{{ item.label }}</span>
+                <div class="priority-container">
+                  <div class="priority-header">
+                    <div class="priority-desc">
+                      <el-icon><InfoFilled /></el-icon>
+                      拖拽调整优先级顺序，第1位为你的首要考虑因素
                     </div>
-                    <div class="sort-actions">
-                      <el-button 
-                        text 
-                        :disabled="index === 0" 
-                        @click="movePriority(index, -1)"
-                        :icon="ArrowUp"
-                        title="上移"
-                      />
-                      <el-button 
-                        text 
-                        :disabled="index === formData.priorities.length - 1" 
-                        @click="movePriority(index, 1)"
-                        :icon="ArrowDown"
-                        title="下移"
-                      />
+                    <div class="priority-legend">
+                      <span class="legend-item first">
+                        <span class="legend-dot"></span>
+                        首要
+                      </span>
+                      <span class="legend-item second">
+                        <span class="legend-dot"></span>
+                        次要
+                      </span>
+                      <span class="legend-item third">
+                        <span class="legend-dot"></span>
+                        第三
+                      </span>
+                    </div>
+                  </div>
+                  <div class="priority-cards">
+                    <div 
+                      v-for="(item, index) in formData.priorities" 
+                      :key="item.value" 
+                      class="priority-card"
+                      :class="{ 
+                        'is-first': index === 0,
+                        'is-second': index === 1,
+                        'is-third': index === 2,
+                        'is-dragging': dragIndex === index,
+                        'is-drag-over': dragOverIndex === index 
+                      }"
+                      draggable="true"
+                      @dragstart="handleDragStart(index)"
+                      @dragover="handleDragOver($event, index)"
+                      @dragleave="handleDragLeave"
+                      @drop="handleDrop(index)"
+                      @dragend="handleDragEnd"
+                    >
+                      <div class="card-rank">
+                        <div class="rank-badge" :class="getPriorityClass(index)">
+                          <el-icon v-if="index === 0"><Trophy /></el-icon>
+                          <span v-else>{{ index + 1 }}</span>
+                        </div>
+                      </div>
+                      <div class="card-content">
+                        <div class="card-label">{{ item.label }}</div>
+                        <div class="card-hint">{{ getPriorityHint(index) }}</div>
+                      </div>
+                      <div class="card-actions">
+                        <el-button 
+                          text 
+                          circle
+                          size="small"
+                          :disabled="index === 0" 
+                          @click="movePriority(index, -1)"
+                          :icon="ArrowUp"
+                          title="上移"
+                          class="action-btn"
+                        />
+                        <el-button 
+                          text 
+                          circle
+                          size="small"
+                          :disabled="index === formData.priorities.length - 1" 
+                          @click="movePriority(index, 1)"
+                          :icon="ArrowDown"
+                          title="下移"
+                          class="action-btn"
+                        />
+                      </div>
+                      <div class="drag-indicator">
+                        <el-icon><Rank /></el-icon>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -2009,6 +1963,18 @@ const resetForm = () => {
               </el-button>
             </div>
           </el-form>
+
+          <!-- 雷达图弹窗组件 -->
+          <CareerFormRadar
+            v-model:visible="showRadarDialog"
+            :scores="radarScores"
+            :loading="radarLoading"
+            :loading-text="'正在生成能力评估报告...'"
+            :source-type="hasUploadedResume ? 'resume' : 'manual'"
+            :completeness="profileCompleteness"
+            :missing-items="missingItems"
+            @jump-to-field="handleJumpToField"
+          />
         </el-card>
       </el-main>
     </el-container>
@@ -2078,6 +2044,136 @@ const resetForm = () => {
         @close="showUploadDialog = false"
         @parsed="handleResumeParsed"
       />
+    </el-dialog>
+
+    <!-- 项目经历弹窗 -->
+    <el-dialog
+      v-model="showProjectDialog"
+      title="添加项目/竞赛经历"
+      width="600px"
+      destroy-on-close
+      class="experience-dialog"
+    >
+      <div class="experience-form">
+        <div class="form-item">
+          <label class="form-label">
+            <el-icon><Switch /></el-icon>
+            类型
+          </label>
+          <el-switch
+            v-model="projectForm.isCompetition"
+            active-text="竞赛"
+            inactive-text="项目"
+            inline-prompt
+            style="--el-switch-on-color: #e6a23c; --el-switch-off-color: #409eff"
+          />
+        </div>
+        <div class="form-item">
+          <label class="form-label">
+            <el-icon><Document /></el-icon>
+            {{ projectForm.isCompetition ? '竞赛名称' : '项目名称' }}
+          </label>
+          <el-input
+            v-model="projectForm.name"
+            :placeholder="projectForm.isCompetition ? '请输入竞赛名称' : '请输入项目名称'"
+            size="large"
+          />
+        </div>
+        <div class="form-item">
+          <label class="form-label">
+            <el-icon><Edit /></el-icon>
+            详细描述
+          </label>
+          <el-input
+            v-model="projectForm.desc"
+            type="textarea"
+            :rows="5"
+            :placeholder="projectForm.isCompetition
+              ? '描述竞赛背景、你的角色分工、具体工作和最终成绩'
+              : '描述项目背景、你的职责、技术栈和取得的成果'
+            "
+          />
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="showProjectDialog = false">取消</el-button>
+        <el-button type="primary" @click="confirmAddProject" :disabled="!projectForm.name.trim()">
+          确认添加
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 实践经历弹窗 -->
+    <el-dialog
+      v-model="showInternshipDialog"
+      title="添加实践经历"
+      width="600px"
+      destroy-on-close
+      class="experience-dialog"
+    >
+      <div class="experience-form">
+        <div class="form-row two-col">
+          <div class="form-item">
+            <label class="form-label">
+              <el-icon><OfficeBuilding /></el-icon>
+              公司/组织
+            </label>
+            <el-input
+              v-model="internshipForm.company"
+              placeholder="请输入公司或组织全称"
+              size="large"
+            />
+          </div>
+          <div class="form-item">
+            <label class="form-label">
+              <el-icon><User /></el-icon>
+              担任岗位
+            </label>
+            <el-input
+              v-model="internshipForm.role"
+              placeholder="请输入你的职位"
+              size="large"
+            />
+          </div>
+        </div>
+        <div class="form-item">
+          <label class="form-label">
+            <el-icon><Calendar /></el-icon>
+            起止时间
+          </label>
+          <el-date-picker
+            v-model="internshipForm.date"
+            type="daterange"
+            range-separator="至"
+            start-placeholder="开始时间"
+            end-placeholder="结束时间"
+            style="width: 100%"
+            size="large"
+          />
+        </div>
+        <div class="form-item">
+          <label class="form-label">
+            <el-icon><EditPen /></el-icon>
+            工作描述
+          </label>
+          <el-input
+            v-model="internshipForm.desc"
+            type="textarea"
+            :rows="5"
+            placeholder="详细描述工作内容、承担的责任和取得的成果"
+          />
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="showInternshipDialog = false">取消</el-button>
+        <el-button
+          type="primary"
+          @click="confirmAddInternship"
+          :disabled="!internshipForm.company.trim() || !internshipForm.role.trim()"
+        >
+          确认添加
+        </el-button>
+      </template>
     </el-dialog>
   </div>
 </template>
@@ -2685,121 +2781,285 @@ const resetForm = () => {
   display: inline-block;
 }
 
-/* 优先级描述 */
-.priority-desc {
-  font-size: 13px;
-  color: #909399;
-  margin-bottom: 12px;
-  padding-left: 4px;
-}
+/* ========== 发展优先级样式 - 卡片式设计 ========== */
 
-/* 排序列表样式 */
-.sort-list {
-  border: 1px solid #e4e7ed;
-  padding: 12px 16px;
-  border-radius: 4px;
+.priority-container {
   background: #fafbfc;
-  max-width: 480px;
+  border-radius: 16px;
+  padding: 24px;
+  border: 1px solid #e4e7ed;
 }
 
-.sort-item {
+.priority-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 12px;
-  margin: 4px 0;
-  border-radius: 4px;
-  font-size: 14px;
-  color: #303133;
-  transition: all 0.2s ease;
-  cursor: grab;
-  user-select: none;
-}
-
-.sort-item:hover {
-  background: #f0f2f5;
-}
-
-.sort-item:active {
-  cursor: grabbing;
-}
-
-.sort-item.is-dragging {
-  opacity: 0.5;
-  background: #ecf5ff;
-  border: 1px dashed #409eff;
-}
-
-.sort-item.is-drag-over {
-  background: #e6f2ff;
-  border: 1px dashed #409eff;
-  transform: scale(1.02);
-}
-
-.sort-item-left {
-  display: flex;
-  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
   gap: 12px;
 }
 
-.drag-handle {
+.priority-desc {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #606266;
+  font-weight: 500;
+}
+
+.priority-desc .el-icon {
+  color: #409eff;
   font-size: 16px;
-  color: #c0c4cc;
-  cursor: grab;
 }
 
-.sort-item:hover .drag-handle {
-  color: #909399;
+/* 优先级图例 */
+.priority-legend {
+  display: flex;
+  gap: 16px;
+  align-items: center;
 }
 
-.sort-number {
-  width: 28px;
-  height: 28px;
-  border-radius: 4px;
-  font-weight: 600;
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 13px;
+  color: #606266;
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.legend-item.first .legend-dot {
+  background: linear-gradient(135deg, #f0c78a 0%, #e6a23c 100%);
+  box-shadow: 0 2px 6px rgba(230, 162, 60, 0.3);
+}
+
+.legend-item.second .legend-dot {
+  background: linear-gradient(135deg, #b3d8ff 0%, #409eff 100%);
+  box-shadow: 0 2px 6px rgba(64, 158, 255, 0.3);
+}
+
+.legend-item.third .legend-dot {
+  background: linear-gradient(135deg, #d9d9d9 0%, #909399 100%);
+}
+
+/* 优先级卡片容器 */
+.priority-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* 优先级卡片 */
+.priority-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 2px solid transparent;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: grab;
+  user-select: none;
+  position: relative;
+  overflow: hidden;
+}
+
+.priority-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: #dcdfe6;
+  transition: all 0.3s ease;
+}
+
+.priority-card:hover {
+  transform: translateX(4px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.priority-card:active {
+  cursor: grabbing;
+}
+
+/* 第一名 - 金色 */
+.priority-card.is-first {
+  border-color: #e6a23c;
+  background: linear-gradient(135deg, #fffaf0 0%, #ffffff 100%);
+}
+
+.priority-card.is-first::before {
+  background: linear-gradient(180deg, #f0c78a 0%, #e6a23c 100%);
+  width: 6px;
+}
+
+/* 第二名 - 蓝色 */
+.priority-card.is-second {
+  border-color: #409eff;
+  background: linear-gradient(135deg, #f0f9ff 0%, #ffffff 100%);
+}
+
+.priority-card.is-second::before {
+  background: linear-gradient(180deg, #b3d8ff 0%, #409eff 100%);
+  width: 6px;
+}
+
+/* 第三名 - 灰色 */
+.priority-card.is-third {
+  border-color: #c0c4cc;
+}
+
+.priority-card.is-third::before {
+  background: linear-gradient(180deg, #d9d9d9 0%, #909399 100%);
+}
+
+/* 拖拽状态 */
+.priority-card.is-dragging {
+  opacity: 0.6;
+  transform: scale(0.98) rotate(1deg);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.priority-card.is-drag-over {
+  transform: scale(1.02);
+  box-shadow: 0 8px 24px rgba(64, 158, 255, 0.2);
+  border-style: dashed;
+}
+
+/* 排名徽章 */
+.card-rank {
+  flex-shrink: 0;
+}
+
+.rank-badge {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease;
+  font-weight: 700;
+  font-size: 18px;
+  transition: all 0.3s ease;
 }
 
-/* 第1优先级 - 金色高亮 */
-.sort-number.priority-first {
-  background: #f0f9eb;
-  color: #67c23a;
-  border: 1px solid #b3e19d;
+.rank-badge.priority-first {
+  background: linear-gradient(135deg, #f0c78a 0%, #e6a23c 100%);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(230, 162, 60, 0.35);
+  font-size: 22px;
 }
 
-/* 第2优先级 - 蓝色 */
-.sort-number.priority-second {
-  background: #ecf5ff;
-  color: #409eff;
-  border: 1px solid #b3d8ff;
+.rank-badge.priority-second {
+  background: linear-gradient(135deg, #b3d8ff 0%, #409eff 100%);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.35);
 }
 
-/* 第3优先级 - 灰色淡化 */
-.sort-number.priority-third {
-  background: #f5f7fa;
-  color: #909399;
-  border: 1px solid #dcdfe6;
+.rank-badge.priority-third {
+  background: linear-gradient(135deg, #f5f7fa 0%, #e4e7ed 100%);
+  color: #606266;
+  border: 2px solid #dcdfe6;
 }
 
-.sort-label {
-  font-weight: 500;
+/* 卡片内容 */
+.card-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.card-label {
+  font-size: 16px;
+  font-weight: 600;
   color: #303133;
 }
 
-.sort-actions {
-  display: flex;
-  gap: 2px;
+.card-hint {
+  font-size: 13px;
+  color: #909399;
 }
 
-.sort-actions .el-button {
-  padding: 6px;
-  font-size: 14px;
-  border-radius: 4px;
+.priority-card.is-first .card-hint {
+  color: #e6a23c;
+  font-weight: 500;
 }
+
+.priority-card.is-second .card-hint {
+  color: #409eff;
+  font-weight: 500;
+}
+
+/* 卡片操作按钮 */
+.card-actions {
+  display: flex;
+  gap: 8px;
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
+}
+
+.priority-card:hover .card-actions {
+  opacity: 1;
+}
+
+.card-actions .action-btn {
+  transition: all 0.2s ease;
+}
+
+.card-actions .action-btn:hover:not(:disabled) {
+  background: #f5f7fa;
+  transform: scale(1.1);
+}
+
+/* 拖拽指示器 */
+.drag-indicator {
+  color: #c0c4cc;
+  font-size: 18px;
+  cursor: grab;
+  padding: 8px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.drag-indicator:hover {
+  color: #909399;
+  background: #f5f7fa;
+}
+
+.priority-card:active .drag-indicator {
+  cursor: grabbing;
+}
+
+/* 入场动画 */
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.priority-card {
+  animation: slideInUp 0.4s ease forwards;
+}
+
+.priority-card:nth-child(1) { animation-delay: 0.05s; }
+.priority-card:nth-child(2) { animation-delay: 0.1s; }
+.priority-card:nth-child(3) { animation-delay: 0.15s; }
 
 /* 底部操作按钮 */
 .form-actions {
@@ -3012,8 +3272,27 @@ const resetForm = () => {
 }
 
 /* 素质测评弹窗样式 */
-.quiz-dialog :deep(.el-dialog__body) {
+.quiz-dialog :deep(.el-dialog__header) {
   padding: 20px 24px;
+  border-bottom: 1px solid #e4e7ed;
+  margin-right: 0;
+}
+
+.quiz-dialog :deep(.el-dialog__title) {
+  font-weight: 600;
+  font-size: 18px;
+  color: #303133;
+}
+
+.quiz-dialog :deep(.el-dialog__body) {
+  padding: 24px;
+  background: #fafbfc;
+}
+
+.quiz-dialog :deep(.el-dialog__footer) {
+  padding: 16px 24px;
+  border-top: 1px solid #e4e7ed;
+  background: #fff;
 }
 
 .quiz-content {
@@ -3021,11 +3300,26 @@ const resetForm = () => {
 }
 
 .quiz-question {
-  margin-bottom: 20px;
+  margin-bottom: 28px;
+  padding: 20px 24px;
+  background: linear-gradient(135deg, #f5f7fa 0%, #ffffff 100%);
+  border-radius: 12px;
+  border-left: 4px solid #409eff;
 }
 
 .question-tag {
   margin-bottom: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 20px;
+}
+
+.question-text {
+  font-size: 16px;
+  color: #303133;
+  line-height: 1.7;
+  font-weight: 500;
+  margin: 0;
 }
 
 .question-text {
@@ -3037,68 +3331,123 @@ const resetForm = () => {
 }
 
 .quiz-options {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 1fr;
   gap: 12px;
-  width: auto;
+  width: 100%;
 }
 
 .quiz-option {
-  padding: 14px 16px;
-  border: 1px solid #e4e7ed;
-  border-radius: 4px;
-  margin: 0 0 12px 0 !important;
+  padding: 0;
+  margin: 0 !important;
   height: auto;
   display: flex;
-  align-items: flex-start;
-  gap: 8px; /* 控制圆圈和内容的间距 */
+  align-items: stretch;
+  border: 2px solid #e4e7ed;
+  border-radius: 12px;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  background: #fff;
 }
-
-/* 重置 Element UI 的内部 flex 布局 */
-.quiz-option .el-radio__label {
-  display: flex !important;
-  align-items: flex-start;
-  width: calc(100% - 20px); /* 减去圆圈的宽度 */
-  white-space: normal;
-  line-height: 1.5;
-  padding-left: 4px;
-}
-
 
 .quiz-option:hover {
   border-color: #409eff;
-  background: #f5f7fa;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.15);
 }
 
 .quiz-option.is-checked {
   border-color: #409eff;
-  background: #ecf5ff;
+  background: linear-gradient(135deg, #ecf5ff 0%, #f5f7fa 100%);
+  box-shadow: 0 4px 16px rgba(64, 158, 255, 0.2);
 }
 
+/* 隐藏原生 radio 圆圈 */
 .quiz-option :deep(.el-radio__input) {
-  flex-shrink: 0;
-  margin-top: 2px;
+  display: none;
 }
 
 .quiz-option :deep(.el-radio__label) {
-  padding-left: 10px;
-  white-space: normal;
+  padding: 0;
+  width: 100%;
+  display: flex !important;
+  align-items: stretch;
+}
+
+/* 选项标签容器 */
+.option-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e4e7ed 100%);
+  color: #606266;
+  font-weight: 700;
+  font-size: 18px;
+  flex-shrink: 0;
+  transition: all 0.3s ease;
+}
+
+.quiz-option:hover .option-label {
+  background: linear-gradient(135deg, #409eff 0%, #66b1ff 100%);
+  color: #fff;
+}
+
+.quiz-option.is-checked .option-label {
+  background: linear-gradient(135deg, #409eff 0%, #66b1ff 100%);
+  color: #fff;
+}
+
+/* 选项文本 */
+.option-text {
+  flex: 1;
+  padding: 16px 20px;
+  color: #303133;
+  font-size: 15px;
   line-height: 1.6;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
 }
 
-.option-label {
-  font-weight: 600;
+.quiz-option:hover .option-text {
   color: #409eff;
-  margin-right: 8px;
-  flex-shrink: 0;
-  line-height: 1.6;
 }
 
-.option-text {
-  color: #606266;
-  line-height: 1.6;
+.quiz-option.is-checked .option-text {
+  color: #409eff;
+  font-weight: 500;
+}
+
+/* 选中标记 */
+.quiz-option::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 16px;
+  transform: translateY(-50%) scale(0);
+  width: 24px;
+  height: 24px;
+  background: #409eff;
+  border-radius: 50%;
+  opacity: 0;
+  transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.quiz-option.is-checked::after {
+  content: '✓';
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: bold;
+  transform: translateY(-50%) scale(1);
+  opacity: 1;
+}
+
+.quiz-option {
+  position: relative;
 }
 
 .quiz-loading {
@@ -3156,23 +3505,289 @@ const resetForm = () => {
     min-width: 160px !important;
     max-width: 160px !important;
   }
-  
+
   .el-main {
     padding: 12px;
   }
-  
+
   .form-card :deep(.el-card__body) {
     padding: 20px;
   }
-  
+
   .card-header {
     flex-direction: column;
     align-items: flex-start;
     gap: 12px;
   }
-  
+
   .progress-section {
     align-items: flex-start;
   }
+}
+
+/* ========== 经历列表样式 ========== */
+
+/* 经历列表容器 */
+.experience-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+/* 经历卡片 - 展示模式 */
+.experience-card {
+  background: #ffffff;
+  border: 1px solid #e4e7ed;
+  border-radius: 12px;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.experience-card:hover {
+  border-color: #c0c4cc;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+}
+
+/* 竞赛类型卡片特殊样式 */
+.experience-card.is-competition {
+  border-left: 4px solid #e6a23c;
+}
+
+.experience-card.is-competition:hover {
+  border-color: #e6a23c;
+  box-shadow: 0 4px 16px rgba(230, 162, 60, 0.15);
+}
+
+/* 实习卡片特殊样式 */
+.experience-card.internship-card {
+  border-left: 4px solid #67c23a;
+}
+
+.experience-card.internship-card:hover {
+  border-color: #67c23a;
+  box-shadow: 0 4px 16px rgba(103, 194, 58, 0.15);
+}
+
+/* 卡片头部 */
+.experience-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 20px;
+  background: linear-gradient(135deg, #fafbfc 0%, #f5f7fa 100%);
+  border-bottom: 1px solid #ebeef5;
+}
+
+/* 经历类型徽章 */
+.experience-type-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  background: linear-gradient(135deg, #409eff 0%, #66b1ff 100%);
+  color: #fff;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.experience-type-badge .el-icon {
+  font-size: 13px;
+}
+
+/* 竞赛徽章 */
+.experience-card.is-competition .experience-type-badge {
+  background: linear-gradient(135deg, #e6a23c 0%, #ebb563 100%);
+}
+
+/* 工作徽章 */
+.experience-type-badge.work-badge {
+  background: linear-gradient(135deg, #67c23a 0%, #85ce61 100%);
+}
+
+/* 卡片内容区 - 预览模式 */
+.experience-card-body {
+  padding: 20px;
+}
+
+.experience-card-body.preview-mode {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.preview-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.preview-desc {
+  font-size: 14px;
+  color: #606266;
+  line-height: 1.7;
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* 信息行 */
+.info-row {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.info-company {
+  font-size: 15px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.info-role {
+  font-size: 14px;
+  color: #409eff;
+  background: #ecf5ff;
+  padding: 2px 10px;
+  border-radius: 4px;
+}
+
+.info-date {
+  font-size: 13px;
+  color: #909399;
+}
+
+/* 添加经历按钮 */
+.add-experience-btn {
+  width: 100%;
+  height: auto;
+  min-height: 80px;
+  padding: 20px 28px;
+  border: 2px dashed #d0d3d9;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #fafbfc 0%, #f5f7fa 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.add-experience-btn:hover {
+  border-color: #409eff;
+  border-style: solid;
+  background: linear-gradient(135deg, #ecf5ff 0%, #f5f7fa 100%);
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(64, 158, 255, 0.18);
+}
+
+.add-experience-btn .el-icon {
+  font-size: 28px;
+  margin-bottom: 4px;
+  color: #409eff;
+  transition: transform 0.3s ease;
+}
+
+.add-experience-btn:hover .el-icon {
+  transform: scale(1.1) rotate(90deg);
+}
+
+.add-experience-btn .btn-text {
+  font-size: 16px;
+  font-weight: 600;
+  color: #409eff;
+  line-height: 1.4;
+}
+
+.add-experience-btn .btn-hint {
+  font-size: 13px;
+  color: #606266;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+/* ========== 经历弹窗样式 ========== */
+
+.experience-dialog :deep(.el-dialog__header) {
+  padding: 20px 24px;
+  border-bottom: 1px solid #e4e7ed;
+  margin-right: 0;
+}
+
+.experience-dialog :deep(.el-dialog__title) {
+  font-weight: 600;
+  font-size: 18px;
+  color: #303133;
+}
+
+.experience-dialog :deep(.el-dialog__body) {
+  padding: 28px 24px;
+}
+
+.experience-dialog :deep(.el-dialog__footer) {
+  padding: 16px 24px;
+  border-top: 1px solid #e4e7ed;
+}
+
+/* 弹窗表单样式 */
+.experience-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.experience-form .form-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.experience-form .form-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.experience-form .form-label .el-icon {
+  font-size: 16px;
+  color: #409eff;
+}
+
+.experience-form .form-row.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.experience-form :deep(.el-input__wrapper) {
+  background: #f5f7fa;
+  border-radius: 8px;
+}
+
+.experience-form :deep(.el-input__wrapper:hover) {
+  background: #ffffff;
+}
+
+.experience-form :deep(.el-textarea__inner) {
+  background: #f5f7fa;
+  border-radius: 8px;
+  min-height: 120px !important;
+}
+
+.experience-form :deep(.el-textarea__inner:hover) {
+  background: #ffffff;
 }
 </style>
