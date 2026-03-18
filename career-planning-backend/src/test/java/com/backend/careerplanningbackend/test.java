@@ -21,7 +21,7 @@ class ATest {
     void testChatWithMessage() {
         List<File> files = new ArrayList<>();
         files.add(new File("C:\\Users\\The_cute_cat\\Desktop\\CareerAgent\\第十七届中国大学生服务外包创新创业大赛A13赛题.pdf"));
-        AiChatResponse result = client.chatWithFiles("/parse/pdf", files, "12345");
+        AiChatResponse result = client.chatWithFiles("/parse/files", files, "12345");
         System.out.println(result);
     }
 

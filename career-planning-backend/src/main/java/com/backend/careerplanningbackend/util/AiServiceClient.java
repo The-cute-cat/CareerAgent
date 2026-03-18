@@ -155,9 +155,14 @@ public class AiServiceClient {
             builder.part("conversationId", aiChatRequest.getConversationId());
         }
         if (aiChatRequest.getFiles() != null && !aiChatRequest.getFiles().isEmpty()) {
-            for (File file : aiChatRequest.getFiles()) {
-                builder.part("files", new FileSystemResource(file));
+            if (aiChatRequest.getFiles().size() > 1) {
+                for (File file : aiChatRequest.getFiles()) {
+                    builder.part("files", new FileSystemResource(file));
+                }
+            } else {
+                builder.part("file", new FileSystemResource(aiChatRequest.getFiles().get(0)));
             }
+
         }
         return builder;
     }
