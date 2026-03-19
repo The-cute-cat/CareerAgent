@@ -3,12 +3,10 @@ import asyncio
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 from ai_service.models.struct_txt import StudentProfile
+import os
 import dashscope
 from typing import List, Dict, Any
-
-from ai_service.services import log
-from config import settings, LLM
-
+load_dotenv()
 
 # ==========================================
 # 1. 定义 Agent 输出的结构化数据模型
@@ -32,7 +30,7 @@ class DeepAnalysisResult(BaseModel):
 # 2. 核心分析 Agent 类
 # ==========================================
 class CareerAnalystAgent:
-    def __init__(self, api_key: str = settings.llm.api_key.get_secret_value(), model: str = settings.llm_model_name.model_name):
+    def __init__(self, api_key: str = os.getenv("LLM__API_KEY"), model: str = "qwen-max"):
         """
         初始化职业分析 Agent
         推荐使用 qwen-max 以保证复杂的 JSON 结构化输出和逻辑判断能力
@@ -43,7 +41,7 @@ class CareerAnalystAgent:
 
         dashscope.api_key = self.api_key
         self.model = model
-        log.info(f"✅ Career Analyst Agent 初始化完成，使用模型：{self.model}")
+        print(f"✅ Career Analyst Agent 初始化完成，使用模型：{self.model}")
 
     def _clean_json_response(self, text: str) -> str:
         """清理 LLM 返回的 Markdown 格式，提取纯 JSON 字符串"""
@@ -71,14 +69,14 @@ class CareerAnalystAgent:
                 clean_json = self._clean_json_response(content)
                 return json.loads(clean_json)
             else:
-                log.error(f"⚠️ API 请求失败：{response.code} - {response.message}")
+                print(f"⚠️ API 请求失败：{response.code} - {response.message}")
                 return self._fallback_result()
 
         except json.JSONDecodeError:
-            log.error("❌ LLM 返回的 JSON 格式解析失败")
+            print("❌ LLM 返回的 JSON 格式解析失败")
             return self._fallback_result()
         except Exception as e:
-            log.error(f"❌ LLM 请求异常：{e}")
+            print(f"❌ LLM 请求异常：{e}")
             return self._fallback_result()
 
     async def _analyze_single_job_async(self, student_info: str, job: Dict[str, Any]) -> Dict[str, Any]:
@@ -116,7 +114,6 @@ class CareerAnalystAgent:
                 }}
             ],
             "actionable_advice": "一句话建议"
-            “all_analysis”:"总的差距分析"
         }}
         """
 
@@ -158,7 +155,7 @@ class CareerAnalystAgent:
         ]
 
         # 2. 等待所有任务并发完成 (这里将 10 个请求的时间压缩到 1 个请求的时间)
-        log.info(f"🚀 启动并发分析，共 {len(tasks)} 个岗位，请稍候...")
+        print(f"🚀 启动并发分析，共 {len(tasks)} 个岗位，请稍候...")
         analyzed_jobs = await asyncio.gather(*tasks)
 
         # 3. 拦截与重排逻辑 (Rerank)
@@ -230,7 +227,7 @@ class CareerAnalystAgent:
     #             else:
     #                 score = 0.0
     #         except Exception as e:
-    #             log.info(f"❌ Rerank 异常: {e}")
+    #             print(f"❌ Rerank 异常: {e}")
     #             score = 0.0
     #
     #         # 直接在原始字典上注入分数，不破坏原始结构
