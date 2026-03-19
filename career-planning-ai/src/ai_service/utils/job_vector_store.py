@@ -6,7 +6,6 @@ from pymilvus import (
     connections, FieldSchema, CollectionSchema, DataType, Collection, utility,
     AnnSearchRequest, WeightedRanker
 )
-from sympy import false
 
 from ai_service.models.struct_job_txt import JDAnalysisResult
 from ai_service.models.struct_txt import StudentProfile
@@ -21,7 +20,6 @@ class JobVectorStore:
         self.dim = dim
         self.collection_name = collection_name
         self.embedder = AliyunEmbedding(api_key=api_key)
-        
         # 1. 连接 Milvus
         connections.connect("default", host=self.host, port=self.port)
         print(f"✅ 已连接到 Milvus: {self.host}:{self.port}")
