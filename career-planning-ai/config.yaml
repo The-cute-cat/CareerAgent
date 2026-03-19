@@ -30,6 +30,11 @@ lite_llm:
     max_retries: 3
     extra:
       temperature: 0.7
+vector_model:
+  model_name: text-embedding-v4
+llm_model_name:
+  model_name: qwen-plus
+
 llm:
   model_name: qwen-plus
   base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
