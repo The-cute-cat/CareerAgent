@@ -73,7 +73,7 @@ public class UserController {
     /**
      * 查询用户信息
      */
-    @GetMapping("/info")
+    @GetMapping("/get-user-info")
     public Result<UserDTO> getUserInfo() {
         return userService.getUserInfo();
     }
