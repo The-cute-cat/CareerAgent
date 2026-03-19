@@ -6,7 +6,6 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime
 import re
 
-from dotenv import load_dotenv
 
 from ai_service.models.job_info import JobInfo  # 替换为您的实际导入路径
 from pydantic import BaseModel, Field
@@ -17,9 +16,8 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_community.chat_models.tongyi import ChatTongyi
 from langchain_core.output_parsers import PydanticOutputParser
 
+from config import LLM, settings
 
-
-load_dotenv()
 
 class JobClassificationItem(BaseModel):
     job_title: str = Field(description="岗位名称")
@@ -35,7 +33,7 @@ class JobClassificationResult(BaseModel):
 def filter_computer_jobs_excel(
         file_path: str,
         api_key: Optional[str] = None,
-        model_name: str = "qwq-plus-latest",
+        model_name: str = settings.llm_model_name.model_name,
         batch_size: int = 50  # 每次发送给大模型的唯一岗位数量
 ) -> str:
     """
@@ -55,7 +53,7 @@ def filter_computer_jobs_excel(
         raise FileNotFoundError(f"文件不存在：{file_path}")
 
     if not api_key:
-        api_key = os.getenv("LLM__API_KEY")
+        api_key = settings.llm.api_key.get_secret_value()
     if not api_key:
         raise ValueError("请提供 API Key 或设置环境变量 LLM__API_KEY")
 
