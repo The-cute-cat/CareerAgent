@@ -56,4 +56,4 @@ class MajorAligner:
 
 # --- 初始化单例 ---
 # 假设 major.txt 放在 resources 文件夹下
-major_aligner = MajorAligner("data\\major.txt")
+major_aligner = MajorAligner("src\\ai_service\\prompts\\major.txt")
