@@ -17,7 +17,7 @@ class MajorAligner:
         if not self.file_path.exists():
             print(f"错误: 找不到文件 {self.file_path}")
             return []
-
+        
         with open(self.file_path, "r", encoding="utf-8") as f:
             # 去除空行和首尾空格
             return [line.strip() for line in f if line.strip()]
@@ -39,21 +39,21 @@ class MajorAligner:
         # 3. 第二层：RapidFuzz 模糊匹配
         # 返回格式: (匹配到的字符串, 分数, 索引)
         result = process.extractOne(
-            query,
+            query, 
             self.standard_majors,
-            processor=utils.default_process,  # 自动转小写、去标点、处理空格
-            score_cutoff=score_cutoff,
+            processor=utils.default_process, # 自动转小写、去标点、处理空格
+            score_cutoff=score_cutoff
         )
 
         if result:
             matched_name, score, _ = result
             # print(f"匹配成功: {query} -> {matched_name} (分数: {score:.2f})")
             return matched_name
-
+        
         # 4. 第三层：匹配不到则返回原词
         return query
 
 
 # --- 初始化单例 ---
 # 假设 major.txt 放在 resources 文件夹下
-major_aligner = MajorAligner("data\\major.txt")
+major_aligner = MajorAligner("src\\ai_service\\prompts\\major.txt")
