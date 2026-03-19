@@ -16,7 +16,8 @@ public class JwtUtil {
     private static final SecretKey secret = Keys.hmacShaKeyFor(secretString.getBytes());
 
     // Token过期时间配置
-    private static final long ACCESS_TOKEN_EXPIRE = 30 * 60 * 100000; // 30分钟
+//    private static final long ACCESS_TOKEN_EXPIRE = 30 * 60 * 100000; // 30分钟
+    private static final long ACCESS_TOKEN_EXPIRE = 30 * 60 * 10000000; // 30分钟
     private static final long REFRESH_TOKEN_EXPIRE = 7 * 24 * 60 * 60 * 1000; // 7天
 
     //携带用户的基础信息

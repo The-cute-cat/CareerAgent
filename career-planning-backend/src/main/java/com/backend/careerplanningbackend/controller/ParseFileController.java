@@ -11,7 +11,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -41,14 +40,14 @@ public class ParseFileController {
      * @return
      */
     @PostMapping("/file")
-    public Result<String> parseFile(@RequestParam("file") MultipartFile file) {
+    public Result<Object> parseFile(@RequestParam("file") MultipartFile file) {
         log.info("parse-file接收到的参数: {}", file.toString());
 
         List<MultipartFile>files = new ArrayList<>();
         files.add(file);
         AiChatResponse aiChatResponse = aiServiceClient.chatWithMultipartFiles("/parse/file", files, "");
         log.info("parse-file接收到的参数: {}", aiChatResponse.toString());
-        return Result.ok("aiChatResponse");
+        return Result.ok(aiChatResponse.getData());
     }
 
     /**
@@ -58,17 +57,17 @@ public class ParseFileController {
      * @return
      */
     @PostMapping("/files")
-    public Result<String> parseFiles(@RequestParam("file") MultipartFile file) {
+    public Result<Object>parseFiles(@RequestParam("file") MultipartFile file) {
         log.info("parse-resume接收到的参数: {}", file.toString());
 
         List<MultipartFile>files = new ArrayList<>();
         files.add(file);
         AiChatResponse aiChatResponse = aiServiceClient.chatWithMultipartFiles("/parse/file", files, "");
         log.info("parse-file接收到的参数: {}", aiChatResponse.toString());
-        return Result.ok("解析成功");
+        return Result.ok(aiChatResponse.getData());
     }
 //    @PostMapping("/file")
-//    public Result<String> parseFile(@RequestParam("file") File file) {
+//    public Result<AiChatResponse> parseFile(@RequestParam("file") File file) {
 //        log.info("parse-file接收到的参数: {}", file.toString());
 //
 //        List<File>files = new ArrayList<>();
@@ -79,7 +78,7 @@ public class ParseFileController {
 //    }
 //
 //    @PostMapping("/files")
-//    public Result<String> parseFiles(@RequestParam("file") File file) {
+//    public Result<AiChatResponse> parseFiles(@RequestParam("file") File file) {
 //        log.info("parse-resume接收到的参数: {}", file.toString());
 //
 //        List<File>files = new ArrayList<>();

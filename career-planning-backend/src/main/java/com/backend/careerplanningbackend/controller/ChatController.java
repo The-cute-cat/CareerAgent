@@ -33,6 +33,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/resume-upload-chat")
 @RequiredArgsConstructor
+
 public class ChatController {
 
     private final AiServiceClient aiServiceClient;
