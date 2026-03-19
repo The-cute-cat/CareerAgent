@@ -1,3 +1,4 @@
 __all__ = [
-    "parse"
+    "parse",
+    "test_question",
 ]

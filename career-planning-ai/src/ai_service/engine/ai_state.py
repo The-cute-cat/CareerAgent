@@ -6,7 +6,8 @@ from ai_service.engine.exceptions import (
     ModelConfigNotFoundError,
 )
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
-from config import LLM
+
+from config import LiteLLM, LLM
 
 
 # =====================================================================
@@ -32,7 +33,7 @@ class AIState(BaseModel):
         metadata (Dict[str, Any]): 请求元数据
     """
 
-    model: Optional[LLM] = None
+    model: Optional[LiteLLM] = None
     model_fallbacks: List[LLM] = Field(default_factory=list)
 
     # 提示词层次架构
