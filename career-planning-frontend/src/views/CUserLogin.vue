@@ -27,6 +27,9 @@ const handleLogin = async () => {
   try {
     console.log("loginform 参数", loginform);
     const result = await userLoginService(loginform)
+    if (result.data.code !== 200) {
+      throw new Error(result.data.message || '登录失败')
+    }
     console.log("result 结果", result);
 
     userStore.setUserALLInfo(

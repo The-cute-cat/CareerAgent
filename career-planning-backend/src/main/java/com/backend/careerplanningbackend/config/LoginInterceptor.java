@@ -39,7 +39,8 @@ public class LoginInterceptor implements HandlerInterceptor {
 
             // 5. 解析token获取用户信息
             Claims claims = JwtUtil.parseToken(accessToken);
-            String userId = claims.getSubject();
+//            String userId = claims.getSubject();
+            String userId = (String) claims.get("id");
             // 将用户ID存入ThreadLocal供后续使用
             ThreadLocalUtil.set(userId);
             return true;
