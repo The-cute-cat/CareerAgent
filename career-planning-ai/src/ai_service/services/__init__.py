@@ -4,6 +4,7 @@ __all__ = [
     "pdf_extractor",
     "prompt_loader",
     "image_extractor",
+    "struct_text_extractor"
 ]
 
 from ai_service.utils.logger_handler import get_logger

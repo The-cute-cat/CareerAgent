@@ -11,7 +11,7 @@ from pydantic import BaseModel, field_validator, SecretStr, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic_settings.sources import InitSettingsSource
 
-__all__ = ["settings", "LLM"]
+__all__ = ["settings", "LiteLLM"]
 
 from ai_service.utils.path_tool import abs_path, get_project_root, get_abs_path
 
@@ -57,15 +57,14 @@ class Communication(BaseModel):
     token: Token = Token()
 
 
-class LLM(BaseModel):
-    """大模型通用配置"""
-    api_key: SecretStr = SecretStr("")  # 敏感信息，使用时调用 .get_secret_value() 方法获取
-    base_url: str = ""  # 大模型服务器地址
-    model_name: str = ""  # 大模型名称
-    timeout: float = 30.0  # 超时时间
-    max_retries: int = 3  # 最大重试次数
-    max_concurrent_requests: int = 3  # 最大并发请求数
-    extra: Dict[str, Any] = {}  # 额外参数
+class LiteLLM(BaseModel):
+    api_key: SecretStr = SecretStr("")
+    base_url: str = ""
+    model_name: str = ""
+    timeout: float = 30.0
+    max_retries: int = 3
+    max_concurrent_requests: int = 3
+    extra: Dict[str, Any] = {}
 
     class Qwen(BaseModel):
         api_key: SecretStr = SecretStr("")
@@ -129,6 +128,30 @@ class LLM(BaseModel):
         return v
 
 
+class LLM(BaseModel):
+    """大模型通用配置"""
+    api_key: SecretStr = SecretStr("")  # 敏感信息，使用时调用 .get_secret_value() 方法获取
+    base_url: str = ""  # 大模型服务器地址
+    model_name: str = ""  # 大模型名称
+    timeout: float = 30.0  # 超时时间
+    max_retries: int = 3  # 最大重试次数
+    max_concurrent_requests: int = 3  # 最大并发请求数
+    extra: Dict[str, Any] = {}  # 额外参数
+
+    def __repr__(self):
+        return f"LLM(api_key={self.api_key}, base_url={self.base_url}, model_name={self.model_name}, timeout={self.timeout}, max_retries={self.max_retries}, extra={self.extra})"
+
+    def __str__(self):
+        return self.__repr__()
+
+    @field_validator("api_key", mode="after")
+    @classmethod
+    def validate_api_key(cls, v: SecretStr) -> SecretStr:
+        if not v.get_secret_value() or v.get_secret_value() == "" or v.get_secret_value() == "<api_key>":
+            raise ValueError("请在 .env 文件中配置正确的 LLM API Key")
+        return v
+
+
 class PDF(BaseModel):
     model_name: str = ""
     extra: Dict[str, Any] = {}
@@ -139,6 +162,12 @@ class Image(BaseModel):
     suffix: List[str] = []
     max_size: int = 0  # 单位 MB
     max_dimension: int = 0  # 单位 px
+    extra: Dict[str, Any] = {}
+
+
+class TestQuestion(BaseModel):
+    model_name: str = ""
+    timeout: int = 30
     extra: Dict[str, Any] = {}
 
 
@@ -195,9 +224,11 @@ class Settings(BaseSettings):
     )
     database: Database = Field(default_factory=Database)
     communication: Communication = Field(default_factory=Communication)
+    lite_llm: LiteLLM = Field(default_factory=LiteLLM)
     llm: LLM = Field(default_factory=LLM)
     pdf: PDF = Field(default_factory=PDF)
     image: Image = Field(default_factory=Image)
+    test_question: TestQuestion = Field(default_factory=TestQuestion)
     path_config: PathConfig = Field(default_factory=PathConfig)
 
     @classmethod
@@ -249,5 +280,5 @@ if __name__ == "__main__":
     print(f"  用户名: {settings.database.user}")
     print(f"  密码: {settings.database.password}")
     print(f"  API Key: {settings.llm.api_key.get_secret_value()}")
-    print(settings.llm.qwen)
+    print(settings.lite_llm.qwen)
     pass
