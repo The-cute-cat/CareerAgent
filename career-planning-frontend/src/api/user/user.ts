@@ -5,6 +5,7 @@ import type { LoginFormDTO, Result } from '../../types/type'
 
 // 用户登录接口 -maq
 export interface LoginResponse {
+  message: string
   code: number
   msg?: string
   data: {
@@ -15,21 +16,25 @@ export interface LoginResponse {
 }
 
 export const userLoginService = (loginInfo: LoginFormDTO) => {
-  return request.post<LoginResponse>('/user/login', loginInfo)
+  return request.post('/user/login', loginInfo)
 }
 
 export const userRegisterService = (loginInfo: LoginFormDTO) => {
-  return request.post<Result>('/user/register', loginInfo)
+  return request.post('/user/register', loginInfo)
 }
 
 export const userForgetPasswordService = (loginInfo: LoginFormDTO) => {
-  return request.post<Result>('/user/forget-password', loginInfo)
+  return request.post('/user/forget-password', loginInfo)
 }
 
 export const userSendCodeRegisterService = (loginInfo: LoginFormDTO) => {
-  return request.post<Result>('/user/send-code-register', loginInfo)
+  return request.post('/user/send-code-register', loginInfo)
 }
 
 export const userSendCodeForgetService = (loginInfo: LoginFormDTO) => {
-  return request.post<Result>('/user/send-code-forget', loginInfo)
+  return request.post('/user/send-code-forget', loginInfo)
+}
+
+export const userGetUserInfoService = () => {
+  return request.get('/user/get-user-info')
 }

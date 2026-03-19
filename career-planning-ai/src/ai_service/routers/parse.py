@@ -21,7 +21,7 @@ semaphore = asyncio.Semaphore(3)  # 限制最多 3 个并发
 @router.post("/file")
 async def parse_file(file_info=Depends(handle_file)):
     text = await _extract_text_from_file(file_info["save_path"], file_info["extension"])
-    return success(await struct_text_extractor.extract_from_text_to_json(text))
+    return success(await struct_text_extractor.extract_from_text_to_userform(text))
 
 
 @router.post("/files")
@@ -33,7 +33,7 @@ async def parse_files(file_infos=Depends(handle_files)):
         ])
 
     results = await asyncio.gather(*[
-        struct_text_extractor.extract_from_text_to_json(text)
+        struct_text_extractor.extract_from_text_to_userform(text)
         for text in texts
     ])
 

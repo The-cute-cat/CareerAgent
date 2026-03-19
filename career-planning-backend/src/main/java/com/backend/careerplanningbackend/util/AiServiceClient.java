@@ -205,7 +205,7 @@ public class AiServiceClient {
     }
 
     /**
-     * 纯文本消息对话（同步方式）
+     * 纯文本消息对话（阻塞方式）
      *
      * @param url            请求的 API 路径
      * @param message        消息内容
@@ -218,7 +218,7 @@ public class AiServiceClient {
     }
 
     /**
-     * 文件上传对话（同步方式）
+     * 文件上传对话（阻塞方式）
      *
      * @param url            请求的 API 路径
      * @param files          文件列表
@@ -231,7 +231,7 @@ public class AiServiceClient {
     }
 
     /**
-     * MultipartFile 文件上传对话（同步方式）
+     * MultipartFile 文件上传对话（阻塞方式）
      * <p>
      * 用于处理前端直接上传的 MultipartFile 文件
      *
@@ -247,7 +247,7 @@ public class AiServiceClient {
     }
 
     /**
-     * 消息和文件同时上传对话（同步方式）
+     * 消息和文件同时上传对话（阻塞方式）
      *
      * @param url            请求的 API 路径
      * @param message        消息内容
@@ -255,13 +255,14 @@ public class AiServiceClient {
      * @param conversationId 对话 ID
      * @return AI 响应结果
      */
-    public AiChatResponse chatWithMessageAndFiles(String url, String message, List<File> files, String conversationId) {
+    public AiChatResponse chatWithMessageAndFiles(String url, String message, List<File> files, 
+                                                  String conversationId) {
         AiChatRequest request = AiChatRequest.ofFiles(conversationId, message, files);
         return callAiService(url, request);
     }
 
     /**
-     * 消息和 MultipartFile 文件同时上传对话（同步方式）
+     * 消息和 MultipartFile 文件同时上传对话（阻塞方式）
      * <p>
      * 用于处理前端直接上传的 MultipartFile 文件并附带消息
      *
@@ -278,7 +279,7 @@ public class AiServiceClient {
     }
 
     /**
-     * 自定义参数对话（同步方式）
+     * 自定义参数对话（阻塞方式）
      * <p>
      * 用于发送非标准格式的请求到 AI 服务，
      * 支持任意键值对参数，适用于特殊接口调用。

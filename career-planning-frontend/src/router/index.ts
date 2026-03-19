@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useUserStore } from '@/stores/modules/user'
+import { userGetUserInfoService } from '@/api/user/user'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -7,17 +8,17 @@ const router = createRouter({
     {
       path: '/login',
       name: 'login',
-      component: () => import('../views/CUserLogin.vue'),//登录
+      component: () => import('../views/CUserLogin.vue'), //登录
     },
     {
       path: '/register',
       name: 'register',
-      component: () => import('../views/CUserRegister.vue'),//注册
+      component: () => import('../views/CUserRegister.vue'), //注册
     },
     {
       path: '/forgot-password',
       name: 'forget-password',
-      component: () => import('../views/CUserForgetPassword.vue'),//忘记密码
+      component: () => import('../views/CUserForgetPassword.vue'), //忘记密码
     },
     {
       path: '/',
@@ -26,7 +27,7 @@ const router = createRouter({
         {
           path: '',
           name: 'home',
-          component: () => import('../views/HomePage.vue'), // 首页
+          component: () => import('../views/CHomePage.vue'), // 首页
         },
         {
           path: 'career-form',
@@ -36,7 +37,7 @@ const router = createRouter({
         {
           path: 'report',
           name: 'report',
-          component: () => import('../views/Report.vue'),
+          component: () => import('../views/CReport.vue'),
         },
         {
           path: 'development-map',
@@ -46,22 +47,30 @@ const router = createRouter({
         {
           path: 'profile',
           name: 'profile',
-          component: () => import('../views/Profile.vue'),
-        }
+          component: () => import('../views/CProfile.vue'),
+        },
       ],
     },
     {
       path: '/:pathMatch(.*)*',
       name: 'NotFound',
-      component: () => import('../views/404.vue')//404错误
+      component: () => import('../views/404.vue'), //404错误
     },
   ],
 })
 
 // 路由守卫
-router.beforeEach((to, _from, next) => {
+router.beforeEach(async (to, _from, next) => {
   try {
     const userStore = useUserStore()
+    if (userStore.isLoggedIn && !userStore.userInfo) {
+      try {
+        const res = await userGetUserInfoService()
+        userStore.userInfo = res.data.data.checkUser
+      } catch (error) {
+        userStore.clearUserALLInfo()
+      }
+    }
 
     // 延迟执行以确保 Pinia 持久化状态已恢复
     const checkAuth = () => {
@@ -94,3 +103,36 @@ router.beforeEach((to, _from, next) => {
 })
 
 export default router
+
+// // 路由守卫
+// router.beforeEach((to, _from, next) => {
+//   const userStore = useUserStore()
+//     // 延迟执行以确保 Pinia 持久化状态已恢复
+//     const checkAuth = () => {
+//       const isLoggedIn = userStore.isLoggedIn
+
+//       // 已登录用户访问登录页，重定向到首页或指定页面
+//       if (to.name === 'login' && isLoggedIn) {
+//         const redirect = to.query.redirect as string
+//         next(redirect || { name: 'home' })
+//         return
+//       }
+
+//       // 需要认证但未登录，重定向到登录页
+//       if (to.meta.requiresAuth && !isLoggedIn) {
+//         next({ name: 'login', query: { redirect: to.fullPath } })
+//         return
+//       }
+
+//       // 其他情况正常放行
+//       next()
+//     }
+
+//     // 使用微任务队列确保状态恢复后再检查
+//     Promise.resolve().then(checkAuth)
+//   } catch (error) {
+//     console.error('路由守卫错误:', error)
+//     // 发生错误时放行，避免用户被卡在空白页
+//     next()
+//   }
+// })

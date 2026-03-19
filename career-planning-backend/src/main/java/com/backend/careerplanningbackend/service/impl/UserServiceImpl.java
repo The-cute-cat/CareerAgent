@@ -420,6 +420,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     @Override
     public Result<UserDTO> getUserInfo() {
         Long currentUserId = ThreadLocalUtil.getCurrentUserId();
+        log.info("currentUserId: {}", currentUserId);
         if (currentUserId == 0) {
             return Result.fail("id为空");
         }
