@@ -1,5 +1,6 @@
 # 人岗匹配的接口文档
 import asyncio
+import json
 
 from ai_service.services.Career_AnalystAgent import CareerAnalystAgent
 from ai_service.utils.job_vector_store import JobVectorStore
@@ -99,8 +100,8 @@ if __name__ == "__main__":
         # 1. 初始化
         store = JobVectorStore()
         agent = CareerAnalystAgent()
-        # # store.reset_collection()
-        # # 2. 模拟岗位入库
+        # store.reset_collection()
+        # # # 2. 模拟岗位入库
         # for jd in job_list:
         #     store.insert_job(jd)
 
@@ -109,7 +110,7 @@ if __name__ == "__main__":
         matches = store.match_jobs_for_student(student_test_data, top_k=20)
         final_results = asyncio.run(agent.batch_analyze_async(student_test_data, matches, top_k=5))
         print("\n" + "=" * 50)
-        for i, res in enumerate(final_results):
+        # for i, res in enumerate(final_results):
             # analysis = res['deep_analysis']
             # print(f"🏆 综合排名 Top {i + 1} | 岗位 ID: {res['job_id']}")
             # print(f"   - 门槛判定 (can_apply): {'✅ 通过' if analysis['can_apply'] else '❌ 拦截 (硬性条件不符)'}")
@@ -124,5 +125,5 @@ if __name__ == "__main__":
             #
             # print(f"   - 💡 专家建议: {analysis['actionable_advice']}")
             # print("-" * 50)
-
-            print(str(res))
+        for res in final_results:
+            print(json.dumps(res, ensure_ascii=False, indent=2))
