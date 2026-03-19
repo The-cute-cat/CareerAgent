@@ -104,6 +104,7 @@ class StudentFormProfile(BaseModel):
     def validate_graduation_date(cls, v):
         if not v or v in ["未知", "无", "暂无", "不详", "N/A", "null", "none", "未提供"]:
             return None
+
         if isinstance(v, str):
             v = v.replace(".", "-").strip()
             # 强化正则：匹配 YYYY-MM，且月份在 01-12 之间
