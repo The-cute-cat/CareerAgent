@@ -8,13 +8,13 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class AliyunEmbedding:
-    def __init__(self, api_key: str = None):
+    def __init__(self, api_key: str = os.getenv("LLM__API_KEY")):
         """
         初始化阿里云 Embedding 客户端
         :param api_key: 阿里云 DashScope API Key
         """
         # 优先使用传入的 key，否则从环境变量读取
-        self.api_key = api_key or os.getenv("LLM__API_KEY")
+        self.api_key = api_key
 
         if not self.api_key:
             raise ValueError("未找到 API Key，请传入或在环境变量中设置 LLM__API_KEY")
