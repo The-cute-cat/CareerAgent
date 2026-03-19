@@ -31,8 +31,8 @@ public class QuestionController {
     private final AiServiceClient aiServiceClient;
 
     /**
-     * parseFile
-     * 解析单个文件
+     * skillGenerate
+     * 获取生成关于某个技能的问题
      * 
      * @param questionDTO
      * @return
@@ -47,8 +47,8 @@ public class QuestionController {
     }
 
     /**
-     * parseFile
-     * 解析单个文件
+     * toolGenerate
+     * 获取生成关于某个工具的问题
      * 
      * @param questionDTO
      * @return
@@ -63,8 +63,8 @@ public class QuestionController {
     }
 
     /**
-     * parseFile
-     * 解析单个文件
+     * checkStudentAnswer
+     * 检查问答题的答案
      * 
      * @param questionDTO
      * @return

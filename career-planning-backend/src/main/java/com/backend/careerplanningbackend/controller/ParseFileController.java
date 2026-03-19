@@ -51,7 +51,7 @@ public class ParseFileController {
     }
 
     /**
-     * parseFile
+     * parseFiles
      * 解析多个文件
      * @param file
      * @return
