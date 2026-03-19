@@ -31,7 +31,7 @@ import java.util.List;
  */
 @Slf4j
 @RestController
-@RequestMapping("/chat")
+@RequestMapping("/resume-upload-chat")
 @RequiredArgsConstructor
 public class ChatController {
 
@@ -48,7 +48,7 @@ public class ChatController {
      */
     @PostMapping("/message")
     public Result chatWithMessage(
-            @RequestParam String message,
+            @RequestParam(required = false) String message,
             @RequestParam(required = false) String conversationId,
             @RequestParam(required = false) MultipartFile[] files
     ) {
@@ -93,7 +93,7 @@ public class ChatController {
      */
     @PostMapping(value = "/message/stream", produces = "text/event-stream")
     public Flux<String> chatWithMessageStream(
-            @RequestParam String message,
+            @RequestParam(required = false) String message,
             @RequestParam(required = false) String conversationId,
             @RequestParam(required = false) MultipartFile[] files
     ) {
