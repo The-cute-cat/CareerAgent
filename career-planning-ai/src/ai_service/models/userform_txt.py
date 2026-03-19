@@ -116,7 +116,6 @@ class StudentFormProfile(BaseModel):
             "未提供",
         ]:
             return None
-
         if isinstance(v, str):
             v = v.replace(".", "-").strip()
             # 强化正则：匹配 YYYY-MM，且月份在 01-12 之间
