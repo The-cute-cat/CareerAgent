@@ -33,7 +33,7 @@ class JobClassificationResult(BaseModel):
 def filter_computer_jobs_excel(
         file_path: str,
         api_key: Optional[str] = None,
-        model_name: str = settings.llm_model_name.model_name,
+        model_name: str = settings.LLM.model_name,
         batch_size: int = 50  # 每次发送给大模型的唯一岗位数量
 ) -> str:
     """
