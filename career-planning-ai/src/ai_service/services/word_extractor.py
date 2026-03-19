@@ -34,7 +34,7 @@ __all__ = [
 ]
 
 class WordExtractor:
-    max_concurrent_requests: int = settings.llm.max_concurrent_requests  # 最大并发请求数
+    max_concurrent_requests: int = settings.lite_llm.max_concurrent_requests  # 最大并发请求数
 
     # 设置线程池，用于处理同步阻塞方法（如Docling的convert方法），避免阻塞事件循环，同时限制最大并发请求数以防止过载
     _executor = ThreadPoolExecutor(max_workers=max_concurrent_requests)
@@ -42,7 +42,7 @@ class WordExtractor:
 
     # 初始化大模型客户端
     def __init__(self):
-        self.llm = AIEngine().pick_brain(settings.llm)
+        self.llm = AIEngine().pick_brain(settings.lite_llm)
         self.output_parser = StrOutputParser()
 
         # 配置专门为 Word 优化的 Docling 转换器，确保能够处理 Word 文档中的复杂布局、表格和图片等内容，并且能够将表格精准转为 Markdown 格式以保留原有的格式信息

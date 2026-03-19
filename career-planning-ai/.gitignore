@@ -4,7 +4,6 @@
 .jbeval/
 node_modules/
 logs/
-data/
 tests/
 temp/
 *.pyc

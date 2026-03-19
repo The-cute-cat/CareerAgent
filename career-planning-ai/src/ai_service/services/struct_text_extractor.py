@@ -13,7 +13,7 @@ __all__ = [
 
 class StructTextExtractor:
     def __init__(self):
-        self.llm = AIEngine().pick_brain(settings.llm)
+        self.llm = AIEngine().pick_brain(settings.lite_llm)
 
     async def extract_from_text_to_json(self, text: str) -> Any:
         response = await self.llm.set_system_role("你是一个专业的学生信息提取助手").add_text(text) \
