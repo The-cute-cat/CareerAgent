@@ -3,12 +3,12 @@ import time
 import dashscope
 from typing import List, Optional
 
-from dotenv import load_dotenv
 
-load_dotenv()
+from config import LLM, settings
+
 
 class AliyunEmbedding:
-    def __init__(self, api_key: str = os.getenv("LLM__API_KEY")):
+    def __init__(self, model : str=settings.vector_model.model_name,api_key: str = settings.llm.api_key.get_secret_value()):
         """
         初始化阿里云 Embedding 客户端
         :param api_key: 阿里云 DashScope API Key
@@ -20,7 +20,7 @@ class AliyunEmbedding:
             raise ValueError("未找到 API Key，请传入或在环境变量中设置 LLM__API_KEY")
 
         dashscope.api_key = self.api_key
-        self.model = "text-embedding-v4"  # 阿里云主力模型
+        self.model = model  # 阿里云主力模型
         print(f"阿里云 Embedding 初始化完成，使用模型：{self.model}")
 
     def get_embedding(self, text: str) -> Optional[List[float]]:
@@ -115,7 +115,7 @@ if __name__ == "__main__":
     # 方式 1: 直接传入
     # API_KEY = "sk-xxxxxxxxxxxxxxxx"
 
-    API_KEY = os.getenv("LLM__API_KEY")
+    API_KEY = settings.llm.api_key.get_secret_value()
 
     if not API_KEY:
         print("❌ 未找到 API Key，请设置环境变量 LLM__API_KEY")

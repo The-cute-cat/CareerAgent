@@ -9,6 +9,7 @@ from langchain_core.output_parsers import PydanticOutputParser
 from langchain_community.chat_models import ChatTongyi
 
 from ai_service.models.struct_job_txt import JDAnalysisResult
+from config import settings
 
 load_dotenv()
 
@@ -41,7 +42,7 @@ USER_PROMPT = """
 # 3. 封装调用函数
 # ==========================================
 
-def analyze_job_description(jd_text: str, api_key: Optional[str] = None, model_name: str = "qwq-plus-latest") -> dict:
+def analyze_job_description(jd_text: str, api_key: Optional[str] = None, model_name: str = settings.llm.model_name) -> dict:
     """
     使用 LangChain 调用大模型分析 JD 文本并返回结构化 JSON 数据
 
@@ -55,7 +56,7 @@ def analyze_job_description(jd_text: str, api_key: Optional[str] = None, model_n
     """
     # 1. 初始化 LLM
     if not api_key:
-        api_key = os.getenv("LLM__API_KEY")
+        api_key = settings.llm.api_key.get_secret_value()
 
     if not api_key:
         raise ValueError("请提供 API Key 或设置环境变量 LLM__API_KEY")

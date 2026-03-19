@@ -3,10 +3,11 @@ import asyncio
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 from ai_service.models.struct_txt import StudentProfile
-import os
 import dashscope
 from typing import List, Dict, Any
-load_dotenv()
+
+from config import settings, LLM
+
 
 # ==========================================
 # 1. 定义 Agent 输出的结构化数据模型
@@ -30,7 +31,7 @@ class DeepAnalysisResult(BaseModel):
 # 2. 核心分析 Agent 类
 # ==========================================
 class CareerAnalystAgent:
-    def __init__(self, api_key: str = os.getenv("LLM__API_KEY"), model: str = "qwen-max"):
+    def __init__(self, api_key: str = settings.llm.api_key.get_secret_value(), model: str = settings.llm.model_name):
         """
         初始化职业分析 Agent
         推荐使用 qwen-max 以保证复杂的 JSON 结构化输出和逻辑判断能力
