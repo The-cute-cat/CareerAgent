@@ -32,6 +32,8 @@ lite_llm:
       temperature: 0.7
 vector_model:
   model_name: text-embedding-v4
+llm_model_name:
+  model_name: qwen-plus
 
 llm:
   model_name: qwen-plus

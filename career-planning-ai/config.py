@@ -215,7 +215,9 @@ class PathConfig(BaseModel):
         return str(Path(path))
 
 
-class VectorModel:
+class VectorModel(BaseModel):
+    model_name: str = ""
+class LlmModelName(BaseModel):
     model_name: str = ""
 
 class Settings(BaseSettings):
@@ -234,6 +236,7 @@ class Settings(BaseSettings):
     test_question: TestQuestion = Field(default_factory=TestQuestion)
     path_config: PathConfig = Field(default_factory=PathConfig)
     vector_model: VectorModel = Field(default_factory=VectorModel)
+    llm_model_name: LlmModelName = Field(default_factory=LlmModelName)
 
     @classmethod
     def settings_customise_sources(
