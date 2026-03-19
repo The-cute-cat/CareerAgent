@@ -9,7 +9,6 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from ai_service.exceptions import TokenValidationError, ConversationIDValidationError
 from ai_service.utils.ai_token_util import check_token
-from ai_service.utils.logger_handler import log
 
 security = HTTPBearer(auto_error=False)
 

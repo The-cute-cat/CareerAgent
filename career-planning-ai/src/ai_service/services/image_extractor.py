@@ -33,7 +33,7 @@ class ImageExtractor:
         )
 
     @staticmethod
-    async def validate_image(image_path: str) -> dict:
+    async def validate_image(image_path: str) -> dict[str, None | bool | str | int | tuple[int, int]]:
         """
         验证图片文件是否符合处理要求
 
@@ -130,7 +130,7 @@ class ImageExtractor:
         return base64.b64encode(image_bytes).decode("utf-8")
 
     async def _identify_image(self, image_path: str = None, image_bytes: bytes = None, prompt: str = "",
-                        llm: ChatOpenAI = None) -> str | None:
+                              llm: ChatOpenAI = None) -> str | None:
         if not image_path and not image_bytes:
             log.warning("请传入图片路径或图片字节数组")
             raise ValueError("请传入图片路径或图片字节数组")
@@ -169,7 +169,7 @@ class ImageExtractor:
             return None
 
     async def extract_text(self, image_path: str = None, image_bytes: bytes = None, prompt: str = "",
-                     llm: ChatOpenAI = None) -> str | None:
+                           llm: ChatOpenAI = None) -> str | None:
         """
         使用视觉模型提取图片中的文本内容
 
@@ -185,6 +185,12 @@ class ImageExtractor:
         Raises:
             ValueError: 未提供图片路径或字节数据时抛出
         """
+        r = await self.validate_image(image_path)
+        if not r["valid"] and not r["preprocessed"]:
+            log.warning(f"图片验证失败: {r}")
+            raise ValueError("图片验证失败")
+        if r["preprocessed"]:
+            await self.preprocess_image(image_path)
         if not image_path and not image_bytes:
             log.warning("请传入图片路径或图片字节数组")
             raise ValueError("请传入图片路径或图片字节数组")
@@ -196,7 +202,7 @@ class ImageExtractor:
         )
 
     async def extract_visual_content(self, image_path: str = None, image_bytes: bytes = None, prompt: str = "",
-                        llm: ChatOpenAI = None):
+                                     llm: ChatOpenAI = None):
         if not image_path and not image_bytes:
             log.warning("请传入图片路径或图片字节数组")
             raise ValueError("请传入图片路径或图片字节数组")

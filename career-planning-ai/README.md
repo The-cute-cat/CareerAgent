@@ -4,6 +4,12 @@
 poetry env use D:\IDE\Python\3.12\python.exe
 ```
 
+``` 
+poetry env use python
+```
+
+
+
 # 安装依赖
 
 ```shell
