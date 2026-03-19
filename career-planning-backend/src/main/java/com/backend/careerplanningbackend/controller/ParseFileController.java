@@ -33,7 +33,13 @@ import java.util.List;
 public class ParseFileController {
 
     private final AiServiceClient aiServiceClient;
-    
+
+    /**
+     * parseFile
+     * 解析单个文件
+     * @param file
+     * @return
+     */
     @PostMapping("/file")
     public Result<String> parseFile(@RequestParam("file") MultipartFile file) {
         log.info("parse-file接收到的参数: {}", file.toString());
@@ -45,8 +51,14 @@ public class ParseFileController {
         return Result.ok("aiChatResponse");
     }
 
+    /**
+     * parseFile
+     * 解析多个文件
+     * @param file
+     * @return
+     */
     @PostMapping("/files")
-    public Result<String> parseResume(@RequestParam("file") MultipartFile file) {
+    public Result<String> parseFiles(@RequestParam("file") MultipartFile file) {
         log.info("parse-resume接收到的参数: {}", file.toString());
 
         List<MultipartFile>files = new ArrayList<>();
@@ -67,7 +79,7 @@ public class ParseFileController {
 //    }
 //
 //    @PostMapping("/files")
-//    public Result<String> parseResume(@RequestParam("file") File file) {
+//    public Result<String> parseFiles(@RequestParam("file") File file) {
 //        log.info("parse-resume接收到的参数: {}", file.toString());
 //
 //        List<File>files = new ArrayList<>();

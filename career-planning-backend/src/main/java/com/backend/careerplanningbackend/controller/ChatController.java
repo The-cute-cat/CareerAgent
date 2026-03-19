@@ -39,6 +39,7 @@ public class ChatController {
     private final AliOSSMultipartFileUtil aliOSSMultipartFileUtil;
 
     /**
+     * chatWithMessage
      * 发送消息到 AI 服务（阻塞方式）
      *
      * @param message 消息内容
@@ -82,6 +83,7 @@ public class ChatController {
     }
 
     /**
+     * chatWithMessageStream
      * 发送消息到 AI 服务（流式方式）
      * 返回 SSE 流式响应
      *

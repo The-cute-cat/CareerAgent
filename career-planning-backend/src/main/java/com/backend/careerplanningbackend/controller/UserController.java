@@ -24,6 +24,7 @@ import java.io.IOException;
 public class UserController {
     private final UserService userService;
     /**
+     * login
      * 登录
      *
      * @param user 包含用户信息的对象，包括用户名、邮箱、密码和用户类型
@@ -35,6 +36,7 @@ public class UserController {
         return userService.login(user);
     }
     /**
+     * register
      * 注册
      */
     @PostMapping("/register")
@@ -43,6 +45,7 @@ public class UserController {
         return userService.register(user);
     }
     /**
+     * forget
      * 忘记密码
      */
     @PutMapping("/forget-password")
@@ -51,6 +54,7 @@ public class UserController {
         return userService.forget(user);
     }
     /**
+     * sendCodeRegister
      * 发送注册验证码
      */
     @PostMapping("/send-code-register")
@@ -59,6 +63,7 @@ public class UserController {
         return userService.sendCodeRegister(user);
     }
     /**
+     * sendCodeForget
      * 发送注册验证码
      */
     @PostMapping("/send-code-forget")
@@ -67,6 +72,7 @@ public class UserController {
         return userService.sendCodeForget(user);
     }
     /**
+     * edit
      * 修改个人信息
      */
     @PutMapping("/edit")
@@ -76,6 +82,7 @@ public class UserController {
     }
     
     /**
+     * getUserInfo
      * 查询用户信息
      */
     @GetMapping("/get-user-info")
@@ -84,6 +91,7 @@ public class UserController {
         return userService.getUserInfo();
     }
     /**
+     * updateAvatar
      * 更换头像
      */
     @GetMapping("/avatar")
@@ -92,6 +100,7 @@ public class UserController {
         return userService.updateAvatar(avatar);
     }
     /**
+     * refreshToken
      * 更新 双token
      */
     @PostMapping("refreshToken")
