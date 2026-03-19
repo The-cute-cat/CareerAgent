@@ -54,7 +54,8 @@ class StructTextExtractor:
         
         # 对 major 进行标准化处理
         response.major = major_aligner.align(response.major)
-        return json.loads(response.model_dump_json(by_alias=True))
+        return json.loads(response.model_dump_json())
+
 
 
 struct_text_extractor = StructTextExtractor()
