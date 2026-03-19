@@ -10,9 +10,9 @@ import pymupdf
 from langchain_openai import ChatOpenAI
 
 from ai_service.models.pdf import PDFType, PDFInfo
-from ai_service.services import log
 from ai_service.services.image_extractor import image_extractor
 from ai_service.services.prompt_loader import prompt_loader
+from ai_service.utils.logger_handler import log
 from config import settings
 
 __all__ = ["pdf_extractor"]
@@ -135,8 +135,7 @@ class PDFExtractor:
             text_page_list: 指定提取的页码列表，为空则提取全部
 
         Returns:
-            页面内容列表，每项包含 page 和 content 字段，若存在错误则包含 error 字段；
-            若为空则说明提取失败
+            页面内容列表，每项包含 page 和 content 字段
         """
         try:
             with pymupdf.open(pdf_path) as doc:
@@ -186,8 +185,7 @@ class PDFExtractor:
             scanned_page_list: 指定提取的页码列表，为空则提取全部
 
         Returns:
-            页面内容列表，每项包含 page 和 content 字段，若存在错误则包含 error 字段；
-            若为空则说明提取失败
+            页面内容列表，每项包含 page 和 content 字段
         """
         try:
             with pymupdf.open(pdf_path) as doc:
@@ -244,8 +242,7 @@ class PDFExtractor:
             password: 加密 PDF 的密码
 
         Returns:
-            页面内容列表，每项包含 page 和 content 字段，若存在错误则包含 error 字段；
-            若为空则说明提取失败
+            页面内容列表
         """
         try:
             result = []

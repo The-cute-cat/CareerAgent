@@ -42,7 +42,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     private final AliOSSUtils aliOSSUtils;
 
     @Override
-    public Result<LoginVO> login(LoginFormDTO user) {
+    public Result login(LoginFormDTO user) {
         String password = user.getPassword();
         String username = user.getUsername();
         if (StrUtil.isBlank(password) || StrUtil.isBlank(username)) {
@@ -84,7 +84,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     }
 
     @Override
-    public Result<String> register(LoginFormDTO user) {
+    public Result register(LoginFormDTO user) {
         log.debug("用户注册请求: {}", user);
         String password = user.getPassword();
         String username = user.getUsername();
@@ -143,7 +143,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     }
 
     @Override
-    public Result<String> forget(LoginFormDTO user) {
+    public Result forget(LoginFormDTO user) {
         log.debug("用户修改密码请求: {}", user);
         String username = user.getUsername();
         String password = user.getPassword();
@@ -196,10 +196,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
      * 发送验证码 （带防刷）
      *
      * @param user*(LoginFormDTO)
-     * @return (Result)
+     * @return
      */
     @Override
-    public Result<String> sendCode(LoginFormDTO user) {
+    public Result sendCode(LoginFormDTO user) {
         String username = user.getUsername();
         String toEmail = user.getEmail();
         // 判断参数不合法
@@ -212,7 +212,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         // 2. 防刷校验：使用 ":" 分隔符规范 Key 结构
         // 建议格式：项目名:模块:业务:标识 这个用来计算60秒内是否重置 
         String sentKey = RedisConstant.EMAIL_SENT + ":" + username + ":" + toEmail;
-        if (stringRedisTemplate.hasKey(sentKey)) {
+        if (Boolean.TRUE.equals(stringRedisTemplate.hasKey(sentKey))) {
             return Result.fail("60秒之内已经发送了一条验证码");
         }
         try {
@@ -235,7 +235,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             sender.send(msg);
             return Result.ok();
         } catch (MailException e) {
-            log.error("邮件发送失败: {}", e.getMessage());
+            e.printStackTrace();
             return Result.fail("重置密码错误");
         }
     }
@@ -244,9 +244,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
      * 发送注册验证码 （带防刷）
      *
      * @param user*(LoginFormDTO)
+     * @return
      */
     @Override
-    public Result<String> sendCodeRegister(LoginFormDTO user) {
+    public Result sendCodeRegister(LoginFormDTO user) {
         User userByName = userMapper.selectByUsername(user.getUsername());
         if (userByName != null) {
             return Result.fail("用户名已被占用");
@@ -268,7 +269,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         // 2. 防刷校验：使用 ":" 分隔符规范 Key 结构
         // 建议格式：项目名:模块:业务:标识 这个用来计算60秒内是否重置 
         String sentKey = RedisConstant.EMAIL_SENT + ":" + username + ":" + toEmail;
-        if (stringRedisTemplate.hasKey(sentKey)) {
+        if (Boolean.TRUE.equals(stringRedisTemplate.hasKey(sentKey))) {
             return Result.fail("60秒之内已经发送了一条验证码");
         }
         try {
@@ -291,7 +292,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             sender.send(msg);
             return Result.ok();
         } catch (MailException e) {
-            log.error("邮件发送失败: {}", e.getMessage());
+            e.printStackTrace();
             return Result.fail("重置密码错误");
         }
     }
@@ -300,9 +301,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
      * 发送忘记密码验证码 （带防刷）
      *
      * @param user*(LoginFormDTO)
+     * @return
      */
     @Override
-    public Result<String> sendCodeForget(LoginFormDTO user) {
+    public Result sendCodeForget(LoginFormDTO user) {
         User userByName = userMapper.selectByUsername(user.getUsername());
         if (userByName == null) {
             return Result.fail("用户名不存在");
@@ -324,7 +326,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         // 2. 防刷校验：使用 ":" 分隔符规范 Key 结构
         // 建议格式：项目名:模块:业务:标识 这个用来计算60秒内是否重置 
         String sentKey = RedisConstant.EMAIL_SENT + ":" + username + ":" + toEmail;
-        if (stringRedisTemplate.hasKey(sentKey)) {
+        if (Boolean.TRUE.equals(stringRedisTemplate.hasKey(sentKey))) {
             return Result.fail("60秒之内已经发送了一条验证码");
         }
         try {
@@ -347,16 +349,18 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             sender.send(msg);
             return Result.ok();
         } catch (MailException e) {
-            log.error("邮件发送失败: {}", e.getMessage());
+            e.printStackTrace();
             return Result.fail("重置密码错误");
         }
     }
     
     /***
      * 修改用户的资料
+     * @param user
+     * @return
      */
     @Override
-    public Result<String> edit(User user) {
+    public Result edit(User user) {
         if (user == null) {
             return Result.fail("前端传输过来的是空的东西或者邮箱为空");
         }
@@ -383,8 +387,15 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         return Result.ok();
     }
 
+    /**
+     * 刷新短token
+     *
+     * @param refreshToken
+     * @param response
+     * @return
+     */
     @Override
-    public Result<LoginVO> refreshToken(String refreshToken, HttpServletResponse response) {
+    public Result refreshToken(String refreshToken, HttpServletResponse response) {
         log.info("refreshToken={}", refreshToken);
         Claims claims = null;
         try {
@@ -416,11 +427,11 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     /**
      * 获取用户的资料（只能自己获取）
      *
+     * @return
      */
     @Override
-    public Result<UserDTO> getUserInfo() {
+    public Result getUserInfo() {
         Long currentUserId = ThreadLocalUtil.getCurrentUserId();
-        log.info("currentUserId: {}", currentUserId);
         if (currentUserId == 0) {
             return Result.fail("id为空");
         }
@@ -432,7 +443,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     }
 
     @Override
-    public Result<String> updateAvatar(MultipartFile avatar) throws IOException {
+    public Result updateAvatar(MultipartFile avatar) throws IOException {
         Long currentUserId = ThreadLocalUtil.getCurrentUserId();
         String upload = aliOSSUtils.upload(avatar);
         int i = userMapper.updateAvatar(upload, currentUserId);

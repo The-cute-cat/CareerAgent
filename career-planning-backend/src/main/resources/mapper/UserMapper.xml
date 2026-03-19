@@ -48,7 +48,7 @@
         where id = #{id}
     </select>
     <select id="getUserInfo" resultType="com.backend.careerplanningbackend.domain.dto.UserDTO">
-        select id, username, nickname, email, avatar, info
+        select id, username, nickname, email, avatar
         from user_stu
         where id = #{id}
     </select>

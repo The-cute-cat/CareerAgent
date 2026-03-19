@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onBeforeUnmount, ref, nextTick } from 'vue'
-import { Graph } from '@antv/x6'  // 引入 X6 图谱库
+import { Graph } from '@antv/x6'
 import { ElMessage } from 'element-plus'
 import {
   User,
@@ -12,6 +12,14 @@ import {
   ArrowRight,
   Close
 } from '@element-plus/icons-vue'
+import {
+  careerStages,
+  verticalPathNodes,
+  verticalPathEdges,
+  transferPathNodes,
+  transferPathEdges,
+  progressColors
+} from '@/mock/data'
 
 // 容器引用
 const graphContainer = ref<HTMLDivElement | null>(null)
@@ -20,7 +28,7 @@ let graph: Graph | null = null
 // 当前选中节点详情
 const selectedNode = ref<any>(null)
 
-// 用户数据（来自 CReport.vue）
+// 用户数据（来自 Report.vue）
 const userData = {
   name: '李明',
   school: 'XX 大学 (985/211)',
@@ -36,20 +44,6 @@ const userData = {
   advantages: '985 院校背景，GPA 前 5%，GitHub 活跃 (1000+ commits)，算法基础扎实',
   improvements: '缺乏高并发生产环境经验，大型分布式系统实战较少'
 }
-
-// 职业发展阶段数据（与 CReport.vue 对应）
-const careerStages = [
-  { stage: '入职 0-1 年', level: '初级工程师', score: 60, ability: '基础夯实期' },
-  { stage: '入职 1-3 年', level: '中级工程师', score: 75, ability: '快速成长 期' },
-  { stage: '入职 3-5 年', level: '高级工程师', score: 90, ability: '核心骨干期' },
-  { stage: '入职 5 年+', level: '技术专家/总监', score: 95, ability: '专家深耕期' }
-]
-
-// 进度条颜色配置（Element Plus 格式）
-const progressColors = [
-  { color: '#409eff', percentage: 0 },
-  { color: '#67c23a', percentage: 100 }
-]
 
 // 初始化图谱
 const initGraph = () => {
@@ -107,109 +101,8 @@ const loadVerticalPath = () => {
   graph.clearCells()
   selectedNode.value = null
 
-  // 节点数据 - 与 CReport 数据对应
-  const nodes = [
-    {
-      id: '1',
-      label: '初级 Java 工程师',
-      x: 400,
-      y: 40,
-      data: {
-        stage: '入职 0-1 年',
-        desc: '基础夯实期',
-        requirements: ['掌握 Java 基础语法', '熟悉 Spring Boot', '了解 MySQL/Redis'],
-        skills: { 'Java 基础': 60, '框架应用': 50, '数据库': 55, '算法逻辑': 70 },
-        salary: '8-15K',
-        difficulty: '入门'
-      },
-      color: '#E6F7FF',
-      stroke: '#1890FF'
-    },
-    {
-      id: '2',
-      label: '中级 Java 工程师',
-      x: 400,
-      y: 160,
-      data: {
-        stage: '入职 1-3 年',
-        desc: '快速成长 期',
-        requirements: ['独立完成功能模块', '掌握微服务架构', '具备 SQL 优化能力'],
-        skills: { 'Java 基础': 80, '框架应用': 75, '数据库': 80, '算法逻辑': 85 },
-        salary: '15-25K',
-        difficulty: '初级'
-      },
-      color: '#BAE7FF',
-      stroke: '#1890FF'
-    },
-    {
-      id: '3',
-      label: '高级 Java 工程师',
-      x: 400,
-      y: 280,
-      data: {
-        stage: '入职 3-5 年',
-        desc: '核心骨干期',
-        requirements: ['系统架构设计', '技术方案评审', '指导初中级工程师'],
-        skills: { 'Java 基础': 90, '框架应用': 90, '数据库': 90, '算法逻辑': 90 },
-        salary: '25-40K',
-        difficulty: '中级'
-      },
-      color: '#91D5FF',
-      stroke: '#1890FF'
-    },
-    {
-      id: '4',
-      label: 'Java 技术专家',
-      x: 250,
-      y: 420,
-      data: {
-        stage: '入职 5-8 年',
-        desc: '技术深耕路线',
-        requirements: ['领域深度钻研', '开源社区贡献', '技术影响力建设'],
-        skills: { 'Java 基础': 95, '框架应用': 95, '数据库': 95, '算法逻辑': 95 },
-        salary: '40-60K',
-        difficulty: '高级'
-      },
-      color: '#69C0FF',
-      stroke: '#096DD9'
-    },
-    {
-      id: '5',
-      label: '技术总监',
-      x: 550,
-      y: 420,
-      data: {
-        stage: '入职 8 年+',
-        desc: '管理转型路线',
-        requirements: ['团队管理能力', '技术战略规划', '跨部门协作'],
-        skills: { '技术能力': 85, '管理能力': 90, '沟通能力': 95, '战略思维': 90 },
-        salary: '60-100K',
-        difficulty: '专家'
-      },
-      color: '#40A9FF',
-      stroke: '#096DD9'
-    },
-    {
-      id: '6',
-      label: '首席架构师',
-      x: 400,
-      y: 520,
-      data: {
-        stage: '入职 10 年+',
-        desc: '职业巅峰',
-        requirements: ['企业级架构设计', '技术愿景规划', '行业影响力'],
-        skills: { '架构能力': 98, '技术深度': 95, '业务理解': 95, '领导力': 95 },
-        salary: '100K+',
-        difficulty: '顶级'
-      },
-      color: '#1890FF',
-      stroke: '#0050B3',
-      textColor: '#fff'
-    }
-  ]
-
-  // 添加节点
-  nodes.forEach(node => {
+  // 使用模拟数据中的节点
+  verticalPathNodes.forEach(node => {
     graph?.addNode({
       id: node.id,
       x: node.x,
@@ -235,17 +128,8 @@ const loadVerticalPath = () => {
     })
   })
 
-  // 添加连线
-  const edges = [
-    { source: '1', target: '2', label: '1-2 年', color: '#1890FF' },
-    { source: '2', target: '3', label: '2-3 年', color: '#1890FF' },
-    { source: '3', target: '4', label: '技术深耕', color: '#52C41A' },
-    { source: '3', target: '5', label: '管理转型', color: '#FA8C16' },
-    { source: '4', target: '6', label: '专家晋升', color: '#52C41A' },
-    { source: '5', target: '6', label: '总监晋升', color: '#FA8C16' }
-  ]
-
-  edges.forEach(edge => {
+  // 使用模拟数据中的连线
+  verticalPathEdges.forEach(edge => {
     graph?.addEdge({
       source: edge.source,
       target: edge.target,
@@ -277,101 +161,8 @@ const loadTransferPath = () => {
   graph.clearCells()
   selectedNode.value = null
 
-  // 基于 Java 后端技能可转岗的方向
-  const nodes = [
-    {
-      id: 'java',
-      label: 'Java 后端开发',
-      x: 400,
-      y: 100,
-      data: {
-        desc: '当前岗位',
-        match: '100%',
-        skills: ['Java', 'Spring', 'MySQL'],
-        difficulty: '当前'
-      },
-      color: '#1890FF',
-      stroke: '#1890FF',
-      textColor: '#fff'
-    },
-    {
-      id: 'fullstack',
-      label: '全栈工程师',
-      x: 200,
-      y: 200,
-      data: {
-        desc: '前端+后端',
-        match: '85%',
-        skills: ['Vue/React', 'Node.js', 'Java'],
-        difficulty: '较易',
-        needSkills: '需补充前端技术栈'
-      },
-      color: '#52C41A',
-      stroke: '#52C41A'
-    },
-    {
-      id: 'bigdata',
-      label: '大数据开发',
-      x: 600,
-      y: 200,
-      data: {
-        desc: '数据方向',
-        match: '75%',
-        skills: ['Hadoop', 'Spark', 'Flink'],
-        difficulty: '中等',
-        needSkills: '需学习大数据生态'
-      },
-      color: '#722ED1',
-      stroke: '#722ED1'
-    },
-    {
-      id: 'architect',
-      label: '系统架构师',
-      x: 400,
-      y: 300,
-      data: {
-        desc: '架构设计',
-        match: '70%',
-        skills: ['分布式', '微服务', '云原生'],
-        difficulty: '较难',
-        needSkills: '需积累架构经验'
-      },
-      color: '#FA8C16',
-      stroke: '#FA8C16'
-    },
-    {
-      id: 'product',
-      label: '产品经理',
-      x: 200,
-      y: 400,
-      data: {
-        desc: '产品方向',
-        match: '60%',
-        skills: ['需求分析', '用户研究', '项目管理'],
-        difficulty: '较难',
-        needSkills: '需培养产品思维'
-      },
-      color: '#EB2F96',
-      stroke: '#EB2F96'
-    },
-    {
-      id: 'devops',
-      label: 'DevOps 工程师',
-      x: 600,
-      y: 400,
-      data: {
-        desc: '运维开发',
-        match: '65%',
-        skills: ['Docker', 'K8s', 'CI/CD'],
-        difficulty: '中等',
-        needSkills: '需掌握运维技术'
-      },
-      color: '#13C2C2',
-      stroke: '#13C2C2'
-    }
-  ]
-
-  nodes.forEach(node => {
+  // 使用模拟数据中的横向换岗路径节点
+  transferPathNodes.forEach(node => {
     graph?.addNode({
       id: node.id,
       x: node.x,
@@ -397,18 +188,8 @@ const loadTransferPath = () => {
     })
   })
 
-  // 换岗路径
-  const edges = [
-    { source: 'java', target: 'fullstack', label: '前端补充' },
-    { source: 'java', target: 'bigdata', label: '数据转型' },
-    { source: 'java', target: 'architect', label: '架构进阶' },
-    { source: 'fullstack', target: 'product', label: '业务转型' },
-    { source: 'bigdata', target: 'devops', label: '基础设施' },
-    { source: 'architect', target: 'devops', label: '云原生' },
-    { source: 'fullstack', target: 'architect', label: '技术深化' }
-  ]
-
-  edges.forEach(edge => {
+  // 使用模拟数据中的横向换岗路径连线
+  transferPathEdges.forEach(edge => {
     graph?.addEdge({
       source: edge.source,
       target: edge.target,
@@ -475,9 +256,7 @@ onBeforeUnmount(() => {
     <!-- 页面标题区 -->
     <div class="page-header">
       <div class="header-left">
-        <el-icon :size="28" color="#1890FF">
-          <TrendCharts />
-        </el-icon>
+        <el-icon :size="28" color="#1890FF"><TrendCharts /></el-icon>
         <div class="title-section">
           <h2>职业发展路径图谱</h2>
           <span class="subtitle">基于个人能力画像的智能职业规划</span>
@@ -485,21 +264,15 @@ onBeforeUnmount(() => {
       </div>
       <div class="header-actions">
         <el-button type="primary" @click="loadVerticalPath">
-          <el-icon>
-            <TrendCharts />
-          </el-icon>
+          <el-icon><TrendCharts /></el-icon>
           垂直晋升路径
         </el-button>
         <el-button type="success" @click="loadTransferPath">
-          <el-icon>
-            <ArrowRight />
-          </el-icon>
+          <el-icon><ArrowRight /></el-icon>
           横向换岗路径
         </el-button>
         <el-button @click="exportImage">
-          <el-icon>
-            <Check />
-          </el-icon>
+          <el-icon><Check /></el-icon>
           导出图片
         </el-button>
         <el-button type="warning" plain @click="resetGraph">重置</el-button>
@@ -520,14 +293,16 @@ onBeforeUnmount(() => {
 
           <div class="position-info">
             <el-tag type="primary" effect="dark" size="large">
-              <el-icon>
-                <OfficeBuilding />
-              </el-icon>
+              <el-icon><OfficeBuilding /></el-icon>
               {{ userData.position }}
             </el-tag>
             <div class="match-rate">
               <span class="label">岗位匹配度</span>
-              <el-progress :percentage="userData.matchRate" :color="progressColors" :stroke-width="10" />
+              <el-progress
+                :percentage="userData.matchRate"
+                :color="progressColors"
+                :stroke-width="10"
+              />
             </div>
           </div>
         </el-card>
@@ -536,9 +311,7 @@ onBeforeUnmount(() => {
         <el-card class="skills-card" shadow="hover">
           <template #header>
             <div class="card-header">
-              <el-icon>
-                <Star />
-              </el-icon>
+              <el-icon><Star /></el-icon>
               <span>能力维度评估</span>
             </div>
           </template>
@@ -557,9 +330,7 @@ onBeforeUnmount(() => {
         <el-card class="analysis-card" shadow="hover">
           <template #header>
             <div class="card-header">
-              <el-icon>
-                <Check />
-              </el-icon>
+              <el-icon><Check /></el-icon>
               <span>核心优势</span>
             </div>
           </template>
@@ -569,9 +340,7 @@ onBeforeUnmount(() => {
         <el-card class="analysis-card warning" shadow="hover">
           <template #header>
             <div class="card-header">
-              <el-icon>
-                <Warning />
-              </el-icon>
+              <el-icon><Warning /></el-icon>
               <span>待提升项</span>
             </div>
           </template>
@@ -582,15 +351,17 @@ onBeforeUnmount(() => {
         <el-card class="stages-card" shadow="hover">
           <template #header>
             <div class="card-header">
-              <el-icon>
-                <TrendCharts />
-              </el-icon>
+              <el-icon><TrendCharts /></el-icon>
               <span>职业发展阶段</span>
             </div>
           </template>
           <el-timeline>
-            <el-timeline-item v-for="(stage, index) in careerStages" :key="index"
-              :type="index <= 1 ? 'primary' : index === 2 ? 'warning' : 'success'" :timestamp="stage.stage">
+            <el-timeline-item
+              v-for="(stage, index) in careerStages"
+              :key="index"
+              :type="index <= 1 ? 'primary' : index === 2 ? 'warning' : 'success'"
+              :timestamp="stage.stage"
+            >
               <div class="stage-content">
                 <strong>{{ stage.level }}</strong>
                 <p class="stage-ability">{{ stage.ability }}</p>
@@ -610,9 +381,7 @@ onBeforeUnmount(() => {
           <div v-if="selectedNode" class="node-detail-panel">
             <div class="detail-header">
               <h4>{{ selectedNode.label }}</h4>
-              <el-icon class="close-btn" @click="selectedNode = null">
-                <Close />
-              </el-icon>
+              <el-icon class="close-btn" @click="selectedNode = null"><Close /></el-icon>
             </div>
             <div class="detail-content">
               <p class="desc">{{ selectedNode.desc }}</p>

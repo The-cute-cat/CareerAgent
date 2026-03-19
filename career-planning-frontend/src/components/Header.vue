@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, h } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/modules/user'
-import { ArrowDown, User, SwitchButton } from '@element-plus/icons-vue'
+import { ArrowDown, User, UserFilled, SwitchButton } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const route = useRoute()
@@ -10,8 +10,7 @@ const router = useRouter()
 const userStore = useUserStore()
 
 const currentTitle = computed(() => route.meta.title || '欢迎使用职业规划智能体')
-const isLoggedIn = computed(() => userStore.isLoggedIn)
-const userName = computed(() => userStore.userInfo?.nickname || userStore.userInfo?.username || '用户')
+const userName = computed(() => userStore.userInfo?.username || '用户')
 
 const handleLogout = () => {
   userStore.clearUserInfo()
@@ -37,7 +36,6 @@ const confirmLogout = () => {
     }
   )
     .then(() => {
-      userStore.clearUserALLInfo()
       ElMessage({
         type: 'success',
         message: '退出成功',
@@ -63,36 +61,23 @@ const confirmLogout = () => {
       </div>
     </div>
     <div class="header-right">
-      <!-- 未登录状态：显示登录/注册按钮 -->
-      <div v-if="!isLoggedIn" class="auth-buttons">
-        <el-button type="primary" size="small" @click="router.push('/login')">登录</el-button>
-        <el-button type="default" size="small" @click="router.push('/register')">注册</el-button>
-      </div>
-
-      <!-- 已登录状态：显示用户信息下拉菜单 -->
-      <el-dropdown v-else @command="handleCommand" trigger="click">
+      <el-dropdown @command="handleCommand" trigger="click">
         <div class="user-info">
           <div class="user-avatar">
             {{ userName.charAt(0) }}
           </div>
           <span class="user-name">{{ userName }}</span>
-          <el-icon class="dropdown-icon">
-            <ArrowDown />
-          </el-icon>
+          <el-icon class="dropdown-icon"><ArrowDown /></el-icon>
         </div>
         <template #dropdown>
           <el-dropdown-menu>
             <el-dropdown-item command="profile">
-              <el-icon>
-                <User />
-              </el-icon>
+              <el-icon><User /></el-icon>
               个人中心
             </el-dropdown-item>
 
             <el-dropdown-item divided command="logout">
-              <el-icon>
-                <SwitchButton />
-              </el-icon>
+              <el-icon><SwitchButton /></el-icon>
               退出登录
             </el-dropdown-item>
 
@@ -145,12 +130,6 @@ const confirmLogout = () => {
 .header-right {
   display: flex;
   align-items: center;
-}
-
-.auth-buttons {
-  display: flex;
-  align-items: center;
-  gap: 12px;
 }
 
 .user-info {

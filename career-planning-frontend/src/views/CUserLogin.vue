@@ -27,9 +27,6 @@ const handleLogin = async () => {
   try {
     console.log("loginform 参数", loginform);
     const result = await userLoginService(loginform)
-    if (result.data.code !== 200) {
-      throw new Error(result.data.message || '登录失败')
-    }
     console.log("result 结果", result);
 
     userStore.setUserALLInfo(
@@ -98,9 +95,9 @@ const showSuccessNotification = () => {
               </div>
               <form class="signin-form" @submit.prevent="handleLogin">
                 <div class="form-group mb-3">
-                  <label class="label" for="username">用户名</label>
-                  <input type="text" class="form-control" placeholder="请输入邮箱地址" id="username"
-                    v-model="loginform.username" required />
+                  <label class="label" for="username">邮箱</label>
+                  <input type="text" class="form-control" placeholder="请输入邮箱地址" id="username" v-model="loginform.username"
+                    required />
                 </div>
                 <div class="form-group mb-3">
                   <label class="label" for="password">密码</label>
@@ -203,7 +200,6 @@ h3.mb-4 {
 
 /* 响应式调整 */
 @media (max-width: 991.98px) {
-
   .wrap .img,
   .wrap .login-wrap {
     width: 100%;
