@@ -39,7 +39,7 @@ public class ChatController {
     private final AliOSSMultipartFileUtil aliOSSMultipartFileUtil;
 
     /**
-     * 发送消息到 AI 服务（同步方式）
+     * 发送消息到 AI 服务（阻塞方式）
      *
      * @param message 消息内容
      * @param conversationId 对话ID（可选）
@@ -60,10 +60,9 @@ public class ChatController {
             List<String> fileUrls = new ArrayList<>();
             
             MultipartFileDTO multipartFileDTO = new MultipartFileDTO();
-            if (files == null && files.length == 0) {
-                return Result.fail("文件 or 消息会话 不能为空");
+            if (files != null && files.length >= 0) {
+                multipartFileDTO = aliOSSMultipartFileUtil.uploadFiles(files);
             }
-            multipartFileDTO = aliOSSMultipartFileUtil.uploadFiles(files);
 
             // 调用 AI 服务客户端，传入文件URL列表
             AiChatResponse response = aiServiceClient.chatWithMessageAndMultipartFiles("/chat/message",
