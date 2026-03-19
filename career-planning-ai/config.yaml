@@ -10,7 +10,8 @@ communication:
     secret: <SECRET>
     expire: 1800
 llm:
-  model_name: dashscope/qwen3.5-plus
+#  model_name: dashscope/qwen3.5-plus
+  model_name: dashscope/qwen-plus
   base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
   timeout: 30 # 超时时间
   max_retries: 3 # 最大重试次数
