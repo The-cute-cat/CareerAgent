@@ -1,6 +1,6 @@
 import asyncio
 import json
-
+import os
 
 from pymilvus import (
     connections, FieldSchema, CollectionSchema, DataType, Collection, utility,
@@ -10,16 +10,15 @@ from pymilvus import (
 from ai_service.models.struct_job_txt import JDAnalysisResult
 from ai_service.models.struct_txt import StudentProfile
 from ai_service.utils.aliyun_embedding import AliyunEmbedding
-from config import settings
-
 
 class JobVectorStore:
-    def __init__(self, host="192.168.3.128", port="19530", dim=1024,collection_name="job_matching_profiles" ,api_key=settings.llm.api_key.get_secret_value()):
+    def __init__(self, host="192.168.3.128", port="19530", dim=1024,collection_name="job_matching_profiles" ,api_key=os.getenv("LLM__API_KEY")):
         self.host = host
         self.port = port
         self.dim = dim
         self.collection_name = collection_name
         self.embedder = AliyunEmbedding(api_key=api_key)
+        
         # 1. 连接 Milvus
         connections.connect("default", host=self.host, port=self.port)
         print(f"✅ 已连接到 Milvus: {self.host}:{self.port}")
@@ -106,27 +105,27 @@ class JobVectorStore:
         profiles = jd_result.profiles
         
         # 1. 标量字段解析
-        degree_level = self.map_degree_to_level(profiles.basic_requirements.degree)
-        exp_level = self.map_exp_to_level(profiles.basic_requirements.experience_years)
+        degree_level = self.map_degree_to_level(profiles.基础要求.学历要求)
+        exp_level = self.map_exp_to_level(profiles.基础要求.工作年限)
         
         # 2. 获取四个维度的文本并向量化
         # 使用 embedder 获取向量，如果网络不稳定内部自带重试机制
-        vec_basic = self.embedder.get_embedding_with_retry(self.obj_to_text(profiles.basic_requirements))
-        vec_skills = self.embedder.get_embedding_with_retry(self.obj_to_text(profiles.professional_skills))
-        vec_literacy = self.embedder.get_embedding_with_retry(self.obj_to_text(profiles.professional_literacy))
-        vec_potential = self.embedder.get_embedding_with_retry(self.obj_to_text(profiles.development_potential))
+        vec_basic = self.embedder.get_embedding_with_retry(self.obj_to_text(profiles.基础要求))
+        vec_skills = self.embedder.get_embedding_with_retry(self.obj_to_text(profiles.职业技能))
+        vec_literacy = self.embedder.get_embedding_with_retry(self.obj_to_text(profiles.职业素养))
+        vec_potential = self.embedder.get_embedding_with_retry(self.obj_to_text(profiles.发展潜力))
         
         if not all([vec_basic, vec_skills, vec_literacy, vec_potential]):
             print(f"❌ 职位 {jd_result.job_id} 向量化失败，跳过入库。")
             return
 
-        raw_data = jd_result.model_dump(by_alias=False)
+        raw_data = jd_result.model_dump(by_alias=True)
         # 3. 组装数据并插入
         data = [
             [jd_result.job_id],      # job_id
             [degree_level],          # degree_level
             [exp_level],             # exp_level
-            [raw_data],              # raw_data  原json格式数据
+            [raw_data],            # raw_data  原json格式数据
             [vec_basic],             # vec_basic
             [vec_skills],            # vec_skills
             [vec_literacy],          # vec_literacy
@@ -205,16 +204,10 @@ class JobVectorStore:
         matched_jobs = []
         for hits in results:
             for hit in hits:
-                raw_data = hit.entity.get("raw_data")
-
-                # 如果 raw_data 是字符串，解析为字典
-                if isinstance(raw_data, str):
-                    raw_data = json.loads(raw_data)
-
                 matched_jobs.append({
                     "job_id": hit.entity.get("job_id"),
                     "score": hit.score,
-                    "raw_data": raw_data
+                    "raw_data": hit.entity.get("raw_data")
                 })
 
         return matched_jobs
