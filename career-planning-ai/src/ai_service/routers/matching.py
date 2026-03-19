@@ -10,7 +10,7 @@ from ai_service.services import log
 
 __all__ = ["router"]
 
-router = APIRouter(prefix="/match", tags=["match"])
+router = APIRouter(prefix="/matching", tags=["match"])
 
 # 初始化组件 (建议在全局作用域或 lifespan 中初始化以复用连接和模型加载)
 store = JobVectorStore()
@@ -28,6 +28,7 @@ async def match_jobs(
     """
     try:
         log.info(f"--- 正在为学生匹配最合适的岗位 ---")
+        print(student_profile)
 
         # 1. 向量数据库初步召回
         # 注意：如果 match_jobs_for_student 是同步阻塞方法且耗时较长，建议使用 asyncio.to_thread 包裹
