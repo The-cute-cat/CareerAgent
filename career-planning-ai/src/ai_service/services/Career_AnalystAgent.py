@@ -116,6 +116,7 @@ class CareerAnalystAgent:
                 }}
             ],
             "actionable_advice": "一句话建议"
+            “all_analysis”:"总的差距分析"
         }}
         """
 
