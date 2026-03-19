@@ -32,7 +32,7 @@ export function uploadResumeApi(params: UploadParams) {
   //可选：前端预提取的元数据 (减轻后端压力)
   // formData.append('file_type', params.file.type)
 
-  return request.post<Result<UploadResponse>>('/resume/upload', formData, {
+  return request.post<Result<UploadResponse>>('/resume-upload-chat/message', formData, {
     // 上传进度监控 (提升用户体验)
     onUploadProgress: (progressEvent: any) => {
       if (progressEvent.total && params.onProgress) {
@@ -40,7 +40,7 @@ export function uploadResumeApi(params: UploadParams) {
         console.log(`上传进度：${percent}%`)
         params.onProgress(percent)
       }
-    }
+    },
   })
 }
 
@@ -60,10 +60,12 @@ export function getResumeReportApi(taskId: string) {
  * @returns 解析状态和进度
  */
 export function getResumeParseStatusApi(taskId: string) {
-  return request.get<Result<{
-    taskId: string
-    status: 'pending' | 'processing' | 'completed' | 'failed'
-    progress?: number
-    estimatedTimeRemaining?: number
-  }>>(`/resume/status/${taskId}`)
+  return request.get<
+    Result<{
+      taskId: string
+      status: 'pending' | 'processing' | 'completed' | 'failed'
+      progress?: number
+      estimatedTimeRemaining?: number
+    }>
+  >(`/resume/status/${taskId}`)
 }

@@ -4,9 +4,10 @@
 .jbeval/
 node_modules/
 logs/
-data/
 tests/
 temp/
+poetry.lock
+package-lock.json
 *.pyc
 __pycache__/
 

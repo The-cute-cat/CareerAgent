@@ -46,6 +46,7 @@ async def handle_file(
 async def _validate_file(file: UploadFile) -> dict[str, str]:
     save_path = os.path.join(settings.path_config.temp, uuid.uuid4().hex)
     try:
+        os.makedirs(settings.path_config.temp, exist_ok=True)
         bytes_data = await file.read()
         with open(save_path, "wb") as f:
             f.write(bytes_data)
@@ -134,6 +135,6 @@ async def validate_some_image(
 
 
 async def validate_image(file_info: dict[str, str] = Depends(handle_file)) -> dict[str, str]:
-    if file_info["extension"] not in ["png", "jpg", "jpeg"]:
+    if file_info["extension"].lower() in [suffix.lower() for suffix in settings.image.suffix]:
         raise FileValidationError(f"File type is not image, file info:{file_info}")
     return file_info

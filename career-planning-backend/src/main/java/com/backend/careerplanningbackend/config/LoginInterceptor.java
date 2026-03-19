@@ -5,10 +5,11 @@ import com.backend.careerplanningbackend.util.ThreadLocalUtil;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
-
+@Slf4j
 @Component
 public class LoginInterceptor implements HandlerInterceptor {
 
@@ -41,6 +42,7 @@ public class LoginInterceptor implements HandlerInterceptor {
             Claims claims = JwtUtil.parseToken(accessToken);
 //            String userId = claims.getSubject();
             String userId = (String) claims.get("id");
+            log.info("解析出的用户ID: " + userId);
             // 将用户ID存入ThreadLocal供后续使用
             ThreadLocalUtil.set(userId);
             return true;

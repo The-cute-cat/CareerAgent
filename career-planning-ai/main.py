@@ -7,19 +7,24 @@ from starlette.responses import JSONResponse
 
 from ai_service.exceptions import ApiException
 from ai_service.response.result import success
-from ai_service.routers import parse
+from ai_service.routers import parse, matching
+from ai_service.routers import parse, test_question
 from ai_service.utils.logger_handler import log
 
 app = FastAPI()
 
+app.include_router(parse.router)
+app.include_router(test_question.router)
+
 app.include_router(
-    parse.router,
+    matching.router,
 )
 
 
 @app.exception_handler(StarletteHTTPException)
 async def starlette_http_exception_handler(_: Request, exc: StarletteHTTPException):
     """处理所有 Starlette HTTP 异常（包括 405 Method Not Allowed）"""
+    log.error(f"StarletteHTTPException: {exc}", exc_info=True)
     return JSONResponse(
         status_code=200,
         content=jsonable_encoder({
@@ -33,6 +38,7 @@ async def starlette_http_exception_handler(_: Request, exc: StarletteHTTPExcepti
 
 @app.exception_handler(ApiException)
 async def api_exception_handler(_: Request, exc: ApiException):
+    log.error(f"ApiException: {exc}", exc_info=True)
     return JSONResponse(
         status_code=200,
         content=jsonable_encoder({
@@ -47,6 +53,7 @@ async def api_exception_handler(_: Request, exc: ApiException):
 @app.exception_handler(HTTPException)
 async def http_exception_handler(_: Request, exc: HTTPException):
     """统一处理 FastAPI 的 HTTPException"""
+    log.error(f"HTTPException: {exc}", exc_info=True)
     return JSONResponse(
         status_code=200,
         content=jsonable_encoder({
@@ -61,6 +68,7 @@ async def http_exception_handler(_: Request, exc: HTTPException):
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(_: Request, exc: RequestValidationError):
     """统一处理请求参数验证错误（422）"""
+    log.error(f"请求参数验证失败: {exc}", exc_info=True)
     errors = exc.errors()
     if errors:
         error = errors[0]

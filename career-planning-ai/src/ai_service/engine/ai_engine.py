@@ -722,8 +722,8 @@ class AIEngine:
             >>> from config import settings
             >>> engine = AIEngine()
             >>> pipeline = engine.pick_brain(
-            ...     model=settings.llm.qwen,
-            ...     model_fallbacks=[settings.llm.deepseek]
+            ...     model=settings.lite_llm.qwen,
+            ...     model_fallbacks=[settings.lite_llm.deepseek]
             ... )
         """
         log.info(f"[算力锚定] 开启新流水线 | 主模型: {model.model_name if model else 'None'} | 备选模型数: {len(model_fallbacks) if model_fallbacks else 0}")

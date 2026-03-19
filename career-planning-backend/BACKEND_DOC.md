@@ -207,23 +207,23 @@ mybatis-plus:
 
 ### 环境变量
 
-| 变量名 | 说明 |
-|--------|------|
-| host | MySQL 主机地址 |
-| post | MySQL 端口 |
-| database_name | 数据库名称 |
-| database_username | 数据库用户名 |
-| database_password | 数据库密码 |
-| redis_host | Redis 主机地址 |
-| redis_post | Redis 端口 |
-| redis_username | Redis 用户名 |
-| redis_password | Redis 密码 |
-| email_host | 邮件服务器地址 |
-| email_post | 邮件服务器端口 |
-| MAIL_USERNAME_QQ | QQ邮箱账号 |
-| MAIL_PASSWORD_QQ | QQ邮箱授权码 |
-| ALY_OSS_* | 阿里云OSS配置 |
-| SECRET | JWT 密钥 |
+| 变量名               | 说明         |
+|-------------------|------------|
+| host              | MySQL 主机地址 |
+| post              | MySQL 端口   |
+| database_name     | 数据库名称      |
+| database_username | 数据库用户名     |
+| database_password | 数据库密码      |
+| redis_host        | Redis 主机地址 |
+| redis_post        | Redis 端口   |
+| redis_username    | Redis 用户名  |
+| redis_password    | Redis 密码   |
+| email_host        | 邮件服务器地址    |
+| email_post        | 邮件服务器端口    |
+| MAIL_USERNAME_QQ  | QQ邮箱账号     |
+| MAIL_PASSWORD_QQ  | QQ邮箱授权码    |
+| ALY_OSS_*         | 阿里云OSS配置   |
+| SECRET            | JWT 密钥     |
 
 ## 扩展说明
 

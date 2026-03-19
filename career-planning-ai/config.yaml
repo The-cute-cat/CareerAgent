@@ -9,8 +9,8 @@ communication:
   token:
     secret: <SECRET>
     expire: 1800
-llm:
-  model_name: dashscope/qwen3.5-plus
+lite_llm:
+  model_name: dashscope/qwen-plus
   base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
   timeout: 30 # 超时时间
   max_retries: 3 # 最大重试次数
@@ -30,6 +30,18 @@ llm:
     max_retries: 3
     extra:
       temperature: 0.7
+vector_model:
+  model_name: text-embedding-v4
+llm_model_name:
+  model_name: qwen-plus
+
+llm:
+  model_name: qwen-plus
+  base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+  timeout: 30 # 超时时间
+  max_retries: 3 # 最大重试次数
+  extra: # 额外参数
+    temperature: 0.7
 pdf:
   model_name: qwen-vl-plus
   extra:
@@ -39,6 +51,11 @@ image:
   suffix: ["JPG", "JPEG", "PNG", "BMP", "GIF"]
   max_size: 10 # 最大尺寸 MB
   max_dimension: 4096 # 最大尺寸
+  extra:
+    temperature: 0.7
+test_question:
+  model_name: qwen-plus
+  timeout: 60
   extra:
     temperature: 0.7
 path_config: # 路径配置，需要绝对路径，否则使用默认路径
