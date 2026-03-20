@@ -4,6 +4,7 @@ import com.backend.careerplanningbackend.domain.dto.LoginFormDTO;
 import com.backend.careerplanningbackend.domain.dto.UserDTO;
 import com.backend.careerplanningbackend.domain.po.Result;
 import com.backend.careerplanningbackend.domain.po.User;
+import com.backend.careerplanningbackend.domain.po.UserStuInfo;
 import com.backend.careerplanningbackend.domain.vo.LoginVO;
 import com.baomidou.mybatisplus.extension.service.IService;
 import jakarta.servlet.http.HttpServletResponse;
@@ -33,4 +34,5 @@ public interface UserService extends IService<User> {
 
     Result<String> updateAvatar(MultipartFile avatar) throws IOException;
 
+    Result<UserStuInfo> getUserBasicFileInfoService();
 }

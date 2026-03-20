@@ -11,5 +11,6 @@ public class CareerPlanningBackendApplication {
     public static void main(String[] args) {
         SpringApplication.run(CareerPlanningBackendApplication.class, args);
     }
-  
+   
+
 }
