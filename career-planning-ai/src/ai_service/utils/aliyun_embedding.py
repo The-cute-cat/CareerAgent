@@ -8,7 +8,7 @@ from config import LLM, settings
 
 
 class AliyunEmbedding:
-    def __init__(self, model : str=settings.vector_model.model_name,api_key: str = settings.llm.api_key.get_secret_value()):
+    def __init__(self, model : str=settings.vector.model_name, api_key: str = settings.llm.api_key.get_secret_value()):
         """
         初始化阿里云 Embedding 客户端
         :param api_key: 阿里云 DashScope API Key

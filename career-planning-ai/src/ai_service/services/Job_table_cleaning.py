@@ -2,7 +2,7 @@ __all__ = ['filter_computer_jobs_excel','clean_job_excel','read_excel_to_jobinfo
 # 清洗招聘数据 Excel 文件（支持.xls 和.xlsx 格式）
 #从文件中读取数据，并转换为JobInfo/字典实体对象列表
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import Any
 from datetime import datetime
 import re
 
@@ -16,7 +16,8 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_community.chat_models.tongyi import ChatTongyi
 from langchain_core.output_parsers import PydanticOutputParser
 
-from config import LLM, settings
+from ai_service.services import log
+from config import settings
 
 
 class JobClassificationItem(BaseModel):
@@ -32,8 +33,8 @@ class JobClassificationResult(BaseModel):
 # --- 删除与计算机不相干的岗位 ---
 def filter_computer_jobs_excel(
         file_path: str,
-        api_key: Optional[str] = None,
-        model_name: str = settings.llm_model_name.model_name,
+        api_key: str|None = None,
+        model_name: str = settings.vector.llm_model_name,
         batch_size: int = 50  # 每次发送给大模型的唯一岗位数量
 ) -> str:
     """
@@ -83,20 +84,19 @@ def filter_computer_jobs_excel(
         raise ValueError(f"未找到岗位列，请确保包含以下列名之一：{possible_names}")
 
     # 4. 【核心步骤】提取岗位并去重
-    print(f"正在提取唯一岗位名称（原数据行数：{len(df)}）...")
+    log.info(f"正在提取唯一岗位名称（原数据行数：{len(df)}）...")
     # 转为字符串并去除首尾空格，去除空值
     unique_jobs = df[target_col].astype(str).str.strip().replace('', pd.NA).dropna().unique().tolist()
-    print(f"去重后唯一岗位数量：{len(unique_jobs)}")
+    log.info(f"去重后唯一岗位数量：{len(unique_jobs)}")
 
     if not unique_jobs:
-        print("未发现有效岗位数据，直接返回。")
+        log.warning("未发现有效岗位数据，直接返回。")
         return file_path
 
     # 5. 初始化 LLM 与解析器
     llm = ChatTongyi(
         api_key=api_key,
         model=model_name,
-        temperature=0.1,
         streaming=True  # qwq-plus-latest 只支持流式模式
     )
     parser = PydanticOutputParser(pydantic_object=JobClassificationResult)
@@ -414,7 +414,7 @@ def clean_job_excel(file_path, clean_salary=False, clean_date=True, remove_dupli
         # 删除<br>标签（包括<br/>、<br />等变体）
         text = re.sub(r'<br\s*/?>', '', text, flags=re.IGNORECASE)
         # 删除换行符
-        text = re.sub(r'\n|\r|\t', '', text)
+        text = re.sub(r'[\n\r\t]', '', text)
         # 删除多余空格（保留单个空格）
         text = re.sub(r'\s+', ' ', text)
         # 删除首尾空格
@@ -629,7 +629,7 @@ def process_excel_jobs(file_path: str, url_column_name: str='岗位来源地址'
 
         try:
             # 调用你提供的抓取函数
-            from ai_service.scripts.zhaopin_spider import fetch_job_info
+            from ai_service.scripts.py.zhaopin_spider import fetch_job_info
             job_info = fetch_job_info(url=url)
             # print("11")
 
@@ -672,9 +672,9 @@ def process_excel_jobs(file_path: str, url_column_name: str='岗位来源地址'
 
 # ========== 使用示例 ==========
 if __name__ == "__main__":
-    file_path = r"E:\软件工程相关资料\项目比赛\服创2026\a13基于AI的大学生职业规划智能体-JD采样数据.xls"
-    filter_computer_jobs_excel(file_path)
-    clean_job_excel(file_path)
+    test_file_path = r"E:\软件工程相关资料\项目比赛\服创2026\a13基于AI的大学生职业规划智能体-JD采样数据.xls"
+    filter_computer_jobs_excel(test_file_path)
+    clean_job_excel(test_file_path)
     # read_excel_to_jobinfo(file_path)
     # process_excel_jobs(file_path)
 

@@ -215,10 +215,14 @@ class PathConfig(BaseModel):
         return str(Path(path))
 
 
-class VectorModel(BaseModel):
+class Vector(BaseModel):
     model_name: str = ""
-class LlmModelName(BaseModel):
-    model_name: str = ""
+    llm_model_name: str = ""
+
+class Milvus(BaseModel):
+    host: str = ""
+    port: int = 19530
+    enabled: bool = False
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -235,8 +239,8 @@ class Settings(BaseSettings):
     image: Image = Field(default_factory=Image)
     test_question: TestQuestion = Field(default_factory=TestQuestion)
     path_config: PathConfig = Field(default_factory=PathConfig)
-    vector_model: VectorModel = Field(default_factory=VectorModel)
-    llm_model_name: LlmModelName = Field(default_factory=LlmModelName)
+    vector: Vector = Field(default_factory=Vector)
+    milvus: Milvus = Field(default_factory=Milvus)
 
     @classmethod
     def settings_customise_sources(
