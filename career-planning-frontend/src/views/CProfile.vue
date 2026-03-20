@@ -1,29 +1,16 @@
 <script setup lang="ts">
+import type { UserStuInfo } from '@/types/user'
+import { userGetUserBasicFileInfoService } from '@/api/user/user'
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
-  User,
-  School,
-  Reading,
-  Collection,
-  Key,
-  Lock,
-  Unlock,
-  Document,
-  Edit,
-  Check,
-  Close,
-  Phone,
-  Link,
-  TrendCharts
+  User, School, Reading, Collection, Key, Lock, Unlock,
+  Document, Edit, Check, Close, Phone, Link, TrendCharts
 } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/modules/user'
 import {
-  educationLevels,
-  graduationYearOptions,
-  profileFormData,
-  privacySettingsData,
-  progressColors
+  educationLevels, graduationYearOptions, profileFormData,
+  privacySettingsData, progressColors
 } from '@/mock/data'
 
 const userStore = useUserStore()
@@ -32,13 +19,18 @@ const userStore = useUserStore()
 const isEditing = ref(false)
 
 // 个人档案表单
-const profileForm = reactive({ ...profileFormData })
+const userInfo = ref<UserStuInfo>({})
+userInfo.value = { ...profileFormData }
+console.log("userInfo", userInfo.value);
+
+// const userInfo = reactive({ ...profileFormData })
 
 // 原始数据（用于取消编辑）
-let originalProfile = { ...profileForm }
+let originalProfile = { ...userInfo }
 
 // 隐私设置
-const privacySettings = reactive({ ...privacySettingsData,
+const privacySettings = reactive({
+  ...privacySettingsData,
   // 能力画像可见性
   profileVisibility: 'private' as 'public' | 'private',
   // 职业路径可见性
@@ -51,7 +43,7 @@ const privacySettings = reactive({ ...privacySettingsData,
 
 // 进入编辑模式
 const startEdit = () => {
-  originalProfile = { ...profileForm }
+  originalProfile = { ...userInfo }
   isEditing.value = true
 }
 
@@ -60,12 +52,12 @@ const saveProfile = () => {
   isEditing.value = false
   ElMessage.success('个人信息已保存')
   // 这里可以调用 API 保存到后端
-  console.log('保存的个人档案：', profileForm)
+  console.log('保存的个人档案：', userInfo)
 }
 
 // 取消编辑
 const cancelEdit = () => {
-  Object.assign(profileForm, originalProfile)
+  Object.assign(userInfo, originalProfile)
   isEditing.value = false
   ElMessage.info('已取消编辑')
 }
@@ -78,14 +70,15 @@ const savePrivacy = () => {
 }
 
 // 获取用户数据
-onMounted(() => {
+onMounted(async () => {
+  const res = await userGetUserBasicFileInfoService()
+  if (res.data.code !== 200) {
+    throw new Error(res.data.msg || '获取用户信息失败')
+  }
   // 如果后端有数据，可以在这里加载
-  if (userStore.userInfo) {
-    const user = userStore.userInfo
-    profileForm.name = user.nickname || ''
-    profileForm.email = user.email || ''
-    profileForm.phone = user.phone || ''
-    profileForm.bio = user.info || ''
+  if (res.data.data) {
+    const resData = res.data.data
+    userInfo.value = resData
   }
 })
 </script>
@@ -105,49 +98,56 @@ onMounted(() => {
           <template #header>
             <div class="card-header">
               <div class="header-left">
-                <el-icon :size="20"><User /></el-icon>
+                <el-icon :size="20">
+                  <User />
+                </el-icon>
                 <span>个人基础档案</span>
               </div>
               <div class="header-actions" v-if="!isEditing">
                 <el-button type="primary" size="small" @click="startEdit">
-                  <el-icon><Edit /></el-icon>
+                  <el-icon>
+                    <Edit />
+                  </el-icon>
                   编辑
                 </el-button>
               </div>
               <div class="header-actions" v-else>
                 <el-button type="success" size="small" @click="saveProfile">
-                  <el-icon><Check /></el-icon>
+                  <el-icon>
+                    <Check />
+                  </el-icon>
                   保存
                 </el-button>
                 <el-button size="small" @click="cancelEdit">
-                  <el-icon><Close /></el-icon>
+                  <el-icon>
+                    <Close />
+                  </el-icon>
                   取消
                 </el-button>
               </div>
             </div>
           </template>
 
-          <el-form
-            :model="profileForm"
-            label-width="100px"
-            class="profile-form"
-            :disabled="!isEditing"
-          >
+          <el-form :model="userInfo" label-width="100px" class="profile-form" :disabled="!isEditing">
             <el-row :gutter="20">
               <el-col :span="12">
                 <el-form-item label="姓名">
-                  <el-input v-model="profileForm.name" placeholder="请输入姓名">
+                  <el-input v-model="userInfo.realName" placeholder="请输入姓名">
                     <template #prefix>
-                      <el-icon><User /></el-icon>
+                      <el-icon>
+                        <User />
+                      </el-icon>
                     </template>
                   </el-input>
                 </el-form-item>
               </el-col>
               <el-col :span="12">
                 <el-form-item label="学校">
-                  <el-input v-model="profileForm.school" placeholder="请输入学校">
+                  <el-input v-model="userInfo.school" placeholder="请输入学校">
                     <template #prefix>
-                      <el-icon><School /></el-icon>
+                      <el-icon>
+                        <School />
+                      </el-icon>
                     </template>
                   </el-input>
                 </el-form-item>
@@ -157,22 +157,20 @@ onMounted(() => {
             <el-row :gutter="20">
               <el-col :span="12">
                 <el-form-item label="专业">
-                  <el-input v-model="profileForm.major" placeholder="请输入专业">
+                  <el-input v-model="userInfo.major" placeholder="请输入专业">
                     <template #prefix>
-                      <el-icon><Reading /></el-icon>
+                      <el-icon>
+                        <Reading />
+                      </el-icon>
                     </template>
                   </el-input>
                 </el-form-item>
               </el-col>
               <el-col :span="12">
                 <el-form-item label="学历">
-                  <el-select v-model="profileForm.education" placeholder="请选择学历" style="width: 100%">
-                    <el-option
-                      v-for="level in educationLevels"
-                      :key="level.value"
-                      :label="level.label"
-                      :value="level.value"
-                    />
+                  <el-select v-model="userInfo.education" placeholder="请选择学历" style="width: 100%">
+                    <el-option v-for="level in educationLevels" :key="level.value" :label="level.label"
+                      :value="level.value" />
                   </el-select>
                 </el-form-item>
               </el-col>
@@ -181,21 +179,19 @@ onMounted(() => {
             <el-row :gutter="20">
               <el-col :span="12">
                 <el-form-item label="毕业年份">
-                  <el-select v-model="profileForm.graduationYear" placeholder="请选择毕业年份" style="width: 100%">
-                    <el-option
-                      v-for="year in graduationYearOptions"
-                      :key="year.value"
-                      :label="year.label"
-                      :value="year.value"
-                    />
+                  <el-select v-model="userInfo.graduationYear" placeholder="请选择毕业年份" style="width: 100%">
+                    <el-option v-for="year in graduationYearOptions" :key="year.value" :label="year.label"
+                      :value="year.value" />
                   </el-select>
                 </el-form-item>
               </el-col>
               <el-col :span="12">
                 <el-form-item label="邮箱">
-                  <el-input v-model="profileForm.email" placeholder="请输入邮箱">
+                  <el-input v-model="userInfo.email" placeholder="请输入邮箱">
                     <template #prefix>
-                      <el-icon><Key /></el-icon>
+                      <el-icon>
+                        <Key />
+                      </el-icon>
                     </template>
                   </el-input>
                 </el-form-item>
@@ -205,18 +201,22 @@ onMounted(() => {
             <el-row :gutter="20">
               <el-col :span="12">
                 <el-form-item label="手机号">
-                  <el-input v-model="profileForm.phone" placeholder="请输入手机号">
+                  <el-input v-model="userInfo.phone" placeholder="请输入手机号">
                     <template #prefix>
-                      <el-icon><Phone /></el-icon>
+                      <el-icon>
+                        <Phone />
+                      </el-icon>
                     </template>
                   </el-input>
                 </el-form-item>
               </el-col>
               <el-col :span="12">
                 <el-form-item label="GitHub">
-                  <el-input v-model="profileForm.github" placeholder="请输入 GitHub 地址">
+                  <el-input v-model="userInfo.github" placeholder="请输入 GitHub 地址">
                     <template #prefix>
-                      <el-icon><Link /></el-icon>
+                      <el-icon>
+                        <Link />
+                      </el-icon>
                     </template>
                   </el-input>
                 </el-form-item>
@@ -224,22 +224,21 @@ onMounted(() => {
             </el-row>
 
             <el-form-item label="个人简介">
-              <el-input
-                v-model="profileForm.bio"
-                type="textarea"
-                :rows="3"
-                placeholder="请简单介绍自己，包括学习经历、项目经验、职业规划等"
-              />
+              <el-input v-model="userInfo.bio" type="textarea" :rows="3" placeholder="请简单介绍自己，包括学习经历、项目经验、职业规划等" />
             </el-form-item>
           </el-form>
 
           <div class="form-actions" v-if="isEditing">
             <el-button type="primary" @click="saveProfile">
-              <el-icon><Check /></el-icon>
+              <el-icon>
+                <Check />
+              </el-icon>
               保存修改
             </el-button>
             <el-button @click="cancelEdit">
-              <el-icon><Close /></el-icon>
+              <el-icon>
+                <Close />
+              </el-icon>
               取消
             </el-button>
           </div>
@@ -249,7 +248,9 @@ onMounted(() => {
         <el-card class="ability-card" shadow="hover">
           <template #header>
             <div class="card-header">
-              <el-icon :size="20"><TrendCharts /></el-icon>
+              <el-icon :size="20">
+                <TrendCharts />
+              </el-icon>
               <span>能力画像预览</span>
             </div>
           </template>
@@ -283,7 +284,9 @@ onMounted(() => {
         <el-card class="privacy-card" shadow="hover">
           <template #header>
             <div class="card-header">
-              <el-icon :size="20"><Lock /></el-icon>
+              <el-icon :size="20">
+                <Lock />
+              </el-icon>
               <span>隐私设置</span>
             </div>
           </template>
@@ -292,11 +295,15 @@ onMounted(() => {
             <h4>简历可见性</h4>
             <el-radio-group v-model="privacySettings.resumeVisibility" class="radio-group">
               <el-radio value="public">
-                <el-icon><Unlock /></el-icon>
+                <el-icon>
+                  <Unlock />
+                </el-icon>
                 公开 - 企业可查看
               </el-radio>
               <el-radio value="private">
-                <el-icon><lock /></el-icon>
+                <el-icon>
+                  <lock />
+                </el-icon>
                 私有 - 仅自己可见
               </el-radio>
             </el-radio-group>
@@ -309,11 +316,15 @@ onMounted(() => {
             <h4>能力画像可见性</h4>
             <el-radio-group v-model="privacySettings.profileVisibility" class="radio-group">
               <el-radio value="public">
-                <el-icon><Unlock /></el-icon>
+                <el-icon>
+                  <Unlock />
+                </el-icon>
                 公开
               </el-radio>
               <el-radio value="private">
-                <el-icon><lock /></el-icon>
+                <el-icon>
+                  <lock />
+                </el-icon>
                 私有
               </el-radio>
             </el-radio-group>
@@ -326,11 +337,15 @@ onMounted(() => {
             <h4>职业路径可见性</h4>
             <el-radio-group v-model="privacySettings.careerPathVisibility" class="radio-group">
               <el-radio value="public">
-                <el-icon><Unlock /></el-icon>
+                <el-icon>
+                  <Unlock />
+                </el-icon>
                 公开
               </el-radio>
               <el-radio value="private">
-                <el-icon><lock /></el-icon>
+                <el-icon>
+                  <lock />
+                </el-icon>
                 私有
               </el-radio>
             </el-radio-group>
@@ -357,7 +372,9 @@ onMounted(() => {
 
           <div class="save-section">
             <el-button type="primary" @click="savePrivacy" style="width: 100%">
-              <el-icon><Check /></el-icon>
+              <el-icon>
+                <Check />
+              </el-icon>
               保存隐私设置
             </el-button>
           </div>
