@@ -34,18 +34,12 @@ import {
 import CareerFormUpload from '@/components/CareerForm_Upload.vue'
 import Quenation from '@/components/Quenation.vue'
 import { submitCareerFormApi, convertToSubmitDTO } from '@/api/career-form/formdata'
-import type { CareerFormData, JobMatchResult } from '@/types/type'
+import { submitQuiz, getQuestionsApi } from '@/api/career-form/questions'
+import type { CareerFormData } from '@/types/careerform_report'
+import type { Question } from '@/types/careerform_question'
+import type { JobMatchResult } from '@/types/job-match'
 import {
-  majorOptions,
-  communicationQuestions,
-  stressQuestions,
-  learningQuestions,
-  pythonQuestions,
-  javaQuestions,
-  cppQuestions,
-  gitQuestions,
-  dockerQuestions,
-  getRandomQuestion
+  majorOptions
 } from '@/mock/mockdata/CareerForm_mockdata'
 
 
@@ -93,6 +87,8 @@ const showProjectDialog = ref(false)
 
 /** 控制实践经历弹窗显示/隐藏 */
 const showInternshipDialog = ref(false)
+
+
 
 /** 项目经历弹窗表单数据 */
 const projectForm = reactive({
@@ -159,9 +155,9 @@ const profileCompleteness = computed(() => {
 
   // 素质测评项
   const quizItems = [
-    formData.scores.communication,
-    formData.scores.stress,
-    formData.scores.learning,
+    quizCompleted.communication,
+    quizCompleted.stress,
+    quizCompleted.learning,
     !!formData.innovation
   ]
   total += quizItems.length
@@ -176,6 +172,15 @@ const profileCompleteness = computed(() => {
   completed += careerItems.filter(Boolean).length
 
   return Math.round((completed / total) * 100)
+})
+
+
+// --- 素质测评完成状态（独立于表单数据） ---
+
+const quizCompleted = reactive({
+  communication: false,
+  stress: false,
+  learning: false
 })
 
 
@@ -206,8 +211,8 @@ const formData = reactive<CareerFormData>({
   projects: [],
   /** 实习经历列表：每项包含公司、职位、日期范围、描述 */
   internships: [],
-  /** 素质测评完成状态：沟通/抗压/学习能力 */
-  scores: { communication: false, stress: false, learning: false },
+  /** 素质测评分数（沟通/抗压/学习，各0-100） */
+  quizScores: { communication: 0, stress: 0, learning: 0 },
   /** 创新案例描述：用户填写的创新经历 */
   innovation: '',
   /** 目标岗位：用户期望的职位名称 */
@@ -259,14 +264,6 @@ const formProgress = computed(() => {
 })
 
 
-/**
- * 判断用户是否选择了计算机相关专业
- * 用于显示/隐藏代码能力相关表单项
- */
-const isComputerMajor = computed(() => {
-  const majorStr = JSON.stringify(formData.major)
-  return majorStr.includes('计算机') || majorStr.includes('软件')
-})
 
 /**
  * 判断指定步骤是否已完成
@@ -288,7 +285,7 @@ const isStepCompleted = (step: number) => {
     case 3:
       return !!(formData.projects.length > 0 || formData.internships.length > 0)
     case 4:
-      return !!(formData.scores.communication && formData.scores.stress && formData.scores.learning && formData.innovation)
+      return !!(quizCompleted.communication && quizCompleted.stress && quizCompleted.learning && formData.innovation)
     case 5:
       return !!(formData.targetJob && formData.targetIndustries.length > 0)
     default:
@@ -396,10 +393,20 @@ const handleCertificateChange = (value: string[]) => {
 /** 
  * 添加新技能
  * 将 newSkill 输入框的值添加到技能列表，默认熟练度为50
+ * 检查是否已存在（不区分大小写）
  */
 const addSkill = () => {
   if (newSkill.value) {
-    formData.skills.push({ name: newSkill.value, credibility: 50 })
+    const skillName = newSkill.value.trim()
+    // 检查是否已存在（不区分大小写）
+    const isDuplicate = formData.skills.some(
+      skill => skill.name.toLowerCase() === skillName.toLowerCase()
+    )
+    if (isDuplicate) {
+      ElMessage.warning(`技能 "${skillName}" 已经添加过了`)
+      return
+    }
+    formData.skills.push({ name: skillName, score: 50 })
     newSkill.value = ''
   }
 }
@@ -437,10 +444,20 @@ const removeSkill = (index: number) => {
 /**
  * 添加新工具
  * 将 newTool 输入框的值添加到工具列表，默认熟练程度为"熟练"
+ * 检查是否已存在（不区分大小写）
  */
 const addTool = () => {
   if (newTool.value) {
-    formData.tools.push({ name: newTool.value, proficiency: '熟练' })
+    const toolName = newTool.value.trim()
+    // 检查是否已存在（不区分大小写）
+    const isDuplicate = formData.tools.some(
+      tool => tool.name.toLowerCase() === toolName.toLowerCase()
+    )
+    if (isDuplicate) {
+      ElMessage.warning(`工具 "${toolName}" 已经添加过了`)
+      return
+    }
+    formData.tools.push({ name: toolName, score: 50 })
     newTool.value = ''
   }
 }
@@ -849,77 +866,18 @@ const currentTestIndex = ref(-1)
  * @param type - 测试类型
  * @param name - 技能/工具名称
  */
-const fetchQuizData = async (type: string, name: string): Promise<BackendQuizData> => {
-  // TODO: 替换为实际的API调用
-  // const res = await request.get(`/api/quiz/${type}`, { params: { name } })
-  // return res.data
-
-  // 模拟API调用
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      // 根据类型返回模拟数据
-      const mockData: BackendQuizData = {
-        tool: name,
-        total_questions: 5,
-        questions: [
-          {
-            id: 1,
-            type: 'choice',
-            content: `关于 ${name} 的基础知识，以下哪个选项是正确的？`,
-            options: [
-              'A. 这是第一个选项的内容',
-              'B. 这是第二个选项的内容',
-              'C. 这是第三个选项的内容',
-              'D. 这是第四个选项的内容'
-            ],
-            correct_answer: 'B',
-            difficulty: 'easy'
-          },
-          {
-            id: 2,
-            type: 'choice',
-            content: `在使用 ${name} 时，遇到 xxx 情况应该如何处理？`,
-            options: [
-              'A. 采用方案一进行处理',
-              'B. 采用方案二进行处理',
-              'C. 采用方案三进行处理',
-              'D. 以上都不对'
-            ],
-            correct_answer: 'C',
-            difficulty: 'medium'
-          },
-          {
-            id: 3,
-            type: 'fill_in',
-            content: `在 ${name} 中，使用 {{answer}} 命令可以实现快速创建新项目的功能。`,
-            options: null,
-            correct_answer: 'init',
-            difficulty: 'medium'
-          },
-          {
-            id: 4,
-            type: 'fill_in',
-            content: `${name} 的配置文件中，{{answer}} 字段用于指定项目的入口文件。`,
-            options: null,
-            correct_answer: 'main',
-            difficulty: 'hard'
-          },
-          {
-            id: 5,
-            type: 'open_ended',
-            content: `请结合实际项目经验，描述你在使用 ${name} 时遇到的一个复杂问题，以及你是如何分析和解决这个问题的。`,
-            options: null,
-            correct_answer: null,
-            evaluation_criteria: `1. 问题描述清晰，背景交代完整（2分）
-2. 分析思路合理，逻辑清晰（2分）
-3. 解决方案具体可行（2分）`,
-            difficulty: 'hard'
-          }
-        ]
-      }
-      resolve(mockData)
-    }, 500)
-  })
+const fetchQuizData = async (type: string, name?: string): Promise<BackendQuizData> => {
+  const params = {
+    quizType: type as any,
+    ...(name ? { title: name } : {})
+  }
+  const res = await getQuestionsApi(params)
+  // 后端返回 Result<QuizResponse> 格式
+  const result = res.data as any
+  if (result.code !== 200) {
+    throw new Error(result.msg || '获取题目失败')
+  }
+  return result.data
 }
 
 /**
@@ -928,7 +886,7 @@ const fetchQuizData = async (type: string, name: string): Promise<BackendQuizDat
  * @param type - 测试类型：skill(技能) / tool(工具) / code(代码)
  * @param index - 可选，测试项的索引
  */
-const openTestModal = async (type: 'skill' | 'tool' | 'code', index?: number) => {
+const openTestModal = async (type: 'skill' | 'tool', index?: number) => {
   // 保存当前测试的技能信息
   let name = ''
   if (type === 'skill' && index !== undefined) {
@@ -936,23 +894,23 @@ const openTestModal = async (type: 'skill' | 'tool' | 'code', index?: number) =>
     currentTestSkill.value = name
     currentTestIndex.value = index
     testDialog.title = `${name} 技能测试`
+
   } else if (type === 'tool' && index !== undefined) {
     name = formData.tools[index]?.name || ''
     currentTestSkill.value = name
     currentTestIndex.value = index
     testDialog.title = `${name} 工具测试`
-  } else {
-    name = '代码能力'
-    currentTestSkill.value = ''
-    currentTestIndex.value = -1
-    testDialog.title = '代码能力测试'
-  }
+  } 
 
   testDialog.type = type
   testDialog.currentIndex = index ?? -1
   testDialog.loading = true
   testDialog.visible = true
   backendQuizData.value = null
+
+
+  console.log("类型",type)
+  console.log("名称",name)
 
   try {
     // 从后端获取题目数据
@@ -973,12 +931,16 @@ const openTestModal = async (type: 'skill' | 'tool' | 'code', index?: number) =>
  * 使用Quenation组件展示完整问卷
  * @param type - 测评类型：communication(沟通) / stress(抗压) / learning(学习)
  */
-const openQuizModal = async (type: 'communication' | 'stress' | 'learning') => {
+const openQuizModal = async (type: 'code' | 'communication' | 'stress' | 'learning') => {
   currentQuizType.value = type
   testDialog.type = type
 
+  console.log('类别', type)
+
+
   // 测评标题映射
   const titles: Record<string, string> = {
+    'code': '代码能力测评',
     'communication': '沟通能力测评',
     'stress': '抗压能力测评',
     'learning': '学习能力测评'
@@ -990,9 +952,13 @@ const openQuizModal = async (type: 'communication' | 'stress' | 'learning') => {
   testDialog.visible = true
   backendQuizData.value = null
 
+
+
+
+
   try {
-    // 从后端获取题目数据
-    const quizData = await fetchQuizData(type, titles[type] || '素质测评')
+    // 从后端获取题目数据（openQuizModal的类型不需要name参数）
+    const quizData = await fetchQuizData(type)
     backendQuizData.value = quizData
   } catch (error) {
     console.error('获取题目失败:', error)
@@ -1006,72 +972,69 @@ const openQuizModal = async (type: 'communication' | 'stress' | 'learning') => {
 
 /**
  * 处理问卷提交完成
- * 根据测试类型更新相应的熟练度或完成状态
- * @param submitData - 问卷提交的数据
+ * 根据测试类型更新相应的分数或完成状态
+ * @param submitData - 问卷提交的数据 { quizType, answers }
  */
-const handleQuizSubmit = (submitData: any) => {
-  const { quizType } = submitData
-  
-  // 技能测试：提升熟练度
-  if (quizType === 'skill' && currentTestIndex.value >= 0) {
-    const skill = formData.skills[currentTestIndex.value]
-    if (skill) {
-      // 根据答题情况提升熟练度（简单逻辑：完成即提升）
-      skill.credibility = Math.min(100, (skill.credibility || 50) + 15)
-      ElMessage.success(`${skill.name} 技能测试完成！熟练度提升至 ${skill.credibility}%`)
-    }
-    testDialog.visible = false
-    currentTestSkill.value = ''
-    currentTestIndex.value = -1
-    return
+const handleQuizSubmit = async (submitData: any) => {
+  const { quizType, answers } = submitData
+
+  // 准备用户答案映射 { questionId: answer }
+  const userAnswers: Record<number, string> = {}
+  Object.entries(answers || {}).forEach(([key, value]) => {
+    const match = key.match(/q_(\d+)/)
+    if (match && match[1]) userAnswers[parseInt(match[1])] = value as string
+  })
+
+  try {
+    const result = await submitQuiz({
+      quizType,
+      name: ['skill', 'tool'].includes(quizType) ? currentTestSkill.value || '' : undefined,
+      questions: (backendQuizData.value?.questions || []) as Question[],
+      userAnswers
+    })
+
+    // 更新分数并提示
+    updateQuizScore(quizType, result.totalScore)
+    ElMessage.success(`${getQuizTypeName(quizType)}完成！得分：${result.totalScore}分`)
+  } catch (error) {
+    console.error('提交问卷失败:', error)
+    ElMessage.error('提交失败，请稍后重试')
+  } finally {
+    closeTestDialog()
   }
-  
-  // 工具测试：提升熟练度
-  if (quizType === 'tool' && currentTestIndex.value >= 0) {
-    const tool = formData.tools[currentTestIndex.value]
-    if (tool) {
-      const proficiencyMap: Record<string, number> = {
-        '了解': 25,
-        '熟练': 50,
-        '精通': 75
-      }
-      const currentValue = proficiencyMap[tool.proficiency] || 50
-      const newValue = Math.min(100, currentValue + 15)
-      // 转换回文字描述
-      if (newValue >= 75) tool.proficiency = '精通'
-      else if (newValue >= 50) tool.proficiency = '熟练'
-      else tool.proficiency = '了解'
-      ElMessage.success(`${tool.name} 工具测试完成！当前掌握程度：${tool.proficiency}`)
-    }
-    testDialog.visible = false
-    currentTestSkill.value = ''
-    currentTestIndex.value = -1
-    return
-  }
-  
-  // 代码能力测试：标记代码能力已评估
-  if (quizType === 'code') {
-    ElMessage.success('代码能力测试完成！')
-    testDialog.visible = false
-    return
-  }
-  
-  // 素质测评：标记为已完成
-  if (['communication', 'stress', 'learning'].includes(quizType)) {
-    formData.scores[quizType as keyof typeof formData.scores] = true
-    const typeNames: Record<string, string> = {
-      'communication': '沟通能力',
-      'stress': '抗压能力',
-      'learning': '学习能力'
-    }
-    ElMessage.success(`${typeNames[quizType]}测评完成！`)
+}
+
+/**
+ * 更新测试分数到表单数据
+ */
+const updateQuizScore = (quizType: string, score: number) => {
+  const index = currentTestIndex.value
+
+  if (quizType === 'skill' && index >= 0 && formData.skills[index]) {
+    formData.skills[index].score = score
+  } else if (quizType === 'tool' && index >= 0 && formData.tools[index]) {
+    formData.tools[index].score = score
+  } else if (['communication', 'stress', 'learning'].includes(quizType)) {
+    if (!formData.quizScores) formData.quizScores = { communication: 0, stress: 0, learning: 0 }
+    formData.quizScores[quizType as keyof typeof formData.quizScores] = score
+    quizCompleted[quizType as keyof typeof quizCompleted] = true
     currentQuizType.value = ''
-    testDialog.visible = false
-    return
   }
-  
-  // 默认关闭
-  testDialog.visible = false
+}
+
+/**
+ * 获取测试类型名称
+ */
+const getQuizTypeName = (quizType: string): string => {
+  const names: Record<string, string> = {
+    'skill': currentTestSkill.value || '技能',
+    'tool': currentTestSkill.value || '工具',
+    'code': '代码能力',
+    'communication': '沟通能力',
+    'stress': '抗压能力',
+    'learning': '学习能力'
+  }
+  return names[quizType] || quizType
 }
 
 /**
@@ -1224,15 +1187,16 @@ const fillFormWithParsedData = (parsedFormData: any) => {
   if (parsedFormData.skills && Array.isArray(parsedFormData.skills)) {
     formData.skills = parsedFormData.skills.map((s: any) => ({
       name: s.name || s,
-      credibility: s.credibility || 70
+      score: s.score ?? s.credibility ?? 70
     }))
   }
 
   // 填充工具
   if (parsedFormData.tools && Array.isArray(parsedFormData.tools)) {
+    const proficiencyMap: Record<string, number> = { '了解': 25, '熟练': 50, '精通': 75 }
     formData.tools = parsedFormData.tools.map((t: any) => ({
       name: t.name || t,
-      proficiency: t.proficiency || '了解'
+      score: t.score ?? (t.proficiency ? proficiencyMap[t.proficiency] : undefined) ?? 50
     }))
   }
 
@@ -1261,12 +1225,16 @@ const fillFormWithParsedData = (parsedFormData: any) => {
   }
 
   // 填充素质测评分数
-  if (parsedFormData.scores && typeof parsedFormData.scores === 'object') {
-    formData.scores = {
-      communication: parsedFormData.scores.communication || false,
-      stress: parsedFormData.scores.stress || false,
-      learning: parsedFormData.scores.learning || false
+  if (parsedFormData.quizScores && typeof parsedFormData.quizScores === 'object') {
+    formData.quizScores = {
+      communication: parsedFormData.quizScores.communication || 0,
+      stress: parsedFormData.quizScores.stress || 0,
+      learning: parsedFormData.quizScores.learning || 0
     }
+    // 如果分数大于0，标记对应测评为已完成
+    quizCompleted.communication = !!parsedFormData.quizScores.communication
+    quizCompleted.stress = !!parsedFormData.quizScores.stress
+    quizCompleted.learning = !!parsedFormData.quizScores.learning
   }
 
   // 填充创新案例
@@ -1302,34 +1270,21 @@ const handleResumeParsed = (parsedData: unknown) => {
   hasUploadedResume.value = true
   showUploadDialog.value = false
 
-  // 后端直接返回表单数据格式
   const formDataFromResume = parsedData as Record<string, unknown> | null
-
-  // 检查是否有有效数据（至少有一个字段有值）
-  const hasValidData = formDataFromResume && Object.keys(formDataFromResume).some(key => {
-    const value = formDataFromResume[key]
-    if (Array.isArray(value)) return value.length > 0
-    if (typeof value === 'object' && value !== null) return Object.keys(value).length > 0
-    return !!value
-  })
-
-  if (hasValidData) {
-    // 直接填充表单数据
-    fillFormWithParsedData(formDataFromResume)
-    ElMessage.success('简历解析成功！已自动填充表单信息')
-
-    // 检查必填字段
-    const missingFields = checkRequiredFields()
-
-    // 显示缺失字段提醒
-    setTimeout(() => {
-      showMissingFieldsReminder(missingFields)
-    }, 500)
-  } else {
+  if (!formDataFromResume) {
     ElMessage.warning('简历解析结果为空，请手动填写表单')
+    return
+  }
+
+  fillFormWithParsedData(formDataFromResume)
+  ElMessage.success('简历解析成功！已自动填充表单信息')
+
+  // 检查并提示缺失的必填字段
+  const missingFields = checkRequiredFields()
+  if (missingFields.length > 0) {
+    setTimeout(() => showMissingFieldsReminder(missingFields), 500)
   }
 }
-
 
 // --- 岗位联想搜索 ---
 
@@ -1385,8 +1340,6 @@ const formRules = reactive<FormRules>({
 })
 
 
-
-
 /**
  * 获取模拟人岗匹配结果
  */
@@ -1402,52 +1355,32 @@ const fetchMockJobMatchResult = async (): Promise<JobMatchResult> => {
 const submitForm = async () => {
   if (!formRef.value) return
 
-  await formRef.value.validate(async (valid) => {
-    if (!valid) {
-      ElMessage.error('请完善必填信息')
+  const valid = await formRef.value.validate().catch(() => false)
+  if (!valid) {
+    ElMessage.error('请完善必填信息')
+    return
+  }
+
+  submitting.value = true
+  try {
+    const submitData = convertToSubmitDTO(formData)
+    const res = await submitCareerFormApi(submitData)
+
+    if (res.data?.code !== 200) {
+      ElMessage.error(res.data?.msg || '提交失败，请稍后重试')
       return
     }
 
-    submitting.value = true
-
-    try {
-      // 转换表单数据为提交格式
-      const submitData = convertToSubmitDTO(formData)
-
-      // 调用API提交表单，后端直接返回人岗匹配结果
-      const res = await submitCareerFormApi(submitData)
-
-      if (res.data?.code === 200 && res.data.data) {
-        const matchResult = res.data.data as JobMatchResult
-
-        // 保存人岗匹配结果到本地存储，供JobMatching页面使用
-        localStorage.setItem('jobMatchResult', JSON.stringify(matchResult))
-
-        ElMessage.success('人岗匹配分析完成！')
-        console.log('【后端返回】人岗匹配结果:', matchResult)
-
-        // 直接跳转到人岗匹配页面
-        router.push('/job-matching')
-      } else {
-        // 安全获取错误信息
-        const errorMsg = res.data?.msg || '提交失败，请稍后重试'
-        ElMessage.error(errorMsg)
-      }
-    } catch (error: any) {
-      console.error('提交表单或获取人岗匹配失败:', error)
-      ElMessage.error(error.message || '网络错误，请稍后重试')
-
-      // 后端调用失败，降级使用模拟数据（便于演示）
-      console.warn('后端调用失败，降级使用模拟数据')
-      const mockResult = await fetchMockJobMatchResult()
-      localStorage.setItem('jobMatchResult', JSON.stringify(mockResult))
-
-      // 即使出错也跳转到人岗匹配页面（使用模拟数据）
-      router.push('/job-matching')
-    } finally {
-      submitting.value = false
-    }
-  })
+    const matchResult = res.data.data as JobMatchResult
+    localStorage.setItem('jobMatchResult', JSON.stringify(matchResult))
+    ElMessage.success('人岗匹配分析完成！')
+    router.push('/job-matching')
+  } catch (error: any) {
+    console.error('提交失败:', error)
+    ElMessage.error(error.message || '网络错误，请稍后重试')
+  } finally {
+    submitting.value = false
+  }
 }
 
 /**
@@ -1504,7 +1437,10 @@ const resetForm = () => {
   formData.tools = []
   formData.projects = []
   formData.internships = []
-  formData.scores = { communication: false, stress: false, learning: false }
+  formData.quizScores = { communication: 0, stress: 0, learning: 0 }
+  quizCompleted.communication = false
+  quizCompleted.stress = false
+  quizCompleted.learning = false
   formData.priorities = [
     { value: 'tech', label: '技术成长' },
     { value: 'salary', label: '薪资' },
@@ -1833,9 +1769,9 @@ const resetForm = () => {
                     class="skill-item"
                   >
                     <span class="skill-name">{{ skill.name }}</span>
-                    <el-progress 
-                      :percentage="skill.credibility" 
-                      status="success" 
+                    <el-progress
+                      :percentage="skill.score || 0"
+                      status="success"
                       style="width: 120px"
                       :stroke-width="8"
                     />
@@ -1888,7 +1824,7 @@ const resetForm = () => {
                   />
                   <el-button 
                     type="warning" 
-                    @click="openTestModal('code')"
+                    @click="openQuizModal('code')"
                     :icon="DataAnalysis"
                   >
                     AI 测试
@@ -1983,36 +1919,36 @@ const resetForm = () => {
                 <el-col :span="8">
                   <el-form-item label="沟通能力">
                     <el-button 
-                      :type="formData.scores.communication ? 'success' : 'default'" 
-                      :class="formData.scores.communication ? 'quiz-complete' : 'quiz-pending'"
+                      :type="quizCompleted.communication ? 'success' : 'default'" 
+                      :class="quizCompleted.communication ? 'quiz-complete' : 'quiz-pending'"
                       @click="openQuizModal('communication')"
                     >
-                      <el-icon v-if="formData.scores.communication"><Check /></el-icon>
-                      {{ formData.scores.communication ? '已完成' : '开始测试' }}
+                      <el-icon v-if="quizCompleted.communication"><Check /></el-icon>
+                      {{ quizCompleted.communication ? '已完成' : '开始测试' }}
                     </el-button>
                   </el-form-item>
                 </el-col>
                 <el-col :span="8">
                   <el-form-item label="抗压能力">
                     <el-button 
-                      :type="formData.scores.stress ? 'success' : 'default'" 
-                      :class="formData.scores.stress ? 'quiz-complete' : 'quiz-pending'"
+                      :type="quizCompleted.stress ? 'success' : 'default'" 
+                      :class="quizCompleted.stress ? 'quiz-complete' : 'quiz-pending'"
                       @click="openQuizModal('stress')"
                     >
-                      <el-icon v-if="formData.scores.stress"><Check /></el-icon>
-                      {{ formData.scores.stress ? '已完成' : '开始测试' }}
+                      <el-icon v-if="quizCompleted.stress"><Check /></el-icon>
+                      {{ quizCompleted.stress ? '已完成' : '开始测试' }}
                     </el-button>
                   </el-form-item>
                 </el-col>
                 <el-col :span="8">
                   <el-form-item label="学习能力">
                     <el-button 
-                      :type="formData.scores.learning ? 'success' : 'default'" 
-                      :class="formData.scores.learning ? 'quiz-complete' : 'quiz-pending'"
+                      :type="quizCompleted.learning ? 'success' : 'default'" 
+                      :class="quizCompleted.learning ? 'quiz-complete' : 'quiz-pending'"
                       @click="openQuizModal('learning')"
                     >
-                      <el-icon v-if="formData.scores.learning"><Check /></el-icon>
-                      {{ formData.scores.learning ? '已完成' : '开始测试' }}
+                      <el-icon v-if="quizCompleted.learning"><Check /></el-icon>
+                      {{ quizCompleted.learning ? '已完成' : '开始测试' }}
                     </el-button>
                   </el-form-item>
                 </el-col>
@@ -2179,9 +2115,9 @@ const resetForm = () => {
         <p>正在加载题目...</p>
         <el-progress :percentage="50" :stroke-width="8" :indeterminate="true" />
       </div>
-      <!-- 问卷内容 -->
+      <!-- 问卷内容 - 确保数据加载完成后再渲染 -->
       <Quenation
-        v-else
+        v-else-if="backendQuizData"
         ref="quenationRef"
         :title="testDialog.title"
         :quiz-type="testDialog.type"

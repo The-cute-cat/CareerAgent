@@ -203,7 +203,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, watch } from 'vue'
+import { ref, reactive, computed, watch, onMounted } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
@@ -551,7 +551,7 @@ const currentQuestions = computed<QuestionSet>(() => {
 /** 表单是否填写完整 */
 const isFormComplete = computed(() => {
   // 后端数据模式
-  if (props.backendData) {
+  if (props.backendData?.questions && Array.isArray(props.backendData.questions)) {
     return props.backendData.questions.every(q => {
       const answer = formData[`q_${q.id}`]
       return answer && answer.trim() !== ''
@@ -561,9 +561,9 @@ const isFormComplete = computed(() => {
   return !!(
     formData.single1 &&
     formData.single2 &&
-    formData.fill1.trim() &&
-    formData.fill2.trim() &&
-    formData.essay.trim()
+    formData.fill1?.trim() &&
+    formData.fill2?.trim() &&
+    formData.essay?.trim()
   )
 })
 
@@ -619,8 +619,8 @@ const parseFillInContent = (content: string): string => {
 /** 表单引用 */
 const formRef = ref<FormInstance>()
 
-/** 表单数据 */
-const formData = reactive<QuestionnaireForm>({
+/** 表单数据 - 使用 Record 类型支持动态字段 */
+const formData = reactive<Record<string, string>>({
   single1: '',
   single2: '',
   fill1: '',
@@ -642,9 +642,18 @@ watch(() => props.quizType, () => {
 })
 
 /** 监听backendData变化，初始化表单 */
-watch(() => props.backendData, () => {
-  initFormData()
-}, { immediate: true })
+watch(() => props.backendData, (newVal) => {
+  if (newVal) {
+    initFormData()
+  }
+})
+
+/** 组件挂载时初始化表单 */
+onMounted(() => {
+  if (props.backendData) {
+    initFormData()
+  }
+})
 
 // ==================== 表单验证规则 ====================
 
@@ -659,10 +668,10 @@ const validateNotEmpty = (rule: any, value: string, callback: any) => {
 
 
 /** 动态表单验证规则 */
-const formRules = computed<FormRules<QuestionnaireForm>>(() => {
+const formRules = computed<FormRules>(() => {
   // 后端数据模式：动态生成规则
-  if (props.backendData) {
-    const rules: FormRules<QuestionnaireForm> = {}
+  if (props.backendData?.questions && Array.isArray(props.backendData.questions)) {
+    const rules: FormRules = {}
     props.backendData.questions.forEach(q => {
       const key = `q_${q.id}`
       if (q.type === 'choice') {
@@ -736,21 +745,21 @@ const handleSubmit = async () => {
     try {
       // 构造提交数据
       let answers: Record<string, string> = {}
-      
-      if (props.backendData) {
+
+      if (props.backendData?.questions && Array.isArray(props.backendData.questions)) {
         // 后端数据模式：收集所有答案
         props.backendData.questions.forEach(q => {
           answers[`q_${q.id}`] = formData[`q_${q.id}`] || ''
         })
-      } else {
-        // 默认模式
-        answers = {
-          single1: formData.single1,
-          single2: formData.single2,
-          fill1: formData.fill1,
-          fill2: formData.fill2,
-          essay: formData.essay
-        }
+      }
+      // 默认模式
+      answers = {
+        ...answers,
+        single1: formData.single1 || '',
+        single2: formData.single2 || '',
+        fill1: formData.fill1 || '',
+        fill2: formData.fill2 || '',
+        essay: formData.essay || ''
       }
       
       const submitData: SubmitData = {
@@ -805,19 +814,19 @@ const submitToBackend = (data: SubmitData): Promise<{ success: boolean; id?: str
 /** 重置表单 */
 const handleReset = () => {
   // 清空表单数据
-  if (props.backendData) {
+  if (props.backendData?.questions && Array.isArray(props.backendData.questions)) {
     // 后端数据模式：清空动态字段
     props.backendData.questions.forEach(q => {
       formData[`q_${q.id}`] = ''
     })
-  } else {
-    // 默认模式
-    formData.single1 = ''
-    formData.single2 = ''
-    formData.fill1 = ''
-    formData.fill2 = ''
-    formData.essay = ''
   }
+  // 默认模式
+  formData.single1 = ''
+  formData.single2 = ''
+  formData.fill1 = ''
+  formData.fill2 = ''
+  formData.essay = ''
+
   submitSuccess.value = false
   // 触发表单重置验证
   formRef.value?.resetFields()
@@ -825,10 +834,11 @@ const handleReset = () => {
 
 /** 初始化表单数据（用于后端数据模式） */
 const initFormData = () => {
-  if (props.backendData) {
+  if (props.backendData?.questions && Array.isArray(props.backendData.questions)) {
     props.backendData.questions.forEach(q => {
-      if (!(q.id in formData)) {
-        formData[`q_${q.id}`] = ''
+      const key = `q_${q.id}`
+      if (!(key in formData)) {
+        formData[key] = ''
       }
     })
   }

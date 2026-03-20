@@ -4,7 +4,7 @@ import { ElNotification } from 'element-plus'
 
 import { ref, reactive } from 'vue'
 import { ElMessage } from 'element-plus'
-import type { LoginFormDTO } from '@/types/type'
+import type { LoginFormDTO } from '@/types/user'
 import { userLoginService } from '@/api/user/user'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores'

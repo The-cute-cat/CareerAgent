@@ -11,6 +11,10 @@ import type {
   SubmitQuizResult,
   AnswerStats
 } from '@/types/careerform_question'
+import { 
+  mockGetQuestionsResponse, 
+  mockSubmitOpenEndedResponse 
+} from '@/mock/mockdata/question_mockdata'
 
 /**
  * 测验总分计算结果
@@ -38,22 +42,45 @@ export interface QuizTotalResult {
 
 /**
  * 获取测试题目
+ * 使用模拟数据（开发阶段），生产环境请切换为真实 API
  */
 export const getQuestionsApi = (params: GetQuestionsParams) => {
-  const requestData: GetQuestionsRequest = {
-    type: params.quizType,
-    name: (params.quizType === 'skill' || params.quizType === 'tool') 
-      ? params.title 
-      : undefined
-  }
-  return request.get<QuizResponse>('/api/quiz/questions', { params: requestData })
+  // 模拟 API 调用
+  return new Promise<{ data: any }>((resolve) => {
+    setTimeout(() => {
+      const response = mockGetQuestionsResponse(
+        params.quizType,
+        (params.quizType === 'skill' || params.quizType === 'tool') ? params.title : undefined
+      )
+      resolve({ data: response })
+    }, 500)
+  })
+
+  // 真实 API（生产环境使用）
+  // const requestData: GetQuestionsRequest = {
+  //   type: params.quizType,
+  //   name: (params.quizType === 'skill' || params.quizType === 'tool') 
+  //     ? params.title 
+  //     : undefined
+  // }
+  // return request.get<QuizResponse>('/api/quiz/questions', { params: requestData })
 }
 
 /**
  * 提交问答题，获取问答题评分
+ * 使用模拟数据（开发阶段），生产环境请切换为真实 API
  */
 export const submitOpenEndedApi = (data: SubmitOpenEndedParams) => {
-  return request.post<OpenEndedScoreResult>('/api/quiz/open-ended-score', data)
+  // 模拟 API 调用
+  return new Promise<{ data: any }>((resolve) => {
+    setTimeout(() => {
+      const response = mockSubmitOpenEndedResponse(data.answer)
+      resolve({ data: response })
+    }, 800)
+  })
+
+  // 真实 API（生产环境使用）
+  // return request.post<OpenEndedScoreResult>('/api/quiz/open-ended-score', data)
 }
 
 

@@ -2,7 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import * as echarts from 'echarts'
-import { Warning, Lock } from '@element-plus/icons-vue'
+import { Warning, Lock, DataLine } from '@element-plus/icons-vue'
 import { quickActions, homeRadarData } from '@/mock/data'
 import { useUserStore } from '@/stores/modules/user'
 

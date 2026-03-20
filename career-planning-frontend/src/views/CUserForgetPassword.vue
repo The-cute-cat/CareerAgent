@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import type { LoginFormDTO } from '@/types/type'
+import type { LoginFormDTO } from '@/types/user'
 import { userSendCodeForgetService, userForgetPasswordService } from '@/api/user/user'
 const router = useRouter()
 
