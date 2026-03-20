@@ -38,3 +38,7 @@ export const userSendCodeForgetService = (loginInfo: LoginFormDTO) => {
 export const userGetUserInfoService = () => {
   return request.get('/user/get-user-info')
 }
+
+export const userGetUserBasicFileInfoService = () => {
+  return request.get('/user/get-basic-info')
+}

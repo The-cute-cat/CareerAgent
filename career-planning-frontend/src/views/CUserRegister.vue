@@ -35,7 +35,6 @@ const sendVerificationCode = async () => {
   codeSending.value = true
   try {
     console.log('发送验证码至邮箱:', form.value.email)
-    // 模拟API调用发送验证码
     const res = await userSendCodeRegisterService(form.value) // 这里可以调用实际的发送验证码API
     console.log('验证码发送结果:', res)
     if (res.data.code !== 200) {
@@ -275,11 +274,12 @@ h3.mb-4 {
 
 /* 响应式调整 */
 @media (max-width: 991.98px) {
+
   .wrap .img,
   .wrap .login-wrap {
     width: 100%;
   }
-  
+
   .wrap .img {
     min-height: 180px;
     height: 180px;
