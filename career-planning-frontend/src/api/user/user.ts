@@ -1,7 +1,10 @@
 //API呢是我们用来存放和我们后端对接接口
 import request from '@/utils/request'
 // import { API } from '@/api/user/index'
-import type { LoginFormDTO, Result } from '../../types/type'
+import type { LoginFormDTO } from '../../types/user'
+/** 通用响应结果 */
+import type {  Result } from "../../types/type"
+
 
 // 用户登录接口 -maq
 export interface LoginResponse {

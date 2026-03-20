@@ -1,6 +1,5 @@
 
 import axios from 'axios'
-import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/index'
 import router from '@/router' // 直接导入实例，不需要 hooks
 // 在 request.ts 顶部定义一个标志
@@ -12,7 +11,7 @@ let isRefreshing = false
 const baseURL = '/api'
 const instance = axios.create({
   baseURL,
-  timeout: 10000, // 请求超时时间(毫秒)
+  timeout: 15000, // AI解析可能需要较长时间，改为 60 秒
 })
 
 // 请求拦截器，自动添加token

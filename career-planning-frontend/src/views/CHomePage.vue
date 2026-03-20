@@ -1,12 +1,18 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import * as echarts from 'echarts'
-import { Warning } from '@element-plus/icons-vue'
+import { Warning, Lock } from '@element-plus/icons-vue'
 import { quickActions, homeRadarData } from '@/mock/data'
+import { useUserStore } from '@/stores/modules/user'
 
 const router = useRouter()
+const userStore = useUserStore()
 const radarChartRef = ref<HTMLElement | null>(null)
+
+// 计算登录状态
+const isLoggedIn = computed(() => userStore.isLoggedIn)
+const userName = computed(() => userStore.userInfo?.nickname || userStore.userInfo?.username || '用户')
 
 
 // 跳转到对应页面
@@ -16,45 +22,56 @@ const navigateTo = (route: string) => {
 
 // 初始化雷达图
 onMounted(() => {
-  if (radarChartRef.value) {
-    const chart = echarts.init(radarChartRef.value)
-    const option = {
-      radar: {
-        indicator: homeRadarData.indicator,
-        radius: '65%',
-        center: ['50%', '55%'],
-        axisName: {
-          color: '#606266',
-          fontSize: 12
-        },
-        splitArea: {
-          areaStyle: {
-            color: ['#f5f7fa', '#fff']
-          }
-        }
-      },
-      series: [{
-        type: 'radar',
-        data: [{
-          value: homeRadarData.value,
-          name: homeRadarData.name,
-          areaStyle: {
-            color: 'rgba(64, 158, 255, 0.3)'
-          },
-          lineStyle: {
-            color: '#409eff',
-            width: 2
-          },
-          itemStyle: {
-            color: '#409eff'
-          }
-        }]
-      }]
-    }
-    chart.setOption(option)
-    window.addEventListener('resize', () => chart.resize())
+  if (radarChartRef.value && isLoggedIn.value) {
+    initRadarChart()
   }
 })
+
+// 初始化雷达图方法
+const initRadarChart = () => {
+  if (!radarChartRef.value) return
+  const chart = echarts.init(radarChartRef.value)
+  const option = {
+    radar: {
+      indicator: homeRadarData.indicator,
+      radius: '65%',
+      center: ['50%', '55%'],
+      axisName: {
+        color: '#606266',
+        fontSize: 12
+      },
+      splitArea: {
+        areaStyle: {
+          color: ['#f5f7fa', '#fff']
+        }
+      }
+    },
+    series: [{
+      type: 'radar',
+      data: [{
+        value: homeRadarData.value,
+        name: homeRadarData.name,
+        areaStyle: {
+          color: 'rgba(64, 158, 255, 0.3)'
+        },
+        lineStyle: {
+          color: '#409eff',
+          width: 2
+        },
+        itemStyle: {
+          color: '#409eff'
+        }
+      }]
+    }]
+  }
+  chart.setOption(option)
+  window.addEventListener('resize', () => chart.resize())
+}
+
+// 跳转到登录页
+const goToLogin = () => {
+  router.push('/login')
+}
 </script>
 
 <template>
@@ -104,13 +121,25 @@ onMounted(() => {
               <span>能力概览</span>
             </div>
           </template>
-          <div ref="radarChartRef" class="radar-chart"></div>
-          <div class="radar-legend">
-            <div class="legend-item">
-              <span class="legend-dot" style="background-color: #409eff;"></span>
-              <span>当前能力评估（基于简历分析）</span>
-            </div>
+          <!-- 未登录状态：显示登录提醒 -->
+          <div v-if="!isLoggedIn" class="login-prompt">
+            <el-icon :size="64" color="#c0c4cc"><Lock /></el-icon>
+            <h3>请先登录</h3>
+            <p>登录后即可查看您的个人能力概览</p>
+            <el-button type="primary" size="large" @click="goToLogin">
+              立即登录
+            </el-button>
           </div>
+          <!-- 已登录状态：显示雷达图 -->
+          <template v-else>
+            <div ref="radarChartRef" class="radar-chart"></div>
+            <div class="radar-legend">
+              <div class="legend-item">
+                <span class="legend-dot" style="background-color: #409eff;"></span>
+                <span>{{ userName }}的能力评估（基于简历分析）</span>
+              </div>
+            </div>
+          </template>
         </el-card>
       </el-col>
 
@@ -271,6 +300,29 @@ onMounted(() => {
   width: 12px;
   height: 12px;
   border-radius: 50%;
+}
+
+/* 登录提示样式 */
+.login-prompt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 320px;
+  gap: 16px;
+}
+
+.login-prompt h3 {
+  margin: 0;
+  color: #606266;
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.login-prompt p {
+  margin: 0;
+  color: #909399;
+  font-size: 14px;
 }
 
 /* 系统公告卡样式 */
