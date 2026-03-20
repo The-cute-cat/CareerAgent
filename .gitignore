@@ -50,5 +50,3 @@ node_modules/
 HELP.md
 application-dev.yaml
 target/
-tests/
-test/
