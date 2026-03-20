@@ -42,7 +42,7 @@ USER_PROMPT = """
 # 3. 封装调用函数
 # ==========================================
 
-def analyze_job_description(jd_text: str, api_key: Optional[str] = None, model_name: str = settings.llm_model_name.model_name) -> dict:
+def analyze_job_description(jd_text: str, api_key: Optional[str] = None, model_name: str = settings.vector.llm_model_name) -> dict:
     """
     使用 LangChain 调用大模型分析 JD 文本并返回结构化 JSON 数据
 

@@ -56,7 +56,7 @@ class PracticalExperience(BaseModel):
     # 存储详细文本，用于 Layer 2 深度对比和规划报告生成
     project_details: str = Field(alias="项目经历详情", description="详细描述参与过的项目、角色及成果")
     intern_details: str = Field(alias="实习经历详情", description="详细描述实习岗位职责、核心产出")
-    campus_activities: str = Field(alias="校园/实践活动", description="社团、志愿活动、社会实践等描述")
+    campus_activities: str = Field(alias="校园_实践活动", description="社团、志愿活动、社会实践等描述")
     competition_exp: str = Field(alias="竞赛获奖详情", description="参加过的比赛、获得的奖项及个人贡献")
 
 

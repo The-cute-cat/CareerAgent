@@ -10,11 +10,12 @@ from pymilvus import (
 from ai_service.models.struct_job_txt import JDAnalysisResult
 from ai_service.models.struct_txt import StudentProfile
 from ai_service.utils.aliyun_embedding import AliyunEmbedding
+from ai_service.utils.logger_handler import log
 from config import settings
 
 
 class JobVectorStore:
-    def __init__(self, host="192.168.3.128", port="19530", dim=1024,collection_name="job_matching_profiles" ,api_key=settings.llm.api_key.get_secret_value()):
+    def __init__(self, host=settings.milvus.host, port=settings.milvus.port, dim=1024,collection_name="job_matching_profiles" ,api_key=settings.llm.api_key.get_secret_value()):
         self.host = host
         self.port = port
         self.dim = dim
@@ -22,7 +23,7 @@ class JobVectorStore:
         self.embedder = AliyunEmbedding(api_key=api_key)
         # 1. 连接 Milvus
         connections.connect("default", host=self.host, port=self.port)
-        print(f"✅ 已连接到 Milvus: {self.host}:{self.port}")
+        log.info(f"✅ 已连接到 Milvus: {self.host}:{self.port}")
         
         # 2. 初始化或加载 Collection
         self.collection = self._init_collection()
@@ -60,7 +61,7 @@ class JobVectorStore:
         collection.create_index(field_name="vec_potential", index_params=index_params)
         
         collection.load()
-        print(f"✅ Collection '{self.collection_name}' 初始化并加载完成")
+        log.info(f"✅ Collection '{self.collection_name}' 初始化并加载完成")
         return collection
 
     # ================= 工具方法：等级映射 =================
@@ -117,7 +118,7 @@ class JobVectorStore:
         vec_potential = self.embedder.get_embedding_with_retry(self.obj_to_text(profiles.development_potential))
         
         if not all([vec_basic, vec_skills, vec_literacy, vec_potential]):
-            print(f"❌ 职位 {jd_result.job_id} 向量化失败，跳过入库。")
+            log.error(f"❌ 职位 {jd_result.job_id} 向量化失败，跳过入库。")
             return
 
         raw_data = jd_result.model_dump(by_alias=False)
@@ -135,7 +136,7 @@ class JobVectorStore:
         
         res = self.collection.upsert(data)
         self.collection.flush()
-        print(f"✅ 职位 {jd_result.job_name} ({jd_result.job_id}) 成功入库！")
+        log.info(f"✅ 职位 {jd_result.job_name} ({jd_result.job_id}) 成功入库！")
 
     # ================= 重置方法 =================
     def reset_collection(self):
@@ -154,7 +155,7 @@ class JobVectorStore:
         """删除指定岗位"""
         self.collection.delete(expr=f"job_id = '{job_id}'")
         self.collection.flush()
-        print(f"✅ 职位 {job_id} 成功删除！")
+        log.info(f"✅ 职位 {job_id} 成功删除！")
 
     # ================= 匹配方法 =================
     def match_jobs_for_student(self, student: StudentProfile, top_k: int = 20,nums:[float,float,float,float]=[0.2,0.5,0.2,0.1]):
@@ -177,7 +178,7 @@ class JobVectorStore:
         user_vec_potential = self.embedder.get_embedding_with_retry(self.obj_to_text(student.potential))
 
         if not all([user_vec_basic, user_vec_skills, user_vec_literacy, user_vec_potential]):
-            print("❌ 用户画像向量化失败，无法进行匹配。")
+            log.error("❌ 用户画像向量化失败，无法进行匹配。")
             return []
 
         # 4. 构建多路召回请求 (Multi-vector Search)
@@ -267,7 +268,7 @@ if __name__ == "__main__":
 
     from ai_service.models.struct_txt import StudentProfile, BasicRequirements, ProfessionalSkills, ProfessionalLiteracy, DevelopmentPotential, SpecialConstraints, PracticalExperience
 
-    # 学生：一位精通 Vue3 和 Python AI 组件的软件工程大四学生
+    # 学生：一位精通 Vue3 和 Python AI 组件的软件工程大四 学生
     student_test_data = StudentProfile(
         基础信息=BasicRequirements(学历="本科",专业背景="软件工程", 证书=["CET-6", "计算机二级"],实习时长=6,求职状态="应届生"),
         专业技能=ProfessionalSkills(
@@ -301,7 +302,7 @@ if __name__ == "__main__":
         实践详情=PracticalExperience(
             项目经历详情="开发了一个基于 AI 的大学生职业规划 Agent 项目，负责全栈开发。",
             实习经历详情="在某科技公司实习 6 个月，负责后端数据库优化。",
-            campus_activities="校学生会技术部部长",
+            校园_实践活动="校学生会技术部部长",
             竞赛获奖详情="中国高校计算机大赛一等奖"
         )
     )
