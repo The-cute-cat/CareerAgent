@@ -220,9 +220,14 @@ class Vector(BaseModel):
     llm_model_name: str = ""
 
 class Milvus(BaseModel):
-    host: str = ""
-    port: int = 19530
-    enabled: bool = False
+    class Local(BaseModel):
+        host: str = ""
+        port: int = 19530
+    class Cloud(BaseModel):
+        url: str = ""
+        token: SecretStr = SecretStr("")
+    local: Local = Field(default_factory=Local)
+    cloud: Cloud = Field(default_factory=Cloud)
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -292,4 +297,5 @@ if __name__ == "__main__":
     print(f"  密码: {settings.database.password}")
     print(f"  API Key: {settings.llm.api_key.get_secret_value()}")
     print(settings.lite_llm.qwen)
+    print(settings.milvus.cloud.token.get_secret_value())
     pass
