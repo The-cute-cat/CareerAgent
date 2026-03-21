@@ -219,6 +219,9 @@ class VectorModel(BaseModel):
     model_name: str = ""
 class LlmModelName(BaseModel):
     model_name: str = ""
+class MilvusHost(BaseModel):
+    host: str = ""
+    port: int = 19530
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -237,6 +240,7 @@ class Settings(BaseSettings):
     path_config: PathConfig = Field(default_factory=PathConfig)
     vector_model: VectorModel = Field(default_factory=VectorModel)
     llm_model_name: LlmModelName = Field(default_factory=LlmModelName)
+    milvus_host: MilvusHost = Field(default_factory=MilvusHost)
 
     @classmethod
     def settings_customise_sources(

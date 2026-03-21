@@ -14,7 +14,7 @@ from config import settings
 
 
 class JobVectorStore:
-    def __init__(self, host="192.168.3.128", port="19530", dim=1024,collection_name="job_matching_profiles" ,api_key=settings.llm.api_key.get_secret_value()):
+    def __init__(self, host=settings.milvus_host.host, port=settings.milvus_host.port, dim=1024,collection_name="job_matching_profiles" ,api_key=settings.llm.api_key.get_secret_value()):
         self.host = host
         self.port = port
         self.dim = dim
