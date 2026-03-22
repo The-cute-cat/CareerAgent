@@ -5,44 +5,57 @@ from pydantic import (
     field_validator,
     computed_field,
 )
+import datetime
 from typing import List, Optional, Literal
 import re
 
 # --- 嵌套子模型 ---
+class priorityDetail(BaseModel):
+    value: Literal['tech', 'salary', 'stable'] = Field(description="优先级值")
+    label: str = Field(description="优先级名称，string（技术成长/薪资/稳定）")
 
+class quizScoreDetail(BaseModel):
+    communication: float = Field(description="沟通能力分数0-100")
+    stress: float = Field(description="抗压能力分数0-100")
+    learning: float = Field(description="学习能力分数0-100")
 
 class ProjectExperience(BaseModel):
-    name: str = Field(
-        description="项目名称。优先提取正式项目名；若无明确名称，可用‘某电商推荐系统项目’这类可识别短语。"
-    )
-    role: str = Field(
-        description="在项目中的角色或职责身份，如‘后端开发/算法实习生/项目负责人’。"
-    )
-    content: str = Field(
-        description="核心工作内容与技术应用，需包含做了什么、用到哪些技术/方法，避免只写技术名。"
-    )
-    output: str = Field(
-        description="项目成果或量化表现，优先提取可量化结果（如‘准确率提升5%’、‘服务日活1万+’）；无量化时写明确业务结果。"
-    )
-
+    isCompetition: bool = Field(description="boolean(是否竞赛）")
+    name: str = Field(description="项目/竞赛名称")
+    desc: str = Field(description="项目描述")
 
 class InternshipExperience(BaseModel):
     company: str = Field(
         description="实习单位全称，若文本仅有简称则保留简称，不臆造公司信息。"
     )
-    position: str = Field(
-        description="实习岗位名称，如‘数据分析实习生’、‘产品经理实习生’。"
+    role: str = Field(
+        description="实习岗位名称，如'数据分析实习生'、'产品经理实习生'。"
     )
-    duration: str = Field(
-        description="实习起止时间或时长，尽量保留原文时间表达（如‘2024.07-2024.10’或‘3个月’）。"
+    date: List[datetime.date] = Field(
+        ..., 
+        min_length=2, 
+        max_length=2, 
+        description="实习日期范围，必须包含两个元素：[开始日期, 结束日期]。格式统一为 YYYY-MM-DD。"
     )
-    content: str = Field(
-        description="实习职责与产出，优先提取动作+结果信息，如‘搭建报表并将统计耗时从2小时降至20分钟’。"
+    desc: str = Field(
+        description="实习职责与产出，优先提取动作+结果信息，如'搭建报表并将统计耗时从2小时降至20分钟'。"
     )
+class SkillDetail(BaseModel):
+    name: str = Field(description="技能名称")
+    score: float = Field(description="技能分数")
+
+class ToolDetail(BaseModel):
+    name: str = Field(description="工具名称")
+    score: float = Field(description="工具分数")
+
+class LanguageDetail(BaseModel):
+    type: Literal["英语", "日语", "其他"] = Field(description="语种：英语/日语/其他")
+    level: Literal["四级", "六级", "托福", "雅思", "其他"] = Field(description="水平：四级/六级/托福/雅思/其他")
+    other: str = Field(description="其他相关信息")
+
 
 
 # --- 主画像模型 ---
-
 
 class StudentFormProfile(BaseModel):
     model_config = ConfigDict(
@@ -56,7 +69,12 @@ class StudentFormProfile(BaseModel):
         alias="education",
         description="最高学历。仅允许‘专科/本科/硕士/博士/其他’，无法判断时返回 null。",
     )
-    major: Optional[str] = Field(
+    educationOther: Optional[str] = Field(
+        None,
+        alias="educationOther",
+        description="其他学历信息，当 education 为‘其他’时填写, 无法判断时返回 null。比如:曾在美国留学等。",
+    )
+    major: Optional[List[str]] = Field(
         None,
         alias="major",
         description="就读专业全称，尽量标准化为正式专业名称（如‘计算机科学与技术’），无法确认时返回 null。",
@@ -68,106 +86,85 @@ class StudentFormProfile(BaseModel):
     )
 
     # 2. 能力矩阵
-    languages: List[str] = Field(
-        default_factory=list,
+    languages: Optional[List[LanguageDetail]] = Field(
+        None,
         alias="languages",
-        description="掌握的语言列表（自然语言或编程语言均可），去重后输出，如‘英语’‘Python’。无信息时返回空列表。",
+        description="掌握的语言列表（自然语言），去重后输出，如'英语'。无信息时返回空列表。",
     )
-    certificates: List[str] = Field(
-        default_factory=list,
+    certificates: Optional[List[str]] = Field(
+        None,
         alias="certificates",
-        description="证书列表，提取正式证书名称（如‘CET-6’‘软考中级’），去重后输出。",
+        description="证书列表，提取正式证书名称（如‘CET-6’‘软考中级’），去重后输出。"
     )
-    skills: List[str] = Field(
-        default_factory=list,
+    certificates_other: Optional[str] = Field(
+        None,
+        alias="certificatesOther",
+        description="外语水平选择'其他'后显示，与水平信息在同一行，供 AI 填写具体信息；无信息时返回 null。比如:学习过世界语。",
+    )
+    skills: Optional[List[SkillDetail]] = Field(
+        None,
         alias="skills",
         description="专业技能列表，提取可迁移能力与专业能力（如‘机器学习建模’‘需求分析’），避免与 tools 重复。",
     )
-    tools: List[str] = Field(
-        default_factory=list,
+    tools: Optional[List[ToolDetail]] = Field(
+        None,
         alias="tools",
         description="工具/平台/框架列表（如‘Excel’‘Power BI’‘PyTorch’‘Figma’），去重后输出。",
     )
 
     # 3. 实践与产出 (这里是 AI 提取的“工作区”)
     # 修改：别名不与计算属性冲突，使用内部标识符
-    code_links: Optional[str] = Field(
+    code_ability: Optional[str] = Field(
         None,
-        alias="codeLinks",
-        description="代码仓库链接。仅提取明确 URL（如 GitHub/Gitee）；无链接时返回 null。",
+        alias="codeAbility",
+        description="代码仓库链接。仅提取明确 URL(如 GitHub/Gitee), 不同链接用逗号分隔；无链接时返回 null。",
     )
 
     # AI 会根据 description 填充这两个列表
-    internal_project_list: List[ProjectExperience] = Field(
-        default_factory=list,
-        alias="internal_project_list",  # 避开 projects 别名
+    projects: Optional[List[ProjectExperience]] = Field(
+        None,
+        alias="projects",  # 避开 projects 别名
         description=(
             "从文本提取的项目经历明细。每个元素需尽量包含 "
             "name/role/content/output；无项目信息时返回空列表。"
         ),
-        exclude=True,
     )
-    internal_internship_list: List[InternshipExperience] = Field(
-        default_factory=list,
-        alias="internal_internship_list",  # 避开 internships 别名
+    internships: Optional[List[InternshipExperience]] = Field(
+        None,
+        alias="internships",  # 避开 internships 别名
         description=(
             "从文本提取的实习经历明细。每个元素需尽量包含 "
-            "company/position/duration/content；无实习信息时返回空列表。"
+            "company/role/date/desc；无实习信息时返回空列表。"
         ),
-        exclude=True,
     )
 
     # 4. 素质与规划
-    quiz_scores: Optional[str] = Field(
+    quiz_scores: None = Field(
         None,
         alias="quizScores",
-        description="问卷得分或测评结果原文（如‘职业兴趣：RIA’或‘综合得分82’）。无信息时返回 null。",
+        description="保持为空对象，AI 不需要填充此字段，后续会根据其他字段内容自动生成测验分数结果。",
     )
     innovation: Optional[str] = Field(
         None,
         alias="innovation",
-        description="创新能力相关表述，提取原文中的能力评价或案例摘要；无信息时返回 null。",
+        description="创新能力相关表述，提取原文中的能力评价或案例摘要；无信息时返回 null。比如:“优化了某算法，效率提升 20%”",
     )
     target_job: Optional[str] = Field(
         None,
         alias="targetJob",
         description="目标岗位名称，优先提取最明确的单一岗位（如‘数据分析师’）；无信息时返回 null。",
     )
-    target_industries: List[str] = Field(
-        default_factory=list,
+    target_industries: Optional[List[str]] = Field(
+        None,
         alias="targetIndustries",
         description="目标行业列表（如‘互联网’‘智能制造’‘金融科技’），去重后输出。",
     )
-    priorities: List[str] = Field(
-        default_factory=list,
+    priorities: None = Field(
+        None,
         alias="priorities",
-        description="发展方向优先级关键词列表（如‘城市优先’‘薪资优先’‘成长优先’），按文本表达顺序输出。",
+        description="保持为空列表，AI 不需要填充此字段，后续会根据其他字段内容自动生成优先级排序结果。",
     )
     # --- 自动化坍缩：将结构化列表转为前端需要的字符串 ---
-
-    @computed_field(alias="projects")  # 这里才是真正输出给前端的键名
-    @property
-    def projects_display(self) -> str:
-        if not self.internal_project_list:
-            return "无"
-        return "\n".join(
-            [
-                f"在【{p.name}】项目担任{p.role}，工作内容：{p.content}。成果：{p.output}"
-                for p in self.internal_project_list
-            ]
-        )
-
-    @computed_field(alias="internships")  # 这里才是真正输出给前端的键名
-    @property
-    def internships_display(self) -> str:
-        if not self.internal_internship_list:
-            return "无"
-        return "\n".join(
-            [
-                f"{i.duration} 在【{i.company}】担任{i.position}，职责：{i.content}"
-                for i in self.internal_internship_list
-            ]
-        )
 
     # --- 校验器优化 ---
 
