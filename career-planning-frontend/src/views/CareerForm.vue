@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed } from 'vue'
-import { ElMessage } from 'element-plus'
+import { useRouter } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import {
   DocumentAdd, Trophy, DataAnalysis, Position, Plus, Delete, Upload,
@@ -23,6 +24,9 @@ import {
 
 
 // --- 状态定义 ---
+
+/** 路由实例 */
+const router = useRouter()
 
 /** 表单引用，用于表单验证和重置 */
 const formRef = ref<FormInstance>()
@@ -58,23 +62,21 @@ const currentQuizType = ref('')
 const dragIndex = ref(-1)
 const dragOverIndex = ref(-1)
 
-/** 控制雷达图弹窗显示/隐藏 */
-const showRadarDialog = ref(false)
-
-/** 雷达图加载状态 */
-const radarLoading = ref(false)
-
 /** 控制项目经历弹窗显示/隐藏 */
 const showProjectDialog = ref(false)
 
 /** 控制实践经历弹窗显示/隐藏 */
 const showInternshipDialog = ref(false)
 
+
+
 /** 项目经历弹窗表单数据 */
 const projectForm = reactive({
   isCompetition: false,
   name: '',
-  desc: ''
+  desc: '',
+  isEdit: false,
+  editIndex: -1
 })
 
 /** 实践经历弹窗表单数据 */
@@ -82,18 +84,13 @@ const internshipForm = reactive({
   company: '',
   role: '',
   date: [] as Date[],
-  desc: ''
+  desc: '',
+  isEdit: false,
+  editIndex: -1
 })
 
-/** 雷达图能力分数 */
-const radarScores = reactive<RadarScores>({
-  专业: 0,
-  创新: 0,
-  学习: 0,
-  抗压: 0,
-  沟通: 0,
-  实习: 0
-})
+/** 人岗匹配结果数据（后端返回的岗位匹配数组） */
+const jobMatchResult = reactive<JobMatchItem[]>([])
 
 /** 画像完整度 (0-100) */
 const profileCompleteness = computed(() => {
@@ -129,9 +126,9 @@ const profileCompleteness = computed(() => {
 
   // 素质测评项
   const quizItems = [
-    formData.scores.communication,
-    formData.scores.stress,
-    formData.scores.learning,
+    quizCompleted.communication,
+    quizCompleted.stress,
+    quizCompleted.learning,
     !!formData.innovation
   ]
   total += quizItems.length
@@ -148,107 +145,13 @@ const profileCompleteness = computed(() => {
   return Math.round((completed / total) * 100)
 })
 
-/** 缺失项列表 */
-const missingItems = computed<MissingItem[]>(() => {
-  const items: MissingItem[] = []
 
-  // 检查证书
-  if (formData.certificates.length === 0) {
-    items.push({
-      field: 'certificates',
-      label: '缺少专业证书',
-      icon: 'certificate',
-      priority: 'medium'
-    })
-  }
+// --- 素质测评完成状态（独立于表单数据） ---
 
-  // 检查实习经历
-  if (formData.internships.length === 0) {
-    items.push({
-      field: 'internships',
-      label: '缺少实习经历',
-      icon: 'internship',
-      priority: 'high'
-    })
-  }
-
-  // 检查项目经历
-  if (formData.projects.length === 0) {
-    items.push({
-      field: 'projects',
-      label: '缺少项目经历',
-      icon: 'project',
-      priority: 'high'
-    })
-  }
-
-  // 检查语言能力
-  if (!formData.languages.some(l => l.type && l.level)) {
-    items.push({
-      field: 'languages',
-      label: '缺少语言能力',
-      icon: 'language',
-      priority: 'medium'
-    })
-  }
-
-  // 检查技能
-  if (formData.skills.length === 0) {
-    items.push({
-      field: 'skills',
-      label: '缺少专业技能',
-      icon: 'skill',
-      priority: 'high'
-    })
-  }
-
-  // 检查工具
-  if (formData.tools.length === 0) {
-    items.push({
-      field: 'tools',
-      label: '缺少工具掌握',
-      icon: 'tool',
-      priority: 'low'
-    })
-  }
-
-  // 检查素质测评
-  if (!formData.scores.communication) {
-    items.push({
-      field: 'quiz-communication',
-      label: '未完成沟通能力测评',
-      icon: 'quiz',
-      priority: 'medium'
-    })
-  }
-  if (!formData.scores.stress) {
-    items.push({
-      field: 'quiz-stress',
-      label: '未完成抗压能力测评',
-      icon: 'quiz',
-      priority: 'medium'
-    })
-  }
-  if (!formData.scores.learning) {
-    items.push({
-      field: 'quiz-learning',
-      label: '未完成学习能力测评',
-      icon: 'quiz',
-      priority: 'medium'
-    })
-  }
-
-  // 检查创新案例
-  if (!formData.innovation) {
-    items.push({
-      field: 'innovation',
-      label: '缺少创新案例',
-      icon: 'innovation',
-      priority: 'low'
-    })
-  }
-
-  return items
+const quizCompleted = reactive({
+  communication: false,
+  stress: false,
+  learning: false
 })
 
 
@@ -279,8 +182,8 @@ const formData = reactive<CareerFormData>({
   projects: [],
   /** 实习经历列表：每项包含公司、职位、日期范围、描述 */
   internships: [],
-  /** 素质测评完成状态：沟通/抗压/学习能力 */
-  scores: { communication: false, stress: false, learning: false },
+  /** 素质测评分数（沟通/抗压/学习，各0-100） */
+  quizScores: { communication: 0, stress: 0, learning: 0 },
   /** 创新案例描述：用户填写的创新经历 */
   innovation: '',
   /** 目标岗位：用户期望的职位名称 */
@@ -332,14 +235,6 @@ const formProgress = computed(() => {
 })
 
 
-/**
- * 判断用户是否选择了计算机相关专业
- * 用于显示/隐藏代码能力相关表单项
- */
-const isComputerMajor = computed(() => {
-  const majorStr = JSON.stringify(formData.major)
-  return majorStr.includes('计算机') || majorStr.includes('软件')
-})
 
 /**
  * 判断指定步骤是否已完成
@@ -361,7 +256,7 @@ const isStepCompleted = (step: number) => {
     case 3:
       return !!(formData.projects.length > 0 || formData.internships.length > 0)
     case 4:
-      return !!(formData.scores.communication && formData.scores.stress && formData.scores.learning && formData.innovation)
+      return !!(quizCompleted.communication && quizCompleted.stress && quizCompleted.learning && formData.innovation)
     case 5:
       return !!(formData.targetJob && formData.targetIndustries.length > 0)
     default:
@@ -394,11 +289,53 @@ const handleMenuSelect = (index: string) => {
 const addLanguage = () => formData.languages.push({ type: '', level: '', other: '' })
 
 /**
+/**
  * 移除指定索引的语言能力项
  * @param index - 要移除的项的索引
  */
-const removeLanguage = (index: number) => formData.languages.splice(index, 1)
+const removeLanguage = (index: number) => {
+  ElMessageBox.confirm(
+    '确定要删除此外语能力吗？',
+    '删除确认',
+    {
+      confirmButtonText: '确认删除',
+      cancelButtonText: '取消',
+      type: 'warning',
+    }
+  )
+    .then(() => {
+      formData.languages.splice(index, 1)
+      ElMessage({
+        type: 'success',
+        message: '已删除',
+      })
+    })
+    .catch(() => {
+      ElMessage({
+        type: 'info',
+        message: '已取消删除',
+      })
+    })
+}
 
+/**
+ * 确认自定义语言输入
+ * 将输入框的值回写到对应字段，并清空输入框
+ * @param index - 语言项索引
+ * @param field - 要更新的字段：type(语种) 或 level(水平)
+ */
+const confirmCustomLanguage = (index: number, field: 'type' | 'level') => {
+  const lang = formData.languages[index]
+  if (!lang) return
+  if (lang.other.trim()) {
+    if (field === 'type') {
+      lang.type = lang.other.trim()
+    } else {
+      lang.level = lang.other.trim()
+    }
+    lang.other = ''
+  }
+}
 
 /**
  * 处理学历选择变化
@@ -411,7 +348,6 @@ const handleEducationChange = (value: string) => {
     formData.educationOther = ''
   }
 }
-
 
 /**
  * 处理证书选择变化
@@ -429,10 +365,20 @@ const handleCertificateChange = (value: string[]) => {
 /**
  * 添加新技能
  * 将 newSkill 输入框的值添加到技能列表，默认熟练度为50
+ * 检查是否已存在（不区分大小写）
  */
 const addSkill = () => {
   if (newSkill.value) {
-    formData.skills.push({ name: newSkill.value, credibility: 50 })
+    const skillName = newSkill.value.trim()
+    // 检查是否已存在（不区分大小写）
+    const isDuplicate = formData.skills.some(
+      skill => skill.name.toLowerCase() === skillName.toLowerCase()
+    )
+    if (isDuplicate) {
+      ElMessage.warning(`技能 "${skillName}" 已经添加过了`)
+      return
+    }
+    formData.skills.push({ name: skillName, score: 50 })
     newSkill.value = ''
   }
 }
@@ -441,16 +387,49 @@ const addSkill = () => {
  * 移除指定索引的技能
  * @param index - 要移除的技能索引
  */
-const removeSkill = (index: number) => formData.skills.splice(index, 1)
+const removeSkill = (index: number) => {
+  ElMessageBox.confirm(
+    '确定要删除此专业技能吗？',
+    '删除确认',
+    {
+      confirmButtonText: '确认删除',
+      cancelButtonText: '取消',
+      type: 'warning',
+    }
+  )
+    .then(() => {
+      formData.skills.splice(index, 1)
+      ElMessage({
+        type: 'success',
+        message: '已删除',
+      })
+    })
+    .catch(() => {
+      ElMessage({
+        type: 'info',
+        message: '已取消删除',
+      })
+    })
+}
 
 
 /**
  * 添加新工具
  * 将 newTool 输入框的值添加到工具列表，默认熟练程度为"熟练"
+ * 检查是否已存在（不区分大小写）
  */
 const addTool = () => {
   if (newTool.value) {
-    formData.tools.push({ name: newTool.value, proficiency: '熟练' })
+    const toolName = newTool.value.trim()
+    // 检查是否已存在（不区分大小写）
+    const isDuplicate = formData.tools.some(
+      tool => tool.name.toLowerCase() === toolName.toLowerCase()
+    )
+    if (isDuplicate) {
+      ElMessage.warning(`工具 "${toolName}" 已经添加过了`)
+      return
+    }
+    formData.tools.push({ name: toolName, score: 50 })
     newTool.value = ''
   }
 }
@@ -459,48 +438,162 @@ const addTool = () => {
  * 移除指定索引的工具
  * @param index - 要移除的工具索引
  */
-const removeTool = (index: number) => formData.tools.splice(index, 1)
+const removeTool = (index: number) => {
+  ElMessageBox.confirm(
+    '确定要删除此工具技能吗？',
+    '删除确认',
+    {
+      confirmButtonText: '确认删除',
+      cancelButtonText: '取消',
+      type: 'warning',
+    }
+  )
+    .then(() => {
+      formData.tools.splice(index, 1)
+      ElMessage({
+        type: 'success',
+        message: '已删除',
+      })
+    })
+    .catch(() => {
+      ElMessage({
+        type: 'info',
+        message: '已取消删除',
+      })
+    })
+}
 
 
-/** 打开项目经历弹窗 */
+/** 打开项目经历弹窗（新增模式） */
 const openProjectDialog = () => {
   projectForm.isCompetition = false
   projectForm.name = ''
   projectForm.desc = ''
+  projectForm.isEdit = false
+  projectForm.editIndex = -1
   showProjectDialog.value = true
 }
 
-/** 确认添加项目经历 */
+/** 打开项目经历弹窗（编辑模式） */
+const openEditProjectDialog = (index: number) => {
+  const project = formData.projects[index]
+  if (!project) {
+    ElMessage.error('项目不存在')
+    return
+  }
+  projectForm.isCompetition = project.isCompetition
+  projectForm.name = project.name
+  projectForm.desc = project.desc
+  projectForm.isEdit = true
+  projectForm.editIndex = index
+  showProjectDialog.value = true
+}
+
+/** 确认添加/编辑项目经历 */
 const confirmAddProject = () => {
   if (!projectForm.name.trim()) {
     ElMessage.warning('请输入项目名称')
     return
   }
-  formData.projects.push({
+
+  const projectData = {
     isCompetition: projectForm.isCompetition,
     name: projectForm.name,
     desc: projectForm.desc
-  })
-  showProjectDialog.value = false
-  ElMessage.success('添加成功')
+  }
+
+  if (projectForm.isEdit) {
+    // 编辑模式：弹出确认弹窗
+    ElMessageBox.confirm(
+      '确定要保存对该项目/竞赛经历的修改吗？',
+      '修改确认',
+      {
+        confirmButtonText: '确认修改',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    )
+      .then(() => {
+        formData.projects[projectForm.editIndex] = projectData
+        showProjectDialog.value = false
+        ElMessage.success('修改成功')
+        // 重置编辑状态
+        projectForm.isEdit = false
+        projectForm.editIndex = -1
+      })
+      .catch(() => {
+        ElMessage({
+          type: 'info',
+          message: '已取消修改',
+        })
+      })
+  } else {
+    // 新增模式
+    formData.projects.push(projectData)
+    showProjectDialog.value = false
+    ElMessage.success('添加成功')
+  }
 }
 
 /**
  * 移除指定索引的项目经历
  * @param index - 要移除的项目索引
  */
-const removeProject = (index: number) => formData.projects.splice(index, 1)
+const removeProject = (index: number) => {
+  ElMessageBox.confirm(
+    '确定要删除此项目/竞赛经历吗？',
+    '删除确认',
+    {
+      confirmButtonText: '确认删除',
+      cancelButtonText: '取消',
+      type: 'warning',
+    }
+  )
+    .then(() => {
+      formData.projects.splice(index, 1)
+      ElMessage({
+        type: 'success',
+        message: '已删除',
+      })
+    })
+    .catch(() => {
+      ElMessage({
+        type: 'info',
+        message: '已取消删除',
+      })
+    })
+}
 
-/** 打开实践经历弹窗 */
+/** 打开实践经历弹窗（新增模式） */
 const openInternshipDialog = () => {
   internshipForm.company = ''
   internshipForm.role = ''
   internshipForm.date = []
   internshipForm.desc = ''
+  internshipForm.isEdit = false
+  internshipForm.editIndex = -1
   showInternshipDialog.value = true
 }
 
-/** 确认添加实践经历 */
+/** 打开实践经历弹窗（编辑模式） */
+const openEditInternshipDialog = (index: number) => {
+  const internship = formData.internships[index]
+  if (!internship) {
+    ElMessage.error('实践经历不存在')
+    return
+  }
+  internshipForm.company = internship.company
+  internshipForm.role = internship.role
+  internshipForm.date = Array.isArray(internship.date)
+    ? [...internship.date] as Date[]
+    : []
+  internshipForm.desc = internship.desc
+  internshipForm.isEdit = true
+  internshipForm.editIndex = index
+  showInternshipDialog.value = true
+}
+
+/** 确认添加/编辑实践经历 */
 const confirmAddInternship = () => {
   if (!internshipForm.company.trim()) {
     ElMessage.warning('请输入公司名称')
@@ -510,21 +603,75 @@ const confirmAddInternship = () => {
     ElMessage.warning('请输入担任岗位')
     return
   }
-  formData.internships.push({
+
+  const internshipData = {
     company: internshipForm.company,
     role: internshipForm.role,
     date: internshipForm.date,
     desc: internshipForm.desc
-  })
-  showInternshipDialog.value = false
-  ElMessage.success('添加成功')
+  }
+
+  if (internshipForm.isEdit) {
+    // 编辑模式：弹出确认弹窗
+    ElMessageBox.confirm(
+      '确定要保存对该实践经历的修改吗？',
+      '修改确认',
+      {
+        confirmButtonText: '确认修改',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    )
+      .then(() => {
+        formData.internships[internshipForm.editIndex] = internshipData
+        showInternshipDialog.value = false
+        ElMessage.success('修改成功')
+        // 重置编辑状态
+        internshipForm.isEdit = false
+        internshipForm.editIndex = -1
+      })
+      .catch(() => {
+        ElMessage({
+          type: 'info',
+          message: '已取消修改',
+        })
+      })
+  } else {
+    // 新增模式
+    formData.internships.push(internshipData)
+    showInternshipDialog.value = false
+    ElMessage.success('添加成功')
+  }
 }
 
 /**
  * 移除指定索引的实习经历
  * @param index - 要移除的实习索引
  */
-const removeInternship = (index: number) => formData.internships.splice(index, 1)
+const removeInternship = (index: number) => {
+  ElMessageBox.confirm(
+    '确定要删除此实习/工作经历吗？',
+    '删除确认',
+    {
+      confirmButtonText: '确认删除',
+      cancelButtonText: '取消',
+      type: 'warning',
+    }
+  )
+    .then(() => {
+      formData.internships.splice(index, 1)
+      ElMessage({
+        type: 'success',
+        message: '已删除',
+      })
+    })
+    .catch(() => {
+      ElMessage({
+        type: 'info',
+        message: '已取消删除',
+      })
+    })
+}
 
 /**
  * 格式化日期范围显示
@@ -646,22 +793,35 @@ const testDialog = reactive({
   visible: false,
   /** 弹窗标题 */
   title: '',
-  /** 测试类型：quiz(测评) / ai(AI生成) */
-  type: 'quiz',
-  /** 当前题目对象 */
-  currentQuestion: null as QuizQuestion | null,
-  /** 用户的答案 */
-  answer: '',
-  /** AI生成进度 (0-100) */
-  progress: 0
+  /** 测试类型：skill(技能) / tool(工具) / code(代码) / communication(沟通) / stress(抗压) / learning(学习) */
+  type: 'skill' as 'skill' | 'tool' | 'code' | 'communication' | 'stress' | 'learning',
+  /** 当前测试项的索引 */
+  currentIndex: -1,
+  /** 当前测试项的名称 */
+  currentName: '',
+  /** 是否正在加载题目 */
+  loading: false
 })
 
-/** 测评题目类型定义 */
-interface QuizQuestion {
-  id: number
-  question: string
-  options: { label: string; value: string; text: string }[]
-  correctAnswer?: string
+/** 后端返回的问卷数据 */
+const backendQuizData = ref<BackendQuizData | null>(null)
+
+/** Quenation组件引用 */
+const quenationRef = ref<InstanceType<typeof Quenation> | null>(null)
+
+/** 导入 BackendQuizData 类型 */
+interface BackendQuizData {
+  tool: string
+  total_questions: number
+  questions: {
+    id: number
+    type: 'choice' | 'fill_in' | 'open_ended'
+    content: string
+    options: string[] | null
+    correct_answer: string | null
+    evaluation_criteria?: string
+    difficulty: 'easy' | 'medium' | 'hard'
+  }[]
 }
 
 
@@ -672,18 +832,42 @@ const currentTestSkill = ref('')
 const currentTestIndex = ref(-1)
 
 /**
+ * 从后端获取问卷数据
+ * @param type - 测试类型
+ * @param name - 技能/工具名称
+ */
+const fetchQuizData = async (type: string, name?: string): Promise<BackendQuizData> => {
+  const params = {
+    quizType: type as any,
+    ...(name ? { title: name } : {})
+  }
+  const res = await getQuestionsApi(params)
+  // 后端返回 Result<QuizResponse> 格式
+  const result = res.data as any
+  if (result.code !== 200) {
+    throw new Error(result.msg || '获取题目失败')
+  }
+  return result.data
+}
+
+/**
  * 打开技能/工具/代码能力测试弹窗
- * 根据技能名称从对应题库中随机抽取题目，支持 Python/Java/C++
+ * 使用Quenation组件展示完整问卷
  * @param type - 测试类型：skill(技能) / tool(工具) / code(代码)
  * @param index - 可选，测试项的索引
  */
-const openTestModal = (type: string, index?: number) => {
+const openTestModal = async (type: 'skill' | 'tool', index?: number) => {
   // 保存当前测试的技能信息
+  let name = ''
   if (type === 'skill' && index !== undefined) {
-    currentTestSkill.value = formData.skills[index]?.name || ''
+    name = formData.skills[index]?.name || ''
+    currentTestSkill.value = name
     currentTestIndex.value = index
+    testDialog.title = `${name} 技能测试`
+
   } else if (type === 'tool' && index !== undefined) {
-    currentTestSkill.value = formData.tools[index]?.name || ''
+    name = formData.tools[index]?.name || ''
+    currentTestSkill.value = name
     currentTestIndex.value = index
   } else {
     currentTestSkill.value = ''
@@ -834,8 +1018,7 @@ const openQuizModal = (type: string) => {
 
 
 /**
- * 确认完成测试
- * 验证答案并显示结果，更新技能/工具熟练度
+ * 关闭测试弹窗
  */
 const confirmTest = () => {
   // 检查是否有当前题目
@@ -998,64 +1181,30 @@ const pollForResumeReport = async (taskId: string): Promise<RadarScores> => {
 
 /**
  * 处理简历解析完成后的数据
- * 自动将解析出的技能填充到表单中，并展示能力评估雷达图
- * @param parsedData - 简历解析后的数据对象
+ * 直接将返回的表单数据填充到表单中，检测缺失字段并提醒用户
+ * @param parsedData - 简历解析后的表单数据对象（直接是 CareerFormData 格式）
  */
 const handleResumeParsed = async (parsedData: any) => {
   Object.assign(formData, parsedData)
 
   hasUploadedResume.value = true
   showUploadDialog.value = false
-  ElMessage.success('简历解析成功！已自动填充部分信息')
 
-  // 将解析出的技能添加到技能列表，默认熟练度70
-  if (parsedData?.profile?.skills && parsedData.profile.skills.length > 0) {
-    parsedData.profile.skills.forEach((skill: string) => {
-      if (!formData.skills.find(s => s.name === skill)) {
-        formData.skills.push({ name: skill, credibility: 70 })
-      }
-    })
-  }
-
-  // 情况1: 如果后端直接返回了 abilityScores，直接展示
-  if (parsedData?.abilityScores) {
-    Object.assign(radarScores, parsedData.abilityScores)
-    showRadarDialog.value = true
-    ElMessage.success('简历能力评估报告已生成！')
+  const formDataFromResume = parsedData as Record<string, unknown> | null
+  if (!formDataFromResume) {
+    ElMessage.warning('简历解析结果为空，请手动填写表单')
     return
   }
 
-  // 情况2: 如果后端返回了完整报告，提取 abilityScores
-  if (parsedData?.report?.abilityScores) {
-    Object.assign(radarScores, parsedData.report.abilityScores)
-    showRadarDialog.value = true
-    ElMessage.success('简历能力评估报告已生成！')
-    return
-  }
+  fillFormWithParsedData(formDataFromResume)
+  ElMessage.success('简历解析成功！已自动填充表单信息')
 
-  // 情况3: 如果有 task_id，需要轮询获取报告
-  if (parsedData?.task_id) {
-    showRadarDialog.value = true
-    radarLoading.value = true
-
-    try {
-      const scores = await pollForResumeReport(parsedData.task_id)
-      Object.assign(radarScores, scores)
-      ElMessage.success('简历能力评估报告生成完成！')
-    } catch (error: any) {
-      console.error('获取简历报告失败:', error)
-      ElMessage.error(error.message || '获取报告失败，请稍后重试')
-
-      // 降级使用模拟数据
-      console.warn('后端调用失败，降级使用模拟数据')
-      const mockReport = await fetchMockAbilityReport(formData)
-      Object.assign(radarScores, mockReport.abilityScores)
-    } finally {
-      radarLoading.value = false
-    }
+  // 检查并提示缺失的必填字段
+  const missingFields = checkRequiredFields()
+  if (missingFields.length > 0) {
+    setTimeout(() => showMissingFieldsReminder(missingFields), 500)
   }
 }
-
 
 // --- 岗位联想搜索 ---
 
@@ -1065,9 +1214,14 @@ const handleResumeParsed = async (parsedData: any) => {
  * @param queryString - 用户输入的搜索关键字
  * @param cb - 回调函数，用于返回搜索结果
  */
-const querySearch = (queryString: string, cb: any) => {
+interface SearchSuggestion {
+  value: string
+}
+
+const querySearch = (queryString: string, cb: (results: SearchSuggestion[]) => void) => {
+  const jobOptions = ['后端工程师', '前端开发', '后端运维工程师', '产品经理']
   const results = queryString
-    ? ['后端工程师', '前端开发', '后端运维工程师', '产品经理'].filter(i => i.includes(queryString))
+    ? jobOptions.filter(i => i.includes(queryString))
     : []
   cb(results.map(i => ({ value: i })))
 }
@@ -1084,6 +1238,19 @@ const formRules = reactive<FormRules>({
   education: [{ required: true, message: '请选择学历', trigger: 'change' }],
   /** 专业：必填，变更时触发验证 */
   major: [{ required: true, message: '请选择专业', trigger: 'change' }],
+  /** 外语水平：必填，自定义验证 */
+  languages: [{
+    required: true,
+    validator: (_rule, value: Array<{ type: string; level: string }>, callback) => {
+      const hasValidLanguage = value.some(l => l.type && l.level)
+      if (!hasValidLanguage) {
+        callback(new Error('请至少填写一项外语水平'))
+      } else {
+        callback()
+      }
+    },
+    trigger: 'change'
+  }],
   /** 技能：必填，变更时触发验证 */
   skills: [{ required: true, message: '请至少添加一项技能', trigger: 'change' }],
   /** 目标岗位：必填，失焦时触发验证 */
@@ -1094,95 +1261,11 @@ const formRules = reactive<FormRules>({
 
 
 /**
- * 轮询获取能力评估报告
- * 等待后端生成报告并返回能力分数
- * @param taskId 任务ID
- * @returns 能力评估分数
+ * 获取模拟人岗匹配结果
  */
-const pollForAbilityReport = async (taskId: string): Promise<RadarScores> => {
-  const maxAttempts = 30 // 最大轮询次数
-  const interval = 2000 // 轮询间隔 2秒
-
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    try {
-      // 查询报告状态
-      const statusRes = await getCareerReportStatusApi(taskId)
-
-      if (statusRes.data.code === 200) {
-        const status = statusRes.data.data?.status
-
-        if (status === 'completed') {
-          // 报告已生成，获取报告数据
-          const reportRes = await getCareerReportApi(taskId)
-
-          if (reportRes.data.code === 200 && reportRes.data.data) {
-            const report = reportRes.data.data
-
-            // 从报告中提取能力分数
-            if (report.abilityScores) {
-              return report.abilityScores as RadarScores
-            }
-          }
-
-          // 如果后端没有返回 abilityScores，使用模拟数据
-          console.warn('后端报告未包含能力分数，使用模拟数据')
-          return calculateRadarScores(formData)
-        } else if (status === 'failed') {
-          throw new Error('报告生成失败')
-        }
-        // 状态为 processing 或 pending，继续轮询
-      }
-    } catch (error) {
-      console.error(`轮询报告状态失败 (尝试 ${attempt + 1}/${maxAttempts}):`, error)
-    }
-
-    // 等待下一轮轮询
-    await new Promise(resolve => setTimeout(resolve, interval))
-  }
-
-  throw new Error('获取报告超时，请稍后重试')
-}
-
-/**
- * 处理跳转到指定字段
- * @param field - 字段标识
- */
-const handleJumpToField = (field: string) => {
-  // 根据字段跳转到对应步骤
-  switch (field) {
-    case 'education':
-    case 'major':
-      activeMenu.value = '1'
-      break
-    case 'languages':
-    case 'certificates':
-    case 'skills':
-    case 'tools':
-      activeMenu.value = '2'
-      break
-    case 'projects':
-    case 'internships':
-      activeMenu.value = '3'
-      break
-    case 'quiz-communication':
-    case 'quiz-stress':
-    case 'quiz-learning':
-    case 'innovation':
-      activeMenu.value = '4'
-      // 如果是素质测评，自动打开对应测评弹窗
-      if (field === 'quiz-communication') {
-        openQuizModal('communication')
-      } else if (field === 'quiz-stress') {
-        openQuizModal('stress')
-      } else if (field === 'quiz-learning') {
-        openQuizModal('learning')
-      }
-      break
-    case 'targetJob':
-    case 'targetIndustries':
-      activeMenu.value = '5'
-      break
-  }
+const fetchMockJobMatchResult = async (): Promise<JobMatchItem[]> => {
+  const { mockJobMatchItems } = await import('@/mock/mockdata/JobMatch_mockdata')
+  return mockJobMatchItems
 }
 
 /**
@@ -1192,68 +1275,36 @@ const handleJumpToField = (field: string) => {
 const submitForm = async () => {
   if (!formRef.value) return
 
-  await formRef.value.validate(async (valid) => {
-    if (!valid) {
-      ElMessage.error('请完善必填信息')
+  const valid = await formRef.value.validate().catch(() => false)
+  if (!valid) {
+    ElMessage.error('请完善必填信息')
+    return
+  }
+
+  submitting.value = true
+  try {
+    const submitData = convertToSubmitDTO(formData)
+    const res = await submitCareerFormApi(submitData)
+
+    if (res.data?.code !== 200) {
+      ElMessage.error(res.data?.msg || '提交失败，请稍后重试')
       return
     }
 
-    submitting.value = true
-    radarLoading.value = true
-    showRadarDialog.value = true
-
-    try {
-      // 转换表单数据为提交格式
-      const submitData = convertToSubmitDTO(formData)
-
-      // 调用API提交表单
-      const res = await submitCareerFormApi(submitData)
-
-      if (res.data.code === 200) {
-        ElMessage.success('画像提交成功，正在生成能力评估报告...')
-
-        const result = res.data.data as CareerFormSubmitResult
-
-        if (result?.taskId) {
-          // 保存任务ID到本地存储
-          localStorage.setItem('careerFormTaskId', result.taskId)
-
-          // 轮询获取报告数据（包含能力评估分数）
-          const scores = await pollForAbilityReport(result.taskId)
-
-          // 更新雷达图分数
-          Object.assign(radarScores, scores)
-
-          ElMessage.success('能力评估报告生成完成！')
-          console.log('【后端返回】雷达图分数:', scores)
-        } else {
-          // 后端未返回任务ID，使用模拟数据
-          console.warn('后端未返回任务ID，使用模拟数据')
-          const mockReport = await fetchMockAbilityReport(formData)
-          Object.assign(radarScores, mockReport.abilityScores)
-        }
-      } else {
-        ElMessage.error(res.data.msg || '提交失败，请稍后重试')
-        // 提交失败，关闭弹窗
-        showRadarDialog.value = false
-      }
-    } catch (error: any) {
-      console.error('提交表单或获取报告失败:', error)
-      ElMessage.error(error.message || '网络错误，请稍后重试')
-
-      // 后端调用失败，降级使用模拟数据（便于演示）
-      console.warn('后端调用失败，降级使用模拟数据')
-      const mockReport = await fetchMockAbilityReport(formData)
-      Object.assign(radarScores, mockReport.abilityScores)
-    } finally {
-      submitting.value = false
-      radarLoading.value = false
-    }
-  })
+    const matchResult = res.data.data as JobMatchItem[]
+    localStorage.setItem('jobMatchResult', JSON.stringify(matchResult))
+    ElMessage.success('人岗匹配分析完成！')
+    router.push('/job-matching')
+  } catch (error: any) {
+    console.error('提交失败:', error)
+    ElMessage.error(error.message || '网络错误，请稍后重试')
+  } finally {
+    submitting.value = false
+  }
 }
 
 /**
- * 使用模拟数据生成能力评估（调试/预览模式）
+ * 使用模拟数据生成人岗匹配结果（调试/预览模式）
  * 当后端服务不可用时，可调用此方法使用前端模拟数据
  */
 const submitFormWithMockData = async () => {
@@ -1266,25 +1317,24 @@ const submitFormWithMockData = async () => {
     }
 
     submitting.value = true
-    radarLoading.value = true
-    showRadarDialog.value = true
 
     try {
-      // 使用模拟数据生成能力评估报告
-      const mockReport = await fetchMockAbilityReport(formData)
+      // 使用模拟数据生成人岗匹配结果
+      const mockResult = await fetchMockJobMatchResult()
 
-      // 更新雷达图分数
-      Object.assign(radarScores, mockReport.abilityScores)
+      // 保存人岗匹配结果到本地存储
+      localStorage.setItem('jobMatchResult', JSON.stringify(mockResult))
 
-      console.log('【模拟模式】雷达图分数:', mockReport.abilityScores)
-      ElMessage.success('能力评估报告生成完成（模拟数据）！')
+      console.log('【模拟模式】人岗匹配结果:', mockResult)
+      ElMessage.success('人岗匹配分析完成，正在跳转...')
+
+      // 直接跳转到人岗匹配页面
+      router.push('/job-matching')
     } catch (error) {
-      console.error('生成模拟报告失败:', error)
+      console.error('生成模拟人岗匹配失败:', error)
       ElMessage.error('生成报告失败，请稍后重试')
-      showRadarDialog.value = false
     } finally {
       submitting.value = false
-      radarLoading.value = false
     }
   })
 }
@@ -1307,7 +1357,10 @@ const resetForm = () => {
   formData.tools = []
   formData.projects = []
   formData.internships = []
-  formData.scores = { communication: false, stress: false, learning: false }
+  formData.quizScores = { communication: 0, stress: 0, learning: 0 }
+  quizCompleted.communication = false
+  quizCompleted.stress = false
+  quizCompleted.learning = false
   formData.priorities = [
     { value: 'tech', label: '技术成长' },
     { value: 'salary', label: '薪资' },
@@ -1607,9 +1660,14 @@ const resetForm = () => {
                         </el-icon>
                         <span>{{ proj.isCompetition ? '竞赛' : '项目' }}</span>
                       </div>
-                      <el-button text type="danger" :icon="Delete" @click="removeProject(index)">
-                        删除
-                      </el-button>
+                      <div class="card-actions">
+                        <el-button text type="primary" :icon="Edit" @click="openEditProjectDialog(index)">
+                          编辑
+                        </el-button>
+                        <el-button text type="danger" :icon="Delete" @click="removeProject(index)">
+                          删除
+                        </el-button>
+                      </div>
                     </div>
                     <div class="experience-card-body preview-mode">
                       <h4 class="preview-title">{{ proj.name }}</h4>
@@ -1635,9 +1693,14 @@ const resetForm = () => {
                         </el-icon>
                         <span>工作/实习</span>
                       </div>
-                      <el-button text type="danger" :icon="Delete" @click="removeInternship(index)">
-                        删除
-                      </el-button>
+                      <div class="card-actions">
+                        <el-button text type="primary" :icon="Edit" @click="openEditInternshipDialog(index)">
+                          编辑
+                        </el-button>
+                        <el-button text type="danger" :icon="Delete" @click="removeInternship(index)">
+                          删除
+                        </el-button>
+                      </div>
                     </div>
                     <div class="experience-card-body preview-mode">
                       <div class="info-row">
@@ -1906,7 +1969,7 @@ const resetForm = () => {
       <template #footer>
         <el-button @click="showProjectDialog = false">取消</el-button>
         <el-button type="primary" @click="confirmAddProject" :disabled="!projectForm.name.trim()">
-          确认添加
+          {{ projectForm.isEdit ? '确认修改' : '确认添加' }}
         </el-button>
       </template>
     </el-dialog>
@@ -3076,7 +3139,7 @@ const resetForm = () => {
 
 /* 素质测评弹窗样式 */
 .quiz-dialog :deep(.el-dialog__header) {
-  padding: 20px 24px;
+  padding: 16px 24px;
   border-bottom: 1px solid #e4e7ed;
   margin-right: 0;
 }
@@ -3088,14 +3151,239 @@ const resetForm = () => {
 }
 
 .quiz-dialog :deep(.el-dialog__body) {
-  padding: 24px;
-  background: #fafbfc;
+  padding: 0;
+  background: #f5f7fa;
+  max-height: 70vh;
+  overflow-y: auto;
 }
 
 .quiz-dialog :deep(.el-dialog__footer) {
-  padding: 16px 24px;
-  border-top: 1px solid #e4e7ed;
+  display: none;
+}
+
+/* Quenation组件在弹窗中的样式适配 */
+.quiz-dialog :deep(.questionnaire-container) {
+  padding: 0;
+}
+
+.quiz-dialog :deep(.questionnaire-card) {
+  box-shadow: none;
+  border-radius: 0;
+}
+
+.quiz-dialog :deep(.questionnaire-card .el-card__header) {
+  display: none;
+}
+
+.quiz-dialog :deep(.questionnaire-card .el-card__body) {
+  padding: 24px;
+}
+
+/* 加载状态样式 */
+.quiz-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 40px;
+  gap: 20px;
+  min-height: 300px;
+}
+
+.quiz-loading p {
+  color: #606266;
+  font-size: 16px;
+}
+
+.loading-icon {
+  color: #409eff;
+  animation: rotate 1s linear infinite;
+}
+
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 测评结果展示样式 */
+.quiz-result-container {
+  padding: 32px 24px;
+  background: #f5f7fa;
+}
+
+.quiz-result-header {
+  text-align: center;
+  margin-bottom: 24px;
+
+  .quiz-result-title {
+    margin: 12px 0 0;
+    font-size: 22px;
+    font-weight: 600;
+    color: #303133;
+  }
+}
+
+.quiz-score-overview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 28px;
+  padding: 20px;
+  background: linear-gradient(135deg, #ecf5ff 0%, #f0f9eb 100%);
+  border-radius: 12px;
+
+  .score-circle {
+    display: flex;
+    align-items: baseline;
+    gap: 2px;
+  }
+
+  .score-number {
+    font-size: 48px;
+    font-weight: 700;
+    color: #409eff;
+  }
+
+  .score-divider {
+    font-size: 28px;
+    color: #909399;
+    margin: 0 2px;
+  }
+
+  .score-max {
+    font-size: 28px;
+    font-weight: 600;
+    color: #909399;
+  }
+
+  .score-label {
+    margin-top: 4px;
+    font-size: 14px;
+    color: #909399;
+  }
+}
+
+.open-ended-result {
   background: #fff;
+  border-radius: 12px;
+  padding: 20px 24px;
+
+  .section-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 16px;
+    font-weight: 600;
+    color: #303133;
+    margin: 0 0 16px;
+  }
+}
+
+.oe-score-bar {
+  margin-bottom: 20px;
+
+  .oe-score-text {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 15px;
+    color: #606266;
+
+    strong {
+      font-size: 20px;
+      color: #409eff;
+    }
+  }
+}
+
+.score-details {
+  margin-bottom: 20px;
+  border-top: 1px solid #ebeef5;
+  padding-top: 16px;
+
+  .score-detail-item {
+    padding: 12px 16px;
+    margin-bottom: 8px;
+    background: #fafafa;
+    border-radius: 8px;
+    border-left: 3px solid #409eff;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+
+    .detail-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+
+      .detail-point {
+        font-weight: 600;
+        font-size: 14px;
+        color: #303133;
+      }
+    }
+
+    .detail-reason {
+      font-size: 13px;
+      color: #606266;
+      line-height: 1.6;
+    }
+  }
+}
+
+.result-comment,
+.result-suggestions {
+  margin-top: 16px;
+  padding: 16px;
+  border-radius: 8px;
+
+  .comment-label,
+  .suggestions-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 8px;
+  }
+
+  .comment-text,
+  .suggestions-text {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.8;
+    color: #606266;
+    white-space: pre-wrap;
+  }
+}
+
+.result-comment {
+  background: #f0f9eb;
+  border-left: 3px solid #67c23a;
+
+  .comment-label {
+    color: #67c23a;
+  }
+}
+
+.result-suggestions {
+  background: #fdf6ec;
+  border-left: 3px solid #e6a23c;
+
+  .suggestions-label {
+    color: #e6a23c;
+  }
+}
+
+.quiz-result-footer {
+  margin-top: 28px;
+  text-align: center;
 }
 
 .quiz-content {
@@ -3593,5 +3881,158 @@ const resetForm = () => {
 
 .experience-form :deep(.el-textarea__inner:hover) {
   background: #ffffff;
+}
+
+/* ========== 缺失字段提醒对话框样式 ========== */
+
+/* 全局样式覆盖 - 需要在全局CSS中生效 */
+:global(.missing-fields-dialog) {
+  max-width: 480px !important;
+}
+
+:global(.missing-fields-dialog .el-message-box__content) {
+  padding: 20px 24px;
+}
+
+:global(.missing-fields-dialog .el-message-box__message) {
+  padding: 0;
+}
+
+:global(.missing-fields-dialog .el-message-box__btns) {
+  padding: 12px 24px 20px;
+}
+
+/* 缺失字段提示样式 - 组件内部使用 */
+.missing-fields-hint {
+  position: fixed;
+  top: 80px;
+  right: 20px;
+  z-index: 2000;
+  max-width: 360px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  border: 1px solid #e4e7ed;
+  overflow: hidden;
+}
+
+.missing-fields-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #fff7e6 0%, #ffffff 100%);
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.missing-fields-header .el-icon {
+  color: #e6a23c;
+  font-size: 20px;
+}
+
+.missing-fields-title {
+  font-weight: 600;
+  color: #303133;
+  font-size: 15px;
+}
+
+.missing-fields-body {
+  padding: 16px 20px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.missing-fields-group {
+  margin-bottom: 14px;
+}
+
+.missing-fields-group:last-child {
+  margin-bottom: 0;
+}
+
+.missing-fields-group-title {
+  font-size: 13px;
+  color: #409eff;
+  font-weight: 500;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.missing-fields-group-title::before {
+  content: '';
+  width: 3px;
+  height: 14px;
+  background: #409eff;
+  border-radius: 2px;
+}
+
+.missing-fields-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.missing-fields-list li {
+  padding: 6px 0 6px 16px;
+  color: #606266;
+  font-size: 13px;
+  position: relative;
+}
+
+.missing-fields-list li::before {
+  content: '•';
+  position: absolute;
+  left: 4px;
+  color: #c0c4cc;
+}
+
+.missing-fields-footer {
+  padding: 12px 20px 16px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  border-top: 1px solid #f0f0f0;
+  background: #fafbfc;
+}
+
+/* 简历解析后的提示样式 */
+.resume-parsed-notification {
+  background: linear-gradient(135deg, #f0f9eb 0%, #ffffff 100%);
+  border: 1px solid #b3e19d;
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+}
+
+.resume-parsed-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.resume-parsed-header .el-icon {
+  color: #67c23a;
+  font-size: 20px;
+}
+
+.resume-parsed-title {
+  font-weight: 600;
+  color: #67c23a;
+  font-size: 15px;
+}
+
+.resume-parsed-desc {
+  color: #606266;
+  font-size: 13px;
+  line-height: 1.6;
+  padding-left: 30px;
+}
+
+.resume-parsed-desc .highlight {
+  color: #409eff;
+  font-weight: 500;
 }
 </style>

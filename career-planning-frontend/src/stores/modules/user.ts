@@ -1,7 +1,7 @@
 // src/stores/user.ts（持久化设计）
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
-import type { UserInfo } from '@/types/type'
+import type { UserInfo } from '@/types/user'
 
 export const useUserStore = defineStore(
   'user',

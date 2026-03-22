@@ -74,6 +74,7 @@ const isCollapsed = ref(false)
 
 // 判断是否有有效数据（任一维度大于0）
 const hasValidData = computed(() => {
+  if (!props.scores) return false
   const values = Object.values(props.scores)
   return values.some(val => (val || 0) > 0)
 })
@@ -102,6 +103,7 @@ const isEmpty = computed(() => {
 
 // 计算平均分
 const averageScore = computed(() => {
+  if (!props.scores) return 0
   const values = Object.values(props.scores)
   if (values.length === 0) return 0
   const sum = values.reduce((acc, val) => acc + (val || 0), 0)
@@ -143,12 +145,18 @@ const toggleCollapse = () => {
     nextTick(() => {
       initChart()
     })
+  } else {
+    // 收起时销毁图表释放资源
+    chart?.dispose()
+    chart = null
   }
 }
 
 // 关闭弹窗
 const closeDialog = () => {
   emit('update:visible', false)
+  // 关闭时重置收起状态
+  isCollapsed.value = false
 }
 
 // 跳转到指定字段
@@ -160,13 +168,17 @@ const jumpToField = (field: string) => {
 // 初始化图表
 const initChart = () => {
   if (!chartRef.value || !showRadar.value) return
+  // 如果已存在图表，先销毁
+  if (chart) {
+    chart.dispose()
+  }
   chart = echarts.init(chartRef.value)
   updateChart()
 }
 
 // 更新图表配置
 const updateChart = () => {
-  if (!chart || !showRadar.value) return
+  if (!chart || !showRadar.value || !props.visible) return
 
   const option = {
     radar: {
@@ -238,7 +250,7 @@ const updateChart = () => {
             ],
             name: '能力评估',
             areaStyle: {
-              color: new (echarts as any).graphic.LinearGradient(0, 0, 0, 1, [
+              color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
                 { offset: 0, color: 'rgba(64,158,255,0.4)' },
                 { offset: 1, color: 'rgba(64,158,255,0.1)' }
               ])
@@ -299,7 +311,12 @@ watch(
   () => props.scores,
   () => {
     nextTick(() => {
-      updateChart()
+      // 如果图表未初始化但数据有效且弹窗可见，先初始化图表
+      if (!chart && showRadar.value && props.visible) {
+        initChart()
+      } else {
+        updateChart()
+      }
     })
   },
   { deep: true }

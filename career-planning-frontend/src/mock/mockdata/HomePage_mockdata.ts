@@ -23,7 +23,7 @@ export const quickActions = [
     icon: DocumentChecked,
     desc: '岗位匹配',
     color: '#67c23a',
-    route: '/report'
+    route: '/job-matching'
   },
   {
     title: '生成报告',

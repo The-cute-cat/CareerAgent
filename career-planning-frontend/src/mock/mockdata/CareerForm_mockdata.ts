@@ -911,6 +911,54 @@ export const generateMockResumeUploadResponse = (fileName: string) => {
     internships: [{ company: 'ABC科技', role: 'Java开发工程师' }]
   })
 
+  // 模拟从简历解析出的表单数据（用于自动填充表单）
+  const parsedFormData = {
+    education: '本科',
+    major: ['计算机类', '软件工程'],
+    graduationDate: '2025-06',
+    languages: [
+      { type: '英语', level: 'CET-6', other: '' }
+    ],
+    certificates: ['CET-6', '软件设计师'],
+    skills: [
+      { name: 'Java', credibility: 85 },
+      { name: 'Spring Boot', credibility: 80 },
+      { name: 'MySQL', credibility: 75 },
+      { name: 'Redis', credibility: 70 },
+      { name: 'Vue.js', credibility: 65 },
+      { name: 'Docker', credibility: 60 }
+    ],
+    tools: [
+      { name: 'Git', proficiency: '熟练' },
+      { name: 'IntelliJ IDEA', proficiency: '精通' },
+      { name: 'VS Code', proficiency: '熟练' }
+    ],
+    codeAbility: { links: 'https://github.com/zhangsan' },
+    projects: [
+      {
+        isCompetition: false,
+        name: '电商平台后端系统',
+        desc: '负责订单模块的设计与开发，使用Spring Boot + MySQL + Redis技术栈，支持高并发场景'
+      },
+      {
+        isCompetition: true,
+        name: '校园二手交易平台',
+        desc: '获得校级创新创业大赛二等奖，负责整体架构设计和核心功能开发'
+      }
+    ],
+    internships: [
+      {
+        company: 'ABC科技有限公司',
+        role: 'Java开发工程师',
+        date: [],
+        desc: '参与公司核心业务系统开发，负责订单管理模块的设计与实现'
+      }
+    ],
+    innovation: '通过引入Redis缓存和数据库索引优化，将系统查询性能提升30%',
+    targetJob: '', // 故意留空，测试必填检测
+    targetIndustries: ['互联网', '软件开发'] // 目标行业也留空，测试必填检测
+  }
+
   return {
     code: 200,
     message: '简历上传并解析成功',
@@ -922,7 +970,9 @@ export const generateMockResumeUploadResponse = (fileName: string) => {
       // 能力评估分数（与表单提交流程格式一致）
       abilityScores,
       // 完整报告（与表单提交流程格式一致）
-      report
+      report,
+      // AI解析后的表单数据（新增，用于自动填充）
+      formData: parsedFormData
     }
   }
 }

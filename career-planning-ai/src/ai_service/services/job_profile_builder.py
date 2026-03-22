@@ -9,6 +9,7 @@ from langchain_core.output_parsers import PydanticOutputParser
 from langchain_community.chat_models import ChatTongyi
 
 from ai_service.models.struct_job_txt import JDAnalysisResult
+from ai_service.services import log
 from config import settings
 
 load_dotenv()
@@ -92,7 +93,7 @@ def analyze_job_description(jd_text: str, api_key: Optional[str] = None, model_n
         return result.model_dump(by_alias=True)
 
     except Exception as e:
-        print(f"解析错误:{e}")
+        log.error(f"解析错误:{e}",exc_info=True)
         # 如果解析失败，可以尝试返回原始文本或重试逻辑
         return {"error": str(e), "raw_text": jd_text}
 
@@ -109,7 +110,7 @@ if __name__ == "__main__":
         result_data = analyze_job_description(sample_jd)
 
         # 打印结果
-        print(json.dumps(result_data, ensure_ascii=False, indent=2))
+        log.info(json.dumps(result_data, ensure_ascii=False, indent=2))
 
     except Exception as e:
-        print(f"运行失败:{e}")
+        log.error(f"运行失败:{e}",exc_info=True)

@@ -1,3 +1,5 @@
+import time
+
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
@@ -7,14 +9,15 @@ from starlette.responses import JSONResponse
 
 from ai_service.exceptions import ApiException
 from ai_service.response.result import success
-from ai_service.routers import parse, test_question
+from ai_service.routers import parse, test_question, matching, convert
 from ai_service.utils.logger_handler import log
 
 app = FastAPI()
 
 app.include_router(parse.router)
 app.include_router(test_question.router)
-#app.include_router(matching.router)
+app.include_router(matching.router)
+app.include_router(convert.router)
 
 
 @app.exception_handler(StarletteHTTPException)
@@ -106,6 +109,15 @@ app.add_middleware(
     allow_methods=["*"],  # 允许所有方法
     allow_headers=["*"],  # 允许所有请求头
 )
+
+
+@app.middleware("http")
+async def log_middleware(request: Request, call_next):
+    start_time = time.time()
+    response = await call_next(request)
+    end_time = time.time()
+    log.info(f"请求地址: {request.url.path}, 响应时间: {end_time - start_time:.3f}s")
+    return response
 
 
 @app.get("/")

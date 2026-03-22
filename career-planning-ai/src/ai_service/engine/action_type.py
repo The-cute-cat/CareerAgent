@@ -1,5 +1,9 @@
 from enum import Enum, unique
 
+__all__ = [
+    "ActionType",
+]
+
 
 @unique
 class ActionType(str, Enum):

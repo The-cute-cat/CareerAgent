@@ -21,7 +21,7 @@ semaphore = asyncio.Semaphore(3)  # 限制最多 3 个并发
 @router.post("/file")
 async def parse_file(file_info=Depends(handle_file)):
     text = await _extract_text_from_file(file_info["save_path"], file_info["extension"])
-    return success(await struct_text_extractor.extract_from_text_to_user_form(text))
+    return success(await struct_text_extractor.extract_from_text_to_userform(text))
 
 
 @router.post("/files")
@@ -33,7 +33,7 @@ async def parse_files(file_infos=Depends(handle_files)):
         ])
 
     results = await asyncio.gather(*[
-        struct_text_extractor.extract_from_text_to_user_form(text)
+        struct_text_extractor.extract_from_text_to_userform(text)
         for text in texts
     ])
     return success(results)
@@ -64,8 +64,7 @@ async def _extract_text_from_file(file_path: str, extension: str) -> str:
         return await word_extractor.detect_word_to_enhance_text(file_path)
 
     elif extension.lower() in [suffix.lower() for suffix in settings.image.suffix]:
-        text = await image_extractor.extract_text(image_path=file_path)
-        return text or ""
+        return await image_extractor.extract_text(image_path=file_path)
 
     else:
         raise CommonHandleError(f"不支持的文件类型: {extension}")

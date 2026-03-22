@@ -3,7 +3,7 @@ import { ref, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 
-import type { LoginFormDTO } from '@/types/type'
+import type { LoginFormDTO } from '@/types/user'
 import { userRegisterService, userSendCodeRegisterService } from '@/api/user/user'
 import { useUserStore } from '@/stores'
 
@@ -35,10 +35,11 @@ const sendVerificationCode = async () => {
   codeSending.value = true
   try {
     console.log('发送验证码至邮箱:', form.value.email)
-    const res = await userSendCodeRegisterService(form.value) // 这里可以调用实际的发送验证码API
+    const res = await userSendCodeRegisterService(form.value)
     console.log('验证码发送结果:', res)
     if (res.data.code !== 200) {
       ElMessage.error(res.data.msg || '验证码发送失败')
+      return
     }
     ElMessage.success(`验证码已发送至 ${form.value.email}，请查收`)
     // 启动倒计时 60 秒
@@ -48,15 +49,13 @@ const sendVerificationCode = async () => {
       if (codeCountdown.value > 0) {
         codeCountdown.value--
       } else {
-        if (countdownTimer) {
-          clearInterval(countdownTimer)
-          countdownTimer = null
-        }
+        clearInterval(countdownTimer!)
+        countdownTimer = null
       }
     }, 1000)
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : '验证码发送失败，请重试'
-    ElMessage.error(`${errorMessage}，你刚刚发送了一次验证码，请稍后再试`)
+    ElMessage.error(errorMessage)
   } finally {
     codeSending.value = false
   }
@@ -76,20 +75,20 @@ const handleRegister = async () => {
 
   loading.value = true
   try {
-    // 模拟注册请求
     const res = await userRegisterService(form.value)
     console.log('注册结果:', res)
     if (res.data.code !== 200) {
       ElMessage.error(res.data.msg || '注册失败')
+      return
     }
-    userStore.clearUserALLInfo() // 清除用户信息，确保注册流程干净
+    userStore.clearUserALLInfo()
     ElMessage.success('注册成功，请登录')
     await new Promise(resolve => setTimeout(resolve, 1000))
     router.push('/login')
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : '注册失败'
     ElMessage.error(errorMessage)
-    console.log("注册失败", error);
+    console.log("注册失败", error)
   } finally {
     loading.value = false
   }
@@ -274,12 +273,11 @@ h3.mb-4 {
 
 /* 响应式调整 */
 @media (max-width: 991.98px) {
-
   .wrap .img,
   .wrap .login-wrap {
     width: 100%;
   }
-
+  
   .wrap .img {
     min-height: 180px;
     height: 180px;

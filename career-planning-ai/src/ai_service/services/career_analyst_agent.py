@@ -1,13 +1,13 @@
-import json
 import asyncio
-from dotenv import load_dotenv
-from pydantic import BaseModel, Field
-from ai_service.models.struct_txt import StudentProfile
-import dashscope
+import json
 from typing import List, Dict, Any
 
+import dashscope
+from pydantic import BaseModel, Field
+
+from ai_service.models.struct_txt import StudentProfile
 from ai_service.services import log
-from config import settings, LLM
+from config import settings
 
 
 # ==========================================

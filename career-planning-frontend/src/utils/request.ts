@@ -1,5 +1,4 @@
 import axios from 'axios'
-import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/index'
 import router from '@/router' // 直接导入实例，不需要 hooks
 // 在 request.ts 顶部定义一个标志
