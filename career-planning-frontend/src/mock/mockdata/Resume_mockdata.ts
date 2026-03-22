@@ -6,9 +6,9 @@
  */
 
 import type { Result } from '@/types/type'
-import type { JobMatchResult } from '@/types/job-match'
+import type { JobMatchItem } from '@/types/job-match'
 import type { UploadResponse } from '@/types/careerform_report'
-import { mockJobMatchResult } from './JobMatch_mockdata'
+import { mockJobMatchItems } from './JobMatch_mockdata'
 import type { AxiosResponse } from 'axios'
 
 /**
@@ -223,14 +223,14 @@ export async function mockUploadResumeApi(
 export async function mockSubmitFormApi(
   scenario: 'success' | 'validation_error' = 'success',
   delayMs: number = 1000
-): Promise<AxiosResponse<Result<JobMatchResult>>> {
+): Promise<AxiosResponse<Result<JobMatchItem[]>>> {
   await delay(delayMs)
 
   if (scenario === 'validation_error') {
     return wrapAsAxiosResponse({
       code: 400,
       msg: '表单验证失败，请检查必填字段',
-      data: null as unknown as JobMatchResult
+      data: null as unknown as JobMatchItem[]
     })
   }
 
@@ -238,7 +238,7 @@ export async function mockSubmitFormApi(
   return wrapAsAxiosResponse({
     code: 200,
     msg: '提交成功',
-    data: mockJobMatchResult
+    data: mockJobMatchItems
   })
 }
 

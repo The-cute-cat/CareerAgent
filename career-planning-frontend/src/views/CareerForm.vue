@@ -37,7 +37,7 @@ import { submitCareerFormApi, convertToSubmitDTO } from '@/api/career-form/formd
 import { submitQuiz, getQuestionsApi } from '@/api/career-form/questions'
 import type { CareerFormData } from '@/types/careerform_report'
 import type { Question } from '@/types/careerform_question'
-import type { JobMatchResult } from '@/types/job-match'
+import type { JobMatchItem } from '@/types/job-match'
 import {
   majorOptions
 } from '@/mock/mockdata/CareerForm_mockdata'
@@ -109,17 +109,8 @@ const internshipForm = reactive({
   editIndex: -1
 })
 
-/** 人岗匹配结果数据 */
-const jobMatchResult = reactive<JobMatchResult>({
-  taskId: '',
-  totalScore: 0,
-  dimensions: [],
-  gaps: [],
-  aiExplanation: '',
-  confidence: 0,
-  recommendedJobs: [],
-  generatedAt: ''
-})
+/** 人岗匹配结果数据（后端返回的岗位匹配数组） */
+const jobMatchResult = reactive<JobMatchItem[]>([])
 
 /** 画像完整度 (0-100) */
 const profileCompleteness = computed(() => {
@@ -1384,9 +1375,9 @@ const formRules = reactive<FormRules>({
 /**
  * 获取模拟人岗匹配结果
  */
-const fetchMockJobMatchResult = async (): Promise<JobMatchResult> => {
-  const { mockJobMatchResult } = await import('@/mock/mockdata/JobMatch_mockdata')
-  return mockJobMatchResult
+const fetchMockJobMatchResult = async (): Promise<JobMatchItem[]> => {
+  const { mockJobMatchItems } = await import('@/mock/mockdata/JobMatch_mockdata')
+  return mockJobMatchItems
 }
 
 /**
@@ -1412,7 +1403,7 @@ const submitForm = async () => {
       return
     }
 
-    const matchResult = res.data.data as JobMatchResult
+    const matchResult = res.data.data as JobMatchItem[]
     localStorage.setItem('jobMatchResult', JSON.stringify(matchResult))
     ElMessage.success('人岗匹配分析完成！')
     router.push('/job-matching')

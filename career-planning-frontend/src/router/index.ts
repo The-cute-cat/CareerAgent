@@ -54,6 +54,11 @@ const router = createRouter({
           name: 'job-matching',
           component: () => import('../views/JobMatching.vue'),
         },
+        {
+          path: 'job-position',
+          name: 'job-position',
+          component: () => import('../components/JobMatching_Position.vue'),
+        },
       ],
     },
     {

@@ -1,5 +1,5 @@
 import request from '@/utils/request'
-import type { JobMatchResult } from '@/types/job-match'
+import type { JobMatchItem } from '@/types/job-match'
 import { mockSubmitFormApi } from '@/mock/mockdata/Resume_mockdata'
 import type { CareerFormData, CareerFormSubmitDTO } from '@/types/careerform_report'
 import type { Result } from '@/types/type'
@@ -18,7 +18,7 @@ export function submitCareerFormApi(data: CareerFormSubmitDTO) {
     console.log('[Mock] 提交表单数据:', data)
     return mockSubmitFormApi('success', 1000)
   }
-  return request.post<Result<JobMatchResult>>('/career/form/submit', data)
+  return request.post<Result<JobMatchItem[]>>('/career/form/submit', data)
 }
 
 /**
