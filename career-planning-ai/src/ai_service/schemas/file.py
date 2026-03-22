@@ -135,6 +135,6 @@ async def validate_some_image(
 
 
 async def validate_image(file_info: dict[str, str] = Depends(handle_file)) -> dict[str, str]:
-    if file_info["extension"].lower() in [suffix.lower() for suffix in settings.image.suffix]:
+    if file_info["extension"].lower() not in [suffix.lower() for suffix in settings.image.suffix]:
         raise FileValidationError(f"File type is not image, file info:{file_info}")
     return file_info

@@ -34,7 +34,7 @@ class JobVectorStore:
         # 1. 连接 Milvus
         if self.url != "<url>" and self.token != "<token>":
             connections.connect("default", uri=self.url, token=self.token)
-            log.info(f"✅ 已连接到 Zilliz 云服务: {self.url}")
+            log.info(f"✅ 已连接到 Zilliz 云服务!")
         else:
             connections.connect("default", host=self.host, port=self.port)
             log.info(f"✅ 已连接到本地 Milvus: {self.host}:{self.port}")
