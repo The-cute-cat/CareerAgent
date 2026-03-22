@@ -4,8 +4,7 @@ import type { UploadResponse } from '@/types/careerform_report'
 import type { AxiosResponse } from 'axios'
 import { mockUploadResumeApi } from '@/mock/mockdata/Resume_mockdata'
 /** 通用响应结果 */
-import type {  Result } from "../../types/type"
-
+import type { Result } from '../../types/type'
 
 // ==================== Mock 开关配置 ====================
 // 设置 VITE_ENABLE_MOCK=true 在 .env 文件中启用 Mock
@@ -44,14 +43,16 @@ export function uploadResumeApi(params: UploadParams, signal?: AbortSignal) {
   //业务参数
   formData.append('overwrite', params.overwrite ? 'true' : 'false')
 
-  return request.post<Result<UploadResponse>>('/resume/upload', formData, {
-    signal, // 用于取消上传
+  //可选：前端预提取的元数据 (减轻后端压力)
+  // formData.append('file_type', params.file.type)
+
+  return request.post<Result<UploadResponse>>('/parse/file', formData, {
     // 上传进度监控 (提升用户体验)
     onUploadProgress: (progressEvent: any) => {
       if (progressEvent.total && params.onProgress) {
         params.onProgress(progressEvent)
       }
-    }
+    },
   })
 }
 
@@ -60,7 +61,7 @@ export function uploadResumeApi(params: UploadParams, signal?: AbortSignal) {
  */
 function mockUploadWithProgress(
   params: UploadParams,
-  scenario: 'success' | 'partial' | 'processing' | 'failed'
+  scenario: 'success' | 'partial' | 'processing' | 'failed',
 ): Promise<AxiosResponse<Result<UploadResponse>>> {
   return new Promise((resolve, reject) => {
     let progress = 0
@@ -75,7 +76,7 @@ function mockUploadWithProgress(
         params.onProgress({
           loaded: progress,
           total: 100,
-          progress: progress / 100
+          progress: progress / 100,
         })
       }
 
@@ -84,16 +85,14 @@ function mockUploadWithProgress(
         clearInterval(interval)
         // 延迟后返回结果，模拟后端处理时间
         setTimeout(() => {
-          mockUploadResumeApi(params.file.name, scenario, 500)
-            .then(resolve)
-            .catch(reject)
+          mockUploadResumeApi(params.file.name, scenario, 500).then(resolve).catch(reject)
         }, 500)
       }
     }, stepDelay)
 
     // 支持取消
     if (params.onProgress) {
-      (params as any)._cancelInterval = () => clearInterval(interval)
+      ;(params as any)._cancelInterval = () => clearInterval(interval)
     }
   })
 }
