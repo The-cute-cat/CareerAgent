@@ -3,32 +3,10 @@ import { ref, reactive, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import {
-  DocumentAdd,
-  Trophy,
-  DataAnalysis,
-  Position,
-  Plus,
-  Delete,
-  Upload,
-  Check,
-  ArrowUp,
-  ArrowDown,
-  RefreshRight,
-  InfoFilled,
-  CircleCheck,
-  Document,
-  Loading,
-  Warning,
-  Rank,
-  Folder,
-  Briefcase,
-  OfficeBuilding,
-  User,
-  Calendar,
-  Edit,
-  EditPen,
-  Switch,
-  Medal
+  DocumentAdd, Trophy, DataAnalysis, Position, Plus, Delete, Upload,
+  Check, ArrowUp, ArrowDown, RefreshRight, InfoFilled, CircleCheck,
+  Document, Loading, Warning, Rank, Folder, Briefcase, OfficeBuilding,
+  User, Calendar, Edit, EditPen, Switch, Medal
 } from '@element-plus/icons-vue'
 import CareerFormUpload from '@/components/CareerFormUpload.vue'
 import CareerFormRadar from '@/components/CareerFormRadar.vue'
@@ -37,18 +15,10 @@ import { submitCareerFormApi, convertToSubmitDTO, getCareerReportStatusApi, getC
 import { getResumeReportApi, getResumeParseStatusApi } from '@/api/career-form/resume'
 import type { CareerFormData, CareerFormSubmitResult } from '@/types/type'
 import {
-  majorOptions,
-  communicationQuestions,
-  stressQuestions,
-  learningQuestions,
-  pythonQuestions,
-  javaQuestions,
-  cppQuestions,
-  gitQuestions,
-  dockerQuestions,
-  getRandomQuestion,
-  calculateRadarScores,
-  fetchMockAbilityReport
+  majorOptions, communicationQuestions, stressQuestions,
+  learningQuestions, pythonQuestions, javaQuestions,
+  cppQuestions, gitQuestions, dockerQuestions,
+  getRandomQuestion, calculateRadarScores, fetchMockAbilityReport
 } from '@/mock/mockdata/CareerForm_mockdata'
 
 
@@ -132,45 +102,45 @@ const profileCompleteness = computed(() => {
 
   // 基本信息项
   const basicItems = [
-    !!formData.value.education,
-    formData.value.major.length > 0,
-    !!formData.value.graduationDate
+    !!formData.education,
+    formData.major.length > 0,
+    !!formData.graduationDate
   ]
   total += basicItems.length
   completed += basicItems.filter(Boolean).length
 
   // 技能与证书项
   const skillItems = [
-    formData.value.languages.some(l => l.type && l.level),
-    formData.value.certificates.length > 0,
-    formData.value.skills.length > 0,
-    formData.value.tools.length > 0
+    formData.languages.some(l => l.type && l.level),
+    formData.certificates.length > 0,
+    formData.skills.length > 0,
+    formData.tools.length > 0
   ]
   total += skillItems.length
   completed += skillItems.filter(Boolean).length
 
   // 经历与项目项
   const expItems = [
-    formData.value.projects.length > 0,
-    formData.value.internships.length > 0
+    formData.projects.length > 0,
+    formData.internships.length > 0
   ]
   total += expItems.length
   completed += expItems.filter(Boolean).length
 
   // 素质测评项
   const quizItems = [
-    formData.value.scores.communication,
-    formData.value.scores.stress,
-    formData.value.scores.learning,
-    !!formData.value.innovation
+    formData.scores.communication,
+    formData.scores.stress,
+    formData.scores.learning,
+    !!formData.innovation
   ]
   total += quizItems.length
   completed += quizItems.filter(Boolean).length
 
   // 职业意向项
   const careerItems = [
-    !!formData.value.targetJob,
-    formData.value.targetIndustries.length > 0
+    !!formData.targetJob,
+    formData.targetIndustries.length > 0
   ]
   total += careerItems.length
   completed += careerItems.filter(Boolean).length
@@ -183,7 +153,7 @@ const missingItems = computed<MissingItem[]>(() => {
   const items: MissingItem[] = []
 
   // 检查证书
-  if (formData.value.certificates.length === 0) {
+  if (formData.certificates.length === 0) {
     items.push({
       field: 'certificates',
       label: '缺少专业证书',
@@ -193,7 +163,7 @@ const missingItems = computed<MissingItem[]>(() => {
   }
 
   // 检查实习经历
-  if (formData.value.internships.length === 0) {
+  if (formData.internships.length === 0) {
     items.push({
       field: 'internships',
       label: '缺少实习经历',
@@ -203,7 +173,7 @@ const missingItems = computed<MissingItem[]>(() => {
   }
 
   // 检查项目经历
-  if (formData.value.projects.length === 0) {
+  if (formData.projects.length === 0) {
     items.push({
       field: 'projects',
       label: '缺少项目经历',
@@ -213,7 +183,7 @@ const missingItems = computed<MissingItem[]>(() => {
   }
 
   // 检查语言能力
-  if (!formData.value.languages.some(l => l.type && l.level)) {
+  if (!formData.languages.some(l => l.type && l.level)) {
     items.push({
       field: 'languages',
       label: '缺少语言能力',
@@ -223,7 +193,7 @@ const missingItems = computed<MissingItem[]>(() => {
   }
 
   // 检查技能
-  if (formData.value.skills.length === 0) {
+  if (formData.skills.length === 0) {
     items.push({
       field: 'skills',
       label: '缺少专业技能',
@@ -233,7 +203,7 @@ const missingItems = computed<MissingItem[]>(() => {
   }
 
   // 检查工具
-  if (formData.value.tools.length === 0) {
+  if (formData.tools.length === 0) {
     items.push({
       field: 'tools',
       label: '缺少工具掌握',
@@ -243,7 +213,7 @@ const missingItems = computed<MissingItem[]>(() => {
   }
 
   // 检查素质测评
-  if (!formData.value.scores.communication) {
+  if (!formData.scores.communication) {
     items.push({
       field: 'quiz-communication',
       label: '未完成沟通能力测评',
@@ -251,7 +221,7 @@ const missingItems = computed<MissingItem[]>(() => {
       priority: 'medium'
     })
   }
-  if (!formData.value.scores.stress) {
+  if (!formData.scores.stress) {
     items.push({
       field: 'quiz-stress',
       label: '未完成抗压能力测评',
@@ -259,7 +229,7 @@ const missingItems = computed<MissingItem[]>(() => {
       priority: 'medium'
     })
   }
-  if (!formData.value.scores.learning) {
+  if (!formData.scores.learning) {
     items.push({
       field: 'quiz-learning',
       label: '未完成学习能力测评',
@@ -269,7 +239,7 @@ const missingItems = computed<MissingItem[]>(() => {
   }
 
   // 检查创新案例
-  if (!formData.value.innovation) {
+  if (!formData.innovation) {
     items.push({
       field: 'innovation',
       label: '缺少创新案例',
@@ -284,7 +254,7 @@ const missingItems = computed<MissingItem[]>(() => {
 
 // --- 表单数据 ---
 
-const formData = ref<CareerFormData>({
+const formData = reactive<CareerFormData>({
   /** 学历：高中/大专/本科/硕士/博士/其他 */
   education: '',
   /** 当学历选择"其他"时的自定义输入值 */
@@ -352,11 +322,11 @@ const formProgress = computed(() => {
   let completed = 0
   const total = 5
 
-  if (formData.value.education) completed++
-  if (formData.value.major.length > 0) completed++
-  if (formData.value.skills.length > 0) completed++
-  if (formData.value.projects.length > 0 || formData.value.internships.length > 0) completed++
-  if (formData.value.targetJob) completed++
+  if (formData.education) completed++
+  if (formData.major.length > 0) completed++
+  if (formData.skills.length > 0) completed++
+  if (formData.projects.length > 0 || formData.internships.length > 0) completed++
+  if (formData.targetJob) completed++
 
   return Math.round((completed / total) * 100)
 })
@@ -367,7 +337,7 @@ const formProgress = computed(() => {
  * 用于显示/隐藏代码能力相关表单项
  */
 const isComputerMajor = computed(() => {
-  const majorStr = JSON.stringify(formData.value.major)
+  const majorStr = JSON.stringify(formData.major)
   return majorStr.includes('计算机') || majorStr.includes('软件')
 })
 
@@ -385,15 +355,15 @@ const isComputerMajor = computed(() => {
 const isStepCompleted = (step: number) => {
   switch (step) {
     case 1:
-      return !!(formData.value.education && formData.value.major.length > 0)
+      return !!(formData.education && formData.major.length > 0)
     case 2:
-      return !!(formData.value.skills.length > 0 || formData.value.certificates.length > 0)
+      return !!(formData.skills.length > 0 || formData.certificates.length > 0)
     case 3:
-      return !!(formData.value.projects.length > 0 || formData.value.internships.length > 0)
+      return !!(formData.projects.length > 0 || formData.internships.length > 0)
     case 4:
-      return !!(formData.value.scores.communication && formData.value.scores.stress && formData.value.scores.learning && formData.value.innovation)
+      return !!(formData.scores.communication && formData.scores.stress && formData.scores.learning && formData.innovation)
     case 5:
-      return !!(formData.value.targetJob && formData.value.targetIndustries.length > 0)
+      return !!(formData.targetJob && formData.targetIndustries.length > 0)
     default:
       return false
   }
@@ -421,13 +391,13 @@ const handleMenuSelect = (index: string) => {
 
 
 /** 添加新的语言能力项 */
-const addLanguage = () => formData.value.languages.push({ type: '', level: '', other: '' })
+const addLanguage = () => formData.languages.push({ type: '', level: '', other: '' })
 
 /**
  * 移除指定索引的语言能力项
  * @param index - 要移除的项的索引
  */
-const removeLanguage = (index: number) => formData.value.languages.splice(index, 1)
+const removeLanguage = (index: number) => formData.languages.splice(index, 1)
 
 
 /**
@@ -438,7 +408,7 @@ const removeLanguage = (index: number) => formData.value.languages.splice(index,
 const handleEducationChange = (value: string) => {
   showEducationInput.value = value === '其他'
   if (value !== '其他') {
-    formData.value.educationOther = ''
+    formData.educationOther = ''
   }
 }
 
@@ -451,7 +421,7 @@ const handleEducationChange = (value: string) => {
 const handleCertificateChange = (value: string[]) => {
   showCertificateInput.value = value.includes('其他')
   if (!showCertificateInput.value) {
-    formData.value.certificateOther = ''
+    formData.certificateOther = ''
   }
 }
 
@@ -462,7 +432,7 @@ const handleCertificateChange = (value: string[]) => {
  */
 const addSkill = () => {
   if (newSkill.value) {
-    formData.value.skills.push({ name: newSkill.value, credibility: 50 })
+    formData.skills.push({ name: newSkill.value, credibility: 50 })
     newSkill.value = ''
   }
 }
@@ -471,7 +441,7 @@ const addSkill = () => {
  * 移除指定索引的技能
  * @param index - 要移除的技能索引
  */
-const removeSkill = (index: number) => formData.value.skills.splice(index, 1)
+const removeSkill = (index: number) => formData.skills.splice(index, 1)
 
 
 /**
@@ -480,7 +450,7 @@ const removeSkill = (index: number) => formData.value.skills.splice(index, 1)
  */
 const addTool = () => {
   if (newTool.value) {
-    formData.value.tools.push({ name: newTool.value, proficiency: '熟练' })
+    formData.tools.push({ name: newTool.value, proficiency: '熟练' })
     newTool.value = ''
   }
 }
@@ -489,7 +459,7 @@ const addTool = () => {
  * 移除指定索引的工具
  * @param index - 要移除的工具索引
  */
-const removeTool = (index: number) => formData.value.tools.splice(index, 1)
+const removeTool = (index: number) => formData.tools.splice(index, 1)
 
 
 /** 打开项目经历弹窗 */
@@ -506,7 +476,7 @@ const confirmAddProject = () => {
     ElMessage.warning('请输入项目名称')
     return
   }
-  formData.value.projects.push({
+  formData.projects.push({
     isCompetition: projectForm.isCompetition,
     name: projectForm.name,
     desc: projectForm.desc
@@ -519,7 +489,7 @@ const confirmAddProject = () => {
  * 移除指定索引的项目经历
  * @param index - 要移除的项目索引
  */
-const removeProject = (index: number) => formData.value.projects.splice(index, 1)
+const removeProject = (index: number) => formData.projects.splice(index, 1)
 
 /** 打开实践经历弹窗 */
 const openInternshipDialog = () => {
@@ -540,7 +510,7 @@ const confirmAddInternship = () => {
     ElMessage.warning('请输入担任岗位')
     return
   }
-  formData.value.internships.push({
+  formData.internships.push({
     company: internshipForm.company,
     role: internshipForm.role,
     date: internshipForm.date,
@@ -554,7 +524,7 @@ const confirmAddInternship = () => {
  * 移除指定索引的实习经历
  * @param index - 要移除的实习索引
  */
-const removeInternship = (index: number) => formData.value.internships.splice(index, 1)
+const removeInternship = (index: number) => formData.internships.splice(index, 1)
 
 /**
  * 格式化日期范围显示
@@ -584,13 +554,13 @@ const formatDateRange = (dateRange: Date[]) => {
  */
 const movePriority = (index: number, direction: number) => {
   const newIndex = index + direction
-  if (newIndex < 0 || newIndex >= formData.value.priorities.length) return
+  if (newIndex < 0 || newIndex >= formData.priorities.length) return
 
-  const temp = formData.value.priorities[index]!
-  const target = formData.value.priorities[newIndex]!
+  const temp = formData.priorities[index]!
+  const target = formData.priorities[newIndex]!
 
-  formData.value.priorities[index] = target
-  formData.value.priorities[newIndex] = temp
+  formData.priorities[index] = target
+  formData.priorities[newIndex] = temp
 }
 
 /**
@@ -629,8 +599,8 @@ const handleDrop = (dropIndex: number) => {
   }
 
   // 移动数组元素
-  const item = formData.value.priorities.splice(dragIndex.value, 1)[0]!
-  formData.value.priorities.splice(dropIndex, 0, item)
+  const item = formData.priorities.splice(dragIndex.value, 1)[0]!
+  formData.priorities.splice(dropIndex, 0, item)
 
   dragIndex.value = -1
   dragOverIndex.value = -1
@@ -710,10 +680,10 @@ const currentTestIndex = ref(-1)
 const openTestModal = (type: string, index?: number) => {
   // 保存当前测试的技能信息
   if (type === 'skill' && index !== undefined) {
-    currentTestSkill.value = formData.value.skills[index]?.name || ''
+    currentTestSkill.value = formData.skills[index]?.name || ''
     currentTestIndex.value = index
   } else if (type === 'tool' && index !== undefined) {
-    currentTestSkill.value = formData.value.tools[index]?.name || ''
+    currentTestSkill.value = formData.tools[index]?.name || ''
     currentTestIndex.value = index
   } else {
     currentTestSkill.value = ''
@@ -883,10 +853,10 @@ const confirmTest = () => {
   }
 
   // 检查是技能测试还是工具测试
-  const isSkillTest = formData.value.skills.some((s, idx) =>
+  const isSkillTest = formData.skills.some((s, idx) =>
     idx === currentTestIndex.value && s.name.toLowerCase() === currentTestSkill.value.toLowerCase()
   )
-  const isToolTest = formData.value.tools.some((t, idx) =>
+  const isToolTest = formData.tools.some((t, idx) =>
     idx === currentTestIndex.value && t.name.toLowerCase() === currentTestSkill.value.toLowerCase()
   )
 
@@ -901,9 +871,9 @@ const confirmTest = () => {
       if (isCorrect) {
         ElMessage.success(`回答正确！${currentTestSkill.value} 技能熟练度提升`)
         // 答对后提升熟练度
-        if (formData.value.skills[currentTestIndex.value]) {
-          formData.value.skills[currentTestIndex.value]!.credibility = Math.min(100,
-            (formData.value.skills[currentTestIndex.value]!.credibility || 50) + 10
+        if (formData.skills[currentTestIndex.value]) {
+          formData.skills[currentTestIndex.value]!.credibility = Math.min(100,
+            (formData.skills[currentTestIndex.value]!.credibility || 50) + 10
           )
         }
       } else {
@@ -931,7 +901,7 @@ const confirmTest = () => {
       if (isCorrect) {
         ElMessage.success(`回答正确！${currentTestSkill.value} 工具熟练度提升`)
         // 答对后提升熟练度（将熟练度转换为数值）
-        const tool = formData.value.tools[currentTestIndex.value]
+        const tool = formData.tools[currentTestIndex.value]
         if (tool) {
           const proficiencyMap: Record<string, number> = {
             '了解': 25,
@@ -962,7 +932,7 @@ const confirmTest = () => {
   // 素质测评：标记为已完成
   if (currentQuizType.value) {
     testDialog.visible = false
-    formData.value.scores[currentQuizType.value as keyof typeof formData.scores] = true
+    formData.scores[currentQuizType.value as keyof typeof formData.scores] = true
     ElMessage.success('测试已完成，结果已记录')
     currentQuizType.value = ''
     return
@@ -1032,8 +1002,8 @@ const pollForResumeReport = async (taskId: string): Promise<RadarScores> => {
  * @param parsedData - 简历解析后的数据对象
  */
 const handleResumeParsed = async (parsedData: any) => {
-  console.log('简历解析结果:', parsedData);
-  formData.value = parsedData.value
+  Object.assign(formData, parsedData)
+
   hasUploadedResume.value = true
   showUploadDialog.value = false
   ElMessage.success('简历解析成功！已自动填充部分信息')
@@ -1041,8 +1011,8 @@ const handleResumeParsed = async (parsedData: any) => {
   // 将解析出的技能添加到技能列表，默认熟练度70
   if (parsedData?.profile?.skills && parsedData.profile.skills.length > 0) {
     parsedData.profile.skills.forEach((skill: string) => {
-      if (!formData.value.skills.find(s => s.name === skill)) {
-        formData.value.skills.push({ name: skill, credibility: 70 })
+      if (!formData.skills.find(s => s.name === skill)) {
+        formData.skills.push({ name: skill, credibility: 70 })
       }
     })
   }
@@ -1330,15 +1300,15 @@ const resetForm = () => {
   formRef.value.resetFields()
 
   // 手动重置动态列表数据（resetFields 无法处理动态添加的数组项）
-  formData.value.languages = [{ type: '', level: '', other: '' }]
-  formData.value.certificates = []
-  formData.value.certificateOther = ''
-  formData.value.skills = []
-  formData.value.tools = []
-  formData.value.projects = []
-  formData.value.internships = []
-  formData.value.scores = { communication: false, stress: false, learning: false }
-  formData.value.priorities = [
+  formData.languages = [{ type: '', level: '', other: '' }]
+  formData.certificates = []
+  formData.certificateOther = ''
+  formData.skills = []
+  formData.tools = []
+  formData.projects = []
+  formData.internships = []
+  formData.scores = { communication: false, stress: false, learning: false }
+  formData.priorities = [
     { value: 'tech', label: '技术成长' },
     { value: 'salary', label: '薪资' },
     { value: 'stable', label: '稳定' }
