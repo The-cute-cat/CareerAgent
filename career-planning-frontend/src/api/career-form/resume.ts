@@ -1,36 +1,20 @@
 // src/api/resume.ts
 import request from '@/utils/request'
-import type { UploadResponse } from '@/types/careerform_report'
-import type { AxiosResponse } from 'axios'
-import { mockUploadResumeApi } from '@/mock/mockdata/Resume_mockdata'
-/** 通用响应结果 */
-import type {  Result } from "../../types/type"
-
-
-// ==================== Mock 开关配置 ====================
-// 设置 VITE_ENABLE_MOCK=true 在 .env 文件中启用 Mock
-const ENABLE_MOCK = import.meta.env.VITE_ENABLE_MOCK === 'true'
-
-// Mock 场景配置：'success' | 'partial' | 'processing' | 'failed'
-const MOCK_SCENARIO = import.meta.env.VITE_MOCK_SCENARIO || 'success'
+import type { UploadResponse, Result, CareerReport } from '@/types/type'
 
 export interface UploadParams {
   file: File
   userId?: string
+  // parseMode?: 'quick' | 'ai_deep' // 数据解析模式
   overwrite?: boolean
-  onProgress?: (progressEvent: any) => void
+  onProgress?: (percent: number) => void
 }
 
 /**
  * 上传简历并触发 AI 解析
  * 返回结果包含 abilityScores（能力评估分数，与表单提交流程格式一致）
  */
-export function uploadResumeApi(params: UploadParams, signal?: AbortSignal) {
-  // Mock 模式：模拟上传延迟和进度
-  if (ENABLE_MOCK) {
-    return mockUploadWithProgress(params, MOCK_SCENARIO as any)
-  }
-
+export function uploadResumeApi(params: UploadParams) {
   const formData = new FormData()
 
   //核心：文件流 (Key 必须与后端约定一致，通常为 file)
@@ -41,59 +25,47 @@ export function uploadResumeApi(params: UploadParams, signal?: AbortSignal) {
     formData.append('user_id', params.userId)
   }
 
-  //业务参数
+  //业务参数 (告诉后端如何处理)
+  // formData.append('parse_mode', params.parseMode || 'ai_deep')
   formData.append('overwrite', params.overwrite ? 'true' : 'false')
 
-  return request.post<Result<UploadResponse>>('/resume/upload', formData, {
-    signal, // 用于取消上传
+  //可选：前端预提取的元数据 (减轻后端压力)
+  // formData.append('file_type', params.file.type)
+
+  return request.post<Result<UploadResponse>>('/parse/file', formData, {
     // 上传进度监控 (提升用户体验)
     onUploadProgress: (progressEvent: any) => {
       if (progressEvent.total && params.onProgress) {
-        params.onProgress(progressEvent)
+        const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+        console.log(`上传进度：${percent}%`)
+        params.onProgress(percent)
       }
-    }
+    },
   })
 }
 
 /**
- * Mock 模式下的上传，带进度模拟
+ * 获取简历解析后的能力评估报告
+ * 与表单提交流程的 /career/form/report/{taskId} 返回格式一致
+ * @param taskId 简历解析任务ID
+ * @returns 职业规划报告（包含 abilityScores 雷达图数据）
  */
-function mockUploadWithProgress(
-  params: UploadParams,
-  scenario: 'success' | 'partial' | 'processing' | 'failed'
-): Promise<AxiosResponse<Result<UploadResponse>>> {
-  return new Promise((resolve, reject) => {
-    let progress = 0
-    const stepDelay = 100 // 每步100ms，总共约2秒
+export function getResumeReportApi(taskId: string) {
+  return request.get<Result<CareerReport>>(`/resume/report/${taskId}`)
+}
 
-    // 模拟进度回调
-    const interval = setInterval(() => {
-      progress += 5
-
-      // 模拟进度事件
-      if (params.onProgress && progress < 100) {
-        params.onProgress({
-          loaded: progress,
-          total: 100,
-          progress: progress / 100
-        })
-      }
-
-      // 完成
-      if (progress >= 100) {
-        clearInterval(interval)
-        // 延迟后返回结果，模拟后端处理时间
-        setTimeout(() => {
-          mockUploadResumeApi(params.file.name, scenario, 500)
-            .then(resolve)
-            .catch(reject)
-        }, 500)
-      }
-    }, stepDelay)
-
-    // 支持取消
-    if (params.onProgress) {
-      (params as any)._cancelInterval = () => clearInterval(interval)
-    }
-  })
+/**
+ * 获取简历解析状态
+ * @param taskId 简历解析任务ID
+ * @returns 解析状态和进度
+ */
+export function getResumeParseStatusApi(taskId: string) {
+  return request.get<
+    Result<{
+      taskId: string
+      status: 'pending' | 'processing' | 'completed' | 'failed'
+      progress?: number
+      estimatedTimeRemaining?: number
+    }>
+  >(`/resume/status/${taskId}`)
 }
