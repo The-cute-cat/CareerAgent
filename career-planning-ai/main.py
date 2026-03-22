@@ -116,7 +116,7 @@ async def log_middleware(request: Request, call_next):
     start_time = time.time()
     response = await call_next(request)
     end_time = time.time()
-    log.info(f"请求地址: {request.url.path}, 响应时间: {end_time - start_time:.3f}s")
+    log.info(f"请求路径: {request.url.path}, 响应时间: {end_time - start_time:.3f}s")
     return response
 
 

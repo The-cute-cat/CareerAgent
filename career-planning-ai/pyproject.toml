@@ -63,4 +63,4 @@ url = "https://mirrors.aliyun.com/pypi/simple/"
 priority = "supplemental"
 
 [tool.poetry.group.dev.dependencies]
-pandas-stubs = "==3.0.0.260204"
+pandas-stubs = "3.0.0.260204"
