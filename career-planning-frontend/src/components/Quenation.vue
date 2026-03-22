@@ -146,11 +146,12 @@
                 </div>
                 <pre class="criteria-content">{{ question.evaluation_criteria }}</pre>
               </div>
+              
               <el-input
                 v-model="formData[`q_${question.id}`]"
                 type="textarea"
                 :rows="6"
-                :placeholder="question.evaluation_criteria ? '请根据评分标准作答...' : '请详细描述...'"
+                :placeholder="question.evaluation_criteria ? '请根据评分标准作答，不少于10字' : '请详细描述，不少于10字'"
                 maxlength="2000"
                 show-word-limit
                 resize="vertical"
@@ -1836,6 +1837,7 @@ defineExpose({
     }
   }
 }
+
 
 .essay-textarea {
   margin-top: 8px;
