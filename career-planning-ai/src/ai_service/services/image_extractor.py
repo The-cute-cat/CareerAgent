@@ -12,8 +12,8 @@ from PIL import Image
 from langchain_core.messages import HumanMessage
 from langchain_openai import ChatOpenAI
 
-from ai_service.services import log
 from ai_service.services.prompt_loader import prompt_loader
+from ai_service.utils.logger_handler import log
 from config import settings
 
 __all__ = ["image_extractor"]

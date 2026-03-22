@@ -1,37 +1,33 @@
-import asyncio
-import base64
-import io
 import os
+import io
 import re
-import tempfile
+import docx
+import base64
+import asyncio
 import zipfile
-from concurrent.futures import ThreadPoolExecutor
+import tempfile
+
 from pathlib import Path
 from typing import List, Optional, Any, Awaitable
-
-import docx
 from docx import Document
-from langchain_core.messages import BaseMessage, HumanMessage
 from langchain_core.output_parsers import StrOutputParser
-
-from ai_service.engine.ai_engine import AIEngine
+from langchain_core.messages import BaseMessage, SystemMessage, HumanMessage
 from ai_service.models.word import WordType
-from ai_service.services import log
+from ai_service.utils.logger_handler import log
 from config import settings
+from ai_service.engine.ai_engine import AIEngine
+from concurrent.futures import ThreadPoolExecutor
 
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 from docling.document_converter import DocumentConverter, FormatOption
 from docling.datamodel.base_models import InputFormat, ConversionStatus
-from docling.datamodel.pipeline_options import PdfPipelineOptions
+from docling.datamodel.pipeline_options import PipelineOptions, PdfPipelineOptions
 from docling.backend.msword_backend import MsWordDocumentBackend
 from docling_core.types.doc.document import DoclingDocument
 from docling.pipeline.simple_pipeline import SimplePipeline
 
 
-__all__ = [
-    "WordExtractor",
-    "word_extractor"
-]
+__all__ = ["WordExtractor"]
 
 class WordExtractor:
     max_concurrent_requests: int = settings.lite_llm.max_concurrent_requests  # 最大并发请求数
@@ -598,5 +594,3 @@ class WordExtractor:
     @staticmethod
     def security_check(word_path: str) -> bool:
         return True
-
-word_extractor = WordExtractor()

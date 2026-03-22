@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import Sidebar from '@/components/Sidebar.vue'
-import CHeader from '@/components/CHeader.vue'
+import Header from '@/components/Header.vue'
 import ChatBot from '@/components/ChatBot.vue'
 </script>
 
@@ -13,8 +13,8 @@ import ChatBot from '@/components/ChatBot.vue'
 
     <!-- 右侧主内容区 -->
     <el-container class="main-wrapper">
-      <!-- 顶部 CHeader -->
-      <CHeader />
+      <!-- 顶部 Header -->
+      <Header />
 
       <!-- 页面内容 -->
       <el-main class="main-content">

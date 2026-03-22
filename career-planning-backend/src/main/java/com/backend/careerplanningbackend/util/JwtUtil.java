@@ -26,16 +26,10 @@ public class JwtUtil {
         claims.put("createToken","createToken");
         claims.put("id",id);
         return  Jwts.builder()
-                //头部
-                .claims(claims)
-                .setSubject(id)
-//                .setHeaderParam("typ", "jwp")
-//                .setHeaderParam("alg", "HS256")
-                //载荷
-                .setId(UUID.randomUUID().toString())
                 .header().type("JWT").and()
                 .header().keyId(UUID.randomUUID().toString()).and()
                 .expiration(new Date(System.currentTimeMillis() + ACCESS_TOKEN_EXPIRE))
+                .claims(claims)
                 .signWith(secret)
                 .compact();
     }
@@ -49,7 +43,6 @@ public class JwtUtil {
                 .header().keyId(UUID.randomUUID().toString()).and()
                 .expiration(new Date(System.currentTimeMillis() + REFRESH_TOKEN_EXPIRE))
                 .claims(claims)
-                .setSubject(id)//主题
                 .signWith(secret)
                 .compact();
     }
