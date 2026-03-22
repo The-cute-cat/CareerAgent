@@ -195,6 +195,20 @@ taskkill /PID <PID> /F
 poetry run uvicorn main:app --host 0.0.0.0 --port 9001
 ```
 
+**错误**:
+```text
+ERROR:    [WinError 10013] 以一种访问权限不允许的方式做了一个访问套接字的尝试。
+```
+**解决**:
+```shell
+# 其他同上
+# 检查 Windows 保留端口，Windows 可能会保留某些端口范围
+netsh interface ipv4 show excludedportrange protocol=tcp
+# 如果 9000 在保留范围内，重启 Windows NAT 服务，释放 Windows 保留的端口（需要管理员权限）
+net stop winnat
+net start winnat
+```
+
 ### 4. 依赖冲突
 **解决**:
 ```bash

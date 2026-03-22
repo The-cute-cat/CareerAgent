@@ -64,8 +64,7 @@ async def _extract_text_from_file(file_path: str, extension: str) -> str:
         return await word_extractor.detect_word_to_enhance_text(file_path)
 
     elif extension.lower() in [suffix.lower() for suffix in settings.image.suffix]:
-        text = await image_extractor.extract_text(image_path=file_path)
-        return text or ""
+        return await image_extractor.extract_text(image_path=file_path)
 
     else:
         raise CommonHandleError(f"不支持的文件类型: {extension}")

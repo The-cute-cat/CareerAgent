@@ -14,6 +14,7 @@ from langchain_openai import ChatOpenAI
 
 from ai_service.services import log
 from ai_service.services.prompt_loader import prompt_loader
+from ai_service.utils.temp_file_handler import temp_file
 from config import settings
 
 __all__ = ["image_extractor"]
@@ -168,6 +169,24 @@ class ImageExtractor:
             log.warning(f"Failed to extract page content: {e}", exc_info=True)
             return None
 
+    async def _adjust_picture(self, image_path: str):
+        r = await self.validate_image(image_path)
+        if not r["valid"] and not r["preprocessed"]:
+            log.warning(f"图片验证失败: {r}")
+            raise ValueError("图片验证失败")
+        if r["preprocessed"]:
+            await self.preprocess_image(image_path)
+
+    async def _check_picture(self, image_path: str = None, image_bytes: bytes = None):
+        if not image_path and not image_bytes:
+            log.warning("请传入图片路径或图片字节数组")
+            raise ValueError("请传入图片路径或图片字节数组")
+        if image_bytes is None:
+            await self._adjust_picture(image_path)
+        else:
+            with temp_file(image_bytes) as image_path:
+                await self._adjust_picture(image_path)
+
     async def extract_text(self, image_path: str = None, image_bytes: bytes = None, prompt: str = "",
                            llm: ChatOpenAI = None) -> str | None:
         """
@@ -185,15 +204,8 @@ class ImageExtractor:
         Raises:
             ValueError: 未提供图片路径或字节数据时抛出
         """
-        r = await self.validate_image(image_path)
-        if not r["valid"] and not r["preprocessed"]:
-            log.warning(f"图片验证失败: {r}")
-            raise ValueError("图片验证失败")
-        if r["preprocessed"]:
-            await self.preprocess_image(image_path)
-        if not image_path and not image_bytes:
-            log.warning("请传入图片路径或图片字节数组")
-            raise ValueError("请传入图片路径或图片字节数组")
+
+        await self._check_picture(image_path, image_bytes)
         return await self._identify_image(
             image_path,
             image_bytes,
@@ -203,9 +215,7 @@ class ImageExtractor:
 
     async def extract_visual_content(self, image_path: str = None, image_bytes: bytes = None, prompt: str = "",
                                      llm: ChatOpenAI = None):
-        if not image_path and not image_bytes:
-            log.warning("请传入图片路径或图片字节数组")
-            raise ValueError("请传入图片路径或图片字节数组")
+        await self._check_picture(image_path, image_bytes)
         return await self._identify_image(
             image_path,
             image_bytes,

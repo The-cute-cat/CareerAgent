@@ -1,12 +1,11 @@
-import asyncio
-from fastapi import APIRouter, Body
-from typing import List, Dict, Any
+from fastapi import APIRouter, Body, Depends
 
-from ai_service.response.result import success
 from ai_service.models.struct_txt import StudentProfile
-from ai_service.services.Career_AnalystAgent import CareerAnalystAgent
-from ai_service.utils.job_vector_store import JobVectorStore
+from ai_service.response.result import success
+from ai_service.schemas.auth import validate_token
 from ai_service.services import log
+from ai_service.services.career_analyst_agent import CareerAnalystAgent
+from ai_service.utils.job_vector_store import JobVectorStore
 
 __all__ = ["router"]
 
@@ -21,7 +20,8 @@ agent = CareerAnalystAgent()
 async def match_jobs(
         student_profile: StudentProfile = Body(..., description="学生人物画像数据"),
         recall_top_k: int = Body(20, description="向量库初步召回数量"),
-        final_top_k: int = Body(5, description="Agent 最终深度分析并返回的数量")
+        final_top_k: int = Body(5, description="Agent 最终深度分析并返回的数量"),
+        _: bool = Depends(validate_token)
 ):
     """
     传入学生画像，通过向量库召回相关岗位，并使用 LLM Agent 进行深度匹配差距分析。
