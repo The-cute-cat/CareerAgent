@@ -2,7 +2,7 @@
 import { ref, reactive, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
-import { 
+import {
   DocumentAdd,
   Trophy,
   DataAnalysis,
@@ -30,9 +30,9 @@ import {
   Switch,
   Medal
 } from '@element-plus/icons-vue'
-import CareerFormUpload from '@/components/CareerForm_Upload.vue'
-import CareerFormRadar from '@/components/CareerForm_Radar.vue'
-import type { RadarScores, MissingItem } from '@/components/CareerForm_Radar.vue'
+import CareerFormUpload from '@/components/CareerFormUpload.vue'
+import CareerFormRadar from '@/components/CareerFormRadar.vue'
+import type { RadarScores, MissingItem } from '@/components/CareerFormRadar.vue'
 import { submitCareerFormApi, convertToSubmitDTO, getCareerReportStatusApi, getCareerReportApi } from '@/api/career-form/formdata'
 import { getResumeReportApi, getResumeParseStatusApi } from '@/api/career-form/resume'
 import type { CareerFormData, CareerFormSubmitResult } from '@/types/type'
@@ -132,45 +132,45 @@ const profileCompleteness = computed(() => {
 
   // 基本信息项
   const basicItems = [
-    !!formData.education,
-    formData.major.length > 0,
-    !!formData.graduationDate
+    !!formData.value.education,
+    formData.value.major.length > 0,
+    !!formData.value.graduationDate
   ]
   total += basicItems.length
   completed += basicItems.filter(Boolean).length
 
   // 技能与证书项
   const skillItems = [
-    formData.languages.some(l => l.type && l.level),
-    formData.certificates.length > 0,
-    formData.skills.length > 0,
-    formData.tools.length > 0
+    formData.value.languages.some(l => l.type && l.level),
+    formData.value.certificates.length > 0,
+    formData.value.skills.length > 0,
+    formData.value.tools.length > 0
   ]
   total += skillItems.length
   completed += skillItems.filter(Boolean).length
 
   // 经历与项目项
   const expItems = [
-    formData.projects.length > 0,
-    formData.internships.length > 0
+    formData.value.projects.length > 0,
+    formData.value.internships.length > 0
   ]
   total += expItems.length
   completed += expItems.filter(Boolean).length
 
   // 素质测评项
   const quizItems = [
-    formData.scores.communication,
-    formData.scores.stress,
-    formData.scores.learning,
-    !!formData.innovation
+    formData.value.scores.communication,
+    formData.value.scores.stress,
+    formData.value.scores.learning,
+    !!formData.value.innovation
   ]
   total += quizItems.length
   completed += quizItems.filter(Boolean).length
 
   // 职业意向项
   const careerItems = [
-    !!formData.targetJob,
-    formData.targetIndustries.length > 0
+    !!formData.value.targetJob,
+    formData.value.targetIndustries.length > 0
   ]
   total += careerItems.length
   completed += careerItems.filter(Boolean).length
@@ -183,7 +183,7 @@ const missingItems = computed<MissingItem[]>(() => {
   const items: MissingItem[] = []
 
   // 检查证书
-  if (formData.certificates.length === 0) {
+  if (formData.value.certificates.length === 0) {
     items.push({
       field: 'certificates',
       label: '缺少专业证书',
@@ -193,7 +193,7 @@ const missingItems = computed<MissingItem[]>(() => {
   }
 
   // 检查实习经历
-  if (formData.internships.length === 0) {
+  if (formData.value.internships.length === 0) {
     items.push({
       field: 'internships',
       label: '缺少实习经历',
@@ -203,7 +203,7 @@ const missingItems = computed<MissingItem[]>(() => {
   }
 
   // 检查项目经历
-  if (formData.projects.length === 0) {
+  if (formData.value.projects.length === 0) {
     items.push({
       field: 'projects',
       label: '缺少项目经历',
@@ -213,7 +213,7 @@ const missingItems = computed<MissingItem[]>(() => {
   }
 
   // 检查语言能力
-  if (!formData.languages.some(l => l.type && l.level)) {
+  if (!formData.value.languages.some(l => l.type && l.level)) {
     items.push({
       field: 'languages',
       label: '缺少语言能力',
@@ -223,7 +223,7 @@ const missingItems = computed<MissingItem[]>(() => {
   }
 
   // 检查技能
-  if (formData.skills.length === 0) {
+  if (formData.value.skills.length === 0) {
     items.push({
       field: 'skills',
       label: '缺少专业技能',
@@ -233,7 +233,7 @@ const missingItems = computed<MissingItem[]>(() => {
   }
 
   // 检查工具
-  if (formData.tools.length === 0) {
+  if (formData.value.tools.length === 0) {
     items.push({
       field: 'tools',
       label: '缺少工具掌握',
@@ -243,7 +243,7 @@ const missingItems = computed<MissingItem[]>(() => {
   }
 
   // 检查素质测评
-  if (!formData.scores.communication) {
+  if (!formData.value.scores.communication) {
     items.push({
       field: 'quiz-communication',
       label: '未完成沟通能力测评',
@@ -251,7 +251,7 @@ const missingItems = computed<MissingItem[]>(() => {
       priority: 'medium'
     })
   }
-  if (!formData.scores.stress) {
+  if (!formData.value.scores.stress) {
     items.push({
       field: 'quiz-stress',
       label: '未完成抗压能力测评',
@@ -259,7 +259,7 @@ const missingItems = computed<MissingItem[]>(() => {
       priority: 'medium'
     })
   }
-  if (!formData.scores.learning) {
+  if (!formData.value.scores.learning) {
     items.push({
       field: 'quiz-learning',
       label: '未完成学习能力测评',
@@ -269,7 +269,7 @@ const missingItems = computed<MissingItem[]>(() => {
   }
 
   // 检查创新案例
-  if (!formData.innovation) {
+  if (!formData.value.innovation) {
     items.push({
       field: 'innovation',
       label: '缺少创新案例',
@@ -284,7 +284,7 @@ const missingItems = computed<MissingItem[]>(() => {
 
 // --- 表单数据 ---
 
-const formData = reactive<CareerFormData>({
+const formData = ref<CareerFormData>({
   /** 学历：高中/大专/本科/硕士/博士/其他 */
   education: '',
   /** 当学历选择"其他"时的自定义输入值 */
@@ -351,13 +351,13 @@ const currentSectionTitle = computed(() => {
 const formProgress = computed(() => {
   let completed = 0
   const total = 5
-  
-  if (formData.education) completed++
-  if (formData.major.length > 0) completed++
-  if (formData.skills.length > 0) completed++
-  if (formData.projects.length > 0 || formData.internships.length > 0) completed++
-  if (formData.targetJob) completed++
-  
+
+  if (formData.value.education) completed++
+  if (formData.value.major.length > 0) completed++
+  if (formData.value.skills.length > 0) completed++
+  if (formData.value.projects.length > 0 || formData.value.internships.length > 0) completed++
+  if (formData.value.targetJob) completed++
+
   return Math.round((completed / total) * 100)
 })
 
@@ -367,7 +367,7 @@ const formProgress = computed(() => {
  * 用于显示/隐藏代码能力相关表单项
  */
 const isComputerMajor = computed(() => {
-  const majorStr = JSON.stringify(formData.major)
+  const majorStr = JSON.stringify(formData.value.major)
   return majorStr.includes('计算机') || majorStr.includes('软件')
 })
 
@@ -375,7 +375,7 @@ const isComputerMajor = computed(() => {
  * 判断指定步骤是否已完成
  * @param step - 步骤编号 (1-5)
  * @returns 该步骤是否已完成
- * 
+ *
  * 步骤1: 基本信息 - 需要填写学历和专业
  * 步骤2: 技能证书 - 需要至少添加一项技能或证书
  * 步骤3: 经历项目 - 需要至少添加一个项目或实习经历
@@ -385,15 +385,15 @@ const isComputerMajor = computed(() => {
 const isStepCompleted = (step: number) => {
   switch (step) {
     case 1:
-      return !!(formData.education && formData.major.length > 0)
+      return !!(formData.value.education && formData.value.major.length > 0)
     case 2:
-      return !!(formData.skills.length > 0 || formData.certificates.length > 0)
+      return !!(formData.value.skills.length > 0 || formData.value.certificates.length > 0)
     case 3:
-      return !!(formData.projects.length > 0 || formData.internships.length > 0)
+      return !!(formData.value.projects.length > 0 || formData.value.internships.length > 0)
     case 4:
-      return !!(formData.scores.communication && formData.scores.stress && formData.scores.learning && formData.innovation)
+      return !!(formData.value.scores.communication && formData.value.scores.stress && formData.value.scores.learning && formData.value.innovation)
     case 5:
-      return !!(formData.targetJob && formData.targetIndustries.length > 0)
+      return !!(formData.value.targetJob && formData.value.targetIndustries.length > 0)
     default:
       return false
   }
@@ -421,13 +421,13 @@ const handleMenuSelect = (index: string) => {
 
 
 /** 添加新的语言能力项 */
-const addLanguage = () => formData.languages.push({ type: '', level: '', other: '' })
+const addLanguage = () => formData.value.languages.push({ type: '', level: '', other: '' })
 
-/** 
+/**
  * 移除指定索引的语言能力项
  * @param index - 要移除的项的索引
  */
-const removeLanguage = (index: number) => formData.languages.splice(index, 1)
+const removeLanguage = (index: number) => formData.value.languages.splice(index, 1)
 
 
 /**
@@ -438,7 +438,7 @@ const removeLanguage = (index: number) => formData.languages.splice(index, 1)
 const handleEducationChange = (value: string) => {
   showEducationInput.value = value === '其他'
   if (value !== '其他') {
-    formData.educationOther = ''
+    formData.value.educationOther = ''
   }
 }
 
@@ -451,18 +451,18 @@ const handleEducationChange = (value: string) => {
 const handleCertificateChange = (value: string[]) => {
   showCertificateInput.value = value.includes('其他')
   if (!showCertificateInput.value) {
-    formData.certificateOther = ''
+    formData.value.certificateOther = ''
   }
 }
 
 
-/** 
+/**
  * 添加新技能
  * 将 newSkill 输入框的值添加到技能列表，默认熟练度为50
  */
 const addSkill = () => {
   if (newSkill.value) {
-    formData.skills.push({ name: newSkill.value, credibility: 50 })
+    formData.value.skills.push({ name: newSkill.value, credibility: 50 })
     newSkill.value = ''
   }
 }
@@ -471,7 +471,7 @@ const addSkill = () => {
  * 移除指定索引的技能
  * @param index - 要移除的技能索引
  */
-const removeSkill = (index: number) => formData.skills.splice(index, 1)
+const removeSkill = (index: number) => formData.value.skills.splice(index, 1)
 
 
 /**
@@ -480,7 +480,7 @@ const removeSkill = (index: number) => formData.skills.splice(index, 1)
  */
 const addTool = () => {
   if (newTool.value) {
-    formData.tools.push({ name: newTool.value, proficiency: '熟练' })
+    formData.value.tools.push({ name: newTool.value, proficiency: '熟练' })
     newTool.value = ''
   }
 }
@@ -489,7 +489,7 @@ const addTool = () => {
  * 移除指定索引的工具
  * @param index - 要移除的工具索引
  */
-const removeTool = (index: number) => formData.tools.splice(index, 1)
+const removeTool = (index: number) => formData.value.tools.splice(index, 1)
 
 
 /** 打开项目经历弹窗 */
@@ -506,7 +506,7 @@ const confirmAddProject = () => {
     ElMessage.warning('请输入项目名称')
     return
   }
-  formData.projects.push({
+  formData.value.projects.push({
     isCompetition: projectForm.isCompetition,
     name: projectForm.name,
     desc: projectForm.desc
@@ -519,7 +519,7 @@ const confirmAddProject = () => {
  * 移除指定索引的项目经历
  * @param index - 要移除的项目索引
  */
-const removeProject = (index: number) => formData.projects.splice(index, 1)
+const removeProject = (index: number) => formData.value.projects.splice(index, 1)
 
 /** 打开实践经历弹窗 */
 const openInternshipDialog = () => {
@@ -540,7 +540,7 @@ const confirmAddInternship = () => {
     ElMessage.warning('请输入担任岗位')
     return
   }
-  formData.internships.push({
+  formData.value.internships.push({
     company: internshipForm.company,
     role: internshipForm.role,
     date: internshipForm.date,
@@ -554,7 +554,7 @@ const confirmAddInternship = () => {
  * 移除指定索引的实习经历
  * @param index - 要移除的实习索引
  */
-const removeInternship = (index: number) => formData.internships.splice(index, 1)
+const removeInternship = (index: number) => formData.value.internships.splice(index, 1)
 
 /**
  * 格式化日期范围显示
@@ -584,13 +584,13 @@ const formatDateRange = (dateRange: Date[]) => {
  */
 const movePriority = (index: number, direction: number) => {
   const newIndex = index + direction
-  if (newIndex < 0 || newIndex >= formData.priorities.length) return
-  
-  const temp = formData.priorities[index]!
-  const target = formData.priorities[newIndex]!
-  
-  formData.priorities[index] = target
-  formData.priorities[newIndex] = temp
+  if (newIndex < 0 || newIndex >= formData.value.priorities.length) return
+
+  const temp = formData.value.priorities[index]!
+  const target = formData.value.priorities[newIndex]!
+
+  formData.value.priorities[index] = target
+  formData.value.priorities[newIndex] = temp
 }
 
 /**
@@ -627,11 +627,11 @@ const handleDrop = (dropIndex: number) => {
     dragOverIndex.value = -1
     return
   }
-  
+
   // 移动数组元素
-  const item = formData.priorities.splice(dragIndex.value, 1)[0]!
-  formData.priorities.splice(dropIndex, 0, item)
-  
+  const item = formData.value.priorities.splice(dragIndex.value, 1)[0]!
+  formData.value.priorities.splice(dropIndex, 0, item)
+
   dragIndex.value = -1
   dragOverIndex.value = -1
 }
@@ -710,29 +710,29 @@ const currentTestIndex = ref(-1)
 const openTestModal = (type: string, index?: number) => {
   // 保存当前测试的技能信息
   if (type === 'skill' && index !== undefined) {
-    currentTestSkill.value = formData.skills[index]?.name || ''
+    currentTestSkill.value = formData.value.skills[index]?.name || ''
     currentTestIndex.value = index
   } else if (type === 'tool' && index !== undefined) {
-    currentTestSkill.value = formData.tools[index]?.name || ''
+    currentTestSkill.value = formData.value.tools[index]?.name || ''
     currentTestIndex.value = index
   } else {
     currentTestSkill.value = ''
     currentTestIndex.value = -1
   }
-  
+
   testDialog.visible = true
   testDialog.type = type === 'code' ? 'ai' : 'quiz'
   testDialog.answer = ''
   testDialog.progress = 0
-  
+
   // 技能测试：根据技能名称匹配题库
   if (type === 'skill') {
     const skillName = currentTestSkill.value.toLowerCase().trim()
-    
+
     // 根据技能名称选择对应题库（忽略大小写）
     let questionBank: QuizQuestion[] = []
     let skillType = ''
-    
+
     if (skillName === 'python') {
       questionBank = pythonQuestions
       skillType = 'Python'
@@ -743,7 +743,7 @@ const openTestModal = (type: string, index?: number) => {
       questionBank = cppQuestions
       skillType = 'C++'
     }
-    
+
     // 如果匹配到支持的技能题库
     if (questionBank.length > 0) {
       testDialog.title = `${skillType} 技能测试`
@@ -762,15 +762,15 @@ const openTestModal = (type: string, index?: number) => {
       return
     }
   }
-  
+
   // 工具测试：根据工具名称匹配题库
   if (type === 'tool') {
     const toolName = currentTestSkill.value.toLowerCase().trim()
-    
+
     // 根据工具名称选择对应题库（忽略大小写）
     let questionBank: QuizQuestion[] = []
     let toolType = ''
-    
+
     if (toolName === 'git') {
       questionBank = gitQuestions
       toolType = 'Git'
@@ -778,7 +778,7 @@ const openTestModal = (type: string, index?: number) => {
       questionBank = dockerQuestions
       toolType = 'Docker'
     }
-    
+
     // 如果匹配到支持的工具题库
     if (questionBank.length > 0) {
       testDialog.title = `${toolType} 工具测试`
@@ -797,7 +797,7 @@ const openTestModal = (type: string, index?: number) => {
       return
     }
   }
-  
+
   // 代码能力测试（AI类型）
   testDialog.title = '代码能力测试'
   testDialog.currentQuestion = {
@@ -805,7 +805,7 @@ const openTestModal = (type: string, index?: number) => {
     question: 'AI 正在为你生成代码能力测试题...',
     options: []
   }
-  
+
   // AI类型测试显示进度条动画
   const timer = setInterval(() => {
     testDialog.progress += 10
@@ -836,14 +836,14 @@ const openQuizModal = (type: string) => {
   testDialog.visible = true
   testDialog.type = 'quiz'
   testDialog.answer = ''
-  
+
   // 测评标题映射
   const titles: Record<string, string> = {
     'communication': '沟通能力测评',
     'stress': '抗压能力测评',
     'learning': '学习能力测评'
   }
-  
+
   // 根据类型从对应题库随机抽取题目
   let questionBank: QuizQuestion[] = []
   switch (type) {
@@ -857,7 +857,7 @@ const openQuizModal = (type: string) => {
       questionBank = learningQuestions
       break
   }
-  
+
   testDialog.title = titles[type] || '素质测评'
   testDialog.currentQuestion = getRandomQuestion(questionBank)
 }
@@ -873,7 +873,7 @@ const confirmTest = () => {
     testDialog.visible = false
     return
   }
-  
+
   // 处理不支持的技能/工具提示
   if (testDialog.currentQuestion.id === -1) {
     testDialog.visible = false
@@ -881,29 +881,29 @@ const confirmTest = () => {
     currentTestIndex.value = -1
     return
   }
-  
+
   // 检查是技能测试还是工具测试
-  const isSkillTest = formData.skills.some((s, idx) => 
+  const isSkillTest = formData.value.skills.some((s, idx) =>
     idx === currentTestIndex.value && s.name.toLowerCase() === currentTestSkill.value.toLowerCase()
   )
-  const isToolTest = formData.tools.some((t, idx) => 
+  const isToolTest = formData.value.tools.some((t, idx) =>
     idx === currentTestIndex.value && t.name.toLowerCase() === currentTestSkill.value.toLowerCase()
   )
-  
+
   // 技能测试：验证答案并显示结果
   if (isSkillTest && currentTestIndex.value >= 0) {
     const correctAnswer = testDialog.currentQuestion.correctAnswer
-    
+
     if (correctAnswer) {
       // 有标准答案的专业技能测试
       const isCorrect = testDialog.answer === correctAnswer
-      
+
       if (isCorrect) {
         ElMessage.success(`回答正确！${currentTestSkill.value} 技能熟练度提升`)
         // 答对后提升熟练度
-        if (formData.skills[currentTestIndex.value]) {
-          formData.skills[currentTestIndex.value]!.credibility = Math.min(100, 
-            (formData.skills[currentTestIndex.value]!.credibility || 50) + 10
+        if (formData.value.skills[currentTestIndex.value]) {
+          formData.value.skills[currentTestIndex.value]!.credibility = Math.min(100,
+            (formData.value.skills[currentTestIndex.value]!.credibility || 50) + 10
           )
         }
       } else {
@@ -913,25 +913,25 @@ const confirmTest = () => {
       // 通用测试
       ElMessage.success('测试已完成，结果已记录')
     }
-    
+
     testDialog.visible = false
     currentTestSkill.value = ''
     currentTestIndex.value = -1
     return
   }
-  
+
   // 工具测试：验证答案并显示结果
   if (isToolTest && currentTestIndex.value >= 0) {
     const correctAnswer = testDialog.currentQuestion.correctAnswer
-    
+
     if (correctAnswer) {
       // 有标准答案的工具测试
       const isCorrect = testDialog.answer === correctAnswer
-      
+
       if (isCorrect) {
         ElMessage.success(`回答正确！${currentTestSkill.value} 工具熟练度提升`)
         // 答对后提升熟练度（将熟练度转换为数值）
-        const tool = formData.tools[currentTestIndex.value]
+        const tool = formData.value.tools[currentTestIndex.value]
         if (tool) {
           const proficiencyMap: Record<string, number> = {
             '了解': 25,
@@ -952,22 +952,22 @@ const confirmTest = () => {
       // 通用测试
       ElMessage.success('测试已完成，结果已记录')
     }
-    
+
     testDialog.visible = false
     currentTestSkill.value = ''
     currentTestIndex.value = -1
     return
   }
-  
+
   // 素质测评：标记为已完成
   if (currentQuizType.value) {
     testDialog.visible = false
-    formData.scores[currentQuizType.value as keyof typeof formData.scores] = true
+    formData.value.scores[currentQuizType.value as keyof typeof formData.scores] = true
     ElMessage.success('测试已完成，结果已记录')
     currentQuizType.value = ''
     return
   }
-  
+
   // 其他测试类型
   testDialog.visible = false
   ElMessage.success('测试已完成')
@@ -1032,6 +1032,8 @@ const pollForResumeReport = async (taskId: string): Promise<RadarScores> => {
  * @param parsedData - 简历解析后的数据对象
  */
 const handleResumeParsed = async (parsedData: any) => {
+  console.log('简历解析结果:', parsedData);
+  formData.value = parsedData.value
   hasUploadedResume.value = true
   showUploadDialog.value = false
   ElMessage.success('简历解析成功！已自动填充部分信息')
@@ -1039,8 +1041,8 @@ const handleResumeParsed = async (parsedData: any) => {
   // 将解析出的技能添加到技能列表，默认熟练度70
   if (parsedData?.profile?.skills && parsedData.profile.skills.length > 0) {
     parsedData.profile.skills.forEach((skill: string) => {
-      if (!formData.skills.find(s => s.name === skill)) {
-        formData.skills.push({ name: skill, credibility: 70 })
+      if (!formData.value.skills.find(s => s.name === skill)) {
+        formData.value.skills.push({ name: skill, credibility: 70 })
       }
     })
   }
@@ -1323,42 +1325,42 @@ const submitFormWithMockData = async () => {
  */
 const resetForm = () => {
   if (!formRef.value) return
-  
+
   // 重置 Element Plus 表单组件的字段
   formRef.value.resetFields()
-  
+
   // 手动重置动态列表数据（resetFields 无法处理动态添加的数组项）
-  formData.languages = [{ type: '', level: '', other: '' }]
-  formData.certificates = []
-  formData.certificateOther = ''
-  formData.skills = []
-  formData.tools = []
-  formData.projects = []
-  formData.internships = []
-  formData.scores = { communication: false, stress: false, learning: false }
-  formData.priorities = [
+  formData.value.languages = [{ type: '', level: '', other: '' }]
+  formData.value.certificates = []
+  formData.value.certificateOther = ''
+  formData.value.skills = []
+  formData.value.tools = []
+  formData.value.projects = []
+  formData.value.internships = []
+  formData.value.scores = { communication: false, stress: false, learning: false }
+  formData.value.priorities = [
     { value: 'tech', label: '技术成长' },
     { value: 'salary', label: '薪资' },
     { value: 'stable', label: '稳定' }
   ]
-  
+
   // 重置临时输入值
   newSkill.value = ''
   newTool.value = ''
-  
+
   // 重置显示状态
   showEducationInput.value = false
   showCertificateInput.value = false
   hasUploadedResume.value = false
-  
+
   // 重置测试相关状态
   currentTestSkill.value = ''
   currentTestIndex.value = -1
   currentQuizType.value = ''
-  
+
   // 重置当前步骤到第一步
   activeMenu.value = '1'
-  
+
   ElMessage.success('表单已重置')
 }
 </script>
@@ -1372,94 +1374,93 @@ const resetForm = () => {
       <el-aside width="220px" class="sidebar">
         <div class="sidebar-brand">
           <div class="brand-icon">
-            <el-icon :size="26"><DocumentAdd /></el-icon>
+            <el-icon :size="26">
+              <DocumentAdd />
+            </el-icon>
           </div>
           <div class="brand-info">
             <div class="brand-text">能力画像</div>
             <div class="brand-subtitle">就业规划系统</div>
           </div>
         </div>
-        
+
         <!-- 进度概览 -->
         <div class="progress-overview">
           <div class="progress-text">
             <span>完成度</span>
             <span class="progress-percent">{{ formProgress }}%</span>
           </div>
-          <el-progress 
-            :percentage="formProgress" 
-            :show-text="false"
-            :stroke-width="6"
-            class="sidebar-progress"
-          />
+          <el-progress :percentage="formProgress" :show-text="false" :stroke-width="6" class="sidebar-progress" />
         </div>
-        
-        <el-menu
-          :default-active="activeMenu"
-          class="sidebar-menu"
-          @select="handleMenuSelect"
-        >
+
+        <el-menu :default-active="activeMenu" class="sidebar-menu" @select="handleMenuSelect">
           <el-menu-item index="1" :class="{ 'is-completed': isStepCompleted(1) }">
             <div class="menu-step">
-              <el-icon v-if="isStepCompleted(1)"><Check /></el-icon>
+              <el-icon v-if="isStepCompleted(1)">
+                <Check />
+              </el-icon>
               <span v-else>1</span>
             </div>
             <span class="menu-text">基本信息</span>
             <el-icon class="menu-check" v-if="isStepCompleted(1)"><Circle-Check /></el-icon>
           </el-menu-item>
-          
+
           <el-menu-item index="2" :class="{ 'is-completed': isStepCompleted(2) }">
             <div class="menu-step">
-              <el-icon v-if="isStepCompleted(2)"><Check /></el-icon>
+              <el-icon v-if="isStepCompleted(2)">
+                <Check />
+              </el-icon>
               <span v-else>2</span>
             </div>
             <span class="menu-text">技能证书</span>
             <el-icon class="menu-check" v-if="isStepCompleted(2)"><Circle-Check /></el-icon>
           </el-menu-item>
-          
+
           <el-menu-item index="3" :class="{ 'is-completed': isStepCompleted(3) }">
             <div class="menu-step">
-              <el-icon v-if="isStepCompleted(3)"><Check /></el-icon>
+              <el-icon v-if="isStepCompleted(3)">
+                <Check />
+              </el-icon>
               <span v-else>3</span>
             </div>
             <span class="menu-text">经历项目</span>
             <el-icon class="menu-check" v-if="isStepCompleted(3)"><Circle-Check /></el-icon>
           </el-menu-item>
-          
+
           <el-menu-item index="4" :class="{ 'is-completed': isStepCompleted(4) }">
             <div class="menu-step">
-              <el-icon v-if="isStepCompleted(4)"><Check /></el-icon>
+              <el-icon v-if="isStepCompleted(4)">
+                <Check />
+              </el-icon>
               <span v-else>4</span>
             </div>
             <span class="menu-text">素质测评</span>
             <el-icon class="menu-check" v-if="isStepCompleted(4)"><Circle-Check /></el-icon>
           </el-menu-item>
-          
+
           <el-menu-item index="5" :class="{ 'is-completed': isStepCompleted(5) }">
             <div class="menu-step">
-              <el-icon v-if="isStepCompleted(5)"><Check /></el-icon>
+              <el-icon v-if="isStepCompleted(5)">
+                <Check />
+              </el-icon>
               <span v-else>5</span>
             </div>
             <span class="menu-text">职业意向</span>
             <el-icon class="menu-check" v-if="isStepCompleted(5)"><Circle-Check /></el-icon>
           </el-menu-item>
         </el-menu>
-        
+
         <!-- 简历上传入口 -->
         <div class="resume-upload-section">
           <div class="upload-label">
           </div>
-          <el-button 
-            class="upload-btn"
-            :type="hasUploadedResume ? 'info' : 'primary'"
-            @click="showUploadDialog = true"
-            :icon="hasUploadedResume ? CircleCheck : Upload"
-          >
+          <el-button class="upload-btn" :type="hasUploadedResume ? 'info' : 'primary'" @click="showUploadDialog = true"
+            :icon="hasUploadedResume ? CircleCheck : Upload">
             {{ hasUploadedResume ? '已上传简历' : '上传简历' }}
           </el-button>
         </div>
       </el-aside>
-      
+
       <!-- 主内容区 -->
       <el-main class="main-content">
         <el-card class="form-card">
@@ -1471,36 +1472,20 @@ const resetForm = () => {
               </div>
               <div class="progress-section">
                 <span class="progress-label">完成度 {{ formProgress }}%</span>
-                <el-progress 
-                  :percentage="formProgress" 
-                  :stroke-width="8"
-                  :show-text="false"
-                  class="progress-bar"
-                />
+                <el-progress :percentage="formProgress" :stroke-width="8" :show-text="false" class="progress-bar" />
               </div>
             </div>
           </template>
-          
-          <el-form 
-            ref="formRef" 
-            :model="formData" 
-            :rules="formRules" 
-            label-width="120px" 
-            size="default"
-          >
+
+          <el-form ref="formRef" :model="formData" :rules="formRules" label-width="120px" size="default">
             <!-- 1. 基本信息 -->
             <div v-show="activeMenu === '1'" class="section-content">
               <div class="form-section-title">教育背景</div>
               <el-row :gutter="24">
                 <el-col :span="12">
                   <el-form-item label="最高学历" prop="education">
-                    <el-select 
-                      v-model="formData.education" 
-                      placeholder="请选择最高学历" 
-                      style="width: 100%" 
-                      @change="handleEducationChange"
-                      clearable
-                    >
+                    <el-select v-model="formData.education" placeholder="请选择最高学历" style="width: 100%"
+                      @change="handleEducationChange" clearable>
                       <el-option label="专科" value="专科" />
                       <el-option label="本科" value="本科" />
                       <el-option label="硕士" value="硕士" />
@@ -1511,11 +1496,7 @@ const resetForm = () => {
                 </el-col>
                 <el-col :span="12" v-if="showEducationInput">
                   <el-form-item label="学历说明" prop="educationOther">
-                    <el-input 
-                      v-model="formData.educationOther" 
-                      placeholder="如：MBA、双学位等" 
-                      clearable
-                    />
+                    <el-input v-model="formData.educationOther" placeholder="如：MBA、双学位等" clearable />
                   </el-form-item>
                 </el-col>
               </el-row>
@@ -1523,26 +1504,14 @@ const resetForm = () => {
               <el-row :gutter="24">
                 <el-col :span="12">
                   <el-form-item label="专业类别" prop="major">
-                    <el-cascader 
-                      v-model="formData.major" 
-                      :options="majorOptions" 
-                      placeholder="请选择专业类别"
-                      style="width: 100%"
-                      :props="{ expandTrigger: 'hover' }"
-                      clearable
-                    />
+                    <el-cascader v-model="formData.major" :options="majorOptions" placeholder="请选择专业类别"
+                      style="width: 100%" :props="{ expandTrigger: 'hover' }" clearable />
                   </el-form-item>
                 </el-col>
                 <el-col :span="12">
                   <el-form-item label="毕业时间" prop="graduationDate">
-                    <el-date-picker 
-                      v-model="formData.graduationDate" 
-                      type="month" 
-                      placeholder="选择毕业年月" 
-                      format="YYYY-MM"
-                      style="width: 100%"
-                      clearable
-                    />
+                    <el-date-picker v-model="formData.graduationDate" type="month" placeholder="选择毕业年月" format="YYYY-MM"
+                      style="width: 100%" clearable />
                   </el-form-item>
                 </el-col>
               </el-row>
@@ -1558,43 +1527,23 @@ const resetForm = () => {
               <div class="form-section-title">外语能力</div>
               <el-form-item label="外语水平" prop="languages">
                 <div class="list-container">
-                  <div 
-                    v-for="(lang, index) in formData.languages" 
-                    :key="index" 
-                    class="list-row"
-                  >
-                    <el-select 
-                      v-model="lang.type" 
-                      placeholder="语种" 
-                      style="width: 130px"
-                    >
+                  <div v-for="(lang, index) in formData.languages" :key="index" class="list-row">
+                    <el-select v-model="lang.type" placeholder="语种" style="width: 130px">
                       <el-option label="英语" value="英语" />
                       <el-option label="日语" value="日语" />
                       <el-option label="其他" value="其他" />
                     </el-select>
-                    <el-select 
-                      v-model="lang.level" 
-                      placeholder="水平" 
-                      style="width: 130px"
-                      :disabled="lang.type === '其他' || lang.type === ''"
-                    >
+                    <el-select v-model="lang.level" placeholder="水平" style="width: 130px"
+                      :disabled="lang.type === '其他' || lang.type === ''">
                       <el-option label="四级" value="四级" />
                       <el-option label="六级" value="六级" />
                       <el-option label="托福/雅思" value="托福/雅思" />
                       <el-option label="其他" value="其他" />
                     </el-select>
-                    <el-input 
-                      v-if="lang.type === '其他'" 
-                      v-model="lang.other" 
-                      placeholder="请输入语种" 
-                      style="width: 200px; flex: 1"
-                    />
-                    <el-input 
-                      v-else-if="lang.level === '其他'" 
-                      v-model="lang.other" 
-                      placeholder="请输入证书" 
-                      style="width: 200px; flex: 1"
-                    />
+                    <el-input v-if="lang.type === '其他'" v-model="lang.other" placeholder="请输入语种"
+                      style="width: 200px; flex: 1" />
+                    <el-input v-else-if="lang.level === '其他'" v-model="lang.other" placeholder="请输入证书"
+                      style="width: 200px; flex: 1" />
                     <el-button text type="danger" :icon="Delete" @click="removeLanguage(index)" />
                   </div>
                   <el-button class="add-item-btn" type="primary" plain :icon="Plus" @click="addLanguage">
@@ -1605,53 +1554,32 @@ const resetForm = () => {
 
               <div class="form-section-title">专业证书</div>
               <el-form-item label="核心证书" prop="certificates">
-                <el-select 
-                  v-model="formData.certificates" 
-                  multiple 
-                  placeholder="请选择证书" 
-                  style="width: 100%" 
-                  @change="handleCertificateChange"
-                >
+                <el-select v-model="formData.certificates" multiple placeholder="请选择证书" style="width: 100%"
+                  @change="handleCertificateChange">
                   <el-option label="软考中级" value="软考中级" />
                   <el-option label="软考高级" value="软考高级" />
                   <el-option label="英语六级" value="英语六级" />
                   <el-option label="PMP" value="PMP" />
                   <el-option label="其他" value="其他" />
                 </el-select>
-                <el-input 
-                  v-if="showCertificateInput" 
-                  v-model="formData.certificateOther" 
-                  placeholder="请输入证书名称，如：CPA、CFA 等" 
-                  style="margin-top: 12px"
-                />
+                <el-input v-if="showCertificateInput" v-model="formData.certificateOther"
+                  placeholder="请输入证书名称，如：CPA、CFA 等" style="margin-top: 12px" />
               </el-form-item>
 
               <div class="form-section-title">专业技能</div>
               <el-form-item label="专业技能" prop="skills">
                 <div class="input-list-group">
                   <div class="add-input-row">
-                    <el-input 
-                      v-model="newSkill" 
-                      placeholder="输入技能（如 Java、Python）" 
-                      @keyup.enter="addSkill"
-                      style="flex: 1"
-                    />
+                    <el-input v-model="newSkill" placeholder="输入技能（如 Java、Python）" @keyup.enter="addSkill"
+                      style="flex: 1" />
                     <el-button type="primary" :icon="Plus" @click="addSkill">
                       添加
                     </el-button>
                   </div>
-                  <div 
-                    v-for="(skill, index) in formData.skills" 
-                    :key="index" 
-                    class="skill-item"
-                  >
+                  <div v-for="(skill, index) in formData.skills" :key="index" class="skill-item">
                     <span class="skill-name">{{ skill.name }}</span>
-                    <el-progress 
-                      :percentage="skill.credibility" 
-                      status="success" 
-                      style="width: 120px"
-                      :stroke-width="8"
-                    />
+                    <el-progress :percentage="skill.credibility" status="success" style="width: 120px"
+                      :stroke-width="8" />
                     <div class="skill-actions">
                       <el-button text type="primary" @click="openTestModal('skill', index)">测试</el-button>
                       <el-button text type="danger" :icon="Delete" @click="removeSkill(index)" />
@@ -1664,21 +1592,13 @@ const resetForm = () => {
               <el-form-item label="工具掌握" prop="tools">
                 <div class="input-list-group">
                   <div class="add-input-row">
-                    <el-input 
-                      v-model="newTool" 
-                      placeholder="输入工具（如 Git、Docker）" 
-                      @keyup.enter="addTool"
-                      style="flex: 1"
-                    />
+                    <el-input v-model="newTool" placeholder="输入工具（如 Git、Docker）" @keyup.enter="addTool"
+                      style="flex: 1" />
                     <el-button type="primary" :icon="Plus" @click="addTool">
                       添加
                     </el-button>
                   </div>
-                  <div 
-                    v-for="(tool, index) in formData.tools" 
-                    :key="index" 
-                    class="skill-item"
-                  >
+                  <div v-for="(tool, index) in formData.tools" :key="index" class="skill-item">
                     <span class="skill-name">{{ tool.name }}</span>
                     <div class="skill-actions">
                       <el-button text type="primary" @click="openTestModal('tool', index)">测试</el-button>
@@ -1689,22 +1609,11 @@ const resetForm = () => {
               </el-form-item>
 
               <!-- 代码能力 (动态显示) -->
-              <el-form-item 
-                label="代码能力" 
-                prop="codeAbility" 
-                v-if="isComputerMajor"
-              >
+              <el-form-item label="代码能力" prop="codeAbility" v-if="isComputerMajor">
                 <div class="code-ability-row">
-                  <el-input 
-                    v-model="formData.codeAbility.links" 
-                    placeholder="GitHub/Gitee 链接，多个用逗号分隔"
-                    style="flex: 1"
-                  />
-                  <el-button 
-                    type="warning" 
-                    @click="openTestModal('code')"
-                    :icon="DataAnalysis"
-                  >
+                  <el-input v-model="formData.codeAbility.links" placeholder="GitHub/Gitee 链接，多个用逗号分隔"
+                    style="flex: 1" />
+                  <el-button type="warning" @click="openTestModal('code')" :icon="DataAnalysis">
                     AI 测试
                   </el-button>
                 </div>
@@ -1716,16 +1625,16 @@ const resetForm = () => {
               <div class="form-section-title">项目经历</div>
               <el-form-item label="项目或竞赛">
                 <div class="experience-list">
-                  <div 
-                    v-for="(proj, index) in formData.projects" 
-                    :key="index" 
-                    class="experience-card"
-                    :class="{ 'is-competition': proj.isCompetition }"
-                  >
+                  <div v-for="(proj, index) in formData.projects" :key="index" class="experience-card"
+                    :class="{ 'is-competition': proj.isCompetition }">
                     <div class="experience-card-header">
                       <div class="experience-type-badge">
-                        <el-icon v-if="proj.isCompetition"><Trophy /></el-icon>
-                        <el-icon v-else><Folder /></el-icon>
+                        <el-icon v-if="proj.isCompetition">
+                          <Trophy />
+                        </el-icon>
+                        <el-icon v-else>
+                          <Folder />
+                        </el-icon>
                         <span>{{ proj.isCompetition ? '竞赛' : '项目' }}</span>
                       </div>
                       <el-button text type="danger" :icon="Delete" @click="removeProject(index)">
@@ -1747,14 +1656,13 @@ const resetForm = () => {
               <div class="form-section-title">实践经历</div>
               <el-form-item label="实习/工作" prop="internships">
                 <div class="experience-list">
-                  <div 
-                    v-for="(intern, index) in formData.internships" 
-                    :key="index" 
-                    class="experience-card internship-card"
-                  >
+                  <div v-for="(intern, index) in formData.internships" :key="index"
+                    class="experience-card internship-card">
                     <div class="experience-card-header">
                       <div class="experience-type-badge work-badge">
-                        <el-icon><Briefcase /></el-icon>
+                        <el-icon>
+                          <Briefcase />
+                        </el-icon>
                         <span>工作/实习</span>
                       </div>
                       <el-button text type="danger" :icon="Delete" @click="removeInternship(index)">
@@ -1786,36 +1694,36 @@ const resetForm = () => {
               <el-row :gutter="24">
                 <el-col :span="8">
                   <el-form-item label="沟通能力">
-                    <el-button 
-                      :type="formData.scores.communication ? 'success' : 'default'" 
+                    <el-button :type="formData.scores.communication ? 'success' : 'default'"
                       :class="formData.scores.communication ? 'quiz-complete' : 'quiz-pending'"
-                      @click="openQuizModal('communication')"
-                    >
-                      <el-icon v-if="formData.scores.communication"><Check /></el-icon>
+                      @click="openQuizModal('communication')">
+                      <el-icon v-if="formData.scores.communication">
+                        <Check />
+                      </el-icon>
                       {{ formData.scores.communication ? '已完成' : '开始测试' }}
                     </el-button>
                   </el-form-item>
                 </el-col>
                 <el-col :span="8">
                   <el-form-item label="抗压能力">
-                    <el-button 
-                      :type="formData.scores.stress ? 'success' : 'default'" 
+                    <el-button :type="formData.scores.stress ? 'success' : 'default'"
                       :class="formData.scores.stress ? 'quiz-complete' : 'quiz-pending'"
-                      @click="openQuizModal('stress')"
-                    >
-                      <el-icon v-if="formData.scores.stress"><Check /></el-icon>
+                      @click="openQuizModal('stress')">
+                      <el-icon v-if="formData.scores.stress">
+                        <Check />
+                      </el-icon>
                       {{ formData.scores.stress ? '已完成' : '开始测试' }}
                     </el-button>
                   </el-form-item>
                 </el-col>
                 <el-col :span="8">
                   <el-form-item label="学习能力">
-                    <el-button 
-                      :type="formData.scores.learning ? 'success' : 'default'" 
+                    <el-button :type="formData.scores.learning ? 'success' : 'default'"
                       :class="formData.scores.learning ? 'quiz-complete' : 'quiz-pending'"
-                      @click="openQuizModal('learning')"
-                    >
-                      <el-icon v-if="formData.scores.learning"><Check /></el-icon>
+                      @click="openQuizModal('learning')">
+                      <el-icon v-if="formData.scores.learning">
+                        <Check />
+                      </el-icon>
                       {{ formData.scores.learning ? '已完成' : '开始测试' }}
                     </el-button>
                   </el-form-item>
@@ -1823,12 +1731,8 @@ const resetForm = () => {
               </el-row>
               <div class="form-section-title">创新案例</div>
               <el-form-item label="创新思维" prop="innovation">
-                <el-input 
-                  v-model="formData.innovation" 
-                  type="textarea" 
-                  :rows="4"
-                  placeholder="请填写一个改进案例，如：优化了某算法，效率提升 20%"
-                />
+                <el-input v-model="formData.innovation" type="textarea" :rows="4"
+                  placeholder="请填写一个改进案例，如：优化了某算法，效率提升 20%" />
               </el-form-item>
             </div>
 
@@ -1838,24 +1742,14 @@ const resetForm = () => {
               <el-row :gutter="24">
                 <el-col :span="12">
                   <el-form-item label="目标岗位" prop="targetJob">
-                    <el-autocomplete 
-                      v-model="formData.targetJob" 
-                      :fetch-suggestions="querySearch" 
-                      placeholder="输入意向岗位，如后端工程师"
-                      style="width: 100%"
-                      clearable
-                    />
+                    <el-autocomplete v-model="formData.targetJob" :fetch-suggestions="querySearch"
+                      placeholder="输入意向岗位，如后端工程师" style="width: 100%" clearable />
                   </el-form-item>
                 </el-col>
                 <el-col :span="12">
                   <el-form-item label="期望行业" prop="targetIndustries">
-                    <el-select 
-                      v-model="formData.targetIndustries" 
-                      multiple 
-                      placeholder="请选择期望行业"
-                      style="width: 100%"
-                      clearable
-                    >
+                    <el-select v-model="formData.targetIndustries" multiple placeholder="请选择期望行业" style="width: 100%"
+                      clearable>
                       <el-option label="互联网/IT" value="互联网" />
                       <el-option label="金融科技" value="金融" />
                       <el-option label="智能制造" value="制造" />
@@ -1868,14 +1762,18 @@ const resetForm = () => {
               </el-row>
 
               <div class="form-section-title">
-                <el-icon><Medal /></el-icon>
+                <el-icon>
+                  <Medal />
+                </el-icon>
                 发展优先级
               </div>
               <el-form-item label="优先级排序" prop="priorities">
                 <div class="priority-container">
                   <div class="priority-header">
                     <div class="priority-desc">
-                      <el-icon><InfoFilled /></el-icon>
+                      <el-icon>
+                        <InfoFilled />
+                      </el-icon>
                       拖拽调整优先级顺序，第1位为你的首要考虑因素
                     </div>
                     <div class="priority-legend">
@@ -1894,27 +1792,19 @@ const resetForm = () => {
                     </div>
                   </div>
                   <div class="priority-cards">
-                    <div 
-                      v-for="(item, index) in formData.priorities" 
-                      :key="item.value" 
-                      class="priority-card"
-                      :class="{ 
-                        'is-first': index === 0,
-                        'is-second': index === 1,
-                        'is-third': index === 2,
-                        'is-dragging': dragIndex === index,
-                        'is-drag-over': dragOverIndex === index 
-                      }"
-                      draggable="true"
-                      @dragstart="handleDragStart(index)"
-                      @dragover="handleDragOver($event, index)"
-                      @dragleave="handleDragLeave"
-                      @drop="handleDrop(index)"
-                      @dragend="handleDragEnd"
-                    >
+                    <div v-for="(item, index) in formData.priorities" :key="item.value" class="priority-card" :class="{
+                      'is-first': index === 0,
+                      'is-second': index === 1,
+                      'is-third': index === 2,
+                      'is-dragging': dragIndex === index,
+                      'is-drag-over': dragOverIndex === index
+                    }" draggable="true" @dragstart="handleDragStart(index)" @dragover="handleDragOver($event, index)"
+                      @dragleave="handleDragLeave" @drop="handleDrop(index)" @dragend="handleDragEnd">
                       <div class="card-rank">
                         <div class="rank-badge" :class="getPriorityClass(index)">
-                          <el-icon v-if="index === 0"><Trophy /></el-icon>
+                          <el-icon v-if="index === 0">
+                            <Trophy />
+                          </el-icon>
                           <span v-else>{{ index + 1 }}</span>
                         </div>
                       </div>
@@ -1923,29 +1813,15 @@ const resetForm = () => {
                         <div class="card-hint">{{ getPriorityHint(index) }}</div>
                       </div>
                       <div class="card-actions">
-                        <el-button 
-                          text 
-                          circle
-                          size="small"
-                          :disabled="index === 0" 
-                          @click="movePriority(index, -1)"
-                          :icon="ArrowUp"
-                          title="上移"
-                          class="action-btn"
-                        />
-                        <el-button 
-                          text 
-                          circle
-                          size="small"
-                          :disabled="index === formData.priorities.length - 1" 
-                          @click="movePriority(index, 1)"
-                          :icon="ArrowDown"
-                          title="下移"
-                          class="action-btn"
-                        />
+                        <el-button text circle size="small" :disabled="index === 0" @click="movePriority(index, -1)"
+                          :icon="ArrowUp" title="上移" class="action-btn" />
+                        <el-button text circle size="small" :disabled="index === formData.priorities.length - 1"
+                          @click="movePriority(index, 1)" :icon="ArrowDown" title="下移" class="action-btn" />
                       </div>
                       <div class="drag-indicator">
-                        <el-icon><Rank /></el-icon>
+                        <el-icon>
+                          <Rank />
+                        </el-icon>
                       </div>
                     </div>
                   </div>
@@ -1965,32 +1841,22 @@ const resetForm = () => {
           </el-form>
 
           <!-- 雷达图弹窗组件 -->
-          <CareerFormRadar
-            v-model:visible="showRadarDialog"
-            :scores="radarScores"
-            :loading="radarLoading"
-            :loading-text="'正在生成能力评估报告...'"
-            :source-type="hasUploadedResume ? 'resume' : 'manual'"
-            :completeness="profileCompleteness"
-            :missing-items="missingItems"
-            @jump-to-field="handleJumpToField"
-          />
+          <CareerFormRadar v-model:visible="showRadarDialog" :scores="radarScores" :loading="radarLoading"
+            :loading-text="'正在生成能力评估报告...'" :source-type="hasUploadedResume ? 'resume' : 'manual'"
+            :completeness="profileCompleteness" :missing-items="missingItems" @jump-to-field="handleJumpToField" />
         </el-card>
       </el-main>
     </el-container>
 
     <!-- 素质测评弹窗 -->
-    <el-dialog 
-      v-model="testDialog.visible" 
-      :title="testDialog.title" 
-      width="600px"
-      class="quiz-dialog"
-      destroy-on-close
-    >
+    <el-dialog v-model="testDialog.visible" :title="testDialog.title" width="600px" class="quiz-dialog"
+      destroy-on-close>
       <div v-if="testDialog.type === 'quiz' && testDialog.currentQuestion" class="quiz-content">
         <!-- 不支持的技能提示（只有单个选项时显示为提示信息） -->
         <div v-if="testDialog.currentQuestion.id === -1" class="quiz-unsupported">
-          <el-icon :size="48" color="#e6a23c"><Warning /></el-icon>
+          <el-icon :size="48" color="#e6a23c">
+            <Warning />
+          </el-icon>
           <p class="unsupported-text">{{ testDialog.currentQuestion.question }}</p>
         </div>
         <!-- 正常测试题 -->
@@ -2000,12 +1866,8 @@ const resetForm = () => {
             <p class="question-text">{{ testDialog.currentQuestion.question }}</p>
           </div>
           <el-radio-group v-model="testDialog.answer" class="quiz-options">
-            <el-radio 
-              v-for="option in testDialog.currentQuestion.options" 
-              :key="option.value"
-              :label="option.value"
-              class="quiz-option"
-            >
+            <el-radio v-for="option in testDialog.currentQuestion.options" :key="option.value" :label="option.value"
+              class="quiz-option">
               <span class="option-label">{{ option.label }}.</span>
               <span class="option-text">{{ option.text }}</span>
             </el-radio>
@@ -2013,7 +1875,9 @@ const resetForm = () => {
         </template>
       </div>
       <div v-else class="quiz-loading">
-        <el-icon class="loading-icon" :size="48"><Loading /></el-icon>
+        <el-icon class="loading-icon" :size="48">
+          <Loading />
+        </el-icon>
         <p>AI 正在生成测试题...</p>
         <el-progress :percentage="testDialog.progress" :stroke-width="8" />
       </div>
@@ -2021,78 +1885,52 @@ const resetForm = () => {
         <el-button @click="testDialog.visible = false">
           {{ testDialog.currentQuestion?.id === -1 ? '关闭' : '取消' }}
         </el-button>
-        <el-button 
-          v-if="testDialog.currentQuestion?.id !== -1"
-          type="primary" 
-          @click="confirmTest"
-          :disabled="!testDialog.answer"
-        >
+        <el-button v-if="testDialog.currentQuestion?.id !== -1" type="primary" @click="confirmTest"
+          :disabled="!testDialog.answer">
           提交测试
         </el-button>
       </template>
     </el-dialog>
 
     <!-- 简历上传弹窗 -->
-    <el-dialog 
-      v-model="showUploadDialog" 
-      title="简历智能上传" 
-      width="650px"
-      destroy-on-close
-    >
-      <CareerFormUpload 
-        :show-close="true" 
-        @close="showUploadDialog = false"
-        @parsed="handleResumeParsed"
-      />
+    <el-dialog v-model="showUploadDialog" title="简历智能上传" width="650px" destroy-on-close>
+      <CareerFormUpload :show-close="true" @close="showUploadDialog = false" @parsed="handleResumeParsed" />
     </el-dialog>
 
     <!-- 项目经历弹窗 -->
-    <el-dialog
-      v-model="showProjectDialog"
-      title="添加项目/竞赛经历"
-      width="600px"
-      destroy-on-close
-      class="experience-dialog"
-    >
+    <el-dialog v-model="showProjectDialog" title="添加项目/竞赛经历" width="600px" destroy-on-close class="experience-dialog">
       <div class="experience-form">
         <div class="form-item">
           <label class="form-label">
-            <el-icon><Switch /></el-icon>
+            <el-icon>
+              <Switch />
+            </el-icon>
             类型
           </label>
-          <el-switch
-            v-model="projectForm.isCompetition"
-            active-text="竞赛"
-            inactive-text="项目"
-            inline-prompt
-            style="--el-switch-on-color: #e6a23c; --el-switch-off-color: #409eff"
-          />
+          <el-switch v-model="projectForm.isCompetition" active-text="竞赛" inactive-text="项目" inline-prompt
+            style="--el-switch-on-color: #e6a23c; --el-switch-off-color: #409eff" />
         </div>
         <div class="form-item">
           <label class="form-label">
-            <el-icon><Document /></el-icon>
+            <el-icon>
+              <Document />
+            </el-icon>
             {{ projectForm.isCompetition ? '竞赛名称' : '项目名称' }}
           </label>
-          <el-input
-            v-model="projectForm.name"
-            :placeholder="projectForm.isCompetition ? '请输入竞赛名称' : '请输入项目名称'"
-            size="large"
-          />
+          <el-input v-model="projectForm.name" :placeholder="projectForm.isCompetition ? '请输入竞赛名称' : '请输入项目名称'"
+            size="large" />
         </div>
         <div class="form-item">
           <label class="form-label">
-            <el-icon><Edit /></el-icon>
+            <el-icon>
+              <Edit />
+            </el-icon>
             详细描述
           </label>
-          <el-input
-            v-model="projectForm.desc"
-            type="textarea"
-            :rows="5"
-            :placeholder="projectForm.isCompetition
-              ? '描述竞赛背景、你的角色分工、具体工作和最终成绩'
-              : '描述项目背景、你的职责、技术栈和取得的成果'
-            "
-          />
+          <el-input v-model="projectForm.desc" type="textarea" :rows="5" :placeholder="projectForm.isCompetition
+            ? '描述竞赛背景、你的角色分工、具体工作和最终成绩'
+            : '描述项目背景、你的职责、技术栈和取得的成果'
+            " />
         </div>
       </div>
       <template #footer>
@@ -2104,73 +1942,52 @@ const resetForm = () => {
     </el-dialog>
 
     <!-- 实践经历弹窗 -->
-    <el-dialog
-      v-model="showInternshipDialog"
-      title="添加实践经历"
-      width="600px"
-      destroy-on-close
-      class="experience-dialog"
-    >
+    <el-dialog v-model="showInternshipDialog" title="添加实践经历" width="600px" destroy-on-close class="experience-dialog">
       <div class="experience-form">
         <div class="form-row two-col">
           <div class="form-item">
             <label class="form-label">
-              <el-icon><OfficeBuilding /></el-icon>
+              <el-icon>
+                <OfficeBuilding />
+              </el-icon>
               公司/组织
             </label>
-            <el-input
-              v-model="internshipForm.company"
-              placeholder="请输入公司或组织全称"
-              size="large"
-            />
+            <el-input v-model="internshipForm.company" placeholder="请输入公司或组织全称" size="large" />
           </div>
           <div class="form-item">
             <label class="form-label">
-              <el-icon><User /></el-icon>
+              <el-icon>
+                <User />
+              </el-icon>
               担任岗位
             </label>
-            <el-input
-              v-model="internshipForm.role"
-              placeholder="请输入你的职位"
-              size="large"
-            />
+            <el-input v-model="internshipForm.role" placeholder="请输入你的职位" size="large" />
           </div>
         </div>
         <div class="form-item">
           <label class="form-label">
-            <el-icon><Calendar /></el-icon>
+            <el-icon>
+              <Calendar />
+            </el-icon>
             起止时间
           </label>
-          <el-date-picker
-            v-model="internshipForm.date"
-            type="daterange"
-            range-separator="至"
-            start-placeholder="开始时间"
-            end-placeholder="结束时间"
-            style="width: 100%"
-            size="large"
-          />
+          <el-date-picker v-model="internshipForm.date" type="daterange" range-separator="至" start-placeholder="开始时间"
+            end-placeholder="结束时间" style="width: 100%" size="large" />
         </div>
         <div class="form-item">
           <label class="form-label">
-            <el-icon><EditPen /></el-icon>
+            <el-icon>
+              <EditPen />
+            </el-icon>
             工作描述
           </label>
-          <el-input
-            v-model="internshipForm.desc"
-            type="textarea"
-            :rows="5"
-            placeholder="详细描述工作内容、承担的责任和取得的成果"
-          />
+          <el-input v-model="internshipForm.desc" type="textarea" :rows="5" placeholder="详细描述工作内容、承担的责任和取得的成果" />
         </div>
       </div>
       <template #footer>
         <el-button @click="showInternshipDialog = false">取消</el-button>
-        <el-button
-          type="primary"
-          @click="confirmAddInternship"
-          :disabled="!internshipForm.company.trim() || !internshipForm.role.trim()"
-        >
+        <el-button type="primary" @click="confirmAddInternship"
+          :disabled="!internshipForm.company.trim() || !internshipForm.role.trim()">
           确认添加
         </el-button>
       </template>
@@ -2199,7 +2016,7 @@ const resetForm = () => {
   flex: 1;
 }
 
-.sidebar {  
+.sidebar {
   background: #fff;
   padding: 20px 0;
   display: flex;
@@ -2621,11 +2438,13 @@ const resetForm = () => {
 }
 
 /* 列表样式 */
-.list-container, .input-list-group {
+.list-container,
+.input-list-group {
   width: 100%;
 }
 
-.list-row, .skill-item {
+.list-row,
+.skill-item {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -2637,11 +2456,13 @@ const resetForm = () => {
   transition: all 0.2s ease;
 }
 
-.list-row:last-child, .skill-item:last-child {
+.list-row:last-child,
+.skill-item:last-child {
   margin-bottom: 0;
 }
 
-.list-row:hover, .skill-item:hover {
+.list-row:hover,
+.skill-item:hover {
   border-color: #c0c4cc;
   background: #f5f7fa;
 }
@@ -2661,7 +2482,8 @@ const resetForm = () => {
 .project-card {
   display: flex;
   flex-direction: column;
-  gap: 16px;  /* 统一控制内部间距 */
+  gap: 16px;
+  /* 统一控制内部间距 */
   padding: 20px;
   background: #fafbfc;
   border: 1px solid #e4e7ed;
@@ -2690,7 +2512,8 @@ const resetForm = () => {
   justify-content: space-between;
   align-items: center;
   border-bottom: 1px dashed #dcdfe6;
-  padding-bottom: 16px;  /* 这个 padding 不影响外部间距，因为 gap 已经处理了 */
+  padding-bottom: 16px;
+  /* 这个 padding 不影响外部间距，因为 gap 已经处理了 */
 }
 
 /* 项目操作区 */
@@ -3047,6 +2870,7 @@ const resetForm = () => {
     opacity: 0;
     transform: translateY(20px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -3057,9 +2881,17 @@ const resetForm = () => {
   animation: slideInUp 0.4s ease forwards;
 }
 
-.priority-card:nth-child(1) { animation-delay: 0.05s; }
-.priority-card:nth-child(2) { animation-delay: 0.1s; }
-.priority-card:nth-child(3) { animation-delay: 0.15s; }
+.priority-card:nth-child(1) {
+  animation-delay: 0.05s;
+}
+
+.priority-card:nth-child(2) {
+  animation-delay: 0.1s;
+}
+
+.priority-card:nth-child(3) {
+  animation-delay: 0.15s;
+}
 
 /* 底部操作按钮 */
 .form-actions {
@@ -3266,6 +3098,7 @@ const resetForm = () => {
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -3468,6 +3301,7 @@ const resetForm = () => {
   from {
     transform: rotate(0deg);
   }
+
   to {
     transform: rotate(360deg);
   }

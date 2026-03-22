@@ -19,19 +19,13 @@ const props = withDefaults(defineProps<Props>(), {
   showClose: false
 })
 
-
 // 定义组件触发的事件
-const emit = defineEmits<{
-  close: []
-  parsed: [data: any]
-}>()
-
+const emit = defineEmits<{ close: [], parsed: [data: any] }>()
 
 const userStore = useUserStore()
 const uploading = ref(false)
 const uploadProgress = ref(0)
 const selectedFile = ref<File | null>(null)
-
 
 // 进度条颜色配置
 const progressColors = [
@@ -39,11 +33,9 @@ const progressColors = [
   { color: '#67c23a', percentage: 100 }
 ]
 
-
 const handleFileChange = (file: UploadFile) => {
   selectedFile.value = file.raw || null
 }
-
 
 const beforeUpload = (file: File) => {
   const isLt5M = file.size / 1024 / 1024 < 5
@@ -53,8 +45,6 @@ const beforeUpload = (file: File) => {
   }
   return true
 }
-
-
 const formatFileSize = (bytes: number) => {
   if (bytes === 0) return '0 B'
   const k = 1024
@@ -66,10 +56,10 @@ const formatFileSize = (bytes: number) => {
 
 const submitUpload = async () => {
   if (!selectedFile.value) return ElMessage.warning('请先选择文件')
-  
+
   uploading.value = true
   uploadProgress.value = 0
-  
+
   try {
     const res = await uploadResumeApi({
       file: selectedFile.value,
@@ -80,16 +70,18 @@ const submitUpload = async () => {
         uploadProgress.value = percent
       }
     })
-    
+
     if (res.data.code === 200) {
       ElMessage.success('简历解析成功！')
+      console.log(res.data.data);
       emit('parsed', res.data.data)
+
       // 如果 showClose 为 true，说明是弹窗模式，关闭弹窗
       if (props.showClose) {
         emit('close')
       }
     } else {
-      ElMessage.error(res.data.message || '解析失败，请重试')
+      ElMessage.error(res.data.msg || '解析失败，请重试')
     }
   } catch (error) {
     ElMessage.error('解析失败，请重试')
@@ -107,27 +99,12 @@ const submitUpload = async () => {
     <el-card class="upload-card" shadow="hover">
       <div class="upload-header">
         <h3>简历上传</h3>
-        <el-button 
-          v-if="showClose" 
-          link 
-          type="info" 
-          @click="$emit('close')"
-          :icon="Close"
-          circle
-        />
+        <el-button v-if="showClose" link type="info" @click="$emit('close')" :icon="Close" circle />
       </div>
-      
+
       <div class="upload-area">
-        <el-upload
-          ref="uploadRef"
-          drag
-          :auto-upload="false"
-          :on-change="handleFileChange"
-          :before-upload="beforeUpload"
-          :limit="1"
-          accept=".pdf,.doc,.docx"
-          class="upload-component"
-        >
+        <el-upload ref="uploadRef" drag :auto-upload="false" :on-change="handleFileChange" :before-upload="beforeUpload"
+          :limit="1" accept=".pdf,.doc,.docx" class="upload-component">
           <el-icon class="upload-icon" :size="48"><upload-filled /></el-icon>
           <div class="upload-text">
             <div class="main-text">拖拽文件到此处或<em>点击上传</em></div>
@@ -137,21 +114,19 @@ const submitUpload = async () => {
 
         <!-- 文件信息（选中后显示） -->
         <div v-if="selectedFile" class="file-info">
-          <el-icon><Document /></el-icon>
+          <el-icon>
+            <Document />
+          </el-icon>
           <span class="file-name">{{ selectedFile.name }}</span>
           <span class="file-size">{{ formatFileSize(selectedFile.size) }}</span>
         </div>
 
         <!-- 上传按钮 -->
-        <el-button 
-          type="primary" 
-          :loading="uploading" 
-          @click="submitUpload"
-          :disabled="!selectedFile"
-          class="upload-btn"
-          size="large"
-        >
-          <el-icon class="btn-icon"><MagicStick v-if="!uploading" /></el-icon>
+        <el-button type="primary" :loading="uploading" @click="submitUpload" :disabled="!selectedFile"
+          class="upload-btn" size="large">
+          <el-icon class="btn-icon">
+            <MagicStick v-if="!uploading" />
+          </el-icon>
           {{ uploading ? 'AI 解析中...' : '开始智能解析' }}
         </el-button>
 
@@ -161,16 +136,12 @@ const submitUpload = async () => {
             <span>解析进度</span>
             <span class="progress-percent">{{ uploadProgress }}%</span>
           </div>
-          <el-progress 
-            :percentage="uploadProgress" 
-            :stroke-width="20"
-            :color="progressColors"
-            striped
-            striped-flow
-          />
+          <el-progress :percentage="uploadProgress" :stroke-width="20" :color="progressColors" striped striped-flow />
           <div class="progress-tips">
             <el-text type="info" size="small">
-              <el-icon><Timer /></el-icon>
+              <el-icon>
+                <Timer />
+              </el-icon>
               AI 正在分析您的简历内容，请稍候...
             </el-text>
           </div>
@@ -182,38 +153,48 @@ const submitUpload = async () => {
     <el-card class="feature-card" shadow="hover">
       <template #header>
         <div class="card-header">
-          <el-icon><Operation /></el-icon>
+          <el-icon>
+            <Operation />
+          </el-icon>
           <span>AI 解析功能</span>
         </div>
       </template>
-      
+
       <div class="feature-list">
         <div class="feature-item">
-          <el-icon class="feature-icon" color="#67C23A"><Check /></el-icon>
+          <el-icon class="feature-icon" color="#67C23A">
+            <Check />
+          </el-icon>
           <div class="feature-content">
             <div class="feature-title">智能技能提取</div>
             <div class="feature-desc">自动识别简历中的专业技能和工具</div>
           </div>
         </div>
-        
+
         <div class="feature-item">
-          <el-icon class="feature-icon" color="#409EFF"><Check /></el-icon>
+          <el-icon class="feature-icon" color="#409EFF">
+            <Check />
+          </el-icon>
           <div class="feature-content">
             <div class="feature-title">经历分析</div>
             <div class="feature-desc">深度解析项目经验和实习经历</div>
           </div>
         </div>
-        
+
         <div class="feature-item">
-          <el-icon class="feature-icon" color="#E6A23C"><Check /></el-icon>
+          <el-icon class="feature-icon" color="#E6A23C">
+            <Check />
+          </el-icon>
           <div class="feature-content">
             <div class="feature-title">能力画像生成</div>
             <div class="feature-desc">生成个性化的职业能力画像</div>
           </div>
         </div>
-        
+
         <div class="feature-item">
-          <el-icon class="feature-icon" color="#F56C6C"><Check /></el-icon>
+          <el-icon class="feature-icon" color="#F56C6C">
+            <Check />
+          </el-icon>
           <div class="feature-content">
             <div class="feature-title">发展建议</div>
             <div class="feature-desc">基于画像提供职业发展建议</div>

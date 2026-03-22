@@ -32,7 +32,7 @@ export function uploadResumeApi(params: UploadParams) {
   //可选：前端预提取的元数据 (减轻后端压力)
   // formData.append('file_type', params.file.type)
 
-  return request.post<Result<UploadResponse>>('/resume-upload-chat/message', formData, {
+  return request.post<Result<UploadResponse>>('/parse/file', formData, {
     // 上传进度监控 (提升用户体验)
     onUploadProgress: (progressEvent: any) => {
       if (progressEvent.total && params.onProgress) {

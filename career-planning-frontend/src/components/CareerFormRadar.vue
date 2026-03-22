@@ -1,4 +1,4 @@
-<!-- src/components/CareerForm_Radar.vue -->
+<!-- src/components/CareerFormRadar.vue -->
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch, nextTick, computed } from 'vue'
 import * as echarts from 'echarts'
@@ -308,57 +308,46 @@ watch(
 
 <template>
   <!-- 悬浮按钮 - 当弹窗关闭时显示 -->
-  <div
-    v-if="!visible"
-    class="radar-float-btn"
-    :class="{ 'has-data': hasValidData }"
-    @click="$emit('update:visible', true)"
-  >
-    <el-icon :size="24"><DataAnalysis /></el-icon>
+  <div v-if="!visible" class="radar-float-btn" :class="{ 'has-data': hasValidData }"
+    @click="$emit('update:visible', true)">
+    <el-icon :size="24">
+      <DataAnalysis />
+    </el-icon>
     <span class="float-text">能力评估</span>
     <div v-if="hasValidData" class="score-badge">{{ averageScore }}</div>
   </div>
 
   <!-- 雷达图弹窗 -->
-  <div
-    v-if="visible"
-    class="radar-dialog-overlay"
-    @click.self="closeDialog"
-  >
-    <div
-      class="radar-dialog"
-      :class="{ 'is-collapsed': isCollapsed }"
-    >
+  <div v-if="visible" class="radar-dialog-overlay" @click.self="closeDialog">
+    <div class="radar-dialog" :class="{ 'is-collapsed': isCollapsed }">
       <!-- 弹窗头部 -->
       <div class="radar-dialog-header">
         <div class="header-left">
-          <el-icon class="header-icon" :size="20"><DataAnalysis /></el-icon>
+          <el-icon class="header-icon" :size="20">
+            <DataAnalysis />
+          </el-icon>
           <span class="header-title">能力画像评估</span>
           <div class="radar-badge" :class="sourceType">
-            <el-icon v-if="sourceType === 'manual'"><DocumentChecked /></el-icon>
-            <el-icon v-else-if="sourceType === 'resume'"><DataAnalysis /></el-icon>
+            <el-icon v-if="sourceType === 'manual'">
+              <DocumentChecked />
+            </el-icon>
+            <el-icon v-else-if="sourceType === 'resume'">
+              <DataAnalysis />
+            </el-icon>
             <span>{{ sourceType === 'manual' ? '手动填写' : sourceType === 'resume' ? '简历解析' : '系统评估' }}</span>
           </div>
         </div>
         <div class="header-actions">
-          <el-button
-            text
-            class="collapse-btn"
-            @click="toggleCollapse"
-            :title="isCollapsed ? '展开' : '收起'"
-          >
+          <el-button text class="collapse-btn" @click="toggleCollapse" :title="isCollapsed ? '展开' : '收起'">
             <el-icon :size="16">
               <ArrowUp v-if="!isCollapsed" />
               <ArrowDown v-else />
             </el-icon>
           </el-button>
-          <el-button
-            text
-            class="close-btn"
-            @click="closeDialog"
-            title="关闭"
-          >
-            <el-icon :size="16"><Close /></el-icon>
+          <el-button text class="close-btn" @click="closeDialog" title="关闭">
+            <el-icon :size="16">
+              <Close />
+            </el-icon>
           </el-button>
         </div>
       </div>
@@ -369,7 +358,9 @@ watch(
         <div class="completeness-section">
           <div class="completeness-header">
             <div class="completeness-title">
-              <el-icon :size="18" :color="completenessLevel.color"><CircleCheck /></el-icon>
+              <el-icon :size="18" :color="completenessLevel.color">
+                <CircleCheck />
+              </el-icon>
               <span>画像完整度</span>
             </div>
             <div class="completeness-value" :style="{ color: completenessLevel.color }">
@@ -379,34 +370,26 @@ watch(
               </el-tag>
             </div>
           </div>
-          <el-progress
-            :percentage="completeness"
-            :status="completenessLevel.status"
-            :stroke-width="10"
-            :show-text="false"
-            class="completeness-progress"
-          />
+          <el-progress :percentage="completeness" :status="completenessLevel.status" :stroke-width="10"
+            :show-text="false" class="completeness-progress" />
           <p class="completeness-hint">
-            {{ completeness >= 90 ? '您的画像信息已非常完善，可以进行能力评估' : 
-               completeness >= 70 ? '您的画像信息较为完善，建议补充以下内容' : 
-               '您的画像信息有待完善，建议先补充以下重要信息' }}
+            {{ completeness >= 90 ? '您的画像信息已非常完善，可以进行能力评估' :
+              completeness >= 70 ? '您的画像信息较为完善，建议补充以下内容' :
+                '您的画像信息有待完善，建议先补充以下重要信息' }}
           </p>
         </div>
 
         <!-- 缺失项提示区域 -->
         <div v-if="missingItems.length > 0" class="missing-section">
           <div class="missing-title">
-            <el-icon :size="16"><Warning /></el-icon>
+            <el-icon :size="16">
+              <Warning />
+            </el-icon>
             <span>待完善项 ({{ missingItems.length }})</span>
           </div>
           <div class="missing-list">
-            <div
-              v-for="(item, index) in missingItems"
-              :key="index"
-              class="missing-item"
-              :class="`priority-${item.priority}`"
-              @click="jumpToField(item.field)"
-            >
+            <div v-for="(item, index) in missingItems" :key="index" class="missing-item"
+              :class="`priority-${item.priority}`" @click="jumpToField(item.field)">
               <div class="missing-icon">
                 <el-icon :size="16">
                   <Collection v-if="item.icon === 'certificate'" />
@@ -417,12 +400,9 @@ watch(
               </div>
               <div class="missing-info">
                 <span class="missing-label">{{ item.label }}</span>
-                <el-tag
-                  size="small"
+                <el-tag size="small"
                   :type="item.priority === 'high' ? 'danger' : item.priority === 'medium' ? 'warning' : 'info'"
-                  effect="light"
-                  class="priority-tag"
-                >
+                  effect="light" class="priority-tag">
                   {{ getPriorityLabel(item.priority) }}
                 </el-tag>
               </div>
@@ -436,7 +416,9 @@ watch(
         <!-- 雷达图展示区域 -->
         <div v-if="showRadar" class="radar-chart-section">
           <div class="section-title">
-            <el-icon :size="16"><DataAnalysis /></el-icon>
+            <el-icon :size="16">
+              <DataAnalysis />
+            </el-icon>
             <span>六维能力评估</span>
           </div>
           <div ref="chartRef" class="chart-content"></div>
@@ -448,25 +430,19 @@ watch(
               <span class="score" :style="{ color: getAbilityLevel(averageScore).color }">
                 {{ averageScore }}
               </span>
-              <span class="level" :style="{ backgroundColor: getAbilityLevel(averageScore).color + '20', color: getAbilityLevel(averageScore).color }">
+              <span class="level"
+                :style="{ backgroundColor: getAbilityLevel(averageScore).color + '20', color: getAbilityLevel(averageScore).color }">
                 {{ getAbilityLevel(averageScore).label }}
               </span>
             </div>
             <div class="scores-grid">
-              <div
-                v-for="(score, key) in scores"
-                :key="key"
-                class="score-item"
-              >
+              <div v-for="(score, key) in scores" :key="key" class="score-item">
                 <span class="score-name">{{ key }}</span>
                 <div class="score-bar">
-                  <div
-                    class="score-progress"
-                    :style="{
-                      width: score + '%',
-                      backgroundColor: getAbilityLevel(score).color
-                    }"
-                  ></div>
+                  <div class="score-progress" :style="{
+                    width: score + '%',
+                    backgroundColor: getAbilityLevel(score).color
+                  }"></div>
                 </div>
                 <span class="score-value" :style="{ color: getAbilityLevel(score).color }">
                   {{ score }}
@@ -478,20 +454,19 @@ watch(
 
         <!-- 加载状态 -->
         <div v-else-if="isLoading" class="status-container loading">
-          <el-icon class="loading-icon" :size="48"><Loading /></el-icon>
+          <el-icon class="loading-icon" :size="48">
+            <Loading />
+          </el-icon>
           <p class="status-text">{{ loadingText }}</p>
-          <el-progress
-            :percentage="100"
-            :indeterminate="true"
-            :stroke-width="4"
-            class="loading-progress"
-          />
+          <el-progress :percentage="100" :indeterminate="true" :stroke-width="4" class="loading-progress" />
           <p class="status-hint">AI 正在分析您的画像数据，请稍候...</p>
         </div>
 
         <!-- 空状态 -->
         <div v-else-if="isEmpty" class="status-container empty">
-          <el-icon class="empty-icon" :size="48"><DataAnalysis /></el-icon>
+          <el-icon class="empty-icon" :size="48">
+            <DataAnalysis />
+          </el-icon>
           <p class="status-text">暂无能力评估数据</p>
           <p class="status-hint">请先完善画像信息，提交后生成能力雷达图</p>
         </div>
@@ -594,6 +569,7 @@ watch(
     opacity: 0;
     transform: translateY(30px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -953,8 +929,13 @@ watch(
 }
 
 @keyframes rotate {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .empty-icon {

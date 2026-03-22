@@ -32,7 +32,7 @@ export interface LoginFormDTO {
  * 通用响应结果
  * @template T 响应数据的类型
  */
-export interface Result<T = unknown> {
+export interface Result<T> {
   /**
    * 成功为 --200  失败为 401
    */
@@ -176,22 +176,22 @@ export interface UploadResponse {
   code: number
   message: string
   data: {
-    file_id: string          // 文件存储 ID
+    file_id: string // 文件存储 ID
     parse_status: 'pending' | 'processing' | 'completed' | 'failed'
-    task_id?: string         // 异步解析任务 ID (若耗时较长)
-    
-    //  赛题核心：AI 解析出的画像数据 
+    task_id?: string // 异步解析任务 ID (若耗时较长)
+
+    //  赛题核心：AI 解析出的画像数据
     profile?: {
       name: string
-      skills: string[]       // 技能标签
-      experience: string[]   // 经历摘要
-      education: string      // 学历
+      skills: string[] // 技能标签
+      experience: string[] // 经历摘要
+      education: string // 学历
       confidence_score: number // 解析置信度 (0-1)
     }
-    
+
     // 能力评估分数（与表单提交返回的 abilityScores 格式一致）
     abilityScores?: AbilityScores
-    
+
     // 完整报告（与表单提交流程返回的 CareerReport 格式一致）
     report?: CareerReport
   }
