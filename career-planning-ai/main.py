@@ -9,7 +9,7 @@ from starlette.responses import JSONResponse
 
 from ai_service.exceptions import ApiException
 from ai_service.response.result import success
-from ai_service.routers import parse, test_question, matching
+from ai_service.routers import parse, test_question, matching, convert
 from ai_service.utils.logger_handler import log
 
 app = FastAPI()
@@ -17,6 +17,7 @@ app = FastAPI()
 app.include_router(parse.router)
 app.include_router(test_question.router)
 app.include_router(matching.router)
+app.include_router(convert.router)
 
 
 @app.exception_handler(StarletteHTTPException)
