@@ -219,15 +219,19 @@ class Vector(BaseModel):
     model_name: str = ""
     llm_model_name: str = ""
 
+
 class Milvus(BaseModel):
     class Local(BaseModel):
         host: str = ""
         port: int = 19530
+
     class Cloud(BaseModel):
         url: str = ""
         token: SecretStr = SecretStr("")
+
     local: Local = Field(default_factory=Local)
     cloud: Cloud = Field(default_factory=Cloud)
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -280,7 +284,7 @@ def get_settings() -> Settings:
 def program_exit():
     """程序退出前执行的操作"""
     if settings.path_config.is_clean:  # 是否清理临时文件
-        temp_path = settings.path_config.temp
+        temp_path = os.path.join(settings.path_config.temp, "../../")
         if Path(temp_path).exists():
             shutil.rmtree(temp_path, ignore_errors=True)
 

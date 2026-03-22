@@ -4,8 +4,8 @@ from typing import Any
 from ai_service.engine.ai_engine import AIEngine
 from ai_service.models.struct_txt import StudentProfile
 from ai_service.models.userform_txt import StudentFormProfile
+from ai_service.services import log
 from ai_service.services.major_aliger import major_aligner
-from ai_service.utils.logger_handler import log
 from config import settings
 
 __all__ = [
@@ -41,6 +41,6 @@ class StructTextExtractor:
         # 对 major 进行标准化处理
         response.major = major_aligner.align(response.major)
         return json.loads(response.model_dump_json(by_alias=True))
-    
+
 
 struct_text_extractor = StructTextExtractor()

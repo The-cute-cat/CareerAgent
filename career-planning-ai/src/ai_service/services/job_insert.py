@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 # 导入你提供的模块
 from ai_service.models.job_info import JobInfo
 from ai_service.models.job_portrait import JobPortrait
-from ai_service.services.Job_table_cleaning import read_excel_to_jobinfo
+from ai_service.services.job_table_cleaning import read_excel_to_jobinfo
 from ai_service.services.job_profile_builder import analyze_job_description
 from config import settings
 

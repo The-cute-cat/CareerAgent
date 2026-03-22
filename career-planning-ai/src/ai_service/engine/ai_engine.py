@@ -15,7 +15,6 @@ from langchain_core.messages import (
     BaseMessage,
 )
 from pydantic import BaseModel
-
 from ai_service.engine.action_type import ActionType
 from ai_service.engine.ai_state import AIState  # 引入 AIState 类
 from ai_service.engine.exceptions import (
@@ -25,10 +24,22 @@ from ai_service.engine.exceptions import (
     TextGenerationError,
     StreamInterruptedError,
 )
-from ai_service.utils.logger_handler import log
-from config import LLM
 
-__all__ = ["AIEngine"]
+
+__all__ = [
+    "AIEngine",
+    "BaseStep",
+    "InputStep",
+    "TuneStep",
+    "ShapeStep",
+    "StructActionStep",
+    "TextActionStep",
+]
+
+from ai_service.utils.logger_handler import log
+
+from config import LiteLLM
+
 litellm.drop_params = True
 
 """
@@ -135,7 +146,8 @@ class StructActionStep(Generic[T], BaseStep):
             ...     .next_step().next_step().into_struct(Person).do()
         """
         try:
-            log.info(f"[结构化提取] 开始执行 | 模型: {self._state.model.model_name if self._state.model else 'unknown'} | Schema: {self.schema.__name__}")
+            log.info(
+                f"[结构化提取] 开始执行 | 模型: {self._state.model.model_name if self._state.model else 'unknown'} | Schema: {self.schema.__name__}")
 
             messages = self._state._compile_messages()
             log.debug(f"[结构化提取] 消息编译完成 | 消息数量: {len(messages)}")
@@ -147,7 +159,8 @@ class StructActionStep(Generic[T], BaseStep):
             )  # 直接传入 Pydantic 模型类，LiteLLM 会自动处理结构化输出
             kwargs["messages"] = messages  # 直接传入编译好的消息列表，避免重复处理
 
-            log.debug(f"[结构化提取] LLM参数: temperature={kwargs.get('temperature', 'default')}, max_tokens={kwargs.get('max_tokens', 'default')}")
+            log.debug(
+                f"[结构化提取] LLM参数: temperature={kwargs.get('temperature', 'default')}, max_tokens={kwargs.get('max_tokens', 'default')}")
 
             # 【核心修复点】: 显式指定模式为 MD_JSON
             # 这会告诉 Instructor：不要走脆弱的 tool_call 协议
@@ -208,7 +221,8 @@ class TextActionStep(BaseStep):
             kwargs = self._state.to_litellm_params()
             kwargs["messages"] = messages  # 直接传入编译好的消息列表，避免重复处理
 
-            log.debug(f"[文本生成] LLM参数: temperature={kwargs.get('temperature', 'default')}, max_tokens={kwargs.get('max_tokens', 'default')}")
+            log.debug(
+                f"[文本生成] LLM参数: temperature={kwargs.get('temperature', 'default')}, max_tokens={kwargs.get('max_tokens', 'default')}")
 
             response = await self._engine.text_client(**kwargs)
 
@@ -423,7 +437,8 @@ class InputStep(BaseStep):
             >>> engine.pick_brain(model).set_system_role("你是一个资深的 Python 开发专家")
         """
         log.info(f"[上下文注入] 设置系统角色 | 长度: {len(role)} 字符")
-        log.debug(f"[上下文注入] 角色内容摘要: {role[:100]}..." if len(role) > 100 else f"[上下文注入] 角色内容: {role}")
+        log.debug(
+            f"[上下文注入] 角色内容摘要: {role[:100]}..." if len(role) > 100 else f"[上下文注入] 角色内容: {role}")
         return InputStep(self._state.evolve(ActionType.SET_SYSTEM_ROLE, role), self._engine)
 
     def set_history(self, history: List[Dict[str, Any]]) -> "InputStep":
@@ -493,7 +508,8 @@ class InputStep(BaseStep):
             ...     .add_instruction("输出格式：正面/负面/中性")
         """
         log.info(f"[上下文注入] 添加任务指令 | 长度: {len(task)} 字符")
-        log.debug(f"[上下文注入] 指令内容摘要: {task[:100]}..." if len(task) > 100 else f"[上下文注入] 指令内容: {task}")
+        log.debug(
+            f"[上下文注入] 指令内容摘要: {task[:100]}..." if len(task) > 100 else f"[上下文注入] 指令内容: {task}")
         return InputStep(
             self._state.evolve(ActionType.ADD_INSTRUCTION, task), self._engine
         )
@@ -632,19 +648,21 @@ class InputStep(BaseStep):
             ...     .next_step()
         """
         has_input = (
-            self._state.user_data
-            or self._state.instructions
-            or self._state.history
+                self._state.user_data
+                or self._state.instructions
+                or self._state.history
         )
 
         # 记录注入统计
-        log.info(f"[上下文注入] 注入完成 | 数据项: {len(self._state.user_data)} | 指令项: {len(self._state.instructions)} | 历史项: {len(self._state.history)}")
+        log.info(
+            f"[上下文注入] 注入完成 | 数据项: {len(self._state.user_data)} | 指令项: {len(self._state.instructions)} | 历史项: {len(self._state.history)}")
 
         if not has_input:
             log.error(f"[上下文注入] 编译错误: 未注入任何有效输入")
             raise EmptyInputError(
                 "编译错误：必须至少注入 指令、数据 或 历史记录 中的一项。",
-                context={"user_data": len(self._state.user_data), "instructions": len(self._state.instructions), "history": len(self._state.history)}
+                context={"user_data": len(self._state.user_data), "instructions": len(self._state.instructions),
+                         "history": len(self._state.history)}
             )
 
         log.info(f"[上下文注入] 完成注入，进入行为对齐阶段")
@@ -700,7 +718,7 @@ class AIEngine:
         self.text_client = litellm.acompletion
 
     def pick_brain(
-        self, model: LLM, model_fallbacks: Optional[List[LLM]] = None
+            self, model: LiteLLM, model_fallbacks: Optional[List[LiteLLM]] = None
     ) -> InputStep:
         """
         开启新的推理流水线：选择推理大脑
@@ -709,8 +727,8 @@ class AIEngine:
         支持设置备选模型列表，在主模型失败时自动降级。
 
         Args:
-            model (LLM): 主模型配置对象，包含 API 密钥、模型名称等
-            model_fallbacks (Optional[List[LLM]]): 备选模型列表，用于容错降级
+            model (LiteLLM): 主模型配置对象，包含 API 密钥、模型名称等
+            model_fallbacks (Optional[List[LiteLLM]]): 备选模型列表，用于容错降级
 
         Returns:
             InputStep: 上下文注入步骤，开始构建提示词
@@ -726,7 +744,8 @@ class AIEngine:
             ...     model_fallbacks=[settings.lite_llm.deepseek]
             ... )
         """
-        log.info(f"[算力锚定] 开启新流水线 | 主模型: {model.model_name if model else 'None'} | 备选模型数: {len(model_fallbacks) if model_fallbacks else 0}")
+        log.info(
+            f"[算力锚定] 开启新流水线 | 主模型: {model.model_name if model else 'None'} | 备选模型数: {len(model_fallbacks) if model_fallbacks else 0}")
         if model_fallbacks:
             log.debug(f"[算力锚定] 备选模型: {[m.model_name for m in model_fallbacks]}")
 

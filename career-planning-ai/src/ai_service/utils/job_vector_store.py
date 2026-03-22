@@ -333,9 +333,9 @@ if __name__ == "__main__":
     #     store.insert_job(jd)
 
     # 3. 执行匹配
-    print("\n--- 正在为该学生匹配最合适的岗位 ---")
+    log.info("\n--- 正在为该学生匹配最合适的岗位 ---")
     matches = store.match_jobs_for_student(student_test_data, top_k=20)
     for match in matches:
-        print(f"匹配结果：{match['job_id']} (得分: {match['score']:.2f})")
-        print(f"岗位详情：{match['raw_data']}")
-        print("-" * 50)
+        log.info(f"匹配结果：{match['job_id']} (得分: {match['score']:.2f})")
+        log.info(f"岗位详情：{match['raw_data']}")
+        log.info("-" * 50)

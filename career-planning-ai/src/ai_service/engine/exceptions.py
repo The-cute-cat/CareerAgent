@@ -25,6 +25,22 @@ AIEngineError (基类)
 from typing import Any, Optional, Type
 from pydantic import BaseModel
 
+__all__ = [
+    "AIEngineError",
+    "ConfigurationError",
+    "ModelNotSpecifiedError",
+    "InvalidActionTypeError",
+    "ValidationError",
+    "EmptyInputError",
+    "ExecutionError",
+    "StructExtractionError",
+    "TextGenerationError",
+    "StreamInterruptedError",
+    "ModelConfigNotFoundError",
+    "ResourceError",
+    "StatePollutionError",
+]
+
 
 class AIEngineError(Exception):
     """
@@ -47,10 +63,10 @@ class AIEngineError(Exception):
     """
 
     def __init__(
-        self,
-        message: str,
-        context: Optional[dict] = None,
-        cause: Optional[Exception] = None
+            self,
+            message: str,
+            context: Optional[dict] = None,
+            cause: Optional[Exception] = None
     ) -> None:
         """
         初始化异常
@@ -110,9 +126,9 @@ class ModelNotSpecifiedError(ConfigurationError):
     """
 
     def __init__(
-        self,
-        message: str = "编译错误：必须指定一个有效的模型名称",
-        context: Optional[dict] = None
+            self,
+            message: str = "编译错误：必须指定一个有效的模型名称",
+            context: Optional[dict] = None
     ) -> None:
         super().__init__(message, context)
 
@@ -131,9 +147,9 @@ class InvalidActionTypeError(ConfigurationError):
     """
 
     def __init__(
-        self,
-        action_type: Any,
-        context: Optional[dict] = None
+            self,
+            action_type: Any,
+            context: Optional[dict] = None
     ) -> None:
         ctx = context or {}
         ctx["action_type"] = str(action_type)
@@ -167,9 +183,9 @@ class EmptyInputError(ValidationError):
     """
 
     def __init__(
-        self,
-        message: str = "编译错误：必须至少注入 指令、数据 或 历史记录 中的一项。",
-        context: Optional[dict] = None
+            self,
+            message: str = "编译错误：必须至少注入 指令、数据 或 历史记录 中的一项。",
+            context: Optional[dict] = None
     ) -> None:
         super().__init__(message, context)
 
@@ -187,10 +203,10 @@ class ExecutionError(AIEngineError):
     """
 
     def __init__(
-        self,
-        message: str,
-        context: Optional[dict] = None,
-        cause: Optional[Exception] = None
+            self,
+            message: str,
+            context: Optional[dict] = None,
+            cause: Optional[Exception] = None
     ) -> None:
         super().__init__(message, context, cause)
 
@@ -210,11 +226,11 @@ class StructExtractionError(ExecutionError):
     """
 
     def __init__(
-        self,
-        schema: Type[BaseModel],
-        message: str = "结构化提取失败",
-        context: Optional[dict] = None,
-        cause: Optional[Exception] = None
+            self,
+            schema: Type[BaseModel],
+            message: str = "结构化提取失败",
+            context: Optional[dict] = None,
+            cause: Optional[Exception] = None
     ) -> None:
         ctx = context or {}
         ctx["schema"] = schema.__name__
@@ -252,10 +268,10 @@ class StreamInterruptedError(ExecutionError):
     """
 
     def __init__(
-        self,
-        message: str = "流式生成中断",
-        context: Optional[dict] = None,
-        cause: Optional[Exception] = None
+            self,
+            message: str = "流式生成中断",
+            context: Optional[dict] = None,
+            cause: Optional[Exception] = None
     ) -> None:
         super().__init__(message, context, cause)
 
@@ -273,9 +289,9 @@ class ModelConfigNotFoundError(ExecutionError):
     """
 
     def __init__(
-        self,
-        message: str = "模型配置不存在",
-        context: Optional[dict] = None
+            self,
+            message: str = "模型配置不存在",
+            context: Optional[dict] = None
     ) -> None:
         super().__init__(message, context)
 
@@ -308,10 +324,10 @@ class StatePollutionError(ResourceError):
     """
 
     def __init__(
-        self,
-        field: str,
-        reason: str = "物理资源禁止存入 AIState",
-        context: Optional[dict] = None
+            self,
+            field: str,
+            reason: str = "物理资源禁止存入 AIState",
+            context: Optional[dict] = None
     ) -> None:
         ctx = context or {}
         ctx["field"] = field
@@ -324,10 +340,10 @@ class StatePollutionError(ResourceError):
 # =============================================================================
 
 def wrap_exception(
-    error: Exception,
-    wrapper_class: Type[AIEngineError],
-    message: Optional[str] = None,
-    context: Optional[dict] = None
+        error: Exception,
+        wrapper_class: Type[AIEngineError],
+        message: Optional[str] = None,
+        context: Optional[dict] = None
 ) -> AIEngineError:
     """
     将原始异常包装为框架异常
