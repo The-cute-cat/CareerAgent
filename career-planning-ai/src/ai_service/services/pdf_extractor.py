@@ -62,7 +62,7 @@ class PDFExtractor:
                 info.encrypted = doc.is_encrypted
                 if not self._try_decrypt_pdf(doc, password):
                     log.warning(
-                        f"PDF file is encrypted and password is incorrect: {pdf_path}，password: {password}"
+                        f"PDF file is encrypted and password is incorrect: {pdf_path}"
                     )
                     return PDFType.ENCRYPTED, info
 
@@ -142,7 +142,7 @@ class PDFExtractor:
             with pymupdf.open(pdf_path) as doc:
                 if not self._try_decrypt_pdf(doc, password):
                     log.warning(
-                        f"PDF file is encrypted and password is incorrect: {pdf_path}，password: {password}"
+                        f"PDF file is encrypted and password is incorrect: {pdf_path}"
                     )
                     return []
                 text_list = []
@@ -194,7 +194,7 @@ class PDFExtractor:
                 result = []
                 if not self._try_decrypt_pdf(doc, password):
                     log.warning(
-                        f"PDF file is encrypted and password is incorrect: {pdf_path}，password: {password}"
+                        f"PDF file is encrypted and password is incorrect: {pdf_path}"
                     )
                     return []
                 if scanned_page_list:

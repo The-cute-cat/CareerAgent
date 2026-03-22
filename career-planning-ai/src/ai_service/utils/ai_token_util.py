@@ -77,4 +77,5 @@ def check_token(token: Optional[str]) -> bool:
         return False
 
 if __name__ == '__main__':
-    print(create_token())
+    # print(create_token())
+    pass

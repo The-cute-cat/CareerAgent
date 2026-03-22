@@ -28,12 +28,12 @@ class CommonAgent:
 
     async def get_answer(self, prompt: str | PromptValue) -> str | list[str | dict]:
         start_time = time.time()
-        log.info(f"prompt:{prompt.replace("\n", "") if type(prompt) is str else prompt.to_string().replace("\n", "")}")
+        log.info(f"prompt:{prompt.replace("\n", "\\n") if type(prompt) is str else prompt.to_string().replace("\n", "\\n")}")
         response = await self.llm.ainvoke(prompt)
         end_time = time.time()
         log.info(f"耗时: {end_time - start_time}秒；response_metadata: {response.response_metadata}")
         result = response.content
-        log.info(f"result:{result.replace("\n", "") if type(result) is str else result}")
+        log.info(f"result:{result.replace("\n", "\\n") if type(result) is str else result}")
         return result
 
 
