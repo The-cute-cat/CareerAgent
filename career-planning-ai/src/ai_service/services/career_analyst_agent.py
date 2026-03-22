@@ -1,13 +1,13 @@
-import json
 import asyncio
-from dotenv import load_dotenv
-from pydantic import BaseModel, Field
-from ai_service.models.struct_txt import StudentProfile
-import dashscope
+import json
 from typing import List, Dict, Any
 
+import dashscope
+from pydantic import BaseModel, Field
+
+from ai_service.models.struct_txt import StudentProfile
 from ai_service.services import log
-from config import settings, LLM
+from config import settings
 
 
 # ==========================================
@@ -32,7 +32,7 @@ class DeepAnalysisResult(BaseModel):
 # 2. 核心分析 Agent 类
 # ==========================================
 class CareerAnalystAgent:
-    def __init__(self, api_key: str = settings.llm.api_key.get_secret_value(), model: str = settings.llm_model_name.model_name):
+    def __init__(self, api_key: str = settings.llm.api_key.get_secret_value(), model: str = settings.llm.model_name):
         """
         初始化职业分析 Agent
         推荐使用 qwen-max 以保证复杂的 JSON 结构化输出和逻辑判断能力
@@ -174,13 +174,6 @@ class CareerAnalystAgent:
 
         # 4. 截取最终需要展示的数量
         return analyzed_jobs[:top_k]
-
-
-
-
-
-
-
 
     # 同步RAGc重排在异步里面被包含了，不需要了。
     # def rerank_jobs(

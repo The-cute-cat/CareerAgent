@@ -3,12 +3,12 @@ import time
 import dashscope
 from typing import List, Optional
 
-
+from ai_service.utils.logger_handler import log
 from config import LLM, settings
 
 
 class AliyunEmbedding:
-    def __init__(self, model : str=settings.vector_model.model_name,api_key: str = settings.llm.api_key.get_secret_value()):
+    def __init__(self, model : str=settings.vector.model_name, api_key: str = settings.llm.api_key.get_secret_value()):
         """
         初始化阿里云 Embedding 客户端
         :param api_key: 阿里云 DashScope API Key
@@ -21,7 +21,7 @@ class AliyunEmbedding:
 
         dashscope.api_key = self.api_key
         self.model = model  # 阿里云主力模型
-        print(f"阿里云 Embedding 初始化完成，使用模型：{self.model}")
+        log.info(f"阿里云 Embedding 初始化完成，使用模型：{self.model}")
 
     def get_embedding(self, text: str) -> Optional[List[float]]:
         """
@@ -40,11 +40,11 @@ class AliyunEmbedding:
                 # 提取向量数据
                 return response.output['embeddings'][0]['embedding']
             else:
-                print(f"API 请求失败：{response.code} - {response.message}")
+                log.error(f"API 请求失败：{response.code} - {response.message}")
                 return None
 
         except Exception as e:
-            print(f"Embedding 请求异常：{e}")
+            log.error(f"Embedding 请求异常：{e}")
             return None
 
     def get_embeddings_batch(self, texts: List[str], batch_size: int = 10,
@@ -75,14 +75,14 @@ class AliyunEmbedding:
                         item['embedding'] for item in response.output['embeddings']
                     ]
                     all_embeddings.extend(batch_embeddings)
-                    print(f"批次 {batch_num}/{total_batches} 完成，已处理 {i + len(batch)}/{len(texts)} 条")
+                    log.info(f"批次 {batch_num}/{total_batches} 完成，已处理 {i + len(batch)}/{len(texts)} 条")
                 else:
-                    print(f"批次 {batch_num} 失败：{response.code} - {response.message}")
+                    log.error(f"批次 {batch_num} 失败：{response.code} - {response.message}")
                     # 失败时填充 None
                     all_embeddings.extend([None] * len(batch))
 
             except Exception as e:
-                print(f"批次 {batch_num} 异常：{e}")
+                log.error(f"批次 {batch_num} 异常：{e}")
                 all_embeddings.extend([None] * len(batch))
 
             # 延时避免限流
@@ -102,7 +102,7 @@ class AliyunEmbedding:
             result = self.get_embedding(text)
             if result is not None:
                 return result
-            print(f"重试 {attempt + 1}/{max_retries}")
+            log.info(f"重试 {attempt + 1}/{max_retries}")
             time.sleep(1 * (attempt + 1))  # 指数退避
         return None
 
@@ -118,24 +118,24 @@ if __name__ == "__main__":
     API_KEY = settings.llm.api_key.get_secret_value()
 
     if not API_KEY:
-        print("❌ 未找到 API Key，请设置环境变量 LLM__API_KEY")
+        log.error("❌ 未找到 API Key，请设置环境变量 LLM__API_KEY")
         exit(1)
 
     embedder = AliyunEmbedding(API_KEY)
 
     # 1. 单条测试
-    print("\n=== 单条测试 ===")
+    log.info("\n=== 单条测试 ===")
     text = "Java 后端开发工程师，熟悉 Spring Boot 和 MySQL"
     vector = embedder.get_embedding(text)
 
     if vector:
-        print(f"✅ 向量维度：{len(vector)}")  # 应为 1024
-        print(f"✅ 向量前 5 位：{vector[:1024]}")
+        log.info(f"✅ 向量维度：{len(vector)}")  # 应为 1024
+        log.info(f"✅ 向量前 5 位：{vector[:1024]}")
     else:
-        print("❌ 向量获取失败")
+        log.error("❌ 向量获取失败")
 
     # 2. 批量测试
-    print("\n=== 批量测试 ===")
+    log.info("\n=== 批量测试 ===")
     texts = [
         "Python 数据分析工程师",
         "前端 Vue 开发工程师",
@@ -151,10 +151,10 @@ if __name__ == "__main__":
     vectors = embedder.get_embeddings_batch(texts, batch_size=5, delay=0.3)
 
     success_count = len([v for v in vectors if v])
-    print(f"\n✅ 成功获取 {success_count}/{len(texts)} 条向量")
+    log.info(f"\n✅ 成功获取 {success_count}/{len(texts)} 条向量")
 
     # 3. 带重试测试
-    print("\n=== 重试机制测试 ===")
+    log.info("\n=== 重试机制测试 ===")
     vector_retry = embedder.get_embedding_with_retry("测试重试功能")
     if vector_retry:
-        print(f"✅ 重试成功，维度：{len(vector_retry)}")
+        log.info(f"✅ 重试成功，维度：{len(vector_retry)}")

@@ -1,13 +1,18 @@
-from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
+
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
+from pydantic import BaseModel, Field
+
 from ai_service.engine.action_type import ActionType
 from ai_service.engine.exceptions import (
     InvalidActionTypeError,
     ModelConfigNotFoundError,
 )
-from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
+from config import LiteLLM
 
-from config import LiteLLM, LLM
+__all__ = [
+    "AIState"
+]
 
 
 # =====================================================================
@@ -21,20 +26,20 @@ class AIState(BaseModel):
     通过 evolve() 方法实现不可变的状态演化，每次操作返回新的状态实例。
 
     Attributes:
-        model (Optional[LLM]): 主模型配置
-        model_fallbacks (List[LLM]): 备选模型列表，用于容错降级
+        model (Optional[LiteLLM]): 主模型配置
+        model_fallbacks (List[LiteLLM]): 备选模型列表，用于容错降级
         system_role (str): 系统角色身份定义（身份层）
         instructions (List[str]): 任务指令列表（指令层）
         contexts (List[str]): 上下文知识列表（上下文层）
         examples (List[Dict[str, Any]]): Few-shot 示例列表（示例层）
         user_data (List[Dict[str, Any]]): 原始用户数据（数据层）
         history (List[Dict[str, Any]]): 多轮对话历史
-        llm_params (Dict[str, Any]): LLM 运行参数
+        llm_params (Dict[str, Any]): LiteLLM 运行参数
         metadata (Dict[str, Any]): 请求元数据
     """
 
     model: Optional[LiteLLM] = None
-    model_fallbacks: List[LLM] = Field(default_factory=list)
+    model_fallbacks: List[LiteLLM] = Field(default_factory=list)
 
     # 提示词层次架构
     system_role: str = ""  # 身份层：定义 AI 的核心身份
@@ -109,12 +114,12 @@ class AIState(BaseModel):
         replace_actions = self._REPLACE_ACTIONS
         append_list_action = self._APPEND_LIST_ACTIONS
         merge_dict_action = self._MERGE_DICT_ACTIONS
-        map = self._MAP
+        t_map = self._MAP
 
-        if action_type not in map:
+        if action_type not in t_map:
             raise InvalidActionTypeError(action_type)
 
-        target_field = map[action_type]
+        target_field = t_map[action_type]
         processed_val = self._normalize_data(action_type, data)
 
         # 3. 执行物理合并策略
@@ -122,7 +127,8 @@ class AIState(BaseModel):
         old_val = getattr(self, target_field)
 
         if action_type in append_list_action:
-            update_data[target_field] = old_val + (processed_val if isinstance(processed_val, list) else [processed_val])
+            update_data[target_field] = old_val + (
+                processed_val if isinstance(processed_val, list) else [processed_val])
         elif action_type in merge_dict_action:
             update_data[target_field] = {**old_val, **processed_val}
         elif action_type in replace_actions:

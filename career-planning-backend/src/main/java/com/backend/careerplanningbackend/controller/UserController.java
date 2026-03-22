@@ -4,6 +4,7 @@ import com.backend.careerplanningbackend.domain.dto.LoginFormDTO;
 import com.backend.careerplanningbackend.domain.dto.UserDTO;
 import com.backend.careerplanningbackend.domain.po.Result;
 import com.backend.careerplanningbackend.domain.po.User;
+import com.backend.careerplanningbackend.domain.po.UserStuInfo;
 import com.backend.careerplanningbackend.domain.vo.LoginVO;
 import com.backend.careerplanningbackend.service.UserService;
 import jakarta.servlet.http.HttpServletResponse;
@@ -90,6 +91,17 @@ public class UserController {
         log.info("get-user-info请求");
         return userService.getUserInfo();
     }
+
+    /**
+     * getUserBasicFileInfoService
+     * 查询用户基础档案信息
+     */
+    @GetMapping("/get-basic-info")
+    public Result<UserStuInfo> getUserBasicFileInfoService() {
+        log.info("/user/get-basic-fileInfo请求");
+        return userService.getUserBasicFileInfoService();
+    }
+
     /**
      * updateAvatar
      * 更换头像

@@ -3,8 +3,10 @@ package com.backend.careerplanningbackend.mapper;
 import com.backend.careerplanningbackend.domain.dto.LoginFormDTO;
 import com.backend.careerplanningbackend.domain.dto.UserDTO;
 import com.backend.careerplanningbackend.domain.po.User;
+import com.backend.careerplanningbackend.domain.po.UserStuInfo;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Select;
 
 @Mapper
 public interface UserMapper extends BaseMapper<User> {
@@ -23,4 +25,8 @@ public interface UserMapper extends BaseMapper<User> {
     UserDTO getUserInfo(Long id);
 
     int updateAvatar(String upload, Long id);
+
+    //    @Select("select * from user_stu_info where user_id = #{currentUserId}")
+    UserStuInfo getUserBasicFileInfoService(Long currentUserId);
+
 }
