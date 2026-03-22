@@ -72,10 +72,10 @@ export const generateMockQuestions = (type: string, name?: string): QuizResponse
           : `请结合实际情况，描述你在${type}方面的一次具体经历，以及你的应对思路和解决方案。`,
         options: null,
         correct_answer: null,
-        evaluation_criteria: `1. 问题描述清晰，背景交代完整（8分）
-2. 分析思路合理，逻辑清晰（8分）
-3. 解决方案具体可行（8分）
-4. 总结反思到位，有借鉴意义（6分）`,
+        evaluation_criteria: `1. 问题描述清晰，背景交代完整（10分）
+2. 分析思路合理，逻辑清晰（10分）
+3. 解决方案具体可行（10分）
+4. 总结反思到位，有借鉴意义（10分）`,
         difficulty: 'hard'
       }
     ]

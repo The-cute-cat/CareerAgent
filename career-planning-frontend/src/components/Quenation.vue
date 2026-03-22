@@ -4,9 +4,33 @@
       <template #header>
         <div class="card-header">
           <h2>{{ title }}</h2>
-          <el-tag type="info">共5题，请认真填写</el-tag>
+          <el-tag type="info">共{{ totalSteps }}题，请认真填写</el-tag>
         </div>
       </template>
+
+      <!-- 步骤导航栏 - 仅在未提交时显示 -->
+      <div v-if="!submitted" class="step-nav">
+        <div class="step-header">
+          <span class="step-indicator">第 <strong>{{ currentStep }}</strong> / {{ totalSteps }} 题</span>
+          <span class="step-type-tag">{{ getStepLabel(currentStep - 1) }}</span>
+        </div>
+        <div class="step-dots">
+          <div v-for="i in totalSteps" :key="i" class="step-dot-wrapper">
+            <button
+              class="step-dot"
+              :class="{
+                'is-active': currentStep === i,
+                'is-answered': currentStep === i && isStepAnswered(i - 1),
+                'is-unanswered': currentStep === i && !isStepAnswered(i - 1)
+              }"
+              @click="goToStep(i)"
+            >
+              <span class="step-dot-number">{{ i }}</span>
+            </button>
+            <span class="step-dot-label">{{ getStepLabel(i - 1) }}</span>
+          </div>
+        </div>
+      </div>
 
       <!-- 答题表单 -->
       <el-form
@@ -18,20 +42,20 @@
         require-asterisk-position="right"
         status-icon
       >
-        <!-- 后端数据模式：动态渲染题目 -->
+        <!-- 后端数据模式：分步渲染题目 -->
         <template v-if="props.backendData">
-          <div
-            v-for="(question, index) in props.backendData.questions"
-            :key="question.id"
-          >
+          <div v-for="(question, index) in props.backendData.questions" :key="question.id" v-show="currentStep === index + 1">
             <!-- 单选题 -->
             <el-form-item
               v-if="question.type === 'choice'"
               :label="`${index + 1}. ${question.content}`"
               :prop="`q_${question.id}`"
-              :rules="[{ required: true, message: '请选择答案', trigger: 'change' }]"
+              :rules="[{ required: true, message: '', trigger: 'change' }]"
+              show-message="false"
+              class="quiz-question-item"
+              :class="{ 'is-submitted': submitted }"
             >
-              <el-radio-group v-model="formData[`q_${question.id}`]">
+              <el-radio-group v-model="formData[`q_${question.id}`]" :disabled="submitted">
                 <el-radio
                   v-for="(opt, optIndex) in parseOptions(question.options)"
                   :key="optIndex"
@@ -42,14 +66,27 @@
                   <span class="option-text">{{ opt.text }}</span>
                 </el-radio>
               </el-radio-group>
-              <el-tag
-                v-if="question.difficulty"
-                :type="getDifficultyType(question.difficulty)"
-                size="small"
-                class="difficulty-tag"
-              >
-                {{ getDifficultyText(question.difficulty) }}
-              </el-tag>
+              <!-- 提交后显示结果 -->
+              <template v-if="submitted">
+                <div class="result-feedback" :class="isChoiceCorrect(question) ? 'is-correct' : 'is-wrong'">
+                  <span class="result-icon">{{ isChoiceCorrect(question) ? '✓' : '✗' }}</span>
+                  <span class="result-text">{{ isChoiceCorrect(question) ? '回答正确' : '回答错误' }}</span>
+                </div>
+                <div v-if="!isChoiceCorrect(question)" class="correct-answer-tip">
+                  <el-icon><WarningFilled /></el-icon>
+                  正确答案：{{ getCorrectChoiceText(question) }}
+                </div>
+              </template>
+              <template v-else>
+                <el-tag
+                  v-if="question.difficulty"
+                  :type="getDifficultyType(question.difficulty)"
+                  size="small"
+                  class="difficulty-tag"
+                >
+                  {{ getDifficultyText(question.difficulty) }}
+                </el-tag>
+              </template>
             </el-form-item>
 
             <!-- 填空题 -->
@@ -58,6 +95,8 @@
               :label="`${index + 1}. ${parseFillInContent(question.content)}`"
               :prop="`q_${question.id}`"
               :rules="[{ required: true, message: '请填写答案', trigger: 'blur' }]"
+              class="quiz-question-item"
+              :class="{ 'is-submitted': submitted }"
             >
               <el-input
                 v-model="formData[`q_${question.id}`]"
@@ -65,15 +104,29 @@
                 clearable
                 maxlength="200"
                 show-word-limit
+                :disabled="submitted"
               />
-              <el-tag
-                v-if="question.difficulty"
-                :type="getDifficultyType(question.difficulty)"
-                size="small"
-                class="difficulty-tag"
-              >
-                {{ getDifficultyText(question.difficulty) }}
-              </el-tag>
+              <!-- 提交后显示结果 -->
+              <template v-if="submitted">
+                <div class="result-feedback" :class="isFillInCorrect(question) ? 'is-correct' : 'is-wrong'">
+                  <span class="result-icon">{{ isFillInCorrect(question) ? '✓' : '✗' }}</span>
+                  <span class="result-text">{{ isFillInCorrect(question) ? '回答正确' : '回答错误' }}</span>
+                </div>
+                <div v-if="!isFillInCorrect(question)" class="correct-answer-tip">
+                  <el-icon><WarningFilled /></el-icon>
+                  正确答案：{{ question.correct_answer }}
+                </div>
+              </template>
+              <template v-else>
+                <el-tag
+                  v-if="question.difficulty"
+                  :type="getDifficultyType(question.difficulty)"
+                  size="small"
+                  class="difficulty-tag"
+                >
+                  {{ getDifficultyText(question.difficulty) }}
+                </el-tag>
+              </template>
             </el-form-item>
 
             <!-- 问答题 -->
@@ -81,8 +134,18 @@
               v-else-if="question.type === 'open_ended'"
               :label="`${index + 1}. ${question.content}`"
               :prop="`q_${question.id}`"
-              :rules="[{ required: true, message: '请填写答案', trigger: 'blur' }]"
+              :rules="[{ required: true, message: '', trigger: 'blur' }]"
+              :show-message="false"
+              class="is-open-ended quiz-question-item"
+              :class="{ 'is-submitted': submitted }"
             >
+              <div v-if="question.evaluation_criteria && !submitted" class="evaluation-criteria">
+                <div class="criteria-title">
+                  <el-icon><InfoFilled /></el-icon>
+                  评分标准
+                </div>
+                <pre class="criteria-content">{{ question.evaluation_criteria }}</pre>
+              </div>
               <el-input
                 v-model="formData[`q_${question.id}`]"
                 type="textarea"
@@ -91,113 +154,259 @@
                 maxlength="2000"
                 show-word-limit
                 resize="vertical"
+                class="essay-textarea"
+                :disabled="submitted"
               />
-              <div v-if="question.evaluation_criteria" class="evaluation-criteria">
-                <div class="criteria-title">评分标准：</div>
-                <pre class="criteria-content">{{ question.evaluation_criteria }}</pre>
-              </div>
-              <el-tag
-                v-if="question.difficulty"
-                :type="getDifficultyType(question.difficulty)"
-                size="small"
-                class="difficulty-tag"
-              >
-                {{ getDifficultyText(question.difficulty) }}
-              </el-tag>
+              <!-- 提交后显示参考答案按钮和评分详情 -->
+              <template v-if="submitted">
+                <div class="open-ended-actions">
+                  <el-button
+                    type="primary"
+                    link
+                    size="small"
+                    @click="toggleOpenEndedAnswer(question.id)"
+                  >
+                    <el-icon><View /></el-icon>
+                    {{ showOpenEndedAnswer[question.id] ? '收起参考答案' : '查看参考答案' }}
+                  </el-button>
+                  <!-- 最后一题（问答题）显示查看评分详情按钮 -->
+                  <el-button
+                    v-if="props.quizResult && index === (props.backendData?.questions?.length || 0) - 1"
+                    type="success"
+                    link
+                    size="small"
+                    @click="showScoreDetails = true"
+                  >
+                    <el-icon><Trophy /></el-icon>
+                    查看评分详情
+                  </el-button>
+                </div>
+                <transition name="el-zoom-in-top">
+                  <div v-if="showOpenEndedAnswer[question.id] && question.correct_answer" class="open-ended-answer">
+                    <div class="answer-title">参考答案：</div>
+                    <div class="answer-content">{{ question.correct_answer }}</div>
+                  </div>
+                </transition>
+              </template>
+              <template v-else>
+                <el-tag
+                  v-if="question.difficulty"
+                  :type="getDifficultyType(question.difficulty)"
+                  size="small"
+                  class="difficulty-tag"
+                >
+                  {{ getDifficultyText(question.difficulty) }}
+                </el-tag>
+              </template>
             </el-form-item>
           </div>
         </template>
 
-        <!-- 默认模式：使用本地问题集 -->
+        <!-- 默认模式：分步渲染 -->
         <template v-else>
-          <!-- 单选题 1 -->
-          <el-form-item :label="currentQuestions.single1.label" prop="single1" required>
-            <el-radio-group v-model="formData.single1">
-              <el-radio
-                v-for="opt in currentQuestions.single1.options"
-                :key="opt.value"
-                :value="opt.value"
-              >
-                {{ opt.text }}
-              </el-radio>
-            </el-radio-group>
-          </el-form-item>
-
-          <!-- 单选题 2 -->
-          <el-form-item :label="currentQuestions.single2.label" prop="single2" required>
-            <el-radio-group v-model="formData.single2">
-              <el-radio
-                v-for="opt in currentQuestions.single2.options"
-                :key="opt.value"
-                :value="opt.value"
-              >
-                {{ opt.text }}
-              </el-radio>
-            </el-radio-group>
-          </el-form-item>
-
-          <!-- 填空题 1 -->
-          <el-form-item :label="currentQuestions.fill1.label" prop="fill1" required>
-            <el-input
-              v-model="formData.fill1"
-              :placeholder="currentQuestions.fill1.placeholder"
-              clearable
-              maxlength="100"
-              show-word-limit
-            />
-            <div v-if="currentQuestions.fill1.tip" class="input-tip">{{ currentQuestions.fill1.tip }}</div>
-          </el-form-item>
-
-          <!-- 填空题 2 -->
-          <el-form-item :label="currentQuestions.fill2.label" prop="fill2" required>
-            <el-input
-              v-model="formData.fill2"
-              :placeholder="currentQuestions.fill2.placeholder"
-              clearable
-              maxlength="100"
-              show-word-limit
-            />
-            <div v-if="currentQuestions.fill2.tip" class="input-tip">{{ currentQuestions.fill2.tip }}</div>
-          </el-form-item>
-
-          <!-- 问答题 -->
-          <el-form-item :label="currentQuestions.essay.label" prop="essay" required>
-            <el-input
-              v-model="formData.essay"
-              type="textarea"
-              :rows="6"
-              :placeholder="currentQuestions.essay.placeholder"
-              maxlength="1000"
-              show-word-limit
-              resize="vertical"
-            />
-          </el-form-item>
+          <!-- 第1题：单选题1 -->
+          <div v-show="currentStep === 1">
+            <el-form-item :label="currentQuestions.single1.label" prop="single1" required>
+              <el-radio-group v-model="formData.single1">
+                <el-radio
+                  v-for="opt in currentQuestions.single1.options"
+                  :key="opt.value"
+                  :value="opt.value"
+                >
+                  {{ opt.text }}
+                </el-radio>
+              </el-radio-group>
+            </el-form-item>
+          </div>
+          <!-- 第2题：单选题2 -->
+          <div v-show="currentStep === 2">
+            <el-form-item :label="currentQuestions.single2.label" prop="single2" required>
+              <el-radio-group v-model="formData.single2">
+                <el-radio
+                  v-for="opt in currentQuestions.single2.options"
+                  :key="opt.value"
+                  :value="opt.value"
+                >
+                  {{ opt.text }}
+                </el-radio>
+              </el-radio-group>
+            </el-form-item>
+          </div>
+          <!-- 第3题：填空题1 -->
+          <div v-show="currentStep === 3">
+            <el-form-item :label="currentQuestions.fill1.label" prop="fill1" required>
+              <el-input
+                v-model="formData.fill1"
+                :placeholder="currentQuestions.fill1.placeholder"
+                clearable
+                maxlength="100"
+                show-word-limit
+              />
+              <div v-if="currentQuestions.fill1.tip" class="input-tip">{{ currentQuestions.fill1.tip }}</div>
+            </el-form-item>
+          </div>
+          <!-- 第4题：填空题2 -->
+          <div v-show="currentStep === 4">
+            <el-form-item :label="currentQuestions.fill2.label" prop="fill2" required>
+              <el-input
+                v-model="formData.fill2"
+                :placeholder="currentQuestions.fill2.placeholder"
+                clearable
+                maxlength="100"
+                show-word-limit
+              />
+              <div v-if="currentQuestions.fill2.tip" class="input-tip">{{ currentQuestions.fill2.tip }}</div>
+            </el-form-item>
+          </div>
+          <!-- 第5题：问答题 -->
+          <div v-show="currentStep === 5">
+            <el-form-item :label="currentQuestions.essay.label" prop="essay" required>
+              <el-input
+                v-model="formData.essay"
+                type="textarea"
+                :rows="6"
+                :placeholder="currentQuestions.essay.placeholder"
+                maxlength="1000"
+                show-word-limit
+                resize="vertical"
+              />
+            </el-form-item>
+          </div>
         </template>
 
-        <!-- 提交按钮 -->
-        <el-form-item>
-          <el-button
-            type="primary"
-            size="large"
-            :loading="submitting"
-            @click="handleSubmit"
-            :disabled="!isFormComplete"
-          >
-            {{ submitting ? '提交中...' : '提交问卷' }}
-          </el-button>
-          <el-button size="large" @click="handleReset">重置</el-button>
+        <!-- 底部操作按钮 -->
+        <el-form-item v-if="!submitted" class="step-actions">
+          <div class="step-actions-inner">
+            <el-button size="default" @click="handleReset">重置</el-button>
+            <div class="step-actions-right">
+              <el-button v-if="currentStep > 1" size="default" @click="prevStep">
+                上一题
+              </el-button>
+              <el-button v-if="currentStep < totalSteps" type="primary" size="default" @click="nextStep">
+                下一题
+              </el-button>
+              <el-button
+                v-if="currentStep === totalSteps"
+                type="primary"
+                size="default"
+                :loading="submitting"
+                @click="handleSubmit"
+                :disabled="!isFormComplete"
+              >
+                {{ submitting ? '提交中...' : '提交问卷' }}
+              </el-button>
+            </div>
+          </div>
         </el-form-item>
       </el-form>
 
-      <!-- 提交成功提示 -->
-      <el-alert
-        v-if="submitSuccess"
-        title="提交成功！感谢您的参与"
-        type="success"
-        :closable="true"
-        @close="submitSuccess = false"
-        class="success-alert"
-      />
+      <!-- 提交成功后的结果导航 -->
+      <div v-if="submitted" class="result-nav">
+        <div class="result-nav-header">
+          <el-icon class="result-success-icon"><SuccessFilled /></el-icon>
+          <span class="result-title">提交成功！</span>
+          <span class="result-subtitle">点击题号查看答题结果</span>
+        </div>
+        <div class="result-step-dots">
+          <button
+            v-for="(question, index) in (props.backendData?.questions || [])"
+            :key="question.id"
+            class="result-step-dot"
+            :class="{
+              'is-active': currentStep === index + 1,
+              'is-correct-dot': (question.type === 'choice' || question.type === 'fill_in') && (question.type === 'choice' ? isChoiceCorrect(question) : isFillInCorrect(question)),
+              'is-wrong-dot': (question.type === 'choice' || question.type === 'fill_in') && (question.type === 'choice' ? !isChoiceCorrect(question) : !isFillInCorrect(question)),
+              'is-essay-dot': question.type === 'open_ended'
+            }"
+            @click="currentStep = index + 1"
+          >
+            {{ index + 1 }}
+          </button>
+        </div>
+        <div class="result-actions">
+          <el-button v-if="currentStep > 1" size="default" @click="prevStep">上一题</el-button>
+          <el-button v-if="currentStep < totalSteps" size="default" @click="nextStep">下一题</el-button>
+          <el-button type="success" size="default" @click="emit('cancel')">关闭</el-button>
+        </div>
+      </div>
+
+      <!-- 评分详情弹窗 -->
+      <el-dialog
+        v-model="showScoreDetails"
+        title="测评结果详情"
+        width="600px"
+        class="score-details-dialog"
+        :close-on-click-modal="false"
+      >
+        <div v-if="props.quizResult" class="score-dialog-content">
+          <!-- 总分 -->
+          <div class="dialog-total-score">
+            <div class="dialog-score-number">{{ props.quizResult.totalScore }}</div>
+            <div class="dialog-score-divider">/</div>
+            <div class="dialog-score-max">{{ props.quizResult.totalMaxScore }}</div>
+            <div class="dialog-score-label">总得分</div>
+          </div>
+
+          <!-- 问答题评分 -->
+          <div class="dialog-oe-section">
+            <div class="dialog-oe-header">
+              <el-icon><EditPen /></el-icon>
+              <span>问答题评分</span>
+            </div>
+            <div class="dialog-oe-bar">
+              <span class="dialog-oe-text">
+                {{ props.quizResult.openEndedDetails.score }} / {{ props.quizResult.openEndedDetails.max_score }} 分
+              </span>
+              <el-progress
+                :percentage="Math.round((props.quizResult.openEndedDetails.score / props.quizResult.openEndedDetails.max_score) * 100)"
+                :stroke-width="12"
+                :color="getScoreColor(props.quizResult.openEndedDetails.score, props.quizResult.openEndedDetails.max_score)"
+              />
+            </div>
+
+            <!-- 得分点明细 -->
+            <div v-if="props.quizResult.openEndedDetails.score_details?.length" class="dialog-score-points">
+              <div
+                v-for="(detail, idx) in props.quizResult.openEndedDetails.score_details"
+                :key="idx"
+                class="dialog-point-item"
+              >
+                <div class="dialog-point-header">
+                  <span class="dialog-point-name">{{ detail.point }}</span>
+                  <el-tag
+                    :type="detail.earned_score >= detail.max_point_score ? 'success' : 'warning'"
+                    size="small"
+                  >
+                    {{ detail.earned_score }}/{{ detail.max_point_score }}
+                  </el-tag>
+                </div>
+                <div class="dialog-point-reason">{{ detail.reason }}</div>
+              </div>
+            </div>
+
+            <!-- 评语 -->
+            <div v-if="props.quizResult.openEndedDetails.comment" class="dialog-comment-box">
+              <div class="dialog-comment-label">
+                <el-icon><InfoFilled /></el-icon>
+                整体评语
+              </div>
+              <p class="dialog-comment-text">{{ props.quizResult.openEndedDetails.comment }}</p>
+            </div>
+
+            <!-- 建议 -->
+            <div v-if="props.quizResult.openEndedDetails.suggestions" class="dialog-suggestions-box">
+              <div class="dialog-suggestions-label">
+                <el-icon><Warning /></el-icon>
+                改进建议
+              </div>
+              <p class="dialog-suggestions-text">{{ props.quizResult.openEndedDetails.suggestions }}</p>
+            </div>
+          </div>
+        </div>
+        <template #footer>
+          <el-button type="primary" @click="showScoreDetails = false">知道了</el-button>
+        </template>
+      </el-dialog>
     </el-card>
   </div>
 </template>
@@ -206,6 +415,7 @@
 import { ref, reactive, computed, watch, onMounted } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { InfoFilled, WarningFilled, View, SuccessFilled, Trophy, EditPen, Warning } from '@element-plus/icons-vue'
 
 // ==================== 类型定义 ====================
 
@@ -280,6 +490,30 @@ interface SubmitData {
   toolName: string
 }
 
+/** 评分详情 */
+interface ScoreDetail {
+  point: string
+  max_point_score: number
+  earned_score: number
+  reason: string
+}
+
+/** 问答题评分结果 */
+interface OpenEndedDetails {
+  score: number
+  max_score: number
+  score_details: ScoreDetail[]
+  comment: string
+  suggestions: string
+}
+
+/** 测验结果 */
+interface QuizResult {
+  totalScore: number
+  totalMaxScore: number
+  openEndedDetails: OpenEndedDetails
+}
+
 // ==================== Props 定义 ====================
 
 interface Props {
@@ -291,13 +525,16 @@ interface Props {
   customQuestions?: QuestionSet
   /** 后端返回的问卷数据（优先使用） */
   backendData?: BackendQuizData | null
+  /** 测验结果（提交后传入，用于显示评分详情） */
+  quizResult?: QuizResult | null
 }
 
 const props = withDefaults(defineProps<Props>(), {
   title: '能力评估问卷',
   quizType: 'general',
   customQuestions: undefined,
-  backendData: null
+  backendData: null,
+  quizResult: null
 })
 
 // ==================== Emits 定义 ====================
@@ -538,6 +775,69 @@ const questionBank: Record<string, QuestionSet> = {
   learning: learningQuestions
 }
 
+// ==================== 步骤导航 ====================
+
+/** 当前步骤（1-based） */
+const currentStep = ref(1)
+
+/** 总步骤数 */
+const totalSteps = computed(() => {
+  if (props.backendData?.questions?.length) {
+    return props.backendData.questions.length
+  }
+  return 5
+})
+
+/** 判断某步骤是否已作答 */
+const isStepAnswered = (index: number): boolean => {
+  if (props.backendData?.questions?.length) {
+    const q = props.backendData.questions[index]
+    if (!q) return false
+    return !!formData[`q_${q.id}`]?.trim()
+  }
+  // 默认模式
+  const keys = ['single1', 'single2', 'fill1', 'fill2', 'essay'] as const
+  const key = keys[index]
+  return key ? !!formData[key]?.trim() : false
+}
+
+/** 获取步骤标签（题目类型简称） */
+const getStepLabel = (index: number): string => {
+  if (props.backendData?.questions?.length) {
+    const q = props.backendData.questions[index]
+    if (!q) return ''
+    const typeMap: Record<string, string> = {
+      choice: '单选',
+      fill_in: '填空',
+      open_ended: '问答'
+    }
+    return typeMap[q.type] || `第${index + 1}题`
+  }
+  const labels = ['单选', '单选', '填空', '填空', '问答']
+  return labels[index] || `第${index + 1}题`
+}
+
+/** 跳转到指定步骤 */
+const goToStep = (step: number) => {
+  if (step >= 1 && step <= totalSteps.value) {
+    currentStep.value = step
+  }
+}
+
+/** 上一题 */
+const prevStep = () => {
+  if (currentStep.value > 1) {
+    currentStep.value--
+  }
+}
+
+/** 下一题 */
+const nextStep = () => {
+  if (currentStep.value < totalSteps.value) {
+    currentStep.value++
+  }
+}
+
 // ==================== 计算属性 ====================
 
 /** 当前使用的问题集 */
@@ -633,6 +933,57 @@ const submitting = ref(false)
 
 /** 提交成功标志 */
 const submitSuccess = ref(false)
+
+/** 已提交状态 */
+const submitted = ref(false)
+
+/** 问答题参考答案显示状态 */
+const showOpenEndedAnswer = ref<Record<number, boolean>>({})
+
+/** 评分详情显示状态 */
+const showScoreDetails = ref(false)
+
+/** 切换评分详情显示 */
+const toggleScoreDetails = () => {
+  showScoreDetails.value = !showScoreDetails.value
+}
+
+/** 根据得分比例返回颜色 */
+const getScoreColor = (score: number, maxScore: number): string => {
+  const ratio = score / maxScore
+  if (ratio >= 0.8) return '#67c23a'
+  if (ratio >= 0.6) return '#e6a23c'
+  return '#f56c6c'
+}
+
+/** 判断单选题是否正确 */
+const isChoiceCorrect = (question: BackendQuestion): boolean => {
+  const key = `q_${question.id}`
+  const userAnswer = formData[key]?.trim().toUpperCase()
+  const correctAnswer = question.correct_answer?.trim().toUpperCase()
+  return userAnswer === correctAnswer
+}
+
+/** 判断填空题是否正确 */
+const isFillInCorrect = (question: BackendQuestion): boolean => {
+  const key = `q_${question.id}`
+  const userAnswer = formData[key]?.trim()
+  const correctAnswer = question.correct_answer?.trim()
+  return userAnswer === correctAnswer
+}
+
+/** 获取正确选择题答案文本 */
+const getCorrectChoiceText = (question: BackendQuestion): string => {
+  const correctAnswer = question.correct_answer?.trim().toUpperCase() || ''
+  if (!question.options) return correctAnswer
+  const opt = question.options.find(o => o.match(new RegExp(`^${correctAnswer}[.．\\s]`)))
+  return opt || correctAnswer
+}
+
+/** 切换问答题答案显示 */
+const toggleOpenEndedAnswer = (questionId: number) => {
+  showOpenEndedAnswer.value[questionId] = !showOpenEndedAnswer.value[questionId]
+}
 
 // ==================== 监听 ====================
 
@@ -777,6 +1128,8 @@ const handleSubmit = async () => {
       
       if (result.success) {
         submitSuccess.value = true
+        submitted.value = true
+        currentStep.value = 1
         ElMessage.success('提交成功！')
         // 触发提交事件
         emit('submit', submitData)
@@ -828,6 +1181,10 @@ const handleReset = () => {
   formData.essay = ''
 
   submitSuccess.value = false
+  submitted.value = false
+  showOpenEndedAnswer.value = {}
+  showScoreDetails.value = false
+  currentStep.value = 1
   // 触发表单重置验证
   formRef.value?.resetFields()
 }
@@ -860,19 +1217,18 @@ defineExpose({
 
 .questionnaire-card {
   width: 100%;
-  max-width: 800px;
-  border-radius: 16px;
-  overflow: hidden;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2) !important;
-  
+  max-width: 720px;
+  border-radius: 8px;
+  border: 1px solid #ebeef5;
+
   :deep(.el-card__header) {
-    padding: 20px 30px;
-    background: linear-gradient(135deg, #f5f7fa 0%, #e9ecef 100%);
-    border-bottom: none;
+    padding: 14px 24px;
+    border-bottom: 1px solid #ebeef5;
+    background: #fafbfc;
   }
-  
+
   :deep(.el-card__body) {
-    padding: 30px;
+    padding: 0;
   }
 }
 
@@ -880,169 +1236,817 @@ defineExpose({
   display: flex;
   justify-content: space-between;
   align-items: center;
-  
+
   h2 {
     margin: 0;
-    font-size: 24px;
+    font-size: 16px;
     font-weight: 600;
-    color: #2c3e50;
+    color: #303133;
+  }
+}
+
+// ==================== 步骤导航栏 ====================
+
+.step-nav {
+  padding: 16px 24px;
+  border-bottom: 1px solid #f0f0f0;
+  background: #fafbfc;
+}
+
+.step-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+
+  .step-indicator {
+    font-size: 13px;
+    color: #909399;
+
+    strong {
+      font-size: 16px;
+      color: #303133;
+      font-weight: 600;
+    }
+  }
+
+  .step-type-tag {
+    font-size: 12px;
+    color: #909399;
+    background: #f0f2f5;
+    padding: 2px 8px;
+    border-radius: 10px;
+  }
+}
+
+.step-dots {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  position: relative;
+}
+
+// 连接线
+.step-dots::before {
+  content: '';
+  position: absolute;
+  top: 13px;
+  left: 20px;
+  right: 20px;
+  height: 2px;
+  background: #e4e7ed;
+  z-index: 0;
+}
+
+.step-dot-wrapper {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.step-dot {
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 0;
+  outline: none;
+
+  .step-dot-number {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 500;
+    color: #a8abb2;
+    background: #fff;
+    border: 2px solid #dcdfe6;
+    transition: all 0.2s;
+  }
+
+  &:hover .step-dot-number {
+    border-color: #409eff;
+    color: #409eff;
+  }
+
+  // 当前激活
+  &.is-active .step-dot-number {
+    color: #fff;
+    background: #409eff;
+    border-color: #409eff;
+  }
+
+  // 已回答 + 当前
+  &.is-answered.is-active .step-dot-number {
+    background: #409eff;
+    border-color: #409eff;
+  }
+
+  // 已回答 + 非当前
+  &.is-answered:not(.is-active) .step-dot-number {
+    color: #fff;
+    background: #67c23a;
+    border-color: #67c23a;
+  }
+}
+
+.step-dot-label {
+  font-size: 11px;
+  color: #a8abb2;
+  white-space: nowrap;
+
+  .step-dot.is-active ~ &,
+  .step-dot-wrapper:has(.is-active) & {
+    color: #303133;
+  }
+}
+
+// ==================== 题目区域 ====================
+
+:deep(.el-form) {
+  padding: 24px;
+}
+
+:deep(.el-form-item) {
+  margin-bottom: 0;
+
+  .el-form-item__label {
+    font-size: 15px;
+    font-weight: 500;
+    color: #1d2129;
+    padding-bottom: 16px;
+    line-height: 1.6;
+    letter-spacing: 0.2px;
+  }
+}
+
+// 题号高亮
+:deep(.el-form-item__label) {
+  &::before {
+    content: none;
   }
 }
 
 .input-tip {
   font-size: 12px;
-  color: #909399;
-  margin-top: 4px;
+  color: #86909c;
+  margin-top: 6px;
 }
 
 .success-alert {
-  margin-top: 20px;
+  margin: 0 24px 24px;
 }
 
-/* 难度标签 */
 .difficulty-tag {
-  margin-top: 8px;
+  margin-top: 16px;
+  display: inline-block;
 }
 
-/* 评分标准 */
-.evaluation-criteria {
+// ==================== 答题结果样式 ====================
+
+.result-feedback {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin-top: 12px;
-  padding: 12px 16px;
-  background: #f5f7fa;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+
+  &.is-correct {
+    background: #f0f9eb;
+    color: #67c23a;
+    border: 1px solid #e1f3d8;
+  }
+
+  &.is-wrong {
+    background: #fef0f0;
+    color: #f56c6c;
+    border: 1px solid #fde2e2;
+  }
+
+  .result-icon {
+    font-size: 18px;
+    font-weight: 700;
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+  }
+
+  &.is-correct .result-icon {
+    background: #67c23a;
+    color: #fff;
+  }
+
+  &.is-wrong .result-icon {
+    background: #f56c6c;
+    color: #fff;
+  }
+}
+
+.correct-answer-tip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 8px 14px;
+  background: #fdf6ec;
+  color: #e6a23c;
+  border-radius: 6px;
+  border: 1px solid #faecd8;
+  font-size: 13px;
+
+  .el-icon {
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+}
+
+.open-ended-actions {
+  margin-top: 12px;
+}
+
+.open-ended-answer {
+  margin-top: 12px;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #f0f9eb 0%, #e8f8e0 100%);
+  border-radius: 8px;
+  border-left: 4px solid #67c23a;
+
+  .answer-title {
+    font-weight: 600;
+    color: #529b2e;
+    margin-bottom: 8px;
+    font-size: 14px;
+  }
+
+  .answer-content {
+    font-size: 14px;
+    color: #4e5969;
+    line-height: 1.8;
+    white-space: pre-wrap;
+  }
+}
+
+// ==================== 评分详情弹窗 ====================
+
+.score-details-dialog {
+  :deep(.el-dialog__header) {
+    text-align: center;
+    padding-bottom: 0;
+
+    .el-dialog__title {
+      font-size: 18px;
+      font-weight: 600;
+    }
+  }
+
+  :deep(.el-dialog__body) {
+    padding: 20px 24px;
+  }
+}
+
+.score-dialog-content {
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.dialog-total-score {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px;
+  margin-bottom: 24px;
+  padding: 20px;
+  background: linear-gradient(135deg, #ecf5ff 0%, #f5faff 100%);
+  border-radius: 12px;
+
+  .dialog-score-number {
+    font-size: 48px;
+    font-weight: 700;
+    color: #409eff;
+  }
+
+  .dialog-score-divider {
+    font-size: 28px;
+    color: #86909c;
+  }
+
+  .dialog-score-max {
+    font-size: 24px;
+    color: #86909c;
+  }
+
+  .dialog-score-label {
+    margin-left: 8px;
+    font-size: 14px;
+    color: #4e5969;
+  }
+}
+
+.dialog-oe-section {
+  background: #fafbfc;
+  border-radius: 10px;
+  padding: 16px;
+}
+
+.dialog-oe-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #1d2129;
+  margin-bottom: 12px;
+
+  .el-icon {
+    color: #409eff;
+  }
+}
+
+.dialog-oe-bar {
+  margin-bottom: 16px;
+
+  .dialog-oe-text {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 14px;
+    color: #4e5969;
+
+    strong {
+      color: #409eff;
+      font-size: 18px;
+    }
+  }
+}
+
+.dialog-score-points {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.dialog-point-item {
+  padding: 12px 14px;
+  background: #fff;
   border-radius: 8px;
   border-left: 3px solid #409eff;
+
+  .dialog-point-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+
+  .dialog-point-name {
+    font-weight: 500;
+    color: #1d2129;
+    font-size: 14px;
+  }
+
+  .dialog-point-reason {
+    font-size: 13px;
+    color: #86909c;
+    line-height: 1.6;
+  }
+}
+
+.dialog-comment-box {
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  background: #f0f9eb;
+  border-radius: 8px;
+  border-left: 3px solid #67c23a;
+
+  .dialog-comment-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+    color: #529b2e;
+    font-size: 13px;
+    margin-bottom: 6px;
+
+    .el-icon {
+      font-size: 14px;
+    }
+  }
+
+  .dialog-comment-text {
+    margin: 0;
+    font-size: 13px;
+    color: #4e5969;
+    line-height: 1.7;
+  }
+}
+
+.dialog-suggestions-box {
+  padding: 12px 14px;
+  background: #fdf6ec;
+  border-radius: 8px;
+  border-left: 3px solid #e6a23c;
+
+  .dialog-suggestions-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+    color: #b88230;
+    font-size: 13px;
+    margin-bottom: 6px;
+
+    .el-icon {
+      font-size: 14px;
+    }
+  }
+
+  .dialog-suggestions-text {
+    margin: 0;
+    font-size: 13px;
+    color: #4e5969;
+    line-height: 1.7;
+  }
+}
+
+.quiz-question-item.is-submitted {
+  :deep(.el-form-item__label) {
+    color: #1d2129;
+    font-weight: 500;
+  }
+}
+
+// ==================== 结果导航 ====================
+
+.result-nav {
+  margin-top: 20px;
+  padding: 20px 24px;
+  background: #fafbfc;
+  border-radius: 12px;
+  border: 1px solid #e5e6eb;
+}
+
+.result-nav-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.result-success-icon {
+  font-size: 24px;
+  color: #67c23a;
+}
+
+.result-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1d2129;
+}
+
+.result-subtitle {
+  font-size: 13px;
+  color: #86909c;
+  margin-left: auto;
+}
+
+.result-step-dots {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.result-step-dot {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 2px solid #dcdee0;
+  background: #fff;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 600;
+  color: #4e5969;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &:hover {
+    border-color: #a0cfff;
+    box-shadow: 0 2px 8px rgba(64, 158, 255, 0.15);
+  }
+
+  &.is-active {
+    border-color: #409eff;
+    box-shadow: 0 2px 8px rgba(64, 158, 255, 0.2);
+    background: #ecf5ff;
+  }
+
+  &.is-correct-dot {
+    background: #f0f9eb;
+    border-color: #b3e19d;
+    color: #529b2e;
+
+    &.is-active {
+      background: #e1f3d8;
+      border-color: #67c23a;
+    }
+  }
+
+  &.is-wrong-dot {
+    background: #fef0f0;
+    border-color: #fab6b6;
+    color: #c45656;
+
+    &.is-active {
+      background: #fde2e2;
+      border-color: #f56c6c;
+    }
+  }
+
+  &.is-essay-dot {
+    background: #fdf6ec;
+    border-color: #f3d19e;
+    color: #b88230;
+
+    &.is-active {
+      background: #faecd8;
+      border-color: #e6a23c;
+    }
+  }
+}
+
+.result-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+// ==================== 评分标准 ====================
+
+.evaluation-criteria {
+  margin-bottom: 20px;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #f0f7ff 0%, #e8f4ff 100%);
+  border-radius: 8px;
+  border-left: 4px solid #409eff;
 }
 
 .criteria-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-weight: 600;
-  color: #303133;
-  margin-bottom: 8px;
+  color: #1a5fb4;
+  margin-bottom: 10px;
   font-size: 14px;
+
+  .el-icon {
+    font-size: 15px;
+  }
 }
 
 .criteria-content {
   margin: 0;
   font-size: 13px;
-  color: #606266;
+  color: #4e5969;
   line-height: 1.8;
   white-space: pre-wrap;
   font-family: inherit;
 }
 
-/* 选项样式 */
+// ==================== 问答题文本域 ====================
+
+:deep(.el-form-item) {
+  &.is-open-ended {
+    .el-form-item__label {
+      padding-bottom: 20px;
+      line-height: 1.8;
+    }
+  }
+}
+
+.essay-textarea {
+  margin-top: 8px;
+
+  :deep(.el-textarea__inner) {
+    border-radius: 8px;
+    padding: 14px 18px;
+    font-size: 14px;
+    line-height: 1.8;
+    background: #fafbfc;
+    transition: all 0.3s ease;
+
+    &:hover {
+      background: #fff;
+    }
+
+    &:focus {
+      background: #fff;
+      box-shadow: 0 0 0 3px rgba(64, 158, 255, 0.1);
+    }
+  }
+
+  :deep(.el-input__count) {
+    background: transparent;
+    color: #86909c;
+    font-size: 12px;
+  }
+}
+
+// ==================== 选项样式 ====================
+
 :deep(.el-radio-group) {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
   width: 100%;
 }
 
 :deep(.el-radio) {
   margin-right: 0;
-  padding: 12px 16px;
-  border: 1px solid #dcdfe6;
-  border-radius: 8px;
-  transition: all 0.3s ease;
-  height: auto;
+  padding: 0 20px;
+  border: 1.5px solid #dcdee0;
+  border-radius: 12px;
+  height: 60px;
+  min-height: 60px;
+  width: 100%;
+  max-width: 520px;
   display: flex;
   align-items: center;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  background: #fafbfc;
+  cursor: pointer;
+  box-sizing: border-box;
 }
 
 :deep(.el-radio:hover) {
-  border-color: #409eff;
-  background: #f5f9ff;
+  border-color: #a0cfff;
+  background: #fff;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(64, 158, 255, 0.12);
 }
 
 :deep(.el-radio.is-checked) {
   border-color: #409eff;
-  background: #ecf5ff;
+  background: #fff;
+  box-shadow: 0 4px 16px rgba(64, 158, 255, 0.15), inset 0 0 0 1px rgba(64, 158, 255, 0.1);
+}
+
+:deep(.el-radio__input) {
+  display: none;
 }
 
 :deep(.el-radio__label) {
-  padding-left: 12px;
+  padding-left: 14px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 14px;
+  font-size: 15px;
+  line-height: 1.5;
+  white-space: normal;
+  word-wrap: break-word;
+  width: 100%;
 }
 
 .option-label {
   font-weight: 600;
-  color: #409eff;
-  min-width: 24px;
+  color: #8a919c;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: #e8eaed;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+}
+
+:deep(.el-radio:hover) .option-label {
+  background: #d6e9ff;
+  color: #5a9bd5;
+}
+
+:deep(.el-radio.is-checked) .option-label {
+  color: #fff;
+  background: #409eff;
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.35);
 }
 
 .option-text {
-  color: #303133;
+  color: #4e5969;
+  font-weight: 400;
+  flex: 1;
 }
 
-:deep(.el-form-item) {
-  margin-bottom: 28px;
-  
-  .el-form-item__label {
-    font-weight: 500;
-    color: #2c3e50;
-    padding-bottom: 8px;
-  }
-  
-  .el-radio-group {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 16px;
-    
-    .el-radio {
-      margin-right: 0;
-    }
-  }
-  
-  .el-textarea {
-    .el-textarea__inner {
-      font-family: inherit;
-      line-height: 1.6;
-    }
-  }
-}
-
-:deep(.el-button--primary) {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border: none;
-  padding: 12px 30px;
-  font-weight: 500;
-  
-  &:hover {
-    opacity: 0.9;
-    transform: translateY(-1px);
-    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-  }
-  
-  &:active {
-    transform: translateY(0);
-  }
-}
-
-:deep(.el-button--default) {
-  padding: 12px 30px;
+:deep(.el-radio.is-checked) .option-text {
+  color: #1a5fb4;
   font-weight: 500;
 }
 
-/* 响应式调整 */
+:deep(.el-textarea .el-textarea__inner) {
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+:deep(.el-input__inner) {
+  font-size: 14px;
+}
+
+// ==================== 底部操作按钮 ====================
+
+.step-actions {
+  margin-top: 32px !important;
+  padding-top: 16px;
+  border-top: 1px solid #ebeef5;
+  margin-bottom: 0 !important;
+
+  :deep(.el-form-item__content) {
+    display: block;
+  }
+}
+
+.step-actions-inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.step-actions-right {
+  display: flex;
+  gap: 8px;
+}
+
+// ==================== 响应式 ====================
+
 @media (max-width: 768px) {
   .questionnaire-card {
     max-width: 100%;
-    
-    :deep(.el-card__body) {
-      padding: 20px;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
+
+  :deep(.el-form) {
+    padding: 16px;
+  }
+
+  .step-nav {
+    padding: 12px 16px;
+  }
+
+  .card-header {
+    h2 {
+      font-size: 15px;
     }
   }
-  
-  .card-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 10px;
+
+  .step-dot-label {
+    font-size: 10px;
   }
-  
+
+  .step-dot-number {
+    width: 24px;
+    height: 24px;
+    font-size: 12px;
+  }
+
+  .step-dots::before {
+    top: 11px;
+    left: 16px;
+    right: 16px;
+  }
+
   :deep(.el-radio-group) {
+    gap: 6px;
+  }
+
+  .step-actions-inner {
     flex-direction: column;
-    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .step-actions-right {
+    width: 100%;
+
+    .el-button {
+      flex: 1;
+    }
   }
 }
 </style>

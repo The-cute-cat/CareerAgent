@@ -971,6 +971,26 @@ const openQuizModal = async (type: 'code' | 'communication' | 'stress' | 'learni
 
 
 /**
+ * 问答题评分结果（提交后展示在弹窗中）
+ */
+const quizResult = ref<{
+  totalScore: number
+  totalMaxScore: number
+  openEndedDetails: {
+    score: number
+    max_score: number
+    score_details: Array<{
+      point: string
+      max_point_score: number
+      earned_score: number
+      reason: string
+    }>
+    comment: string
+    suggestions: string
+  }
+} | null>(null)
+
+/**
  * 处理问卷提交完成
  * 根据测试类型更新相应的分数或完成状态
  * @param submitData - 问卷提交的数据 { quizType, answers }
@@ -993,14 +1013,21 @@ const handleQuizSubmit = async (submitData: any) => {
       userAnswers
     })
 
-    // 更新分数并提示
+    // 更新分数
     updateQuizScore(quizType, result.totalScore)
-    ElMessage.success(`${getQuizTypeName(quizType)}完成！得分：${result.totalScore}分`)
+
+    // 不再自动显示结果页面，保留在Quenation组件中查看答题结果
+    // quizResult 用于存储结果但不自动切换视图
+    quizResult.value = {
+      totalScore: result.totalScore,
+      totalMaxScore: result.totalMaxScore,
+      openEndedDetails: result.openEndedDetails
+    }
+
+    ElMessage.success(`${getQuizTypeName(quizType)}完成！得分：${result.totalScore}分，请查看答题结果`)
   } catch (error) {
     console.error('提交问卷失败:', error)
     ElMessage.error('提交失败，请稍后重试')
-  } finally {
-    closeTestDialog()
   }
 }
 
@@ -1038,6 +1065,16 @@ const getQuizTypeName = (quizType: string): string => {
 }
 
 /**
+ * 根据得分比例返回颜色
+ */
+const getScoreColor = (score: number, maxScore: number): string => {
+  const ratio = score / maxScore
+  if (ratio >= 0.8) return '#67c23a'
+  if (ratio >= 0.6) return '#e6a23c'
+  return '#f56c6c'
+}
+
+/**
  * 关闭测试弹窗
  */
 const closeTestDialog = () => {
@@ -1045,6 +1082,10 @@ const closeTestDialog = () => {
   currentTestSkill.value = ''
   currentTestIndex.value = -1
   currentQuizType.value = ''
+  quizResult.value = null
+  backendQuizData.value = null
+  // 重置Quenation组件
+  quenationRef.value?.reset()
 }
 
 
@@ -1921,7 +1962,7 @@ const resetForm = () => {
                     <el-button 
                       :type="quizCompleted.communication ? 'success' : 'default'" 
                       :class="quizCompleted.communication ? 'quiz-complete' : 'quiz-pending'"
-                      @click="openQuizModal('communication')"
+                      @click="!quizCompleted.communication && openQuizModal('communication')"
                     >
                       <el-icon v-if="quizCompleted.communication"><Check /></el-icon>
                       {{ quizCompleted.communication ? '已完成' : '开始测试' }}
@@ -1933,7 +1974,7 @@ const resetForm = () => {
                     <el-button 
                       :type="quizCompleted.stress ? 'success' : 'default'" 
                       :class="quizCompleted.stress ? 'quiz-complete' : 'quiz-pending'"
-                      @click="openQuizModal('stress')"
+                      @click="!quizCompleted.stress && openQuizModal('stress')"
                     >
                       <el-icon v-if="quizCompleted.stress"><Check /></el-icon>
                       {{ quizCompleted.stress ? '已完成' : '开始测试' }}
@@ -1945,7 +1986,7 @@ const resetForm = () => {
                     <el-button 
                       :type="quizCompleted.learning ? 'success' : 'default'" 
                       :class="quizCompleted.learning ? 'quiz-complete' : 'quiz-pending'"
-                      @click="openQuizModal('learning')"
+                      @click="!quizCompleted.learning && openQuizModal('learning')"
                     >
                       <el-icon v-if="quizCompleted.learning"><Check /></el-icon>
                       {{ quizCompleted.learning ? '已完成' : '开始测试' }}
@@ -2115,13 +2156,15 @@ const resetForm = () => {
         <p>正在加载题目...</p>
         <el-progress :percentage="50" :stroke-width="8" :indeterminate="true" />
       </div>
+
       <!-- 问卷内容 - 确保数据加载完成后再渲染 -->
       <Quenation
-        v-else-if="backendQuizData"
+        v-if="backendQuizData"
         ref="quenationRef"
         :title="testDialog.title"
         :quiz-type="testDialog.type"
         :backend-data="backendQuizData"
+        :quiz-result="quizResult"
         @submit="handleQuizSubmit"
         @cancel="closeTestDialog"
       />
@@ -3436,6 +3479,182 @@ const resetForm = () => {
   to {
     transform: rotate(360deg);
   }
+}
+
+/* 测评结果展示样式 */
+.quiz-result-container {
+  padding: 32px 24px;
+  background: #f5f7fa;
+}
+
+.quiz-result-header {
+  text-align: center;
+  margin-bottom: 24px;
+
+  .quiz-result-title {
+    margin: 12px 0 0;
+    font-size: 22px;
+    font-weight: 600;
+    color: #303133;
+  }
+}
+
+.quiz-score-overview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 28px;
+  padding: 20px;
+  background: linear-gradient(135deg, #ecf5ff 0%, #f0f9eb 100%);
+  border-radius: 12px;
+
+  .score-circle {
+    display: flex;
+    align-items: baseline;
+    gap: 2px;
+  }
+
+  .score-number {
+    font-size: 48px;
+    font-weight: 700;
+    color: #409eff;
+  }
+
+  .score-divider {
+    font-size: 28px;
+    color: #909399;
+    margin: 0 2px;
+  }
+
+  .score-max {
+    font-size: 28px;
+    font-weight: 600;
+    color: #909399;
+  }
+
+  .score-label {
+    margin-top: 4px;
+    font-size: 14px;
+    color: #909399;
+  }
+}
+
+.open-ended-result {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px 24px;
+
+  .section-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 16px;
+    font-weight: 600;
+    color: #303133;
+    margin: 0 0 16px;
+  }
+}
+
+.oe-score-bar {
+  margin-bottom: 20px;
+
+  .oe-score-text {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 15px;
+    color: #606266;
+
+    strong {
+      font-size: 20px;
+      color: #409eff;
+    }
+  }
+}
+
+.score-details {
+  margin-bottom: 20px;
+  border-top: 1px solid #ebeef5;
+  padding-top: 16px;
+
+  .score-detail-item {
+    padding: 12px 16px;
+    margin-bottom: 8px;
+    background: #fafafa;
+    border-radius: 8px;
+    border-left: 3px solid #409eff;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+
+    .detail-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+
+      .detail-point {
+        font-weight: 600;
+        font-size: 14px;
+        color: #303133;
+      }
+    }
+
+    .detail-reason {
+      font-size: 13px;
+      color: #606266;
+      line-height: 1.6;
+    }
+  }
+}
+
+.result-comment,
+.result-suggestions {
+  margin-top: 16px;
+  padding: 16px;
+  border-radius: 8px;
+
+  .comment-label,
+  .suggestions-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 8px;
+  }
+
+  .comment-text,
+  .suggestions-text {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.8;
+    color: #606266;
+    white-space: pre-wrap;
+  }
+}
+
+.result-comment {
+  background: #f0f9eb;
+  border-left: 3px solid #67c23a;
+
+  .comment-label {
+    color: #67c23a;
+  }
+}
+
+.result-suggestions {
+  background: #fdf6ec;
+  border-left: 3px solid #e6a23c;
+
+  .suggestions-label {
+    color: #e6a23c;
+  }
+}
+
+.quiz-result-footer {
+  margin-top: 28px;
+  text-align: center;
 }
 
 .quiz-content {
