@@ -119,7 +119,7 @@ class ImageExtractor:
             img.thumbnail((settings.image.max_dimension, settings.image.max_dimension), Image.Resampling.LANCZOS)
 
             quality = 99
-            while Path(image_path).stat().st_size > settings.image.max_size * 1024 * 1024:
+            while Path(image_path).stat().st_size > settings.image.max_size * 1024 * 1024: # nosec: image_path is system-generated
                 img.save(image_path, "JPEG", quality=quality)
                 quality -= 1
                 if quality == 50:
@@ -146,7 +146,7 @@ class ImageExtractor:
 
         # 从文件读取图片数据
         if not image_bytes and image_path:
-            with open(image_path, "rb") as f:
+            with open(image_path, "rb") as f:  # nosec: image_path is system-generated
                 image_bytes = f.read()
 
         base64_image = self._image_to_base64(image_bytes)

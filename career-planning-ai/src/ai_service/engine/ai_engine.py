@@ -15,6 +15,8 @@ from langchain_core.messages import (
     BaseMessage,
 )
 from pydantic import BaseModel
+
+from ai_service.engine import log
 from ai_service.engine.action_type import ActionType
 from ai_service.engine.ai_state import AIState  # 引入 AIState 类
 from ai_service.engine.exceptions import (
@@ -24,7 +26,7 @@ from ai_service.engine.exceptions import (
     TextGenerationError,
     StreamInterruptedError,
 )
-
+from config import LiteLLM
 
 __all__ = [
     "AIEngine",
@@ -35,10 +37,6 @@ __all__ = [
     "StructActionStep",
     "TextActionStep",
 ]
-
-from ai_service.utils.logger_handler import log
-
-from config import LiteLLM
 
 litellm.drop_params = True
 
