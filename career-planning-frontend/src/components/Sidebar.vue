@@ -29,10 +29,9 @@ const handleSelect = (index) => {
 const menuItems = [
   { index: '/', icon: House, text: '首页' },
   { index: '/career-form', icon: Document, text: '能力画像' },
-  { index: '/match', icon: TrendCharts, text: '人岗匹配' },
+  { index: '/job-matching', icon: TrendCharts, text: '人岗匹配' },
   { index: '/report', icon: DataAnalysis, text: '生涯报告' },
-  { index: '/development-map', icon: User, text: '发展图谱' },
-  { index: '/profile', icon: Setting, text: '个人中心' }
+  { index: '/development-map', icon: User, text: '发展图谱' }
 ]
 </script>
 

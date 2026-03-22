@@ -1,6 +1,6 @@
 //统一管理用户相关的接口
 import request from '@/utils/request'
-import type { loginForm, userInfoResponseData } from '../../types/type'
+import type { loginForm, userInfoResponseData } from '../../types/user'
 
 // 定义接口枚举，方便管理和维护
 enum API {
