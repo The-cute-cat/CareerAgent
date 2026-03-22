@@ -1,10 +1,10 @@
 <script setup lang="ts">
 //简历上传，作为能力画像的功能3\组件
 
-import { ref, computed } from 'vue'
-import { UploadFilled, Document, MagicStick, Timer, Operation, Check, Close, CircleCloseFilled, Picture, Folder } from '@element-plus/icons-vue'
+import { ref } from 'vue'
+import { UploadFilled, Document, MagicStick, Timer, Operation, Check, Close } from '@element-plus/icons-vue'
 import { uploadResumeApi } from '@/api/career-form/resume'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/modules/user'
 import type { UploadFile } from 'element-plus'
 
@@ -24,10 +24,7 @@ const emit = defineEmits<{ close: [], parsed: [data: any] }>()
 
 const userStore = useUserStore()
 const uploading = ref(false)
-const parsing = ref(false)
 const uploadProgress = ref(0)
-const uploadSpeed = ref('') // 上传速度
-const uploadTimeLeft = ref('') // 预计剩余时间
 const selectedFile = ref<File | null>(null)
 
 // 进度条颜色配置
@@ -57,39 +54,6 @@ const formatFileSize = (bytes: number) => {
 }
 
 
-// 格式化速度
-const formatSpeed = (bytesPerSecond: number) => {
-  if (bytesPerSecond === 0) return '0 B/s'
-  return formatFileSize(bytesPerSecond) + '/s'
-}
-
-
-// 计算预计剩余时间
-const calculateTimeLeft = (loaded: number, total: number, speed: number) => {
-  if (speed === 0) return '计算中...'
-  const remaining = total - loaded
-  const seconds = Math.ceil(remaining / speed)
-  if (seconds < 60) return `${seconds}秒`
-  const minutes = Math.floor(seconds / 60)
-  const secs = seconds % 60
-  return `${minutes}分${secs}秒`
-}
-
-
-const cancelUpload = () => {
-  if (abortController.value) {
-    abortController.value.abort()
-    abortController.value = null
-  }
-  uploading.value = false
-  parsing.value = false
-  uploadProgress.value = 0
-  uploadSpeed.value = ''
-  uploadTimeLeft.value = ''
-  ElMessage.info('已取消上传')
-}
-
-
 const submitUpload = async () => {
   if (!selectedFile.value) return ElMessage.warning('请先选择文件')
 
@@ -100,6 +64,7 @@ const submitUpload = async () => {
     const res = await uploadResumeApi({
       file: selectedFile.value,
       userId: userStore.userInfo?.id?.toString(),
+      // parseMode: 'ai_deep',
       overwrite: true,
       onProgress: (percent: number) => {
         uploadProgress.value = percent
@@ -123,26 +88,9 @@ const submitUpload = async () => {
     console.error('简历上传错误:', error)
   } finally {
     uploading.value = false
-    parsing.value = false
     uploadProgress.value = 0
-    uploadSpeed.value = ''
-    uploadTimeLeft.value = ''
-    abortController.value = null
+    selectedFile.value = null
   }
-}
-
-
-// 拖拽事件处理
-const handleDragEnter = () => {
-  isDragging.value = true
-}
-
-const handleDragLeave = () => {
-  isDragging.value = false
-}
-
-const handleDrop = () => {
-  isDragging.value = false
 }
 </script>
 <template>
@@ -160,9 +108,7 @@ const handleDrop = () => {
           <el-icon class="upload-icon" :size="48"><upload-filled /></el-icon>
           <div class="upload-text">
             <div class="main-text">拖拽文件到此处或<em>点击上传</em></div>
-            <div class="sub-text">
-              支持 PDF、Word、图片格式（最大 5MB）
-            </div>
+            <div class="sub-text">支持 PDF、Word 格式</div>
           </div>
         </el-upload>
 
@@ -187,7 +133,7 @@ const handleDrop = () => {
         <!-- 进度条 -->
         <div v-if="uploading" class="progress-section">
           <div class="progress-header">
-            <span>上传进度</span>
+            <span>解析进度</span>
             <span class="progress-percent">{{ uploadProgress }}%</span>
           </div>
           <el-progress :percentage="uploadProgress" :stroke-width="20" :color="progressColors" striped striped-flow />
@@ -297,19 +243,6 @@ const handleDrop = () => {
 
 :deep(.el-upload-dragger) {
   padding: 24px;
-  transition: all 0.3s ease;
-  border: 2px dashed #dcdfe6;
-}
-
-:deep(.el-upload-dragger:hover) {
-  border-color: #409eff;
-  background-color: #f5f9ff;
-}
-
-.upload-component.is-dragging :deep(.el-upload-dragger) {
-  border-color: #409eff;
-  background-color: #ecf5ff;
-  border-style: solid;
 }
 
 .upload-icon {
@@ -338,124 +271,32 @@ const handleDrop = () => {
   color: #909399;
 }
 
-.image-preview {
-  width: 100%;
-  max-height: 200px;
-  border-radius: 8px;
-  overflow: hidden;
-  border: 1px solid #ebeef5;
-  background: #f5f7fa;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.preview-img {
-  max-width: 100%;
-  max-height: 200px;
-  object-fit: contain;
-}
-
-/* 文件信息卡片 */
-.file-info-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px;
-  background: linear-gradient(135deg, #f5f9ff 0%, #ffffff 100%);
-  border-radius: 12px;
-  border: 1px solid #e4e7ed;
-  width: 100%;
-  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.06);
-}
-
-.file-info-main {
+.file-info {
   display: flex;
   align-items: center;
   gap: 12px;
-  flex: 1;
-  min-width: 0;
-}
-
-.file-type-icon {
-  color: #409eff;
-  flex-shrink: 0;
-}
-
-.file-info-content {
-  flex: 1;
-  min-width: 0;
-}
-
-.file-name-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 4px;
+  padding: 10px 16px;
+  background: #f5f7fa;
+  border-radius: 6px;
+  border: 1px solid #ebeef5;
+  width: 100%;
 }
 
 .file-name {
+  flex: 1;
   font-weight: 500;
   color: #303133;
   font-size: 14px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  flex: 1;
-}
-
-.file-type-tag {
-  flex-shrink: 0;
-}
-
-.file-meta {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 12px;
 }
 
 .file-size {
   color: #909399;
-}
-
-.file-status {
-  padding: 2px 8px;
-  border-radius: 10px;
-  font-size: 11px;
-}
-
-.file-status.ready {
-  color: #67c23a;
-  background: #f0f9eb;
-}
-
-.file-status.uploading {
-  color: #409eff;
-  background: #ecf5ff;
-}
-
-.file-status.parsing {
-  color: #e6a23c;
-  background: #fdf6ec;
-}
-
-.remove-btn {
-  flex-shrink: 0;
-  margin-left: 12px;
-}
-
-/* 操作按钮组 */
-.action-buttons {
-  display: flex;
-  gap: 12px;
-  justify-content: center;
-  width: 100%;
+  font-size: 13px;
 }
 
 .upload-btn {
   width: 100%;
-  max-width: 200px;
+  max-width: 250px;
   height: 42px;
   font-size: 15px;
   border-radius: 8px;
@@ -467,24 +308,13 @@ const handleDrop = () => {
   color: #c0c4cc;
 }
 
-.cancel-btn {
-  width: 100px;
-  height: 42px;
-  font-size: 15px;
-  border-radius: 8px;
-}
-
 .btn-icon {
   margin-right: 6px;
 }
 
-/* 进度条区域 */
 .progress-section {
   width: 100%;
   max-width: 500px;
-  padding: 16px;
-  background: #fafafa;
-  border-radius: 8px;
 }
 
 .progress-header {
@@ -501,16 +331,6 @@ const handleDrop = () => {
   color: #409eff;
 }
 
-.progress-percent.parsing-text {
-  color: #67c23a;
-}
-
-.progress-stats {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 8px;
-}
-
 .progress-tips {
   margin-top: 12px;
   text-align: center;
@@ -521,31 +341,6 @@ const handleDrop = () => {
   align-items: center;
   justify-content: center;
   gap: 6px;
-}
-
-.parsing-tips {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  color: #67c23a;
-  font-size: 13px;
-}
-
-.parsing-icon {
-  animation: pulse 1.5s ease-in-out infinite;
-}
-
-@keyframes pulse {
-
-  0%,
-  100% {
-    opacity: 1;
-  }
-
-  50% {
-    opacity: 0.5;
-  }
 }
 
 .feature-card {

@@ -4,22 +4,51 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import {
-  DocumentAdd, Trophy, DataAnalysis, Position, Plus, Delete, Upload,
-  Check, ArrowUp, ArrowDown, RefreshRight, InfoFilled, CircleCheck,
-  Document, Loading, Warning, Rank, Folder, Briefcase, OfficeBuilding,
-  User, Calendar, Edit, EditPen, Switch, Medal
+  DocumentAdd,
+  Trophy,
+  DataAnalysis,
+  Position,
+  Plus,
+  Delete,
+  Upload,
+  Check,
+  ArrowUp,
+  ArrowDown,
+  RefreshRight,
+  InfoFilled,
+  CircleCheck,
+  Document,
+  Loading,
+  Warning,
+  Rank,
+  Folder,
+  Briefcase,
+  OfficeBuilding,
+  User,
+  Calendar,
+  Edit,
+  EditPen,
+  Switch,
+  Medal
 } from '@element-plus/icons-vue'
+<<<<<<< HEAD
+import CareerFormUpload from '@/components/CareerForm_Upload.vue'
+import Quenation from '@/components/Quenation.vue'
+import { submitCareerFormApi, convertToSubmitDTO } from '@/api/career-form/formdata'
+import { submitQuiz, getQuestionsApi } from '@/api/career-form/questions'
+import type { CareerFormData } from '@/types/careerform_report'
+import type { Question } from '@/types/careerform_question'
+import type { JobMatchItem } from '@/types/job-match'
+=======
 import CareerFormUpload from '@/components/CareerFormUpload.vue'
 import CareerFormRadar from '@/components/CareerFormRadar.vue'
 import type { RadarScores, MissingItem } from '@/components/CareerFormRadar.vue'
 import { submitCareerFormApi, convertToSubmitDTO, getCareerReportStatusApi, getCareerReportApi } from '@/api/career-form/formdata'
 import { getResumeReportApi, getResumeParseStatusApi } from '@/api/career-form/resume'
 import type { CareerFormData, CareerFormSubmitResult } from '@/types/type'
+>>>>>>> 5c07dc6 (修改代码)
 import {
-  majorOptions, communicationQuestions, stressQuestions,
-  learningQuestions, pythonQuestions, javaQuestions,
-  cppQuestions, gitQuestions, dockerQuestions,
-  getRandomQuestion, calculateRadarScores, fetchMockAbilityReport
+  majorOptions
 } from '@/mock/mockdata/CareerForm_mockdata'
 
 
@@ -99,45 +128,52 @@ const profileCompleteness = computed(() => {
 
   // 基本信息项
   const basicItems = [
-    !!formData.education,
-    formData.major.length > 0,
-    !!formData.graduationDate
+    !!formData.value.education,
+    formData.value.major.length > 0,
+    !!formData.value.graduationDate
   ]
   total += basicItems.length
   completed += basicItems.filter(Boolean).length
 
   // 技能与证书项
   const skillItems = [
-    formData.languages.some(l => l.type && l.level),
-    formData.certificates.length > 0,
-    formData.skills.length > 0,
-    formData.tools.length > 0
+    formData.value.languages.some(l => l.type && l.level),
+    formData.value.certificates.length > 0,
+    formData.value.skills.length > 0,
+    formData.value.tools.length > 0
   ]
   total += skillItems.length
   completed += skillItems.filter(Boolean).length
 
   // 经历与项目项
   const expItems = [
-    formData.projects.length > 0,
-    formData.internships.length > 0
+    formData.value.projects.length > 0,
+    formData.value.internships.length > 0
   ]
   total += expItems.length
   completed += expItems.filter(Boolean).length
 
   // 素质测评项
   const quizItems = [
+<<<<<<< HEAD
     quizCompleted.communication,
     quizCompleted.stress,
     quizCompleted.learning,
     !!formData.innovation
+=======
+    formData.value.scores.communication,
+    formData.value.scores.stress,
+    formData.value.scores.learning,
+    !!formData.value.innovation
+>>>>>>> 5c07dc6 (修改代码)
   ]
   total += quizItems.length
   completed += quizItems.filter(Boolean).length
 
   // 职业意向项
   const careerItems = [
-    !!formData.targetJob,
-    formData.targetIndustries.length > 0
+    !!formData.value.targetJob,
+    formData.value.targetIndustries.length > 0
   ]
   total += careerItems.length
   completed += careerItems.filter(Boolean).length
@@ -146,18 +182,118 @@ const profileCompleteness = computed(() => {
 })
 
 
+<<<<<<< HEAD
 // --- 素质测评完成状态（独立于表单数据） ---
 
 const quizCompleted = reactive({
   communication: false,
   stress: false,
   learning: false
+=======
+  // 检查证书
+  if (formData.value.certificates.length === 0) {
+    items.push({
+      field: 'certificates',
+      label: '缺少专业证书',
+      icon: 'certificate',
+      priority: 'medium'
+    })
+  }
+
+  // 检查实习经历
+  if (formData.value.internships.length === 0) {
+    items.push({
+      field: 'internships',
+      label: '缺少实习经历',
+      icon: 'internship',
+      priority: 'high'
+    })
+  }
+
+  // 检查项目经历
+  if (formData.value.projects.length === 0) {
+    items.push({
+      field: 'projects',
+      label: '缺少项目经历',
+      icon: 'project',
+      priority: 'high'
+    })
+  }
+
+  // 检查语言能力
+  if (!formData.value.languages.some(l => l.type && l.level)) {
+    items.push({
+      field: 'languages',
+      label: '缺少语言能力',
+      icon: 'language',
+      priority: 'medium'
+    })
+  }
+
+  // 检查技能
+  if (formData.value.skills.length === 0) {
+    items.push({
+      field: 'skills',
+      label: '缺少专业技能',
+      icon: 'skill',
+      priority: 'high'
+    })
+  }
+
+  // 检查工具
+  if (formData.value.tools.length === 0) {
+    items.push({
+      field: 'tools',
+      label: '缺少工具掌握',
+      icon: 'tool',
+      priority: 'low'
+    })
+  }
+
+  // 检查素质测评
+  if (!formData.value.scores.communication) {
+    items.push({
+      field: 'quiz-communication',
+      label: '未完成沟通能力测评',
+      icon: 'quiz',
+      priority: 'medium'
+    })
+  }
+  if (!formData.value.scores.stress) {
+    items.push({
+      field: 'quiz-stress',
+      label: '未完成抗压能力测评',
+      icon: 'quiz',
+      priority: 'medium'
+    })
+  }
+  if (!formData.value.scores.learning) {
+    items.push({
+      field: 'quiz-learning',
+      label: '未完成学习能力测评',
+      icon: 'quiz',
+      priority: 'medium'
+    })
+  }
+
+  // 检查创新案例
+  if (!formData.value.innovation) {
+    items.push({
+      field: 'innovation',
+      label: '缺少创新案例',
+      icon: 'innovation',
+      priority: 'low'
+    })
+  }
+
+  return items
+>>>>>>> 5c07dc6 (修改代码)
 })
 
 
 // --- 表单数据 ---
 
-const formData = reactive<CareerFormData>({
+const formData = ref<CareerFormData>({
   /** 学历：高中/大专/本科/硕士/博士/其他 */
   education: '',
   /** 当学历选择"其他"时的自定义输入值 */
@@ -225,16 +361,27 @@ const formProgress = computed(() => {
   let completed = 0
   const total = 5
 
-  if (formData.education) completed++
-  if (formData.major.length > 0) completed++
-  if (formData.skills.length > 0) completed++
-  if (formData.projects.length > 0 || formData.internships.length > 0) completed++
-  if (formData.targetJob) completed++
+  if (formData.value.education) completed++
+  if (formData.value.major.length > 0) completed++
+  if (formData.value.skills.length > 0) completed++
+  if (formData.value.projects.length > 0 || formData.value.internships.length > 0) completed++
+  if (formData.value.targetJob) completed++
 
   return Math.round((completed / total) * 100)
 })
 
 
+<<<<<<< HEAD
+=======
+/**
+ * 判断用户是否选择了计算机相关专业
+ * 用于显示/隐藏代码能力相关表单项
+ */
+const isComputerMajor = computed(() => {
+  const majorStr = JSON.stringify(formData.value.major)
+  return majorStr.includes('计算机') || majorStr.includes('软件')
+})
+>>>>>>> 5c07dc6 (修改代码)
 
 /**
  * 判断指定步骤是否已完成
@@ -250,15 +397,19 @@ const formProgress = computed(() => {
 const isStepCompleted = (step: number) => {
   switch (step) {
     case 1:
-      return !!(formData.education && formData.major.length > 0)
+      return !!(formData.value.education && formData.value.major.length > 0)
     case 2:
-      return !!(formData.skills.length > 0 || formData.certificates.length > 0)
+      return !!(formData.value.skills.length > 0 || formData.value.certificates.length > 0)
     case 3:
-      return !!(formData.projects.length > 0 || formData.internships.length > 0)
+      return !!(formData.value.projects.length > 0 || formData.value.internships.length > 0)
     case 4:
+<<<<<<< HEAD
       return !!(quizCompleted.communication && quizCompleted.stress && quizCompleted.learning && formData.innovation)
+=======
+      return !!(formData.value.scores.communication && formData.value.scores.stress && formData.value.scores.learning && formData.value.innovation)
+>>>>>>> 5c07dc6 (修改代码)
     case 5:
-      return !!(formData.targetJob && formData.targetIndustries.length > 0)
+      return !!(formData.value.targetJob && formData.value.targetIndustries.length > 0)
     default:
       return false
   }
@@ -286,13 +437,13 @@ const handleMenuSelect = (index: string) => {
 
 
 /** 添加新的语言能力项 */
-const addLanguage = () => formData.languages.push({ type: '', level: '', other: '' })
+const addLanguage = () => formData.value.languages.push({ type: '', level: '', other: '' })
 
-/**
 /**
  * 移除指定索引的语言能力项
  * @param index - 要移除的项的索引
  */
+<<<<<<< HEAD
 const removeLanguage = (index: number) => {
   ElMessageBox.confirm(
     '确定要删除此外语能力吗？',
@@ -317,6 +468,9 @@ const removeLanguage = (index: number) => {
       })
     })
 }
+=======
+const removeLanguage = (index: number) => formData.value.languages.splice(index, 1)
+>>>>>>> 5c07dc6 (修改代码)
 
 /**
  * 确认自定义语言输入
@@ -345,7 +499,7 @@ const confirmCustomLanguage = (index: number, field: 'type' | 'level') => {
 const handleEducationChange = (value: string) => {
   showEducationInput.value = value === '其他'
   if (value !== '其他') {
-    formData.educationOther = ''
+    formData.value.educationOther = ''
   }
 }
 
@@ -357,7 +511,7 @@ const handleEducationChange = (value: string) => {
 const handleCertificateChange = (value: string[]) => {
   showCertificateInput.value = value.includes('其他')
   if (!showCertificateInput.value) {
-    formData.certificateOther = ''
+    formData.value.certificateOther = ''
   }
 }
 
@@ -369,6 +523,7 @@ const handleCertificateChange = (value: string[]) => {
  */
 const addSkill = () => {
   if (newSkill.value) {
+<<<<<<< HEAD
     const skillName = newSkill.value.trim()
     // 检查是否已存在（不区分大小写）
     const isDuplicate = formData.skills.some(
@@ -379,6 +534,9 @@ const addSkill = () => {
       return
     }
     formData.skills.push({ name: skillName, score: 50 })
+=======
+    formData.value.skills.push({ name: newSkill.value, credibility: 50 })
+>>>>>>> 5c07dc6 (修改代码)
     newSkill.value = ''
   }
 }
@@ -387,6 +545,7 @@ const addSkill = () => {
  * 移除指定索引的技能
  * @param index - 要移除的技能索引
  */
+<<<<<<< HEAD
 const removeSkill = (index: number) => {
   ElMessageBox.confirm(
     '确定要删除此专业技能吗？',
@@ -411,6 +570,9 @@ const removeSkill = (index: number) => {
       })
     })
 }
+=======
+const removeSkill = (index: number) => formData.value.skills.splice(index, 1)
+>>>>>>> 5c07dc6 (修改代码)
 
 
 /**
@@ -420,6 +582,7 @@ const removeSkill = (index: number) => {
  */
 const addTool = () => {
   if (newTool.value) {
+<<<<<<< HEAD
     const toolName = newTool.value.trim()
     // 检查是否已存在（不区分大小写）
     const isDuplicate = formData.tools.some(
@@ -430,6 +593,9 @@ const addTool = () => {
       return
     }
     formData.tools.push({ name: toolName, score: 50 })
+=======
+    formData.value.tools.push({ name: newTool.value, proficiency: '熟练' })
+>>>>>>> 5c07dc6 (修改代码)
     newTool.value = ''
   }
 }
@@ -438,6 +604,7 @@ const addTool = () => {
  * 移除指定索引的工具
  * @param index - 要移除的工具索引
  */
+<<<<<<< HEAD
 const removeTool = (index: number) => {
   ElMessageBox.confirm(
     '确定要删除此工具技能吗？',
@@ -462,6 +629,9 @@ const removeTool = (index: number) => {
       })
     })
 }
+=======
+const removeTool = (index: number) => formData.value.tools.splice(index, 1)
+>>>>>>> 5c07dc6 (修改代码)
 
 
 /** 打开项目经历弹窗（新增模式） */
@@ -495,8 +665,12 @@ const confirmAddProject = () => {
     ElMessage.warning('请输入项目名称')
     return
   }
+<<<<<<< HEAD
 
   const projectData = {
+=======
+  formData.value.projects.push({
+>>>>>>> 5c07dc6 (修改代码)
     isCompetition: projectForm.isCompetition,
     name: projectForm.name,
     desc: projectForm.desc
@@ -539,6 +713,7 @@ const confirmAddProject = () => {
  * 移除指定索引的项目经历
  * @param index - 要移除的项目索引
  */
+<<<<<<< HEAD
 const removeProject = (index: number) => {
   ElMessageBox.confirm(
     '确定要删除此项目/竞赛经历吗？',
@@ -563,6 +738,9 @@ const removeProject = (index: number) => {
       })
     })
 }
+=======
+const removeProject = (index: number) => formData.value.projects.splice(index, 1)
+>>>>>>> 5c07dc6 (修改代码)
 
 /** 打开实践经历弹窗（新增模式） */
 const openInternshipDialog = () => {
@@ -603,8 +781,12 @@ const confirmAddInternship = () => {
     ElMessage.warning('请输入担任岗位')
     return
   }
+<<<<<<< HEAD
 
   const internshipData = {
+=======
+  formData.value.internships.push({
+>>>>>>> 5c07dc6 (修改代码)
     company: internshipForm.company,
     role: internshipForm.role,
     date: internshipForm.date,
@@ -648,6 +830,7 @@ const confirmAddInternship = () => {
  * 移除指定索引的实习经历
  * @param index - 要移除的实习索引
  */
+<<<<<<< HEAD
 const removeInternship = (index: number) => {
   ElMessageBox.confirm(
     '确定要删除此实习/工作经历吗？',
@@ -672,6 +855,9 @@ const removeInternship = (index: number) => {
       })
     })
 }
+=======
+const removeInternship = (index: number) => formData.value.internships.splice(index, 1)
+>>>>>>> 5c07dc6 (修改代码)
 
 /**
  * 格式化日期范围显示
@@ -701,13 +887,24 @@ const formatDateRange = (dateRange: Date[]) => {
  */
 const movePriority = (index: number, direction: number) => {
   const newIndex = index + direction
+<<<<<<< HEAD
   if (newIndex < 0 || newIndex >= formData.priorities.length) return
 
-  const temp = formData.priorities[index]!
-  const target = formData.priorities[newIndex]!
+  const temp = formData.priorities[index]
+  const target = formData.priorities[newIndex]
+  if (!temp || !target) return
 
-  formData.priorities[index] = target
-  formData.priorities[newIndex] = temp
+  formData.priorities[index] = { ...target }
+  formData.priorities[newIndex] = { ...temp }
+=======
+  if (newIndex < 0 || newIndex >= formData.value.priorities.length) return
+
+  const temp = formData.value.priorities[index]!
+  const target = formData.value.priorities[newIndex]!
+
+  formData.value.priorities[index] = target
+  formData.value.priorities[newIndex] = temp
+>>>>>>> 5c07dc6 (修改代码)
 }
 
 /**
@@ -746,9 +943,16 @@ const handleDrop = (dropIndex: number) => {
   }
 
   // 移动数组元素
-  const item = formData.priorities.splice(dragIndex.value, 1)[0]!
-  formData.priorities.splice(dropIndex, 0, item)
+<<<<<<< HEAD
+  const items = formData.priorities.splice(dragIndex.value, 1)
+  if (items.length === 0 || !items[0]) return
+  formData.priorities.splice(dropIndex, 0, items[0])
 
+=======
+  const item = formData.value.priorities.splice(dragIndex.value, 1)[0]!
+  formData.value.priorities.splice(dropIndex, 0, item)
+
+>>>>>>> 5c07dc6 (修改代码)
   dragIndex.value = -1
   dragOverIndex.value = -1
 }
@@ -860,14 +1064,46 @@ const openTestModal = async (type: 'skill' | 'tool', index?: number) => {
   // 保存当前测试的技能信息
   let name = ''
   if (type === 'skill' && index !== undefined) {
+<<<<<<< HEAD
     name = formData.skills[index]?.name || ''
     currentTestSkill.value = name
+=======
+    currentTestSkill.value = formData.value.skills[index]?.name || ''
+>>>>>>> 5c07dc6 (修改代码)
     currentTestIndex.value = index
     testDialog.title = `${name} 技能测试`
 
   } else if (type === 'tool' && index !== undefined) {
+<<<<<<< HEAD
     name = formData.tools[index]?.name || ''
     currentTestSkill.value = name
+    currentTestIndex.value = index
+    testDialog.title = `${name} 工具测试`
+  }
+
+  testDialog.type = type
+  testDialog.currentIndex = index ?? -1
+  testDialog.loading = true
+  testDialog.visible = true
+  backendQuizData.value = null
+
+
+  console.log("类型",type)
+  console.log("名称",name)
+
+  try {
+    // 从后端获取题目数据
+    const quizData = await fetchQuizData(type, name)
+    backendQuizData.value = quizData
+  } catch (error) {
+    console.error('获取题目失败:', error)
+    ElMessage.error('获取题目失败，请稍后重试')
+    testDialog.visible = false
+  } finally {
+    testDialog.loading = false
+  }
+=======
+    currentTestSkill.value = formData.value.tools[index]?.name || ''
     currentTestIndex.value = index
   } else {
     currentTestSkill.value = ''
@@ -977,27 +1213,38 @@ const openTestModal = async (type: 'skill' | 'tool', index?: number) => {
       }
     }
   }, 200)
+>>>>>>> 5c07dc6 (修改代码)
 }
 
 
 /**
  * 打开素质测评弹窗
- * 根据测评类型从对应题库中随机抽取一道题目
+ * 使用Quenation组件展示完整问卷
  * @param type - 测评类型：communication(沟通) / stress(抗压) / learning(学习)
  */
-const openQuizModal = (type: string) => {
+const openQuizModal = async (type: 'code' | 'communication' | 'stress' | 'learning') => {
   currentQuizType.value = type
+<<<<<<< HEAD
+  testDialog.type = type
+
+  console.log('类别', type)
+
+=======
   testDialog.visible = true
   testDialog.type = 'quiz'
   testDialog.answer = ''
+>>>>>>> 5c07dc6 (修改代码)
 
   // 测评标题映射
   const titles: Record<string, string> = {
+    'code': '代码能力测评',
     'communication': '沟通能力测评',
     'stress': '抗压能力测评',
     'learning': '学习能力测评'
   }
 
+<<<<<<< HEAD
+=======
   // 根据类型从对应题库随机抽取题目
   let questionBank: QuizQuestion[] = []
   switch (type) {
@@ -1012,20 +1259,108 @@ const openQuizModal = (type: string) => {
       break
   }
 
+>>>>>>> 5c07dc6 (修改代码)
   testDialog.title = titles[type] || '素质测评'
-  testDialog.currentQuestion = getRandomQuestion(questionBank)
+  testDialog.currentIndex = -1
+  testDialog.loading = true
+  testDialog.visible = true
+  backendQuizData.value = null
+
+
+
+
+
+  try {
+    // 从后端获取题目数据（openQuizModal的类型不需要name参数）
+    const quizData = await fetchQuizData(type)
+    backendQuizData.value = quizData
+  } catch (error) {
+    console.error('获取题目失败:', error)
+    ElMessage.error('获取题目失败，请稍后重试')
+    testDialog.visible = false
+  } finally {
+    testDialog.loading = false
+  }
 }
 
 
 /**
- * 关闭测试弹窗
+ * 问答题评分结果（提交后展示在弹窗中）
  */
-const confirmTest = () => {
-  // 检查是否有当前题目
-  if (!testDialog.currentQuestion) {
-    testDialog.visible = false
-    return
+const quizResult = ref<{
+  totalScore: number
+  totalMaxScore: number
+  openEndedDetails: {
+    score: number
+    max_score: number
+    score_details: Array<{
+      point: string
+      max_point_score: number
+      earned_score: number
+      reason: string
+    }>
+    comment: string
+    suggestions: string
   }
+<<<<<<< HEAD
+} | null>(null)
+
+/**
+ * 处理问卷提交完成
+ * 根据测试类型更新相应的分数或完成状态
+ * @param submitData - 问卷提交的数据 { quizType, answers }
+ */
+const handleQuizSubmit = async (submitData: any) => {
+  const { quizType, answers } = submitData
+
+  // 准备用户答案映射 { questionId: answer }
+  const userAnswers: Record<number, string> = {}
+  Object.entries(answers || {}).forEach(([key, value]) => {
+    const match = key.match(/q_(\d+)/)
+    if (match && match[1]) userAnswers[parseInt(match[1])] = value as string
+  })
+
+  try {
+    const result = await submitQuiz({
+      quizType,
+      name: ['skill', 'tool'].includes(quizType) ? currentTestSkill.value || '' : undefined,
+      questions: (backendQuizData.value?.questions || []) as Question[],
+      userAnswers
+    })
+
+    // 更新分数
+    updateQuizScore(quizType, result.totalScore)
+
+    // 不再自动显示结果页面，保留在Quenation组件中查看答题结果
+    // quizResult 用于存储结果但不自动切换视图
+    quizResult.value = {
+      totalScore: result.totalScore,
+      totalMaxScore: result.totalMaxScore,
+      openEndedDetails: result.openEndedDetails
+    }
+
+    ElMessage.success(`${getQuizTypeName(quizType)}完成！得分：${result.totalScore}分，请查看答题结果`)
+  } catch (error) {
+    console.error('提交问卷失败:', error)
+    ElMessage.error('提交失败，请稍后重试')
+  }
+}
+
+/**
+ * 更新测试分数到表单数据
+ */
+const updateQuizScore = (quizType: string, score: number) => {
+  const index = currentTestIndex.value
+
+  if (quizType === 'skill' && index >= 0 && formData.skills[index]) {
+    formData.skills[index].score = score
+  } else if (quizType === 'tool' && index >= 0 && formData.tools[index]) {
+    formData.tools[index].score = score
+  } else if (['communication', 'stress', 'learning'].includes(quizType)) {
+    if (!formData.quizScores) formData.quizScores = { communication: 0, stress: 0, learning: 0 }
+    formData.quizScores[quizType as keyof typeof formData.quizScores] = score
+    quizCompleted[quizType as keyof typeof quizCompleted] = true
+=======
 
   // 处理不支持的技能/工具提示
   if (testDialog.currentQuestion.id === -1) {
@@ -1036,10 +1371,10 @@ const confirmTest = () => {
   }
 
   // 检查是技能测试还是工具测试
-  const isSkillTest = formData.skills.some((s, idx) =>
+  const isSkillTest = formData.value.skills.some((s, idx) =>
     idx === currentTestIndex.value && s.name.toLowerCase() === currentTestSkill.value.toLowerCase()
   )
-  const isToolTest = formData.tools.some((t, idx) =>
+  const isToolTest = formData.value.tools.some((t, idx) =>
     idx === currentTestIndex.value && t.name.toLowerCase() === currentTestSkill.value.toLowerCase()
   )
 
@@ -1054,9 +1389,9 @@ const confirmTest = () => {
       if (isCorrect) {
         ElMessage.success(`回答正确！${currentTestSkill.value} 技能熟练度提升`)
         // 答对后提升熟练度
-        if (formData.skills[currentTestIndex.value]) {
-          formData.skills[currentTestIndex.value]!.credibility = Math.min(100,
-            (formData.skills[currentTestIndex.value]!.credibility || 50) + 10
+        if (formData.value.skills[currentTestIndex.value]) {
+          formData.value.skills[currentTestIndex.value]!.credibility = Math.min(100,
+            (formData.value.skills[currentTestIndex.value]!.credibility || 50) + 10
           )
         }
       } else {
@@ -1084,7 +1419,7 @@ const confirmTest = () => {
       if (isCorrect) {
         ElMessage.success(`回答正确！${currentTestSkill.value} 工具熟练度提升`)
         // 答对后提升熟练度（将熟练度转换为数值）
-        const tool = formData.tools[currentTestIndex.value]
+        const tool = formData.value.tools[currentTestIndex.value]
         if (tool) {
           const proficiencyMap: Record<string, number> = {
             '了解': 25,
@@ -1115,68 +1450,269 @@ const confirmTest = () => {
   // 素质测评：标记为已完成
   if (currentQuizType.value) {
     testDialog.visible = false
-    formData.scores[currentQuizType.value as keyof typeof formData.scores] = true
+    formData.value.scores[currentQuizType.value as keyof typeof formData.scores] = true
     ElMessage.success('测试已完成，结果已记录')
+>>>>>>> 5c07dc6 (修改代码)
     currentQuizType.value = ''
-    return
   }
+<<<<<<< HEAD
+}
+
+/**
+ * 获取测试类型名称
+ */
+const getQuizTypeName = (quizType: string): string => {
+  const names: Record<string, string> = {
+    'skill': currentTestSkill.value || '技能',
+    'tool': currentTestSkill.value || '工具',
+    'code': '代码能力',
+    'communication': '沟通能力',
+    'stress': '抗压能力',
+    'learning': '学习能力'
+  }
+  return names[quizType] || quizType
+}
+
+/**
+ * 根据得分比例返回颜色
+ */
+const getScoreColor = (score: number, maxScore: number): string => {
+  const ratio = score / maxScore
+  if (ratio >= 0.8) return '#67c23a'
+  if (ratio >= 0.6) return '#e6a23c'
+  return '#f56c6c'
+}
+
+/**
+ * 关闭测试弹窗
+ */
+const closeTestDialog = () => {
+=======
 
   // 其他测试类型
+>>>>>>> 5c07dc6 (修改代码)
   testDialog.visible = false
-  ElMessage.success('测试已完成')
+  currentTestSkill.value = ''
+  currentTestIndex.value = -1
+  currentQuizType.value = ''
+  quizResult.value = null
+  backendQuizData.value = null
+  // 重置Quenation组件
+  quenationRef.value?.reset()
 }
 
 
-// --- 简历上传处理 ---
+// --- 必填字段配置 ---
 
 /**
- * 轮询获取简历解析报告
- * 等待后端生成报告并返回能力分数
- * @param taskId 简历解析任务ID
- * @returns 能力评估分数
+ * 必填字段配置
+ * 定义哪些字段是必填项以及如何验证
  */
-const pollForResumeReport = async (taskId: string): Promise<RadarScores> => {
-  const maxAttempts = 30 // 最大轮询次数
-  const interval = 2000 // 轮询间隔 2秒
+const requiredFields = [
+  { field: 'education', label: '学历', step: '1', validate: (v: any) => !!v },
+  { field: 'major', label: '专业', step: '1', validate: (v: any) => Array.isArray(v) && v.length > 0 },
+  { field: 'graduationDate', label: '预计毕业日期', step: '1', validate: (v: any) => !!v },
+  { field: 'languages', label: '外语能力', step: '2', validate: (v: any) => Array.isArray(v) && v.some((l: any) => l.type && l.level) },
+  { field: 'skills', label: '专业技能', step: '2', validate: (v: any) => Array.isArray(v) && v.length > 0 },
+  { field: 'targetJob', label: '目标岗位', step: '5', validate: (v: any) => !!v },
+  { field: 'targetIndustries', label: '期望行业', step: '5', validate: (v: any) => Array.isArray(v) && v.length > 0 }
+]
 
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    try {
-      // 查询简历解析状态
-      const statusRes = await getResumeParseStatusApi(taskId)
+/**
+ * 检查必填字段，返回缺失的字段列表
+ * @returns 缺失的字段配置数组
+ */
+const checkRequiredFields = () => {
+  return requiredFields.filter(item => !item.validate(formData[item.field as keyof CareerFormData]))
+}
 
-      if (statusRes.data.code === 200) {
-        const status = statusRes.data.data?.status
-
-        if (status === 'completed') {
-          // 报告已生成，获取报告数据
-          const reportRes = await getResumeReportApi(taskId)
-
-          if (reportRes.data.code === 200 && reportRes.data.data) {
-            const report = reportRes.data.data
-
-            // 从报告中提取能力分数
-            if (report.abilityScores) {
-              return report.abilityScores as RadarScores
-            }
-          }
-
-          // 如果后端没有返回 abilityScores，使用模拟数据
-          console.warn('后端简历报告未包含能力分数，使用模拟数据')
-          return calculateRadarScores(formData)
-        } else if (status === 'failed') {
-          throw new Error('简历解析报告生成失败')
-        }
-        // 状态为 processing 或 pending，继续轮询
-      }
-    } catch (error) {
-      console.error(`轮询简历报告状态失败 (尝试 ${attempt + 1}/${maxAttempts}):`, error)
-    }
-
-    // 等待下一轮轮询
-    await new Promise(resolve => setTimeout(resolve, interval))
+/**
+ * 显示缺失字段提醒，引导用户补充
+ * @param missingFields 缺失的字段列表
+ */
+const showMissingFieldsReminder = (missingFields: typeof requiredFields) => {
+  if (missingFields.length === 0) {
+    ElMessage.success('简历信息已完整填充，可以直接提交！')
+    return
   }
 
-  throw new Error('获取简历报告超时，请稍后重试')
+  // 按步骤分组
+  const stepGroups = missingFields.reduce<Record<string, typeof requiredFields>>((acc, field) => {
+    const stepKey = field.step
+    if (!acc[stepKey]) {
+      acc[stepKey] = []
+    }
+    // 使用非空断言，因为前面已经确保数组存在
+    acc[stepKey]!.push(field)
+    return acc
+  }, {})
+
+  const stepNames: Record<string, string> = {
+    '1': '基本信息',
+    '2': '技能与证书',
+    '3': '经历与项目',
+    '4': '素质测评',
+    '5': '职业意向'
+  }
+
+  // 构建提示消息
+  let message = `<div style="text-align: left; max-height: 300px; overflow-y: auto;">
+    <p style="margin-bottom: 12px; color: #e6a23c;"><strong>简历已自动填充，但以下信息需要补充：</strong></p>`
+
+  Object.entries(stepGroups).forEach(([step, fields]) => {
+    const fieldList = fields
+    if (!fieldList) return
+    message += `<div style="margin-bottom: 10px;">
+      <p style="color: #409eff; margin: 8px 0 4px 0; font-weight: 500;">【${stepNames[step]}】</p>
+      <ul style="margin: 0; padding-left: 20px; color: #606266;">`
+    fieldList.forEach(f => {
+      message += `<li>${f.label}</li>`
+    })
+    message += `</ul></div>`
+  })
+
+  message += `<p style="margin-top: 12px; color: #909399; font-size: 12px;">点击确定跳转到第一个需要补充的步骤</p></div>`
+
+  ElMessageBox.confirm(message, '信息待完善', {
+    confirmButtonText: '去补充',
+    cancelButtonText: '暂不补充',
+    dangerouslyUseHTMLString: true,
+    type: 'warning',
+    customClass: 'missing-fields-dialog'
+  }).then(() => {
+    // 跳转到第一个缺失字段的步骤
+    const firstField = missingFields[0]
+    if (firstField) {
+      const firstMissingStep = firstField.step
+      activeMenu.value = firstMissingStep
+      const stepName = stepNames[firstMissingStep] || '对应步骤'
+      ElMessage.info(`请补充${stepName}中的必填项`)
+    }
+  }).catch(() => {
+    ElMessage.info('您可以稍后通过左侧菜单补充信息')
+  })
+}
+
+/**
+ * 将后端返回的表单数据填充到前端表单
+ * @param parsedFormData 后端返回的解析后的表单数据
+ */
+const fillFormWithParsedData = (parsedFormData: any) => {
+  if (!parsedFormData) return
+
+  // 填充学历
+  if (parsedFormData.education) {
+    formData.education = parsedFormData.education
+    if (parsedFormData.education === '其他' && parsedFormData.educationOther) {
+      formData.educationOther = parsedFormData.educationOther
+      showEducationInput.value = true
+    }
+  }
+
+  // 填充专业
+  if (parsedFormData.major && Array.isArray(parsedFormData.major)) {
+    formData.major = parsedFormData.major
+  }
+
+  // 填充毕业日期
+  if (parsedFormData.graduationDate) {
+    formData.graduationDate = parsedFormData.graduationDate
+  }
+
+  // 填充语言能力
+  if (parsedFormData.languages && Array.isArray(parsedFormData.languages) && parsedFormData.languages.length > 0) {
+    formData.languages = parsedFormData.languages.map((l: any) => ({
+      type: l.type || '',
+      level: l.level || '',
+      other: l.other || ''
+    }))
+  }
+
+  // 填充证书
+  if (parsedFormData.certificates && Array.isArray(parsedFormData.certificates)) {
+    formData.certificates = parsedFormData.certificates
+    if (parsedFormData.certificates.includes('其他') && parsedFormData.certificateOther) {
+      formData.certificateOther = parsedFormData.certificateOther
+      showCertificateInput.value = true
+    }
+  }
+
+  // 填充技能
+  if (parsedFormData.skills && Array.isArray(parsedFormData.skills)) {
+    formData.skills = parsedFormData.skills.map((s: any) => ({
+      name: s.name || s,
+      score: s.score ?? s.credibility ?? 70
+    }))
+  }
+
+  // 填充工具
+  if (parsedFormData.tools && Array.isArray(parsedFormData.tools)) {
+    const proficiencyMap: Record<string, number> = { '了解': 25, '熟练': 50, '精通': 75 }
+    formData.tools = parsedFormData.tools.map((t: any) => ({
+      name: t.name || t,
+      score: t.score ?? (t.proficiency ? proficiencyMap[t.proficiency] : undefined) ?? 50
+    }))
+  }
+
+  // 填充代码能力
+  if (parsedFormData.codeAbility?.links || parsedFormData.codeLinks) {
+    formData.codeAbility.links = parsedFormData.codeAbility?.links || parsedFormData.codeLinks || ''
+  }
+
+  // 填充项目经历
+  if (parsedFormData.projects && Array.isArray(parsedFormData.projects)) {
+    formData.projects = parsedFormData.projects.map((p: any) => ({
+      isCompetition: p.isCompetition || false,
+      name: p.name || '',
+      desc: p.desc || ''
+    }))
+  }
+
+  // 填充实习经历
+  if (parsedFormData.internships && Array.isArray(parsedFormData.internships)) {
+    formData.internships = parsedFormData.internships.map((i: any) => ({
+      company: i.company || '',
+      role: i.role || '',
+      date: i.date || [],
+      desc: i.desc || ''
+    }))
+  }
+
+  // 填充素质测评分数
+  if (parsedFormData.quizScores && typeof parsedFormData.quizScores === 'object') {
+    formData.quizScores = {
+      communication: parsedFormData.quizScores.communication || 0,
+      stress: parsedFormData.quizScores.stress || 0,
+      learning: parsedFormData.quizScores.learning || 0
+    }
+    // 如果分数大于0，标记对应测评为已完成
+    quizCompleted.communication = !!parsedFormData.quizScores.communication
+    quizCompleted.stress = !!parsedFormData.quizScores.stress
+    quizCompleted.learning = !!parsedFormData.quizScores.learning
+  }
+
+  // 填充创新案例
+  if (parsedFormData.innovation) {
+    formData.innovation = parsedFormData.innovation
+  }
+
+  // 填充目标岗位
+  if (parsedFormData.targetJob) {
+    formData.targetJob = parsedFormData.targetJob
+  }
+
+  // 填充目标行业
+  if (parsedFormData.targetIndustries && Array.isArray(parsedFormData.targetIndustries)) {
+    formData.targetIndustries = parsedFormData.targetIndustries
+  }
+
+  // 填充职业优先级
+  if (parsedFormData.priorities && Array.isArray(parsedFormData.priorities) && parsedFormData.priorities.length > 0) {
+    formData.priorities = parsedFormData.priorities.map((p: any) => ({
+      value: p.value || 'tech',
+      label: p.label || '技术成长'
+    }))
+  }
 }
 
 /**
@@ -1184,15 +1720,36 @@ const pollForResumeReport = async (taskId: string): Promise<RadarScores> => {
  * 直接将返回的表单数据填充到表单中，检测缺失字段并提醒用户
  * @param parsedData - 简历解析后的表单数据对象（直接是 CareerFormData 格式）
  */
+<<<<<<< HEAD
+const handleResumeParsed = (parsedData: unknown) => {
+=======
 const handleResumeParsed = async (parsedData: any) => {
-  Object.assign(formData, parsedData)
-
+  console.log('简历解析结果:', parsedData);
+  formData.value = parsedData.value
+>>>>>>> 5c07dc6 (修改代码)
   hasUploadedResume.value = true
   showUploadDialog.value = false
 
+<<<<<<< HEAD
   const formDataFromResume = parsedData as Record<string, unknown> | null
   if (!formDataFromResume) {
     ElMessage.warning('简历解析结果为空，请手动填写表单')
+=======
+  // 将解析出的技能添加到技能列表，默认熟练度70
+  if (parsedData?.profile?.skills && parsedData.profile.skills.length > 0) {
+    parsedData.profile.skills.forEach((skill: string) => {
+      if (!formData.value.skills.find(s => s.name === skill)) {
+        formData.value.skills.push({ name: skill, credibility: 70 })
+      }
+    })
+  }
+
+  // 情况1: 如果后端直接返回了 abilityScores，直接展示
+  if (parsedData?.abilityScores) {
+    Object.assign(radarScores, parsedData.abilityScores)
+    showRadarDialog.value = true
+    ElMessage.success('简历能力评估报告已生成！')
+>>>>>>> 5c07dc6 (修改代码)
     return
   }
 
@@ -1350,6 +1907,7 @@ const resetForm = () => {
   formRef.value.resetFields()
 
   // 手动重置动态列表数据（resetFields 无法处理动态添加的数组项）
+<<<<<<< HEAD
   formData.languages = [{ type: '', level: '', other: '' }]
   formData.certificates = []
   formData.certificateOther = ''
@@ -1362,6 +1920,17 @@ const resetForm = () => {
   quizCompleted.stress = false
   quizCompleted.learning = false
   formData.priorities = [
+=======
+  formData.value.languages = [{ type: '', level: '', other: '' }]
+  formData.value.certificates = []
+  formData.value.certificateOther = ''
+  formData.value.skills = []
+  formData.value.tools = []
+  formData.value.projects = []
+  formData.value.internships = []
+  formData.value.scores = { communication: false, stress: false, learning: false }
+  formData.value.priorities = [
+>>>>>>> 5c07dc6 (修改代码)
     { value: 'tech', label: '技术成长' },
     { value: 'salary', label: '薪资' },
     { value: 'stable', label: '稳定' }
@@ -1507,8 +2076,18 @@ const resetForm = () => {
               <el-row :gutter="24">
                 <el-col :span="12">
                   <el-form-item label="最高学历" prop="education">
+<<<<<<< HEAD
+                    <el-select
+                      v-model="formData.education"
+                      placeholder="请选择最高学历"
+                      style="width: 100%"
+                      @change="handleEducationChange"
+                      clearable
+                    >
+=======
                     <el-select v-model="formData.education" placeholder="请选择最高学历" style="width: 100%"
                       @change="handleEducationChange" clearable>
+>>>>>>> 5c07dc6 (修改代码)
                       <el-option label="专科" value="专科" />
                       <el-option label="本科" value="本科" />
                       <el-option label="硕士" value="硕士" />
@@ -1519,7 +2098,15 @@ const resetForm = () => {
                 </el-col>
                 <el-col :span="12" v-if="showEducationInput">
                   <el-form-item label="学历说明" prop="educationOther">
+<<<<<<< HEAD
+                    <el-input
+                      v-model="formData.educationOther"
+                      placeholder="如：MBA、双学位等"
+                      clearable
+                    />
+=======
                     <el-input v-model="formData.educationOther" placeholder="如：MBA、双学位等" clearable />
+>>>>>>> 5c07dc6 (修改代码)
                   </el-form-item>
                 </el-col>
               </el-row>
@@ -1550,23 +2137,78 @@ const resetForm = () => {
               <div class="form-section-title">外语能力</div>
               <el-form-item label="外语水平" prop="languages">
                 <div class="list-container">
+<<<<<<< HEAD
+                  <div
+                    v-for="(lang, index) in formData.languages"
+                    :key="index"
+                    class="list-row"
+                  >
+                    <el-select
+                      v-model="lang.type"
+                      placeholder="语种"
+                      style="width: 130px"
+                    >
+=======
                   <div v-for="(lang, index) in formData.languages" :key="index" class="list-row">
                     <el-select v-model="lang.type" placeholder="语种" style="width: 130px">
+>>>>>>> 5c07dc6 (修改代码)
                       <el-option label="英语" value="英语" />
                       <el-option label="日语" value="日语" />
                       <el-option label="其他" value="其他" />
                     </el-select>
+<<<<<<< HEAD
+                    <el-select
+                      v-model="lang.level"
+                      placeholder="水平"
+                      style="width: 130px"
+                      :disabled="lang.type === ''"
+                    >
+=======
                     <el-select v-model="lang.level" placeholder="水平" style="width: 130px"
                       :disabled="lang.type === '其他' || lang.type === ''">
+>>>>>>> 5c07dc6 (修改代码)
                       <el-option label="四级" value="四级" />
                       <el-option label="六级" value="六级" />
                       <el-option label="托福/雅思" value="托福/雅思" />
                       <el-option label="其他" value="其他" />
                     </el-select>
+<<<<<<< HEAD
+                    <!-- 语种选择"其他"时的自定义输入 -->
+                    <template v-if="lang.type === '其他'">
+                      <el-input
+                        v-model="lang.other"
+                        placeholder="请输入语种"
+                        style="width: 150px"
+                      />
+                      <el-button
+                        type="primary"
+                        size="small"
+                        @click="confirmCustomLanguage(index, 'type')"
+                      >
+                        确认
+                      </el-button>
+                    </template>
+                    <!-- 水平选择"其他"时的自定义输入 -->
+                    <template v-else-if="lang.level === '其他'">
+                      <el-input
+                        v-model="lang.other"
+                        placeholder="请输入证书"
+                        style="width: 150px"
+                      />
+                      <el-button
+                        type="primary"
+                        size="small"
+                        @click="confirmCustomLanguage(index, 'level')"
+                      >
+                        确认
+                      </el-button>
+                    </template>
+=======
                     <el-input v-if="lang.type === '其他'" v-model="lang.other" placeholder="请输入语种"
                       style="width: 200px; flex: 1" />
                     <el-input v-else-if="lang.level === '其他'" v-model="lang.other" placeholder="请输入证书"
                       style="width: 200px; flex: 1" />
+>>>>>>> 5c07dc6 (修改代码)
                     <el-button text type="danger" :icon="Delete" @click="removeLanguage(index)" />
                   </div>
                   <el-button class="add-item-btn" type="primary" plain :icon="Plus" @click="addLanguage">
@@ -1601,8 +2243,17 @@ const resetForm = () => {
                   </div>
                   <div v-for="(skill, index) in formData.skills" :key="index" class="skill-item">
                     <span class="skill-name">{{ skill.name }}</span>
+<<<<<<< HEAD
+                    <el-progress
+                      :percentage="skill.score || 0"
+                      status="success"
+                      style="width: 120px"
+                      :stroke-width="8"
+                    />
+=======
                     <el-progress :percentage="skill.credibility" status="success" style="width: 120px"
                       :stroke-width="8" />
+>>>>>>> 5c07dc6 (修改代码)
                     <div class="skill-actions">
                       <el-button text type="primary" @click="openTestModal('skill', index)">测试</el-button>
                       <el-button text type="danger" :icon="Delete" @click="removeSkill(index)" />
@@ -1631,12 +2282,31 @@ const resetForm = () => {
                 </div>
               </el-form-item>
 
+<<<<<<< HEAD
+              <!-- 代码能力 -->
+              <el-form-item
+                label="代码能力"
+                prop="codeAbility"
+              >
+                <div class="code-ability-row">
+                  <el-input
+                    v-model="formData.codeAbility.links"
+                    placeholder="GitHub/Gitee 链接，多个用逗号分隔"
+                    style="flex: 1"
+                  />
+                  <el-button
+                    type="warning"
+                    @click="openQuizModal('code')"
+                    :icon="DataAnalysis"
+                  >
+=======
               <!-- 代码能力 (动态显示) -->
               <el-form-item label="代码能力" prop="codeAbility" v-if="isComputerMajor">
                 <div class="code-ability-row">
                   <el-input v-model="formData.codeAbility.links" placeholder="GitHub/Gitee 链接，多个用逗号分隔"
                     style="flex: 1" />
                   <el-button type="warning" @click="openTestModal('code')" :icon="DataAnalysis">
+>>>>>>> 5c07dc6 (修改代码)
                     AI 测试
                   </el-button>
                 </div>
@@ -1727,6 +2397,15 @@ const resetForm = () => {
               <el-row :gutter="24">
                 <el-col :span="8">
                   <el-form-item label="沟通能力">
+<<<<<<< HEAD
+                    <el-button
+                      :type="quizCompleted.communication ? 'success' : 'default'"
+                      :class="quizCompleted.communication ? 'quiz-complete' : 'quiz-pending'"
+                      @click="!quizCompleted.communication && openQuizModal('communication')"
+                    >
+                      <el-icon v-if="quizCompleted.communication"><Check /></el-icon>
+                      {{ quizCompleted.communication ? '已完成' : '开始测试' }}
+=======
                     <el-button :type="formData.scores.communication ? 'success' : 'default'"
                       :class="formData.scores.communication ? 'quiz-complete' : 'quiz-pending'"
                       @click="openQuizModal('communication')">
@@ -1734,11 +2413,21 @@ const resetForm = () => {
                         <Check />
                       </el-icon>
                       {{ formData.scores.communication ? '已完成' : '开始测试' }}
+>>>>>>> 5c07dc6 (修改代码)
                     </el-button>
                   </el-form-item>
                 </el-col>
                 <el-col :span="8">
                   <el-form-item label="抗压能力">
+<<<<<<< HEAD
+                    <el-button
+                      :type="quizCompleted.stress ? 'success' : 'default'"
+                      :class="quizCompleted.stress ? 'quiz-complete' : 'quiz-pending'"
+                      @click="!quizCompleted.stress && openQuizModal('stress')"
+                    >
+                      <el-icon v-if="quizCompleted.stress"><Check /></el-icon>
+                      {{ quizCompleted.stress ? '已完成' : '开始测试' }}
+=======
                     <el-button :type="formData.scores.stress ? 'success' : 'default'"
                       :class="formData.scores.stress ? 'quiz-complete' : 'quiz-pending'"
                       @click="openQuizModal('stress')">
@@ -1746,11 +2435,21 @@ const resetForm = () => {
                         <Check />
                       </el-icon>
                       {{ formData.scores.stress ? '已完成' : '开始测试' }}
+>>>>>>> 5c07dc6 (修改代码)
                     </el-button>
                   </el-form-item>
                 </el-col>
                 <el-col :span="8">
                   <el-form-item label="学习能力">
+<<<<<<< HEAD
+                    <el-button
+                      :type="quizCompleted.learning ? 'success' : 'default'"
+                      :class="quizCompleted.learning ? 'quiz-complete' : 'quiz-pending'"
+                      @click="!quizCompleted.learning && openQuizModal('learning')"
+                    >
+                      <el-icon v-if="quizCompleted.learning"><Check /></el-icon>
+                      {{ quizCompleted.learning ? '已完成' : '开始测试' }}
+=======
                     <el-button :type="formData.scores.learning ? 'success' : 'default'"
                       :class="formData.scores.learning ? 'quiz-complete' : 'quiz-pending'"
                       @click="openQuizModal('learning')">
@@ -1758,6 +2457,7 @@ const resetForm = () => {
                         <Check />
                       </el-icon>
                       {{ formData.scores.learning ? '已完成' : '开始测试' }}
+>>>>>>> 5c07dc6 (修改代码)
                     </el-button>
                   </el-form-item>
                 </el-col>
@@ -1873,14 +2573,46 @@ const resetForm = () => {
             </div>
           </el-form>
 
+<<<<<<< HEAD
+=======
           <!-- 雷达图弹窗组件 -->
           <CareerFormRadar v-model:visible="showRadarDialog" :scores="radarScores" :loading="radarLoading"
             :loading-text="'正在生成能力评估报告...'" :source-type="hasUploadedResume ? 'resume' : 'manual'"
             :completeness="profileCompleteness" :missing-items="missingItems" @jump-to-field="handleJumpToField" />
+>>>>>>> 5c07dc6 (修改代码)
         </el-card>
       </el-main>
     </el-container>
 
+<<<<<<< HEAD
+    <!-- 素质测评弹窗 - 使用Quenation组件 -->
+    <el-dialog
+      v-model="testDialog.visible"
+      :title="testDialog.title"
+      width="800px"
+      class="quiz-dialog"
+      destroy-on-close
+      @close="closeTestDialog"
+    >
+      <!-- 加载状态 -->
+      <div v-if="testDialog.loading" class="quiz-loading">
+        <el-icon class="loading-icon" :size="48"><Loading /></el-icon>
+        <p>正在加载题目...</p>
+        <el-progress :percentage="50" :stroke-width="8" :indeterminate="true" />
+      </div>
+
+      <!-- 问卷内容 - 确保数据加载完成后再渲染 -->
+      <Quenation
+        v-if="backendQuizData"
+        ref="quenationRef"
+        :title="testDialog.title"
+        :quiz-type="testDialog.type"
+        :backend-data="backendQuizData"
+        :quiz-result="quizResult"
+        @submit="handleQuizSubmit"
+        @cancel="closeTestDialog"
+      />
+=======
     <!-- 素质测评弹窗 -->
     <el-dialog v-model="testDialog.visible" :title="testDialog.title" width="600px" class="quiz-dialog"
       destroy-on-close>
@@ -1923,6 +2655,7 @@ const resetForm = () => {
           提交测试
         </el-button>
       </template>
+>>>>>>> 5c07dc6 (修改代码)
     </el-dialog>
 
     <!-- 简历上传弹窗 -->
@@ -1931,7 +2664,17 @@ const resetForm = () => {
     </el-dialog>
 
     <!-- 项目经历弹窗 -->
+<<<<<<< HEAD
+    <el-dialog
+      v-model="showProjectDialog"
+      :title="projectForm.isEdit ? '编辑项目/竞赛经历' : '添加项目/竞赛经历'"
+      width="600px"
+      destroy-on-close
+      class="experience-dialog"
+    >
+=======
     <el-dialog v-model="showProjectDialog" title="添加项目/竞赛经历" width="600px" destroy-on-close class="experience-dialog">
+>>>>>>> 5c07dc6 (修改代码)
       <div class="experience-form">
         <div class="form-item">
           <label class="form-label">
@@ -1975,7 +2718,17 @@ const resetForm = () => {
     </el-dialog>
 
     <!-- 实践经历弹窗 -->
+<<<<<<< HEAD
+    <el-dialog
+      v-model="showInternshipDialog"
+      :title="internshipForm.isEdit ? '编辑实践经历' : '添加实践经历'"
+      width="600px"
+      destroy-on-close
+      class="experience-dialog"
+    >
+=======
     <el-dialog v-model="showInternshipDialog" title="添加实践经历" width="600px" destroy-on-close class="experience-dialog">
+>>>>>>> 5c07dc6 (修改代码)
       <div class="experience-form">
         <div class="form-row two-col">
           <div class="form-item">
@@ -2019,9 +2772,18 @@ const resetForm = () => {
       </div>
       <template #footer>
         <el-button @click="showInternshipDialog = false">取消</el-button>
+<<<<<<< HEAD
+        <el-button
+          type="primary"
+          @click="confirmAddInternship"
+          :disabled="!internshipForm.company.trim() || !internshipForm.role.trim()"
+        >
+          {{ internshipForm.isEdit ? '确认修改' : '确认添加' }}
+=======
         <el-button type="primary" @click="confirmAddInternship"
           :disabled="!internshipForm.company.trim() || !internshipForm.role.trim()">
           确认添加
+>>>>>>> 5c07dc6 (修改代码)
         </el-button>
       </template>
     </el-dialog>
@@ -3204,7 +3966,6 @@ const resetForm = () => {
   from {
     transform: rotate(0deg);
   }
-
   to {
     transform: rotate(360deg);
   }
@@ -3882,6 +4643,7 @@ const resetForm = () => {
 .experience-form :deep(.el-textarea__inner:hover) {
   background: #ffffff;
 }
+<<<<<<< HEAD
 
 /* ========== 缺失字段提醒对话框样式 ========== */
 
@@ -4035,4 +4797,8 @@ const resetForm = () => {
   color: #409eff;
   font-weight: 500;
 }
+
 </style>
+=======
+</style>
+>>>>>>> 5c07dc6 (修改代码)
