@@ -161,7 +161,7 @@
               <!-- 提交后显示参考答案按钮和评分详情 -->
               <template v-if="submitted">
                 <div class="open-ended-actions">
-                  <el-button
+                  <!-- <el-button
                     type="primary"
                     link
                     size="small"
@@ -169,7 +169,7 @@
                   >
                     <el-icon><View /></el-icon>
                     {{ showOpenEndedAnswer[question.id] ? '收起参考答案' : '查看参考答案' }}
-                  </el-button>
+                  </el-button> -->
                   <!-- 最后一题（问答题）显示查看评分详情按钮 -->
                   <el-button
                     v-if="props.quizResult && index === (props.backendData?.questions?.length || 0) - 1"
