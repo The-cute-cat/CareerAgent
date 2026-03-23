@@ -3,6 +3,10 @@
 # 字段名已英文标准化，并与学生画像模型关键维度对齐
 # ==========================================
 from pydantic import BaseModel, ConfigDict, Field
+import json
+from pathlib import Path
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from typing import List, Optional, Union, Dict, Any, Tuple
 
 
 class BasicRequirements(BaseModel):
@@ -89,3 +93,196 @@ class JDAnalysisResult(BaseModel):
     job_id: str = Field(description="职位 ID")
     job_name: str = Field(description="职位名称")
     profiles: Profiles = Field(alias="profiles", description="岗位详细画像")
+
+
+
+"""
+JD 数据转换工具
+读取文件中的 JSON 数据，转换为 Pydantic 模型列表
+"""
+
+
+# ==========================================
+# 2. 核心转换函数
+# ==========================================
+
+def convert_file_to_pydantic_list(
+        file_path: Union[str, Path],
+        encoding: str = 'utf-8',
+        skip_invalid: bool = True,
+        verbose: bool = True
+) -> List[JDAnalysisResult]:
+    """
+    将文件中的 JSON 数据转换为 Pydantic 模型列表
+
+    参数:
+        file_path: 文件路径（支持 .txt, .json 等格式）
+        encoding: 文件编码，默认 'utf-8'
+        skip_invalid: 是否跳过无效数据（不抛出异常）
+        verbose: 是否输出详细日志
+
+    返回:
+        results : List[JDAnalysisResult] Pydantic 模型列表
+    """
+    path = Path(file_path)
+
+    report = {
+        'file_path': str(path.absolute()),
+        'success': False,
+        'total_items': 0,
+        'valid_items': 0,
+        'invalid_items': 0,
+        'errors': []
+    }
+
+
+    # 检查文件
+    if not path.exists():
+        msg = f"文件不存在：{path.absolute()}"
+        report['errors'].append(msg)
+        if verbose:
+            print(f"❌ {msg}")
+        return [], report
+
+    if not path.is_file():
+        msg = f"路径不是文件：{path.absolute()}"
+        report['errors'].append(msg)
+        if verbose:
+            print(f"❌ {msg}")
+        return [], report
+
+    # 读取文件内容
+    try:
+        with open(path, 'r', encoding=encoding) as f:
+            content = f.read().strip()
+        if verbose:
+            print(f"✓ 读取文件成功 ({len(content)} 字符)")
+    except Exception as e:
+        msg = f"读取文件失败：{e}"
+        report['errors'].append(msg)
+        if verbose:
+            print(f"❌ {msg}")
+        return [], report
+
+    # 解析 JSON
+    data = None
+
+    try:
+        data = json.loads(content)
+        if verbose:
+            print("✓ JSON 格式正确")
+    except json.JSONDecodeError as e:
+        msg = f"JSON 格式错误：{e.msg} (第 {e.lineno} 行，第 {e.colno} 列)"
+        report['errors'].append(msg)
+
+        return [], report
+
+    # 确保数据是列表
+    if not isinstance(data, list):
+        data = [data]
+
+    report['total_items'] = len(data)
+    if verbose:
+        print(f"📊 共解析 {len(data)} 条数据")
+
+    # 转换为 Pydantic 模型
+    results = []
+    invalid_details = []
+
+    for i, item in enumerate(data):
+        try:
+            result = JDAnalysisResult.model_validate(item)
+            results.append(result)
+            report['valid_items'] += 1
+        except ValidationError as e:
+            report['invalid_items'] += 1
+            job_id = item.get('job_id', f'索引 {i}')
+
+            if skip_invalid:
+                if verbose and len(invalid_details) < 5:
+                    print(f"⚠ 第 {i + 1} 条数据验证失败 ({job_id})")
+                invalid_details.append({
+                    'index': i,
+                    'job_id': job_id,
+                    'error': str(e)[:200]
+                })
+            else:
+                msg = f"第 {i + 1} 条数据验证失败：{e}"
+                report['errors'].append(msg)
+                if verbose:
+                    print(f"❌ {msg}")
+                return [], report
+
+    report['success'] = True
+
+    if verbose:
+        print(f"✅ 转换完成！")
+        print(f"📊 总数据数：{report['total_items']}")
+        print(f"📊 有效数据：{report['valid_items']}")
+        print(f"📊 无效数据：{report['invalid_items']}")
+
+    return results
+
+
+
+
+def load_jd_to_pydantic(
+        file_path: Union[str, Path],
+        encoding: str = 'utf-8',
+        verbose: bool = True
+) -> List[JDAnalysisResult]:
+    """
+    便捷函数：加载文件并返回 Pydantic 模型列表
+
+    参数:
+        file_path: 文件路径
+        encoding: 文件编码
+        verbose: 是否输出日志
+
+    返回:
+        List[JDAnalysisResult]
+
+    异常:
+        ValueError: 转换失败时抛出
+    """
+    results= convert_file_to_pydantic_list(
+        file_path,
+        encoding=encoding,
+        verbose=verbose
+    )
+
+    return results
+
+
+
+# ==========================================
+# 4. 使用示例
+# ==========================================
+
+if __name__ == "__main__":
+    # 示例 1: 转换单个文件
+    print("\n" + "=" * 70)
+    print("示例 1: 转换单个文件")
+    print("=" * 70)
+
+    file_path = r"E:\软件工程相关资料\项目比赛\服创 2026\岗位.json"
+
+    try:
+        results = convert_file_to_pydantic_list(
+            file_path,
+            verbose=True
+        )
+
+        if results:
+            print(f"\n✅ 成功转换 {len(results)} 条数据\n")
+
+            # 显示前 3 条
+            for i, job in enumerate(results[:3]):
+                print(f"[{i + 1}] {job.job_id}: {job.job_name}")
+                print(f"    学历：{job.profiles.basic_requirements.degree}")
+                print(f"    核心技能：{job.profiles.professional_skills.core_skills[:50]}...")
+                print(f"    薪资：{job.profiles.job_attributes.salary_competitiveness}")
+                print()
+
+    except Exception as e:
+        print(f"❌ 转换失败：{e}")
