@@ -4,6 +4,9 @@
 import * as cheerio from 'cheerio';
 import * as fs from 'fs';
 
+/** @typedef {import('cheerio').CheerioAPI} CheerioAPI */
+/** @typedef {import('cheerio').Cheerio} Cheerio */
+
 const proxy_url = "";//https://cors-proxy-worker.hopecat.dpdns.org/?url=";
 
 // 延迟函数，支持随机延迟
@@ -37,12 +40,14 @@ async function fetchPage(url) {
     return cheerio.load(html);
 }
 
-const html_url = fs.existsSync('./temp/csv/url.txt') ? fs.readFileSync('./temp/csv/url.txt', 'utf8').split('\n') : [];
+/** @type {string[]} */
+const html_url = fs.existsSync('./temp/csv/url.txt') ? fs.readFileSync('./temp/csv/url.txt', 'utf8').split('\n') :[];
 const fail_url = [];
 
 async function get_data(url) {
     const allData = [];
     let job_id = ""
+    /**@type {CheerioAPI} */
     let $doc;
     try {
         $doc = await fetchPage(url);
@@ -65,6 +70,7 @@ async function get_data(url) {
     });
     for (const url of urls) {
         await delay(600, 1000);
+        /**@type {CheerioAPI} */
         let $$doc;
         try {
             $$doc = await fetchPage(url);
@@ -86,6 +92,7 @@ async function get_data(url) {
             }
             html_url.push(link);
             await delay(800, 1200);
+            /**@type {CheerioAPI} */
             let $$$doc;
             try {
                 $$$doc = await fetchPage(link);
@@ -111,7 +118,7 @@ function convertToCSV(data) {
 
     const columns = ['url', 'job', 'salary', 'city', 'district', 'experience', 'education',
         'job_type', 'headcount', 'employer_tag', 'skills_item',
-        'describtion', 'address', 'update_time'];
+        'description', 'address', 'update_time'];
 
     const header = columns.join(',');
     const escapeField = (field) => {
@@ -142,19 +149,21 @@ function convertToCSV(data) {
  * @returns {Record<string, string | string[]>}
  */
 function parse_content($doc) {
+    /** @type {Record<string, string | string[]>} */
     const result = {};
     result["update_time"] = $doc(".summary-plane__time").text().replace("更新于 ", "");
     if (result["update_time"].includes("今天")) {
         result["update_time"] = result["update_time"].replace("今天", new Date().toLocaleDateString())
     }
-    result["employer_tag"] = [];
-    $doc(".best-employer-tag__tag-text").each((index, item) => {
-        result["employer_tag"].push($doc(item).text().trim());
+    const employerTags = /** @type {string[]} */ ([]);
+    $doc(".best-employer-tag__tag-text").each((_, item) => {
+        employerTags.push($doc(item).text().trim());
     });
+    result["employer_tag"] = employerTags;
     result["job"] = $doc(".summary-plane__title").text();
     result["salary"] = $doc(".summary-plane__salary").text();
     const infoItems = $doc(".summary-plane__info li");
-    infoItems.each((index, item) => {
+    infoItems.each((_, item) => {
         const $item = $doc(item);
         const link = $item.find("a");
         const span = $item.find("span");
@@ -178,14 +187,15 @@ function parse_content($doc) {
             }
         }
     });
-    result["skills_item"] = [];
-    $doc(".describtion__skills-content span").each((index, item) => {
+    const skills_item = /** @type {string[]} */ ([]);
+    $doc(".describtion__skills-content span").each((_, item) => {
         const skill = $doc(item).text().trim();
         if (skill) {
-            result["skills_item"].push(skill);
+            skills_item.push(skill);
         }
     });
-    result["describtion"] = $doc(".describtion__detail-content").text();
+    result["skills_item"] = skills_item;
+    result["description"] = $doc(".describtion__detail-content").text();
     result["address"] = $doc(".job-address__content-text").text();
     return result;
 }

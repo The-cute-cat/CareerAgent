@@ -42,7 +42,7 @@ class WordExtractor:
 
     # 初始化大模型客户端
     def __init__(self):
-        self.llm = AIEngine().pick_brain(settings.lite_llm)
+        self.llm = AIEngine().pick_brain(settings.lite_llm.image)
         self.output_parser = StrOutputParser()
 
         # 配置专门为 Word 优化的 Docling 转换器，确保能够处理 Word 文档中的复杂布局、表格和图片等内容，并且能够将表格精准转为 Markdown 格式以保留原有的格式信息
