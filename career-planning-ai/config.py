@@ -11,7 +11,7 @@ from pydantic import BaseModel, field_validator, SecretStr, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic_settings.sources import InitSettingsSource
 
-__all__ = ["settings", "LiteLLM"]
+__all__ = ["settings", "LiteLLMBase"]
 
 from ai_service.utils.path_tool import abs_path, get_project_root, get_abs_path
 
@@ -57,7 +57,8 @@ class Communication(BaseModel):
     token: Token = Token()
 
 
-class LiteLLM(BaseModel):
+class LiteLLMBase(BaseModel):
+    """模型配置基类"""
     api_key: SecretStr = SecretStr("")
     base_url: str = ""
     model_name: str = ""
@@ -66,56 +67,8 @@ class LiteLLM(BaseModel):
     max_concurrent_requests: int = 3
     extra: Dict[str, Any] = {}
 
-    class Qwen(BaseModel):
-        api_key: SecretStr = SecretStr("")
-        base_url: str = ""
-        model_name: str = ""
-        timeout: float = 30.0
-        max_retries: int = 3
-        max_concurrent_requests: int = 3
-        extra: Dict[str, Any] = {}
-
-        def __repr__(self):
-            return f"Qwen(api_key={self.api_key}, base_url={self.base_url}, model_name={self.model_name}, timeout={self.timeout}, max_retries={self.max_retries}, extra={self.extra})"
-
-        def __str__(self):
-            return self.__repr__()
-
-        @field_validator("api_key")
-        @classmethod
-        def validate_api_key(cls, v: SecretStr) -> SecretStr:
-            if not v.get_secret_value() or v.get_secret_value() == "" or v.get_secret_value() == "<api_key>":
-                raise ValueError("请在 .env 文件中配置正确的 LLM_Qwen API Key")
-            return v
-
-    qwen: Qwen = Field(default_factory=Qwen)
-
-    class Deepseek(BaseModel):
-        api_key: SecretStr = SecretStr("")
-        base_url: str = ""
-        model_name: str = ""
-        timeout: float = 30.0
-        max_retries: int = 3
-        max_concurrent_requests: int = 3
-        extra: Dict[str, Any] = {}
-
-        @field_validator("api_key")
-        @classmethod
-        def validate_api_key(cls, v: SecretStr) -> SecretStr:
-            if not v.get_secret_value() or v.get_secret_value() == "" or v.get_secret_value() == "<api_key>":
-                raise ValueError("请在 .env 文件中配置正确的 LLM_Deepseek API Key")
-            return v
-
-        def __repr__(self):
-            return f"Deepseek(api_key={self.api_key}, base_url={self.base_url}, model_name={self.model_name}, timeout={self.timeout}, max_retries={self.max_retries}, extra={self.extra})"
-
-        def __str__(self):
-            return self.__repr__()
-
-    deepseek: Deepseek = Field(default_factory=Deepseek)
-
     def __repr__(self):
-        return f"LLM(api_key={self.api_key}, base_url={self.base_url}, model_name={self.model_name}, timeout={self.timeout}, max_retries={self.max_retries}, extra={self.extra})"
+        return f"{self.__class__.__name__}(api_key={self.api_key}, base_url={self.base_url}, model_name={self.model_name}, timeout={self.timeout}, max_retries={self.max_retries}, extra={self.extra})"
 
     def __str__(self):
         return self.__repr__()
@@ -126,6 +79,38 @@ class LiteLLM(BaseModel):
         if not v.get_secret_value() or v.get_secret_value() == "" or v.get_secret_value() == "<api_key>":
             raise ValueError("请在 .env 文件中配置正确的 LLM API Key")
         return v
+
+
+class LiteLLM(LiteLLMBase):
+    class Qwen(LiteLLMBase):
+        @field_validator("api_key")
+        @classmethod
+        def validate_api_key(cls, v: SecretStr) -> SecretStr:
+            if not v.get_secret_value() or v.get_secret_value() == "" or v.get_secret_value() == "<api_key>":
+                raise ValueError("请在 .env 文件中配置正确的 LLM_Qwen API Key")
+            return v
+
+    qwen: Qwen = Field(default_factory=Qwen)
+
+    class Deepseek(LiteLLMBase):
+        @field_validator("api_key")
+        @classmethod
+        def validate_api_key(cls, v: SecretStr) -> SecretStr:
+            if not v.get_secret_value() or v.get_secret_value() == "" or v.get_secret_value() == "<api_key>":
+                raise ValueError("请在 .env 文件中配置正确的 LLM_Deepseek API Key")
+            return v
+
+    deepseek: Deepseek = Field(default_factory=Deepseek)
+
+    class Image(LiteLLMBase):
+        @field_validator("api_key")
+        @classmethod
+        def validate_api_key(cls, v: SecretStr) -> SecretStr:
+            if not v.get_secret_value() or v.get_secret_value() == "" or v.get_secret_value() == "<api_key>":
+                raise ValueError("请在 .env 文件中配置正确的 LLM_Image API Key")
+            return v
+
+    image: Image = Field(default_factory=Image)
 
 
 class LLM(BaseModel):

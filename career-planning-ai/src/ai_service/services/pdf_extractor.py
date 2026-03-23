@@ -251,6 +251,7 @@ class PDFExtractor:
             result = []
             result.extend(await self.get_text_pdf(pdf_path, password, text_page_list))
             result.extend(await self.get_scanned_pdf(pdf_path, password, scanned_page_list))
+            result.sort(key=lambda x: x["page"])
             return result
         except Exception as e:
             log.error(
