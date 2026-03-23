@@ -1,27 +1,37 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional
+from ai_service.models.userform_profile import (ProjectExperience, 
+                                                InternshipExperience, 
+                                                SkillDetail, 
+                                                ToolDetail, 
+                                                LanguageDetail,
+                                                priorityDetail,
+                                                quizScoreDetail)
 
 
 class UserForm(BaseModel):
-    education: str = Field(..., description="学历")
-    major: str = Field(..., description="专业")
-    graduationDate: Optional[str] = Field(None, description="毕业时间 YYYY-MM")
-    languages: List[str] = Field(..., description="外语能力列表")
-    certificates: Optional[List[str]] = Field(default=[], description="证书列表")
-    skills: List[str] = Field(..., description="技能列表")
-    tools: List[str] = Field(..., description="工具列表")
-    codeLinks: Optional[str] = Field(None, description="代码仓库链接")
-    projects: List[str] = Field(default=[], description="项目经历")
-    internships: List[str] = Field(default=[], description="实习经历")
-    quizScores: Optional[str] = Field(None, description="素质测评结果")
-    innovation: Optional[str] = Field(None, description="创新案例描述")
+    education: Optional[str] = Field(None, description="学历：高中/专科/本科/硕士/博士/其他")
+    educationOther: Optional[str] = None
+    major: Optional[List[str]] = Field(None, description="专业类别")
+    graduationDate: Optional[str] = Field(None, description="毕业日期,YYYY-MM格式")
+    languages: Optional[List[LanguageDetail]] = Field(None, description="语言能力")
+    certificates: Optional[List[str]] = Field(None, description="证书列表")
+    certificatesOther: Optional[str] = None
+    skills: Optional[List[SkillDetail]] = Field(None, description="技能列表")
+    tools: Optional[List[ToolDetail]] = Field(None, description="工具列表")
+    codeLinks: Optional[str] = Field(None, description="代码仓库链接,如GitHub/Gitee,多个逗号分隔")
+    projects: Optional[List[ProjectExperience]] = Field(None, description="项目经历列表")
+    internships: Optional[List[InternshipExperience]] = Field(None, description="实习经历列表")
+    quizScores: Optional[quizScoreDetail] = Field(None, description="测评自述，包含沟通能力、抗压能力、学习能力等")
+    innovation: Optional[str] = Field(None, description="创新表现描述")
     targetJob: Optional[str] = Field(None, description="目标岗位")
-    targetIndustries: List[str] = Field(default=[], description="期望行业列表")
-    priorities: List[str] = Field(default=[], description="职业优先级")
+    targetIndustries: Optional[List[str]] = Field(None, description="期望行业列表")
+    priorities: Optional[List[priorityDetail]] = Field(None, description="核心价值观优先级列表，包含技术成长、薪资、稳定等")
 
     def to_llm_context(self) -> str:
         # 1. 预处理：将列表转为逗号分隔的字符串（如果没有数据则显示“无”）
-        def fmt_list(l): return ", ".join(l) if l else "无"
+        def fmt_list(l):
+            return ", ".join(map(str, l)) if l else "无"
 
         # 2. 使用 f-string 配合多行字符串 (triple quotes)
         # 注意：每一行都清晰定义，方便 AI 像阅读简历一样阅读
@@ -31,22 +41,26 @@ class UserForm(BaseModel):
             - 学历: {self.education}
             - 专业: {self.major}
             - 毕业时间: {self.graduationDate or "未提供"}
+            - 其他学历信息: {self.educationOther or "无"}
 
             [专业技能]
             - 技能列表: {fmt_list(self.skills)}
             - 工具平台: {fmt_list(self.tools)}
             - 外语能力: {fmt_list(self.languages)}
+            - 证书: {fmt_list(self.certificates)}
+            - 其他证书信息: {self.certificatesOther or "无"}
             - 代码仓库: {self.codeLinks or "无"}
 
             [实践经历]
-            - 项目经历: {" | ".join(self.projects) if self.projects else "暂无项目经历"}
-            - 实习经历: {" | ".join(self.internships) if self.internships else "暂无实习经历"}
+            - 项目经历: {fmt_list([p.name for p in self.projects]) if self.projects else "无"}
+            - 实习经历: {fmt_list([i.company for i in self.internships]) if self.internships else "无"}
 
             [个人素质与意向]
             - 测评自述: {self.quizScores or "未提供"}
             - 创新表现: {self.innovation or "未提供"}
             - 目标岗位: {self.targetJob or "待定"}
+            - 目标职位: {self.targetJob or "待定"}
             - 期望行业: {fmt_list(self.targetIndustries)}
-            - 核心价值观优先级: {" > ".join(self.priorities) if self.priorities else "未排序"}
+            - 核心价值观优先级: {" > ".join([p.label for p in self.priorities]) if self.priorities else "未排序"}
             </candidate_raw_data>
                     """.strip()
