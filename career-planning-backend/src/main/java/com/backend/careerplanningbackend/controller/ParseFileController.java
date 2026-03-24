@@ -40,15 +40,30 @@ public class ParseFileController {
      * @return
      */
     @PostMapping("/file")
-    public Result<Object> parseFile(@RequestParam("file") MultipartFile file) {
-        log.info("parse-file接收到的参数: {}", file.toString());
+    public Result<Object> parseFile(
+            @RequestParam("file") MultipartFile file,// 文件数据
+            @RequestParam(value = "user_id", required = false) String userId,//用户id
+            @RequestParam(value = "overwrite", defaultValue = "false") boolean overwrite //是否覆盖
+    ) {
+        log.info("name: {}, size: {} bytes, leixing: {}",
+                file.getOriginalFilename(), file.getSize(), file.getContentType());
+
 
         List<MultipartFile>files = new ArrayList<>();
         files.add(file);
         AiChatResponse aiChatResponse = aiServiceClient.chatWithMultipartFiles("/parse/file", files, "");
         log.info("parse-file接收到的参数: {}", aiChatResponse.toString());
+        System.out.println("python端传来的数据:"+aiChatResponse.getData());
+
+        System.out.println("user_id:"+userId);
+        System.out.println("overwrite:"+overwrite);
+        System.out.println("file.getOriginalFilename():"+file.getOriginalFilename());
+        System.out.println("file.getSize():"+file.getSize());
+        System.out.println("file.getContentType():"+file.getContentType());
+
         return Result.ok(aiChatResponse.getData());
     }
+
 
     /**
      * parseFiles

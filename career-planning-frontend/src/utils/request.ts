@@ -11,7 +11,7 @@ let isRefreshing = false
 const baseURL = '/api'
 const instance = axios.create({
   baseURL,
-  timeout: 100000, // 请求超时时间(毫秒)
+  timeout: 1000000, // 请求超时时间(毫秒)
 })
 
 // 请求拦截器，自动添加token
@@ -20,13 +20,20 @@ instance.interceptors.request.use((config) => {
   const accessToken = userStore.accessToken
   if (accessToken) {
     config.headers.Authorization = `Bearer ${accessToken}`
-  } /* else{
+  }
+
+  /* else{
     const refreshToken = localStorage.getItem('refreshToken');
     if(refreshToken){
       config.headers.Authorization = `Bearer ${refreshToken}`;
     }
     console.log("无无refreshToken");
   } */
+
+  // 确保 POST/PUT/PATCH 请求发送 JSON 数据
+  if (['post', 'put', 'patch'].includes(config.method || '')) {
+    config.headers['Content-Type'] = 'application/json'
+  }
   return config
 })
 
