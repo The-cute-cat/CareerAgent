@@ -25,6 +25,7 @@ import java.util.Map;
 @Slf4j
 @RestController
 @RequiredArgsConstructor
+@RequestMapping("/test_question")
 public class QuestionController {
     
     private final AiServiceClient aiServiceClient;

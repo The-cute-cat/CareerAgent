@@ -1,0 +1,168 @@
+[33me8ecc96[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mfeature/my-new[m[33m, [m[1;31morigin/master[m[33m, [m[1;31morigin/HEAD[m[33m)[m 更新用户表单相关逻辑 (#63)
+[33mfcc369f[m Merge branch 'branch-li' of https://github.com/The-cute-cat/CareerAgent
+[33m65b7cf9[m Merge remote-tracking branch 'origin/master'
+[33mc23c5d6[m Merge branch 'feature/my-new-feature' of https://github.com/The-cute-cat/CareerAgent
+[33m09bdf08[m Branch ma (#62)
+[33m3bd8275[m Merge branch 'branch-ma' of https://github.com/The-cute-cat/CareerAgent
+[33m721bfaa[m Revert "修改代码注释\"
+[33m39707af[m 还差一点点
+[33mc8a839b[m 修改代码
+[33m44aab69[m Merge remote-tracking branch 'origin/branch-ma'
+[33m879c96e[m Merge remote-tracking branch 'origin/master' into branch-ma
+[33m81e585f[m Merge branch 'master' of https://github.com/The-cute-cat/CareerAgent
+[33m5182370[m Merge remote-tracking branch 'origin/master' into branch-ma
+[33mcc17231[m[33m ([m[1;31morigin/feature/my-new[m[33m)[m 还差一点点
+[33m593ce55[m[33m ([m[1;31morigin/branch-zhou[m[33m, [m[1;31morigin/branch-yuan[m[33m, [m[1;32mmaster[m[33m, [m[1;32mbranch-ma[m[33m)[m chore: 优化日志输出与配置项 (#61)
+[33m5c07dc6[m 修改代码
+[33m8b041a6[m Branch li (#60)
+[33m93c8a0e[m[33m ([m[1;31morigin/branch-li[m[33m)[m Merge remote-tracking branch 'origin/branch-li' into branch-li
+[33md6a88fd[m refactor: 重构人岗匹配类型定义与模拟数据结构
+[33m36eabf6[m 重构用户表单模型，新增表单转画像接口
+[33mc07701b[m fix: 更新问答题逻辑
+[33m353f20c[m feat: 实现问卷分步展示和答题结果查看
+[33m4dbb0bf[m refactor: 重构引擎模块结构并优化日志使用 (#58)
+[33m1eee843[m feat: 支持 Milvus 云服务配置 (#57)
+[33m7771e8f[m feat: 替换API调用为模拟数据并优化表单逻辑
+[33m3c824f0[m refactor: 重构配置结构及依赖更新 (#55)
+[33m0c642e6[m Merge remote-tracking branch 'origin/master'
+[33mef6f9ca[m Revert "fdsf"
+[33mc5d8cc6[m yweioru
+[33mb80c615[m Merge remote-tracking branch 'origin/branch-ma'
+[33m2823a3e[m 更改
+[33mf87f507[m 前端个人中心的个人档案已经被我修复了
+[33mad94f7a[m 前端个人中心的个人档案已经被我修复了
+[33mc56f52a[m feat: 新增简历上传解析与测验评分功能
+[33m10dd292[m 优化提示词，删减重复代码 (#53)
+[33mdefa9bc[m Branch le (#52)
+[33m5384e6f[m chore: 删除 poetry.lock 文件 (#51)
+[33med8f364[m Branch yuan (#50)
+[33mecab0e1[m (#49)
+[33m1a219fe[m 合并 (#48)
+[33m71fcf57[m Merge remote-tracking branch 'origin/master' into branch-ma
+[33m673c711[m Merge remote-tracking branch 'origin/master'
+[33mdb76d84[m Branch yuan (#47)
+[33m1a2ecac[m Branch yuan (#46)
+[33mc5f086d[m 修改代码注释\
+[33m3aac109[m 更新提取用户表单的接口与相关类，增加模糊匹配的工具类，以及增加专业的数据文件 (#45)
+[33ma3481d0[m 更新提取用户表单的接口与相关类，增加模糊匹配的工具类，以及增加专业的数据文件 (#44)
+[33mb876be2[m 更新提取用户表单的接口与相关类，增加模糊匹配的工具类，以及增加专业的数据文件  dream-world37 committed 2 hours ago (#43)
+[33m37c830b[m Merge remote-tracking branch 'origin/master'
+[33m2d6f7f6[m 更新提取用户表单的接口与相关类，增加模糊匹配的工具类，以及增加专业的数据文件 (#42)
+[33m9e38643[m 简历问题接口了python代码-ma
+[33mec68f60[m 简历问题接口了python代码-ma
+[33m05cc9fb[m Branch zhou (#41)
+[33md950eb3[m chore: 忽略依赖锁定文件并删除现有锁定文件
+[33me0fe53f[m 修复依赖(#38)
+[33m8d2c318[m 合并 (#37)
+[33mefd466e[m 更新提取用户表单的接口与相关类，增加模糊匹配的工具类，以及增加专业的数据文件 (#36)
+[33m465b6db[m feat: 新增测试问答评估与配置更新 (#35)
+[33mbfa0ec8[m 更新提取用户表单的接口与相关类，增加模糊匹配的工具类，以及增加专业的数据文件 (#34)
+[33mfba7745[m 简历对接口了代码-ma
+[33m489fb72[m 简历对接口了代码-ma
+[33m4ddd04e[m 简历对接口了代码-ma
+[33m442af34[m 简历对接口了代码-ma
+[33m0d306c7[m 我补充了代码
+[33mec2f8eb[m Merge remote-tracking branch 'origin/master' into branch-ma
+[33m8811904[m 我补充了代码
+[33m5f6caad[m Merge remote-tracking branch 'origin/master' into branch-ma
+[33ma78935e[m Merge remote-tracking branch 'origin/branch-ma'
+[33m7536d5d[m 修改前端逻辑
+[33m833baef[m 新添雷达能力显示图，统一管理模拟数据Mock (#33)
+[33m0db014e[m 生成技术文档
+[33m80d3de8[m 合并分支
+[33m32f57da[m 我修改了调用python的结构添加了ChatController这个类用于调用python接口的
+[33mbdf2323[m feat: 支持MultipartFile文件上传 (#32)
+[33m64dc4e6[m refactor: 补充 (#31)
+[33mda18d10[m refactor: 合并文件解析接口并统一异常处理 (#30)
+[33m821c504[m Branch zhou (#29)
+[33mf984edb[m feat: 新增文件解析和异常处理功能
+[33m33dc0b7[m 删除多余文件 (#27)
+[33m6674dfe[m Branch li (#26)
+[33mffd816a[m 生成了一些技术文档,后面可以在添加
+[33me945dbd[m 补充
+[33mcbf1502[m 更新ai_engine的异常处理和日志，并在README加上异常处理部分。删除除旧有的ai封装，更新配置文件，更新有关学生画像结构化提取的服务层以及结构化提取类 (#24)
+[33m59643e2[m chore: 初始化提交
+[33m0e0aaf6[m Merge remote-tracking branch 'origin/master' into master_yuan
+[33m3289b00[m refactor: 重构服务调用逻辑并优化代码结构 (#23)
+[33m9627a6e[m feat: 新增Java端AI服务客户端及Python端认证授权模块 (#22)
+[33m0a1612f[m Merge remote-tracking branch 'origin/master' into master_yuan
+[33m2a3113a[m[33m ([m[1;31mma/master[m[33m)[m Merge branch 'master' of https://github.com/The-cute-cat/CareerAgent
+[33maa0c8b0[m 修改了一些简单逻辑
+[33m2431131[m Merge remote-tracking branch 'origin/master' into master_yuan
+[33m26d3b61[m feat: 新增职位信息抓取与处理功能
+[33me7793dc[m 新增 AI 引擎模块，采用分段建造者模式，提供基础功能、配套README文档，在依赖文件中添加所需依赖。在配置文件中增加并发限制，更新有关word文档的识别逻辑并提供配套的测试文件。新增学生画像数据模型
+[33m087f3ec[m feat: 增加爬虫数据持久化和错误处理 (#20)
+[33me841f0b[m * feat(ai-service): 新增 AI 引擎模块，采用分段建造者模式， 在配置文件中增加并发限制，更新有关word文档的识别逻辑并提供配套的测试文件
+[33ma5ef509[m feat(ai-service): 新增 AI 引擎模块，采用分段建造者模式
+[33m117f84b[m refactor: 移除未使用的路由配置文件 (#17)
+[33mcde2828[m chore: 移除未使用的组件文件
+[33macacadd[m Branch li (#15)
+[33m08430dd[m Branch li (#14)
+[33m8be4613[m 新增初始界面，以及部分模拟数据
+[33m4ca6484[m Merge remote-tracking branch 'origin/master' into master_yuan
+[33m8ccecab[m feat: 添加基于大模型的计算机岗位筛选功能
+[33m2757597[m feat: 添加智联招聘数据爬取脚本 (#12)
+[33m5ab4261[m 在配置文件中增加并发限制，增加有关word文档的识别逻辑并提供配套的测试文件
+[33mbfc97e5[m feat: 新增临时文件处理工具和图片视觉内容提取功能
+[33m19063d4[m Merge remote-tracking branch 'origin/master' into master_yuan
+[33m86ec13d[m chore: 更新数据库配置和依赖 完成岗位的储存和json格式的保存
+[33m42b9e36[m feat: 新增文件上传验证与解析功能
+[33m65e1318[m Merge remote-tracking branch 'origin/master' into master_yuan
+[33md653f32[m feat: 添加Excel数据读取与日期清洗功能 增加将EXcel表格内容转换为jobinfo列表
+[33me354795[m pinia+双token
+[33m0ad7dab[m feat: 新增图像提取器模块并增强文件类型检测能力
+[33md0850e6[m Branch zhou (#6)
+[33mf565329[m fix: 修复配置问题，并增加PDF识别功能
+[33m22bddf1[m fix: 修复配置问题，并增加PDF识别功能
+[33m9a8d454[m Merge remote-tracking branch 'origin/master' into master_yuan
+[33mef11af8[m 合井远程仓库的前后联调
+[33m12464f9[m 合并远程仓库的,前后联调
+[33m2f90b85[m java前后端联调
+[33m817be25[m Merge pull request #3 from The-cute-cat/branch-li
+[33mb709461[m feat: 添加 Vue 类型声明和依赖锁定文件
+[33m8369406[m Merge remote-tracking branch 'origin/master' into master_yuan
+[33m90baff3[m chore: 初始化空提交
+[33m57d24e5[m feat: 添加 LLM 配置和 PDF 提取器功能
+[33m59cb74c[m feat: 添加文件类型检测和PDF类型识别功能
+[33m98010c8[m Merge remote-tracking branch 'origin/master' into master_yuan
+[33m75b0fee[m feat: 添加通信服务令牌配置及验证功能
+[33mdec3465[m 功能：新增注册组件与用户状态管理模块，移除未使用的组件
+[33m00ca024[m feat: 添加AI令牌生成和验证功能
+[33m72a8bee[m Merge remote-tracking branch 'origin/branch-ma'
+[33m3916135[m BCrypt加密测试代码
+[33mff5d552[m 在gitgnore里面设置将application.yml里面的东西设置不检查永远不上传到仓库里面去
+[33mcd95263[m 先提交双token代码还没有测试
+[33maac7116[m ce
+[33m08e0c41[m ce
+[33m94582bd[m ce
+[33m3d659cc[m 添加了一些校验逻辑
+[33m7a8c4c1[m Merge remote-tracking branch 'origin/branch-ma' into branch-ma
+[33m80c98b6[m 新的提交描述
+[33mc1ef744[m refactor--规范地完善了一下user的所有代码--maq
+[33m03b7012[m Merge remote-tracking branch 'origin/master'
+[33md99b3f9[m 修复环境文件读取问题
+[33m2c1f829[m 统一的Result应该改成这样子更好看一些
+[33m04dfb22[m 添加了sqlalchemy
+[33mc2aaee7[m 统一的Result应该改成这样子更好看一些
+[33m9e3d58a[m 统一的Result应该改成这样子更好看一些
+[33mbd3985e[m application设置一下
+[33m5980d56[m BCrypt加密测试代码
+[33m90e6ff8[m 在gitgnore里面设置将application.yml里面的东西设置不检查永远不上传到仓库里面去
+[33m61cca18[m 先提交双token代码还没有测试
+[33m399df93[m ce
+[33md6c36db[m ce
+[33m7608cd3[m ce
+[33m270d4b4[m 添加了一些校验逻辑
+[33me4aa69f[m Merge remote-tracking branch 'origin/branch-ma'
+[33mcc14b06[m 测试分支
+[33mf0f5eaf[m 实测了一下登录可以实现,昨天遇到版本问题慢了很多
+[33m580cfaf[m 功能：添加配置管理和日志工具
+[33m7796a1f[m 创建分支-ma
+[33md1bb37f[m 创建分支-ma
+[33m981035d[m 创建分支-ma
+[33mee17fbd[m Merge remote-tracking branch 'origin/master'
+[33mbdcf919[m Merge remote-tracking branch 'origin/master'
+[33me41fef7[m 重构：重构项目以使用 Vite 和 Vue 3
+[33m7aa8f35[m 将pom.xml中的war修改为jar包了
+[33m1f4b7a6[m 更新 README.md，添加启动服务的说明
+[33mc9d6787[m 初始化项目

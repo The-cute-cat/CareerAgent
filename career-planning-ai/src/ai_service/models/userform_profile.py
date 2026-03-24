@@ -14,10 +14,10 @@ class priorityDetail(BaseModel):
     value: Literal['tech', 'salary', 'stable'] = Field(description="优先级值")
     label: str = Field(description="优先级名称，string（技术成长/薪资/稳定）")
 
-class quizScoreDetail(BaseModel):
-    communication: float = Field(description="沟通能力分数0-100")
-    stress: float = Field(description="抗压能力分数0-100")
-    learning: float = Field(description="学习能力分数0-100")
+class quizDetail(BaseModel):
+    type: Literal["choice", "open_ended"] = Field(description="题目类型：选择题/开放题")
+    question: str = Field(description="测评题目")
+    answer: str = Field(description="用户答案")
 
 class ProjectExperience(BaseModel):
     isCompetition: bool = Field(description="boolean(是否竞赛）")
@@ -139,9 +139,9 @@ class StudentFormProfile(BaseModel):
     )
 
     # 4. 素质与规划
-    quiz_scores: None = Field(
+    quiz: None = Field(
         None,
-        alias="quizScores",
+        alias="quiz",
         description="保持为空对象，AI 不需要填充此字段，后续会根据其他字段内容自动生成测验分数结果。",
     )
     innovation: Optional[str] = Field(
