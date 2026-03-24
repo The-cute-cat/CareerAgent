@@ -26,7 +26,7 @@ from ai_service.engine.exceptions import (
     TextGenerationError,
     StreamInterruptedError,
 )
-from config import LiteLLM
+from config import LiteLLMBase
 
 __all__ = [
     "AIEngine",
@@ -716,7 +716,7 @@ class AIEngine:
         self.text_client = litellm.acompletion
 
     def pick_brain(
-            self, model: LiteLLM, model_fallbacks: Optional[List[LiteLLM]] = None
+            self, model: LiteLLMBase, model_fallbacks: Optional[List[LiteLLMBase]] = None
     ) -> InputStep:
         """
         开启新的推理流水线：选择推理大脑
@@ -725,8 +725,8 @@ class AIEngine:
         支持设置备选模型列表，在主模型失败时自动降级。
 
         Args:
-            model (LiteLLM): 主模型配置对象，包含 API 密钥、模型名称等
-            model_fallbacks (Optional[List[LiteLLM]]): 备选模型列表，用于容错降级
+            model (LiteLLMBase): 主模型配置对象，包含 API 密钥、模型名称等
+            model_fallbacks (Optional[List[LiteLLMBase]]): 备选模型列表，用于容错降级
 
         Returns:
             InputStep: 上下文注入步骤，开始构建提示词
