@@ -11,10 +11,14 @@ import type {
   SubmitQuizResult,
   AnswerStats
 } from '@/types/careerform_question'
-import { 
-  mockGetQuestionsResponse, 
-  mockSubmitOpenEndedResponse 
+import type { Result } from '@/types/type'
+import {
+  mockGetQuestionsResponse,
+  mockSubmitOpenEndedResponse
 } from '@/mock/mockdata/question_mockdata'
+
+// ==================== Mock 开关配置 ====================
+const ENABLE_MOCK = import.meta.env.VITE_ENABLE_MOCK === 'true'
 
 /**
  * 测验总分计算结果
@@ -45,44 +49,44 @@ export interface QuizTotalResult {
  * 使用模拟数据（开发阶段），生产环境请切换为真实 API
  */
 export const getQuestionsApi = (params: GetQuestionsParams) => {
-  // 模拟 API 调用
-  return new Promise<{ data: any }>((resolve) => {
-    setTimeout(() => {
-      const response = mockGetQuestionsResponse(
-        params.quizType,
-        (params.quizType === 'skill' || params.quizType === 'tool') ? params.title : undefined
-      )
-      resolve({ data: response })
-    }, 500)
-  })
+  if (ENABLE_MOCK) {
+    return new Promise<{ data: Result<QuizResponse> }>((resolve) => {
+      setTimeout(() => {
+        const response = mockGetQuestionsResponse(
+          params.quizType,
+          (params.quizType === 'skill' || params.quizType === 'tool') ? params.title : undefined
+        )
+        resolve({ data: response })
+      }, 500)
+    })
+  }
 
-  // 真实 API（生产环境使用）
-  // const requestData: GetQuestionsRequest = {
-  //   type: params.quizType,
-  //   name: (params.quizType === 'skill' || params.quizType === 'tool') 
-  //     ? params.title 
-  //     : undefined
-  // }
-  // return request.get<QuizResponse>('/api/quiz/questions', { params: requestData })
+  const requestData: GetQuestionsRequest = {
+    type: params.quizType,
+    name: (params.quizType === 'skill' || params.quizType === 'tool')
+      ? params.title
+      : undefined
+  }
+  return request.get<QuizResponse>('/test_question/generate', { params: requestData })
 }
 
+
 /**
- * 提交问答题，获取问答题评分
+ * 提交问答题，获取问答题评分 
  * 使用模拟数据（开发阶段），生产环境请切换为真实 API
  */
 export const submitOpenEndedApi = (data: SubmitOpenEndedParams) => {
-  // 模拟 API 调用
-  return new Promise<{ data: any }>((resolve) => {
-    setTimeout(() => {
-      const response = mockSubmitOpenEndedResponse(data.answer)
-      resolve({ data: response })
-    }, 800)
-  })
-
-  // 真实 API（生产环境使用）
-  // return request.post<OpenEndedScoreResult>('/api/quiz/open-ended-score', data)
+  if (ENABLE_MOCK) {
+    return new Promise<{ data: Result<OpenEndedScoreResult> }>((resolve) => {
+      setTimeout(() => {
+        const response = mockSubmitOpenEndedResponse(data.studentAnswer)
+        resolve({ data: response })
+      }, 800)
+    })
+  }
+  console.log('submitOpenEndedApi', data)
+  return request.post<OpenEndedScoreResult>('/test_question/check_student_answer', data)
 }
-
 
 // ==================== 计分配置 ====================
 
@@ -234,19 +238,34 @@ export async function submitQuiz(
     if (userAnswer.trim()) {
       try {
         const response = await submitOpenEndedApi({
-          tool: name,
+          name: name,
           type: quizType,
-          questionId: openEndedQuestion.id,
-          answer: userAnswer,
+          questions: openEndedQuestion.content,
+          studentAnswer: userAnswer,
           evaluationCriteria: openEndedQuestion.evaluation_criteria,
-          submitTime: new Date().toISOString()
         })
-        // 后端返回 Result<OpenEndedScoreResult>，提取 data 字段
+        // 后端返回 Result<OpenEndedScoreResult>，提取 data 字段并乘以4（后端满分10，前端需要40）
         const resultData = response.data as any
+        let rawData: any = null
         if (resultData?.data && typeof resultData.data.score === 'number') {
-          openEndedResult = resultData.data
+          rawData = resultData.data
         } else if (typeof resultData?.score === 'number') {
-          openEndedResult = resultData
+          rawData = resultData
+        }
+
+        if (rawData) {
+          openEndedResult = {
+            score: (rawData.score || 0) * 4,
+            max_score: (rawData.max_score || 10) * 4,
+            score_details: (rawData.score_details || []).map((item: any) => ({
+              point: item.point || '',
+              max_point_score: (item.max_point_score || 0) * 4,
+              earned_score: (item.earned_score || 0) * 4,
+              reason: item.reason || ''
+            })),
+            comment: rawData.comment || '',
+            suggestions: rawData.suggestions || ''
+          }
         }
       } catch (e) {
         console.warn('[submitQuiz] 问答题评分请求失败，该题记0分', e)
@@ -254,7 +273,8 @@ export async function submitQuiz(
     }
   }
 
-  // 3. 汇总总分
+ 
+   // 3. 汇总总分
   const totalScore = objective.choiceScore + objective.fillInScore + openEndedResult.score
   const totalMaxScore =
     objective.choiceMaxScore +

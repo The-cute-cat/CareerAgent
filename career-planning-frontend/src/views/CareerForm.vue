@@ -959,6 +959,9 @@ const quizResult = ref<{
   }
 } | null>(null)
 
+/** 后端评分是否失败 */
+const scoreFailed = ref(false)
+
 /**
  * 处理问卷提交完成
  * 根据测试类型更新相应的分数或完成状态
@@ -982,11 +985,12 @@ const handleQuizSubmit = async (submitData: any) => {
       userAnswers
     })
 
+    scoreFailed.value = false
+
     // 更新分数
     updateQuizScore(quizType, result.totalScore)
 
-    // 不再自动显示结果页面，保留在Quenation组件中查看答题结果
-    // quizResult 用于存储结果但不自动切换视图
+    // quizResult 传入 Quenation 组件，watch 会自动切换到结果页面
     quizResult.value = {
       totalScore: result.totalScore,
       totalMaxScore: result.totalMaxScore,
@@ -996,6 +1000,7 @@ const handleQuizSubmit = async (submitData: any) => {
     ElMessage.success(`${getQuizTypeName(quizType)}完成！得分：${result.totalScore}分，请查看答题结果`)
   } catch (error) {
     console.error('提交问卷失败:', error)
+    scoreFailed.value = true
     ElMessage.error('提交失败，请稍后重试')
   }
 }
@@ -1052,6 +1057,7 @@ const closeTestDialog = () => {
   currentTestIndex.value = -1
   currentQuizType.value = ''
   quizResult.value = null
+  scoreFailed.value = false
   backendQuizData.value = null
   // 重置Quenation组件
   quenationRef.value?.reset()
@@ -1569,9 +1575,13 @@ const resetForm = () => {
         <div class="resume-upload-section">
           <div class="upload-label">
           </div>
-          <el-button class="upload-btn" :type="hasUploadedResume ? 'info' : 'primary'" @click="showUploadDialog = true"
-            :icon="hasUploadedResume ? CircleCheck : Upload">
-            {{ hasUploadedResume ? '已上传简历' : '上传简历' }}
+          <el-button 
+            class="upload-btn"
+            :type="hasUploadedResume ? 'info' : 'primary'"
+            @click="showUploadDialog = true"
+            :icon="Upload"
+          >
+            {{ hasUploadedResume ? '重新上传简历' : '上传简历' }}
           </el-button>
         </div>
       </el-aside>
@@ -1991,9 +2001,17 @@ const resetForm = () => {
       </div>
 
       <!-- 问卷内容 - 确保数据加载完成后再渲染 -->
-      <Quenation v-if="backendQuizData" ref="quenationRef" :title="testDialog.title" :quiz-type="testDialog.type"
-        :backend-data="backendQuizData" :quiz-result="quizResult" @submit="handleQuizSubmit"
-        @cancel="closeTestDialog" />
+      <Quenation
+        v-if="backendQuizData"
+        ref="quenationRef"
+        :title="testDialog.title"
+        :quiz-type="testDialog.type"
+        :backend-data="backendQuizData"
+        :quiz-result="quizResult"
+        :score-failed="scoreFailed"
+        @submit="handleQuizSubmit"
+        @cancel="closeTestDialog"
+      />
     </el-dialog>
 
     <!-- 简历上传弹窗 -->

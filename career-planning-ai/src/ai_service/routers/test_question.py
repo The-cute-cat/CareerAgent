@@ -1,7 +1,5 @@
 import json
-
 from fastapi import APIRouter, Depends, Form
-
 __all__ = ["router"]
 
 from ai_service.agents.test_question_agent import test_question_agent
@@ -15,7 +13,6 @@ router = APIRouter(prefix="/test_question", tags=["test_question"])
 async def generate_test_question_skill(skill: str = Form(None, alias="skill"), _: bool = Depends(validate_token)):
     questions = await test_question_agent.generate_test_questions(skill=skill)
     return success(await _check_question(questions, skill))
-
 
 @router.post("/tool_generate")
 async def generate_test_question_tool(
