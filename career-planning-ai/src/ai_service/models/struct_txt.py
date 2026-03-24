@@ -54,10 +54,10 @@ class SpecialConstraints(BaseModel):
 class PracticalExperience(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
     # 存储详细文本，用于 Layer 2 深度对比和规划报告生成
-    project_details: str = Field(validation_alias="项目经历详情", description="详细描述参与过的项目、角色及成果")
-    intern_details: str = Field(validation_alias="实习经历详情", description="详细描述实习岗位职责、核心产出")
-    campus_activities: str = Field(validation_alias="校园_实践活动", description="社团、志愿活动、社会实践等描述")
-    competition_exp: str = Field(validation_alias="竞赛获奖详情", description="参加过的比赛、获得的奖项及个人贡献")
+    project_details: str = Field(validation_alias="项目经历详情", description="详细描述参与过的项目、角色及成果，按照在{项目名称}中担任{角色}，负责{职责}，产出{成果}的格式")
+    intern_details: str = Field(validation_alias="实习经历详情", description="详细描述实习岗位职责、核心产出， 按照在{公司名称}实习，担任{岗位}，负责{职责}，产出{成果}的格式")
+    campus_activities: str = Field(validation_alias="校园_实践活动", description="社团、志愿活动、社会实践等描述， 按照在{活动名称}中担任{角色}，负责{职责}，产出{成果}的格式")
+    competition_exp: str = Field(validation_alias="竞赛获奖详情", description="参加过的比赛、获得的奖项及个人贡献， 按照在{比赛名称}中担任{角色}，负责{职责}，产出{成果}的格式")
 
 
 # --- 总模型定义 ---
