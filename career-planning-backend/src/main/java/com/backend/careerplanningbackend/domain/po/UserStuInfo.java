@@ -10,11 +10,11 @@ public class UserStuInfo {
     /**
      * 学生学历信息表
      */
-    private long id;
+    private Long id;
     /**
      * 关联sys_user ID
      */
-    private long userid;
+    private Long userid;
     /**
      * 真实姓名
      */
