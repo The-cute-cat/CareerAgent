@@ -29,6 +29,7 @@
 
     <dependencyManagement>
         <dependencies>
+            
             <!-- mybatis plus 管理 -->
             <dependency>
                 <groupId>com.baomidou</groupId>

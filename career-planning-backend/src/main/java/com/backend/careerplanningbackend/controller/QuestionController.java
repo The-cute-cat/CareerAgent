@@ -7,6 +7,7 @@ import com.backend.careerplanningbackend.util.AiServiceClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.HashMap;
@@ -26,6 +27,7 @@ import java.util.Map;
 @Slf4j
 @RestController
 @RequiredArgsConstructor
+@RequestMapping("/test_question")
 public class QuestionController {
     
     private final AiServiceClient aiServiceClient;
@@ -37,7 +39,7 @@ public class QuestionController {
      * @param questionDTO
      * @return
      */
-    @PostMapping("/test_question/skill_generate")
+    @PostMapping("/skill_generate")
     public Result<Object> skillGenerate(QuestionDTO questionDTO) {
         log.info("skill-generate接收到的参数: {}", questionDTO.toString());
         Map<String, Object> params = new HashMap<>();
@@ -53,7 +55,7 @@ public class QuestionController {
      * @param questionDTO
      * @return
      */
-    @PostMapping("/test_question/tool_generate")
+    @PostMapping("/tool_generate")
     public Result<Object> toolGenerate(QuestionDTO questionDTO) {
         log.info("tool-generate接收到的参数: {}", questionDTO.toString());
         Map<String, Object> params = new HashMap<>();
@@ -69,7 +71,7 @@ public class QuestionController {
      * @param questionDTO
      * @return
      */
-    @PostMapping("/test_question/check_student_answer")
+    @PostMapping("/check_student_answer")
     public Result<Object> checkStudentAnswer(QuestionDTO questionDTO) {
         log.info("check-student-answer接收到的参数: {}", questionDTO.toString());
         Map<String, Object> params = new HashMap<>();
