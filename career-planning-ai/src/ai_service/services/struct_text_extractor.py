@@ -30,6 +30,7 @@ class StructTextExtractor:
         if response is None:
             log.error(f"在{__name__}中提取学生信息失败: {text}")
             return None
+
         return json.loads(response.model_dump_json(by_alias=True))
 
     async def extract_from_text_to_userform(self, text: str) -> Any:
@@ -45,6 +46,8 @@ class StructTextExtractor:
             return None
 
         # 对 major 进行标准化处理
+        if response.major:
+            response.major = major_aligner.align_list(response.major)
         return json.loads(response.model_dump_json(by_alias=True))
 
 

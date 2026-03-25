@@ -127,17 +127,15 @@ export interface AnswerItem {
 /** 提交问答题请求参数 */
 export interface SubmitOpenEndedParams {
   /** 工具/技能名称 */
-  tool?: string
+  name?: string
   /** 测试类型 */
   type: QuizType
-  /** 问答题题目ID */
-  questionId: number
-  /** 问答题内容 */
-  answer: string
+  /** 问答题题目内容 */
+  questions: string
+  /** 用户的回答 */
+  studentAnswer: string
   /** 评分标准（可选，用于后端参考） */
   evaluationCriteria?: string
-  /** 提交时间 */
-  submitTime: string
 }
 
 /** 问答题得分详情 */
@@ -157,7 +155,7 @@ export interface OpenEndedScoreResult {
   /** 问答题得分 */
   score: number
   /** 问答题满分（40分） */
-  max_score: 40
+  max_score: number
   /** 问答题详细评分 */
   score_details: ScoreDetailItem[]
   /** 整体评语，指出答案的优点和不足 */
@@ -165,7 +163,6 @@ export interface OpenEndedScoreResult {
   /** 改进建议，帮助学生提升 */
   suggestions: string
 }
-
 
 
 /** 更新 CareerFormData 中的素质测评字段 */

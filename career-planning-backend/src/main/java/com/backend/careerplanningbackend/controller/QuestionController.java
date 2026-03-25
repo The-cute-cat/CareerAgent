@@ -6,8 +6,7 @@ import com.backend.careerplanningbackend.domain.po.Result;
 import com.backend.careerplanningbackend.util.AiServiceClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -26,39 +25,35 @@ import java.util.Map;
 @Slf4j
 @RestController
 @RequiredArgsConstructor
+@RequestMapping("/test_question")
 public class QuestionController {
     
     private final AiServiceClient aiServiceClient;
 
     /**
-     * skillGenerate
-     * 获取生成关于某个技能的问题
-     * 
+     * Generate
+     * 获取生成关于某个类型的能力的问题
+     *
      * @param questionDTO
      * @return
      */
-    @PostMapping("/test_question/skill_generate")
-    public Result<Object> skillGenerate(QuestionDTO questionDTO) {
+    @GetMapping("/test_question/generate")
+    public Result<Object> Generate(QuestionDTO questionDTO) {
         log.info("skill-generate接收到的参数: {}", questionDTO.toString());
         Map<String, Object> params = new HashMap<>();
-        params.put("skill", questionDTO.getSkill());
-        AiChatResponse aiChatResponse = aiServiceClient.chatWithOther("/test_question/skill_generate", params);
-        return Result.ok(aiChatResponse.getData());
-    }
+        AiChatResponse aiChatResponse = null;
 
-    /**
-     * toolGenerate
-     * 获取生成关于某个工具的问题
-     * 
-     * @param questionDTO
-     * @return
-     */
-    @PostMapping("/test_question/tool_generate")
-    public Result<Object> toolGenerate(QuestionDTO questionDTO) {
-        log.info("tool-generate接收到的参数: {}", questionDTO.toString());
-        Map<String, Object> params = new HashMap<>();
-        params.put("tool", questionDTO.getTool());
-        AiChatResponse aiChatResponse = aiServiceClient.chatWithOther("/test_question/tool_generate", params);
+        System.out.println("questionDTO.getType():"+questionDTO.getType());
+        System.out.println("questionDTO.getName():"+questionDTO.getName());
+
+        if("skill".equals(questionDTO.getType())){
+            params.put("skill", questionDTO.getName());
+            aiChatResponse = aiServiceClient.chatWithOther("/test_question/skill_generate", params);
+        }else if("tool".equals(questionDTO.getType())){
+            params.put("tool", questionDTO.getName());
+            aiChatResponse = aiServiceClient.chatWithOther("/test_question/tool_generate", params);
+        }
+
         return Result.ok(aiChatResponse.getData());
     }
 
@@ -70,8 +65,10 @@ public class QuestionController {
      * @return
      */
     @PostMapping("/test_question/check_student_answer")
-    public Result<Object> checkStudentAnswer(QuestionDTO questionDTO) {
+    public Result<Object> checkStudentAnswer(@RequestBody QuestionDTO questionDTO) {
+
         log.info("check-student-answer接收到的参数: {}", questionDTO.toString());
+
         Map<String, Object> params = new HashMap<>();
         params.put("questions", questionDTO.getQuestions());
         params.put("student_answer", questionDTO.getStudentAnswer());

@@ -14,8 +14,8 @@
           <span class="step-indicator">第 <strong>{{ currentStep }}</strong> / {{ totalSteps }} 题</span>
           <span class="step-type-tag">{{ getStepLabel(currentStep - 1) }}</span>
         </div>
-        <div class="step-dots">
-          <div v-for="i in totalSteps" :key="i" class="step-dot-wrapper">
+        <div class="step-dots" :class="{ 'is-overflow': totalSteps > 8 }">
+          <div v-for="i in totalSteps" :key="i" class="step-dot-wrapper" :style="{ flex: totalSteps <= 8 ? '1' : 'none' }">
             <button
               class="step-dot"
               :class="{
@@ -139,19 +139,11 @@
               class="is-open-ended quiz-question-item"
               :class="{ 'is-submitted': submitted }"
             >
-              <div v-if="question.evaluation_criteria && !submitted" class="evaluation-criteria">
-                <div class="criteria-title">
-                  <el-icon><InfoFilled /></el-icon>
-                  评分标准
-                </div>
-                <pre class="criteria-content">{{ question.evaluation_criteria }}</pre>
-              </div>
-              
               <el-input
                 v-model="formData[`q_${question.id}`]"
                 type="textarea"
                 :rows="6"
-                :placeholder="question.evaluation_criteria ? '请根据评分标准作答，不少于10字' : '请详细描述，不少于10字'"
+                placeholder="请详细描述，不少于10字"
                 maxlength="2000"
                 show-word-limit
                 resize="vertical"
@@ -528,6 +520,8 @@ interface Props {
   backendData?: BackendQuizData | null
   /** 测验结果（提交后传入，用于显示评分详情） */
   quizResult?: QuizResult | null
+  /** 后端评分是否失败（父组件在评分失败时设为 true） */
+  scoreFailed?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -535,7 +529,8 @@ const props = withDefaults(defineProps<Props>(), {
   quizType: 'general',
   customQuestions: undefined,
   backendData: null,
-  quizResult: null
+  quizResult: null,
+  scoreFailed: false
 })
 
 // ==================== Emits 定义 ====================
@@ -988,6 +983,24 @@ const toggleOpenEndedAnswer = (questionId: number) => {
 
 // ==================== 监听 ====================
 
+/** 监听quizResult变化，后端评分完成后才切换到结果页面 */
+watch(() => props.quizResult, (newVal) => {
+  if (newVal && submitting.value) {
+    submitted.value = true
+    submitting.value = false
+    submitSuccess.value = true
+    currentStep.value = 1
+    ElMessage.success('提交成功！')
+  }
+})
+
+/** 监听scoreFailed，后端评分失败时恢复可编辑状态 */
+watch(() => props.scoreFailed, (newVal) => {
+  if (newVal && submitting.value) {
+    submitting.value = false
+  }
+})
+
 /** 监听quizType变化，重置表单 */
 watch(() => props.quizType, () => {
   handleReset()
@@ -1124,44 +1137,14 @@ const handleSubmit = async () => {
 
       console.log('准备提交数据:', submitData)
 
-      // 模拟调用后端API
-      const result = await submitToBackend(submitData)
-      
-      if (result.success) {
-        submitSuccess.value = true
-        submitted.value = true
-        currentStep.value = 1
-        ElMessage.success('提交成功！')
-        // 触发提交事件
-        emit('submit', submitData)
-      } else {
-        ElMessage.error('提交失败，请稍后重试')
-      }
+      // 触发提交事件，等待父组件完成评分后通过 quizResult 通知
+      emit('submit', submitData)
+      // 不再立即设 submitted，submitting 保持 true，等 watch quizResult 触发
     } catch (error) {
       console.error('提交出错:', error)
       ElMessage.error('网络错误，提交失败')
-    } finally {
       submitting.value = false
     }
-  })
-}
-
-/** 模拟提交到后端的函数 */
-const submitToBackend = (data: SubmitData): Promise<{ success: boolean; id?: string }> => {
-  return new Promise((resolve) => {
-    // 模拟网络延迟
-    setTimeout(() => {
-      // 模拟成功响应
-      console.log('后端接收到的数据:', data)
-      
-      // 这里可以替换成真正的axios请求
-      // axios.post('/api/questionnaire/submit', data)
-      
-      resolve({
-        success: true,
-        id: 'resp_' + Date.now()
-      })
-    }, 800)
   })
 }
 
@@ -1283,11 +1266,28 @@ defineExpose({
 .step-dots {
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
+  justify-content: flex-start;
   position: relative;
+  overflow-x: auto;
+  gap: 0;
+  padding-bottom: 4px;
+
+  // 美化滚动条
+  &::-webkit-scrollbar {
+    height: 4px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: #dcdfe6;
+    border-radius: 2px;
+  }
 }
 
-// 连接线
+// 连接线（仅题目较少时显示）
 .step-dots::before {
   content: '';
   position: absolute;
@@ -1297,6 +1297,12 @@ defineExpose({
   height: 2px;
   background: #e4e7ed;
   z-index: 0;
+  pointer-events: none;
+}
+
+// 题目过多需要滚动时隐藏连接线
+.step-dots.is-overflow::before {
+  display: none;
 }
 
 .step-dot-wrapper {
@@ -1306,6 +1312,7 @@ defineExpose({
   flex-direction: column;
   align-items: center;
   gap: 6px;
+  flex-shrink: 0;
 }
 
 .step-dot {
@@ -1383,6 +1390,8 @@ defineExpose({
     padding-bottom: 16px;
     line-height: 1.6;
     letter-spacing: 0.2px;
+    word-break: break-word;
+    overflow-wrap: break-word;
   }
 }
 
@@ -1794,39 +1803,6 @@ defineExpose({
   gap: 10px;
 }
 
-// ==================== 评分标准 ====================
-
-.evaluation-criteria {
-  margin-bottom: 20px;
-  padding: 16px 20px;
-  background: linear-gradient(135deg, #f0f7ff 0%, #e8f4ff 100%);
-  border-radius: 8px;
-  border-left: 4px solid #409eff;
-}
-
-.criteria-title {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-weight: 600;
-  color: #1a5fb4;
-  margin-bottom: 10px;
-  font-size: 14px;
-
-  .el-icon {
-    font-size: 15px;
-  }
-}
-
-.criteria-content {
-  margin: 0;
-  font-size: 13px;
-  color: #4e5969;
-  line-height: 1.8;
-  white-space: pre-wrap;
-  font-family: inherit;
-}
-
 // ==================== 问答题文本域 ====================
 
 :deep(.el-form-item) {
@@ -1878,15 +1854,13 @@ defineExpose({
 
 :deep(.el-radio) {
   margin-right: 0;
-  padding: 0 20px;
+  padding: 12px 20px;
   border: 1.5px solid #dcdee0;
   border-radius: 12px;
-  height: 60px;
-  min-height: 60px;
+  min-height: 52px;
   width: 100%;
-  max-width: 520px;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   background: #fafbfc;
   cursor: pointer;
@@ -1913,12 +1887,14 @@ defineExpose({
 :deep(.el-radio__label) {
   padding-left: 14px;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 14px;
   font-size: 15px;
-  line-height: 1.5;
+  line-height: 1.6;
   white-space: normal;
   word-wrap: break-word;
+  overflow-wrap: break-word;
+  word-break: break-word;
   width: 100%;
 }
 
@@ -1931,10 +1907,12 @@ defineExpose({
   justify-content: center;
   width: 32px;
   height: 32px;
+  min-width: 32px;
   background: #e8eaed;
   border-radius: 8px;
   transition: all 0.3s ease;
   flex-shrink: 0;
+  margin-top: 1px;
 }
 
 :deep(.el-radio:hover) .option-label {
@@ -1952,6 +1930,8 @@ defineExpose({
   color: #4e5969;
   font-weight: 400;
   flex: 1;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 :deep(.el-radio.is-checked) .option-text {
@@ -2018,24 +1998,26 @@ defineExpose({
     }
   }
 
-  .step-dot-label {
-    font-size: 10px;
-  }
-
-  .step-dot-number {
-    width: 24px;
-    height: 24px;
-    font-size: 12px;
-  }
-
-  .step-dots::before {
-    top: 11px;
-    left: 16px;
-    right: 16px;
+  .step-dots {
+    &.is-overflow::before,
+    &::before {
+      display: none;
+    }
   }
 
   :deep(.el-radio-group) {
     gap: 6px;
+  }
+
+  :deep(.el-radio) {
+    padding: 10px 14px;
+  }
+
+  .option-label {
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    font-size: 14px;
   }
 
   .step-actions-inner {
