@@ -57,16 +57,23 @@ const loadMatchResult = () => {
   loading.value = true
   try {
     const stored = localStorage.getItem('jobMatchResult')
-    if (stored) {
-      matchItems.value = JSON.parse(stored) as JobMatchItem[]
-      if (matchItems.value.length === 0) {
-        ElMessage.warning('推荐岗位数据不完整，已使用补充数据')
-        matchItems.value = mockJobMatchItems
-      }
-    } else {
-      ElMessage.info('暂无评估数据，已加载示例数据')
-      matchItems.value = mockJobMatchItems
-    }
+    console.log('stored', stored)
+    matchItems.value = stored ? JSON.parse(stored) as JobMatchItem[] : []
+
+    //模拟数据
+    // if (stored) {
+    //   matchItems.value = JSON.parse(stored) as JobMatchItem[]
+
+    //   if (matchItems.value.length === 0) {
+    //     ElMessage.warning('推荐岗位数据不完整，已使用补充数据')
+    //     matchItems.value = mockJobMatchItems
+    //   }
+
+    // } else {
+    //   ElMessage.info('暂无评估数据，已加载示例数据')
+    //   matchItems.value = mockJobMatchItems
+    // }
+
   } catch (e) {
     console.error('加载匹配结果失败:', e)
     ElMessage.error('数据加载失败，已使用示例数据')

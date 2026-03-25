@@ -1,7 +1,7 @@
 import request from '@/utils/request'
-import type { 
-  GetQuestionsParams, 
-  GetQuestionsRequest, 
+import type {
+  GetQuestionsParams,
+  GetQuestionsRequest,
   QuizResponse,
   SubmitOpenEndedParams,
   OpenEndedScoreResult,
@@ -9,12 +9,14 @@ import type {
   Question,
   SubmitQuizParams,
   SubmitQuizResult,
-  AnswerStats
+  AnswerStats,
+  BackendPersonData
 } from '@/types/careerform_question'
 import type { Result } from '@/types/type'
 import {
   mockGetQuestionsResponse,
-  mockSubmitOpenEndedResponse
+  mockSubmitOpenEndedResponse,
+  getPersonMockQuestions
 } from '@/mock/mockdata/question_mockdata'
 
 // ==================== Mock 开关配置 ====================
@@ -68,6 +70,27 @@ export const getQuestionsApi = (params: GetQuestionsParams) => {
       : undefined
   }
   return request.get<QuizResponse>('/test_question/generate', { params: requestData })
+}
+
+
+/**
+ * 获取素质测评/代码能力测评题目（新接口）
+ * 用于 code / communication / stress / learning 四种类型
+ * @param type - 测评类型：code | communication | stress | learning
+ * @returns BackendPersonData[] 题目列表
+ */
+export const getPersonQuizApi = (type: string) => {
+  // Mock 模式：使用本地模拟数据
+  // if (true) {
+    return new Promise<{ data: Result<BackendPersonData[]> }>((resolve) => {
+      setTimeout(() => {
+        const mockData = getPersonMockQuestions(type as 'communication' | 'stress' | 'learning')
+        resolve({ data: { code: 200, msg: '获取题目成功', data: mockData } })
+      }, 500)
+    })
+  //}
+
+  // return request.get<BackendPersonData[]>('/person_question/generate', { params: { type } })
 }
 
 
@@ -215,7 +238,7 @@ export const calculateObjectiveScore = (
  *   questions,
  *   userAnswers
  * })
- * // result.totalScore → 存入 CareerFormData.quizScores.communication = result.totalScore
+ * // result.totalScore → 存入对应 skill/tool 的 score 字段
  * ```
  */
 export async function submitQuiz(
