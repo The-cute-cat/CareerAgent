@@ -1,32 +1,27 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional
-from ai_service.models.userform_profile import (ProjectExperience, 
-                                                InternshipExperience, 
-                                                SkillDetail, 
-                                                ToolDetail, 
-                                                LanguageDetail,
-                                                priorityDetail,
-                                                quizDetail)
+
+from ai_service.models.user_form_profile import LanguageDetail, SkillDetail, ToolDetail, ProjectExperience, \
+    InternshipExperience, QuizDetail, PriorityDetail
 
 
 class UserForm(BaseModel):
-    education: Optional[str] = Field(None, description="学历：高中/专科/本科/硕士/博士/其他")
-    educationOther: Optional[str] = None
-    major: Optional[List[str]] = Field(None, description="专业类别")
-    graduationDate: Optional[str] = Field(None, description="毕业日期,YYYY-MM格式")
-    languages: Optional[List[LanguageDetail]] = Field(None, description="语言能力")
-    certificates: Optional[List[str]] = Field(None, description="证书列表")
-    certificatesOther: Optional[str] = None
-    skills: Optional[List[SkillDetail]] = Field(None, description="技能列表")
-    tools: Optional[List[ToolDetail]] = Field(None, description="工具列表")
-    codeLinks: Optional[str] = Field(None, description="代码仓库链接,如GitHub/Gitee,多个逗号分隔")
-    projects: Optional[List[ProjectExperience]] = Field(None, description="项目经历列表")
-    internships: Optional[List[InternshipExperience]] = Field(None, description="实习经历列表")
-    quiz: Optional[List[quizDetail]] = Field(None, description="测评详细，包含沟通能力、抗压能力、学习能力等题目以及用户答案")
-    innovation: Optional[str] = Field(None, description="创新表现描述")
-    targetJob: Optional[str] = Field(None, description="目标岗位")
-    targetIndustries: Optional[List[str]] = Field(None, description="期望行业列表")
-    priorities: Optional[List[priorityDetail]] = Field(None, description="核心价值观优先级列表，包含技术成长、薪资、稳定等")
+    education: str | None = Field(None, description="学历：高中/专科/本科/硕士/博士/其他")
+    educationOther: str | None = None
+    major: list[str] | None = Field(None, description="专业类别")
+    graduationDate: str | None = Field(None, description="毕业日期,YYYY-MM格式")
+    languages: list[LanguageDetail] | None = Field(None, description="语言能力")
+    certificates: list[str] | None = Field(None, description="证书列表")
+    certificatesOther: str | None = None
+    skills: list[SkillDetail] | None = Field(None, description="技能列表")
+    tools: list[ToolDetail] | None = Field(None, description="工具列表")
+    codeLinks: str | None = Field(None, description="代码仓库链接,如GitHub/Gitee,多个逗号分隔")
+    projects: list[ProjectExperience] | None = Field(None, description="项目经历列表")
+    internships: list[InternshipExperience] | None = Field(None, description="实习经历列表")
+    quiz: list[QuizDetail] | None = Field(None, description="测评详细，包含沟通能力、抗压能力、学习能力等题目以及用户答案")
+    innovation: str | None = Field(None, description="创新表现描述")
+    targetJob: str | None = Field(None, description="目标岗位")
+    targetIndustries: list[str] | None = Field(None, description="期望行业列表")
+    priorities: list[PriorityDetail] | None = Field(None, description="核心价值观优先级列表，包含技术成长、薪资、稳定等")
 
     def to_llm_context(self) -> str:
         # 1. 预处理：将列表转为逗号分隔的字符串（如果没有数据则显示“无”）

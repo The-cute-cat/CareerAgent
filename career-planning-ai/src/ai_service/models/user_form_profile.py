@@ -1,28 +1,42 @@
+import datetime
+import re
+from typing import List, Optional, Literal
+
 from pydantic import (
     BaseModel,
     Field,
     ConfigDict,
     field_validator,
-    computed_field,
 )
-import datetime
-from typing import List, Optional, Literal
-import re
+
+__all__=[
+    "PriorityDetail",
+    "QuizDetail",
+    "ProjectExperience",
+    "InternshipExperience",
+    "SkillDetail",
+    "ToolDetail",
+    "LanguageDetail",
+    "StudentFormProfile"
+]
 
 # --- 嵌套子模型 ---
-class priorityDetail(BaseModel):
+class PriorityDetail(BaseModel):
     value: Literal['tech', 'salary', 'stable'] = Field(description="优先级值")
     label: str = Field(description="优先级名称，string（技术成长/薪资/稳定）")
 
-class quizDetail(BaseModel):
+
+class QuizDetail(BaseModel):
     type: Literal["choice", "open_ended"] = Field(description="题目类型：选择题/开放题")
     question: str = Field(description="测评题目")
     answer: str = Field(description="用户答案")
+
 
 class ProjectExperience(BaseModel):
     isCompetition: bool = Field(description="boolean(是否竞赛）")
     name: str = Field(description="项目/竞赛名称")
     desc: str = Field(description="项目描述")
+
 
 class InternshipExperience(BaseModel):
     company: str = Field(
@@ -32,27 +46,30 @@ class InternshipExperience(BaseModel):
         description="实习岗位名称，如'数据分析实习生'、'产品经理实习生'。"
     )
     date: List[datetime.date] = Field(
-        ..., 
-        min_length=2, 
-        max_length=2, 
+        ...,
+        min_length=2,
+        max_length=2,
         description="实习日期范围，必须包含两个元素：[开始日期, 结束日期]。格式统一为 YYYY-MM-DD。"
     )
     desc: str = Field(
         description="实习职责与产出，优先提取动作+结果信息，如'搭建报表并将统计耗时从2小时降至20分钟'。"
     )
+
+
 class SkillDetail(BaseModel):
     name: str = Field(description="技能名称")
     score: float = Field(description="技能分数")
+
 
 class ToolDetail(BaseModel):
     name: str = Field(description="工具名称")
     score: float = Field(description="工具分数")
 
+
 class LanguageDetail(BaseModel):
     type: Literal["英语", "日语", "其他"] = Field(description="语种：英语/日语/其他")
     level: Literal["四级", "六级", "托福", "雅思", "其他"] = Field(description="水平：四级/六级/托福/雅思/其他")
     other: str = Field(description="其他相关信息")
-
 
 
 # --- 主画像模型 ---
@@ -164,6 +181,7 @@ class StudentFormProfile(BaseModel):
         alias="priorities",
         description="保持为空列表，AI 不需要填充此字段，后续会根据其他字段内容自动生成优先级排序结果。",
     )
+
     # --- 自动化坍缩：将结构化列表转为前端需要的字符串 ---
 
     # --- 校验器优化 ---
