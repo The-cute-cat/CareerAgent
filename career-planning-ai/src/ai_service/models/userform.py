@@ -6,7 +6,7 @@ from ai_service.models.userform_profile import (ProjectExperience,
                                                 ToolDetail, 
                                                 LanguageDetail,
                                                 priorityDetail,
-                                                quizScoreDetail)
+                                                quizDetail)
 
 
 class UserForm(BaseModel):
@@ -22,7 +22,7 @@ class UserForm(BaseModel):
     codeLinks: Optional[str] = Field(None, description="代码仓库链接,如GitHub/Gitee,多个逗号分隔")
     projects: Optional[List[ProjectExperience]] = Field(None, description="项目经历列表")
     internships: Optional[List[InternshipExperience]] = Field(None, description="实习经历列表")
-    quizScores: Optional[quizScoreDetail] = Field(None, description="测评自述，包含沟通能力、抗压能力、学习能力等")
+    quiz: Optional[List[quizDetail]] = Field(None, description="测评详细，包含沟通能力、抗压能力、学习能力等题目以及用户答案")
     innovation: Optional[str] = Field(None, description="创新表现描述")
     targetJob: Optional[str] = Field(None, description="目标岗位")
     targetIndustries: Optional[List[str]] = Field(None, description="期望行业列表")
@@ -56,7 +56,7 @@ class UserForm(BaseModel):
             - 实习经历: {fmt_list([i.company for i in self.internships]) if self.internships else "无"}
 
             [个人素质与意向]
-            - 测评自述: {self.quizScores or "未提供"}
+            - 测评详细: {self.quiz or "未提供"}
             - 创新表现: {self.innovation or "未提供"}
             - 目标岗位: {self.targetJob or "待定"}
             - 目标职位: {self.targetJob or "待定"}

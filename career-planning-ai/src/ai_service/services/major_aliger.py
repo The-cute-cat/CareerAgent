@@ -23,6 +23,10 @@ class MajorAligner:
         with open(self.file_path, "r", encoding="utf-8") as f:
             # 去除空行和首尾空格
             return [line.strip() for line in f if line.strip()]
+        
+    def align_list(self, queries: list[str], score_cutoff: float = 70.0) -> list[str]:
+        """批量对齐专业名称"""
+        return [self.align(query, score_cutoff) for query in queries]
 
     @lru_cache(maxsize=1024)
     def align(self, query: str, score_cutoff: float = 70.0) -> str:

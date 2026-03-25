@@ -263,7 +263,7 @@ const formProgress = computed(() => {
  * 判断指定步骤是否已完成
  * @param step - 步骤编号 (1-5)
  * @returns 该步骤是否已完成
- * 
+ *
  * 步骤1: 基本信息 - 需要填写学历和专业
  * 步骤2: 技能证书 - 需要至少添加一项技能或证书
  * 步骤3: 经历项目 - 需要至少添加一个项目或实习经历
@@ -384,7 +384,7 @@ const handleCertificateChange = (value: string[]) => {
 }
 
 
-/** 
+/**
  * 添加新技能
  * 将 newSkill 输入框的值添加到技能列表，默认熟练度为50
  * 检查是否已存在（不区分大小写）
@@ -1833,16 +1833,9 @@ const resetForm = () => {
                 prop="codeAbility"
               >
                 <div class="code-ability-row">
-                  <el-input 
-                    v-model="formData.codeAbility.links" 
-                    placeholder="GitHub/Gitee 链接，多个用逗号分隔"
-                    style="flex: 1"
-                  />
-                  <el-button 
-                    type="warning" 
-                    @click="openQuizModal('code')"
-                    :icon="DataAnalysis"
-                  >
+                  <el-input v-model="formData.codeAbility.links" placeholder="GitHub/Gitee 链接，多个用逗号分隔"
+                    style="flex: 1" />
+                  <el-button type="warning" @click="openQuizModal('code')" :icon="DataAnalysis">
                     AI 测试
                   </el-button>
                 </div>
@@ -4213,4 +4206,8 @@ const resetForm = () => {
   color: #409eff;
   font-weight: 500;
 }
+<<<<<<< HEAD
 </style>
+=======
+</style>
+>>>>>>> 3f60cd1f726f63e3e77de72b41f10a862e21113d

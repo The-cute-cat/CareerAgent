@@ -29,7 +29,7 @@
 
     <dependencyManagement>
         <dependencies>
-            <!-- mybatis plus 管理 -->
+            <!-- mybatis plus3 _ jdk 17 管理 -->
             <dependency>
                 <groupId>com.baomidou</groupId>
                 <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
@@ -51,6 +51,16 @@
     </dependencyManagement>
 
     <dependencies>
+        <!--Jackson-->
+        <dependency>
+            <groupId>com.fasterxml.jackson.dataformat</groupId>
+            <artifactId>jackson-dataformat-xml</artifactId>
+        </dependency>
+        <!--AMQP依赖，包含RabbitMQ-->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-amqp</artifactId>
+        </dependency>
         <!--email-->
         <dependency>
             <groupId>org.springframework.boot</groupId>
