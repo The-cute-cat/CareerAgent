@@ -2,10 +2,21 @@
 
 // ==================== CareerForm 表单类型定义 ====================
 
-import type {  QuizScores,SkillTool } from "./careerform_question"
+import type {  SkillTool } from "./careerform_question"
 
 /** 通用响应结果 */
 import type {  Result } from "./type"
+
+
+/** 素质测评答题记录 */
+export interface QuizDetailItem {
+  /** 题目类型：选择题/开放题 */
+  type: 'choice' | 'open_ended'
+  /** 测评题目 */
+  question: string
+  /** 测评答案 */
+  answer: string
+}
 
 
 /** 学历类型（标准选项） */
@@ -86,8 +97,8 @@ export interface CareerFormData {
   projects: Project[]
   /** 实习经历列表 */
   internships: Internship[]
-  /** 素质测评分数（沟通/抗压/学习，各0-100） */
-  quizScores?: QuizScores
+  /** 素质测评答题记录（communication/stress/learning 三项测评的题目与答案） */
+  quizDetail: QuizDetailItem[]
   /** 创新案例描述 */
   innovation: string
   /** 目标岗位 */
@@ -121,8 +132,8 @@ export interface CareerFormSubmitDTO {
   projects: Project[]
   /** 实习经历 */
   internships: Internship[]
-  /** 素质测评分数（沟通/抗压/学习，各0-100） */
-  quizScores: QuizScores
+  /** 素质测评答题记录 */
+  quizDetail?: QuizDetailItem[]
   /** 创新案例 */
   innovation: string
   /** 目标岗位 */
@@ -171,8 +182,6 @@ export interface ParsedResumeFormData {
   projects?: Project[]
   /** 实习经历 */
   internships?: Internship[]
-  /** 素质测评完成状态 */
-  quizscores?: QuizScores
   /** 创新案例 */
   innovation?: string
   /** 目标岗位 */

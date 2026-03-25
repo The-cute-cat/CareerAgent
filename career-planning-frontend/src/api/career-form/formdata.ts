@@ -97,11 +97,7 @@ export function convertToSubmitDTO(formData: CareerFormData): CareerFormSubmitDT
     codeLinks: formData.codeAbility?.links || undefined,
     projects,
     internships,
-    quizScores: {
-      communication: formData.quizScores?.communication || 0,
-      stress: formData.quizScores?.stress || 0,
-      learning: formData.quizScores?.learning || 0
-    },
+    quizDetail: formData.quizDetail?.length ? formData.quizDetail : undefined,
     innovation: formData.innovation || '',
     targetJob: formData.targetJob || '',
     targetIndustries: formData.targetIndustries || [],

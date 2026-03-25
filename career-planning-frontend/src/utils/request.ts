@@ -31,7 +31,9 @@ instance.interceptors.request.use((config) => {
   } */
 
   // 确保 POST/PUT/PATCH 请求发送 JSON 数据
-  if (['post', 'put', 'patch'].includes(config.method || '')) {
+  if (['post', 'put', 'patch'].includes(config.method || '')
+  &&  !(config.data instanceof FormData)
+ ){
     config.headers['Content-Type'] = 'application/json'
   }
   return config
