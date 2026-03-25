@@ -3,7 +3,6 @@
 # 字段名已英文标准化，并与学生画像模型关键维度对齐
 # ==========================================
 from pydantic import BaseModel, ConfigDict, Field
-from typing import List, Optional
 
 
 class BasicRequirements(BaseModel):

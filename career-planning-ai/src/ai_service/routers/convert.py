@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Body, Depends
-from ai_service.models.userform import UserForm
+from fastapi import APIRouter, Depends, Body
+
+from ai_service.models.user_form import UserForm
 from ai_service.response.result import success
 from ai_service.schemas.auth import validate_token
 from ai_service.services.struct_text_extractor import struct_text_extractor
@@ -36,6 +37,6 @@ async def user_form_to_userprofile(
         :param user_form:
         :param _:
     """
-    user_profile = await struct_text_extractor.extract_from_userform_to_userprofile(user_form)
+    user_profile = await struct_text_extractor.extract_from_user_form_to_userprofile(user_form)
     # 这里直接返回输入的用户表单数据，实际应用中可以进行更复杂的转换逻辑
     return success(user_profile)

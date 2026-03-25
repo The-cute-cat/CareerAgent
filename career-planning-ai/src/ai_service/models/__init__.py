@@ -1,3 +1,11 @@
 __all__=[
     "pdf",
+    "base",
+    "job_info",
+    "job_portrait",
+    "struct_job_txt",
+    "struct_txt",
+    "user_form",
+    "user_form_profile",
+    "word"
 ]
