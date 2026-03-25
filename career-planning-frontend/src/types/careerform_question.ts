@@ -47,9 +47,24 @@ export interface GetQuestionsRequest {
 /** 题目类型：单选题、填空题、问答题 */
 export type QuestionType = 'choice' | 'fill_in' | 'open_ended'
 
+/** 素质测评题目类型：单选题、问答题 */
+export type PersonQuestionType = 'choice' | 'open_ended'
+
+
+/** 素质测评/代码能力测评 - 单条题目（新接口返回） */
+export interface BackendPersonData {
+  /** 题目ID */
+  id: number
+  /** 题目类型：单选题或问答题 */
+  type: PersonQuestionType
+  /** 题目内容 */
+  text: string
+  /** 选择题选项（问答题为 null） */
+  options: string[] | null
+}
+
 /** 难度级别 */
 export type QuestionDifficulty = 'easy' | 'medium' | 'hard'
-
 
 /** 单选题 */
 export interface ChoiceQuestion {
@@ -165,16 +180,6 @@ export interface OpenEndedScoreResult {
 }
 
 
-/** 更新 CareerFormData 中的素质测评字段 */
-export interface QuizScores {
-  /** 沟通能力测评分数（0-100） */
-  communication: number
-  /** 抗压能力测评分数（0-100） */
-  stress: number
-  /** 学习能力测评分数（0-100） */
-  learning: number
-}
-
 // 技能/工具的定义接口（java,90分）
 export interface SkillTool {
   name: string
@@ -216,9 +221,7 @@ export interface SubmitQuizParams {
  * - quizType='skill' + name → CareerFormData.skills.push({ name, score: totalScore })
  * - quizType='tool'  + name → CareerFormData.tools.push({ name, score: totalScore })
  * - quizType='code'          → CareerFormData.codeAbility 相关
- * - quizType='communication' → CareerFormData.quizScores.communication = totalScore
- * - quizType='stress'        → CareerFormData.quizScores.stress = totalScore
- * - quizType='learning'      → CareerFormData.quizScores.learning = totalScore
+ * - quizType='communication/stress/learning' → 素质测评，答案存入 quizDetail
  */
 export interface SubmitQuizResult {
   /** 问卷类型 */
