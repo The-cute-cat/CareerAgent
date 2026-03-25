@@ -206,22 +206,26 @@ class ImageExtractor:
         """
 
         await self._check_picture(image_path, image_bytes)
-        return await self._identify_image(
+        result = await self._identify_image(
             image_path,
             image_bytes,
             prompt if prompt else prompt_loader.image_extract_text,
             llm if llm else self.llm
         )
+        log.debug(f"extract_text result: {result.replace("\n", "\\n") if result else "None"}")
+        return result
 
     async def extract_visual_content(self, image_path: str = None, image_bytes: bytes = None, prompt: str = "",
                                      llm: ChatOpenAI = None):
         await self._check_picture(image_path, image_bytes)
-        return await self._identify_image(
+        result = await self._identify_image(
             image_path,
             image_bytes,
             prompt if prompt else prompt_loader.image_extract_visual_content,
             llm if llm else self.llm
         )
+        log.debug(f"extract_visual_content result: {result.replace("\n", "\\n") if result else "None"}")
+        return result
 
 
 image_extractor = ImageExtractor()
