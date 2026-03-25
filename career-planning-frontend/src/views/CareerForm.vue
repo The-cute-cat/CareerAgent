@@ -4206,8 +4206,4 @@ const resetForm = () => {
   color: #409eff;
   font-weight: 500;
 }
-<<<<<<< HEAD
 </style>
-=======
-</style>
->>>>>>> 3f60cd1f726f63e3e77de72b41f10a862e21113d
