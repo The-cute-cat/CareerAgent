@@ -116,8 +116,18 @@ async def log_middleware(request: Request, call_next):
     start_time = time.time()
     response = await call_next(request)
     end_time = time.time()
+    response_body = b""
+    async for chunk in response.body_iterator:
+        response_body += chunk
     log.info(f"请求路径: {request.url.path}, 响应时间: {end_time - start_time:.3f}s")
-    return response
+    log.debug(f"响应内容: {response_body.decode()}")
+    from fastapi.responses import Response
+    return Response(
+        content=response_body,
+        status_code=response.status_code,
+        headers=dict(response.headers),
+        media_type=response.media_type
+    )
 
 
 @app.get("/")

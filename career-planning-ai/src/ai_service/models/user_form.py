@@ -1,12 +1,12 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional
-from ai_service.models.userform_profile import (ProjectExperience, 
-                                                InternshipExperience, 
-                                                SkillDetail, 
-                                                ToolDetail, 
-                                                LanguageDetail,
-                                                priorityDetail,
-                                                quizScoreDetail)
+from ai_service.models.user_form_profile import (ProjectExperience,
+                                                 InternshipExperience,
+                                                 SkillDetail,
+                                                 ToolDetail,
+                                                 LanguageDetail,
+                                                 priorityDetail,
+                                                 quizScoreDetail)
 
 
 class UserForm(BaseModel):

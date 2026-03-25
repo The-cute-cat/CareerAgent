@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Body, Depends
-from ai_service.models.userform import UserForm
+from ai_service.models.user_form import UserForm
 from ai_service.response.result import success
 from ai_service.schemas.auth import validate_token
 from ai_service.services.struct_text_extractor import struct_text_extractor

@@ -34,8 +34,10 @@ class TokenValidationError(ApiException):
 
 class CommonHandleError(ApiException):
     """通用处理异常"""
+
     def __init__(self, msg: str = "通用处理异常"):
         super().__init__(code=500, msg=msg)
+
 
 class ConversationIDValidationError(ApiException):
     """
@@ -44,5 +46,6 @@ class ConversationIDValidationError(ApiException):
     当请求中缺少 conversationId 或 conversationId 格式无效时抛出。
     通常用于需要关联会话上下文的接口。
     """
+
     def __init__(self, msg: str = "ConversationID验证失败"):
         super().__init__(code=401, msg=msg)

@@ -1,10 +1,10 @@
 import json
 from typing import Any
 from ai_service.prompts.struct_prompt import struct_prompt, system_role
-from ai_service.models.userform import UserForm
+from ai_service.models.user_form import UserForm
 from ai_service.engine.ai_engine import AIEngine
 from ai_service.models.struct_txt import StudentProfile
-from ai_service.models.userform_profile import StudentFormProfile
+from ai_service.models.user_form_profile import StudentFormProfile
 from ai_service.services import log
 from ai_service.services.major_aliger import major_aligner
 from config import settings

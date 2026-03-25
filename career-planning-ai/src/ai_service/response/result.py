@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any
 
 __all__ = ["success", "success_msg", "error", "error_msg"]
 
@@ -7,7 +7,7 @@ from starlette.responses import JSONResponse
 
 
 class Result:
-    def __init__(self, code: int, data: Any, msg: str = None):
+    def __init__(self, code: int, data: Any | None, msg: str = None):
         self.code = code
         self.state = code < 400
         self.msg = msg or self.__setMessage()
@@ -38,11 +38,11 @@ class Result:
             return "What! o(^・x・^)o"
 
 
-def success(data: Optional[Any] = None) -> JSONResponse:
+def success(data: Any | None = None) -> JSONResponse:
     return JSONResponse(content=jsonable_encoder(Result(200, data)))
 
 
-def success_msg(msg: str, data: Optional[Any] = None):
+def success_msg(msg: str, data: Any | None = None):
     return JSONResponse(content=jsonable_encoder(Result(200, data, msg)))
 
 
