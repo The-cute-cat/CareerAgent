@@ -1,5 +1,4 @@
 import axios from 'axios'
-import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/index'
 import router from '@/router' // 直接导入实例，不需要 hooks
 // 在 request.ts 顶部定义一个标志
@@ -31,7 +30,11 @@ instance.interceptors.request.use((config) => {
   } */
 
   // 确保 POST/PUT/PATCH 请求发送 JSON 数据
-  if (['post', 'put', 'patch'].includes(config.method || '')) {
+
+  if (
+    ['post', 'put', 'patch'].includes(config.method || '') &&
+    !(config.data instanceof FormData)
+  ) {
     config.headers['Content-Type'] = 'application/json'
   }
   return config

@@ -37,7 +37,7 @@ public class QuestionController {
      * @param questionDTO
      * @return
      */
-    @GetMapping("/test_question/generate")
+    @GetMapping("/generate")
     public Result<Object> Generate(QuestionDTO questionDTO) {
         log.info("skill-generate接收到的参数: {}", questionDTO.toString());
         Map<String, Object> params = new HashMap<>();
@@ -64,7 +64,7 @@ public class QuestionController {
      * @param questionDTO
      * @return
      */
-    @PostMapping("/test_question/check_student_answer")
+    @PostMapping("/check_student_answer")
     public Result<Object> checkStudentAnswer(@RequestBody QuestionDTO questionDTO) {
 
         log.info("check-student-answer接收到的参数: {}", questionDTO.toString());

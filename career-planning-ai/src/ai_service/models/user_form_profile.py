@@ -10,8 +10,7 @@ from pydantic import (
 )
 
 __all__=[
-    "PriorityDetail",
-    "QuizDetail",
+    "QuizDetailItem",
     "ProjectExperience",
     "InternshipExperience",
     "SkillDetail",
@@ -21,19 +20,16 @@ __all__=[
 ]
 
 # --- 嵌套子模型 ---
-class PriorityDetail(BaseModel):
-    value: Literal['tech', 'salary', 'stable'] = Field(description="优先级值")
-    label: str = Field(description="优先级名称，string（技术成长/薪资/稳定）")
 
 
-class QuizDetail(BaseModel):
+class QuizDetailItem(BaseModel):
     type: Literal["choice", "open_ended"] = Field(description="题目类型：选择题/开放题")
     question: str = Field(description="测评题目")
     answer: str = Field(description="用户答案")
 
 
 class ProjectExperience(BaseModel):
-    isCompetition: bool = Field(description="boolean(是否竞赛）")
+    isCompetition: bool = Field(alias="competition", description="boolean(是否竞赛）")
     name: str = Field(description="项目/竞赛名称")
     desc: str = Field(description="项目描述")
 

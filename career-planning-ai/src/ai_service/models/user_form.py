@@ -1,13 +1,13 @@
 from pydantic import BaseModel, Field
 
 from ai_service.models.user_form_profile import LanguageDetail, SkillDetail, ToolDetail, ProjectExperience, \
-    InternshipExperience, QuizDetail, PriorityDetail
+    InternshipExperience, QuizDetailItem
 
 
 class UserForm(BaseModel):
     education: str | None = Field(None, description="学历：高中/专科/本科/硕士/博士/其他")
     educationOther: str | None = None
-    major: list[str] | None = Field(None, description="专业类别")
+    major: str | None = Field(None, description="专业类别")
     graduationDate: str | None = Field(None, description="毕业日期,YYYY-MM格式")
     languages: list[LanguageDetail] | None = Field(None, description="语言能力")
     certificates: list[str] | None = Field(None, description="证书列表")
@@ -17,11 +17,12 @@ class UserForm(BaseModel):
     codeLinks: str | None = Field(None, description="代码仓库链接,如GitHub/Gitee,多个逗号分隔")
     projects: list[ProjectExperience] | None = Field(None, description="项目经历列表")
     internships: list[InternshipExperience] | None = Field(None, description="实习经历列表")
-    quiz: list[QuizDetail] | None = Field(None, description="测评详细，包含沟通能力、抗压能力、学习能力等题目以及用户答案")
+    quizDetail: list[QuizDetailItem] | None = Field(None,
+                                                    description="测评详细，包含沟通能力、抗压能力、学习能力等题目以及用户答案")
     innovation: str | None = Field(None, description="创新表现描述")
     targetJob: str | None = Field(None, description="目标岗位")
     targetIndustries: list[str] | None = Field(None, description="期望行业列表")
-    priorities: list[PriorityDetail] | None = Field(None, description="核心价值观优先级列表，包含技术成长、薪资、稳定等")
+    priorities: list[str] | None = Field(None, description="核心价值观优先级列表，包含技术成长、薪资、稳定等")
 
     def to_llm_context(self) -> str:
         # 1. 预处理：将列表转为逗号分隔的字符串（如果没有数据则显示“无”）
@@ -51,11 +52,11 @@ class UserForm(BaseModel):
             - 实习经历: {fmt_list([i.company for i in self.internships]) if self.internships else "无"}
 
             [个人素质与意向]
-            - 测评详细: {self.quiz or "未提供"}
+            - 测评详细: {self.quizDetail or "未提供"}
             - 创新表现: {self.innovation or "未提供"}
             - 目标岗位: {self.targetJob or "待定"}
             - 目标职位: {self.targetJob or "待定"}
             - 期望行业: {fmt_list(self.targetIndustries)}
-            - 核心价值观优先级: {" > ".join([p.label for p in self.priorities]) if self.priorities else "未排序"}
+            - 核心价值观优先级: {" > ".join([p for p in self.priorities]) if self.priorities else "未排序"}
             </candidate_raw_data>
                     """.strip()

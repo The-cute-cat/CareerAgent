@@ -69,8 +69,8 @@ public class AiServiceClient {
     private AiChatResponse universalAiService(String url, MultipartBodyBuilder builder) {
         String token = AITokenUtil.createToken();
         int try_count = 0;
-        // 根据配置的最大尝试次数进行重试
         while (try_count < properties.getRetry().getMaxAttempts()) {
+            try_count++;
             try {
                 long startTime = System.currentTimeMillis();
                 log.info("调用 AI 服务，URL: {}, 请求参数: {}, 尝试次数：{}", url, builder.toString(), try_count + 1);
@@ -90,9 +90,11 @@ public class AiServiceClient {
                     long time = System.currentTimeMillis() - startTime;
                     log.info("调用AI服务结束，耗时：{}ms", time);
                     return response;
+                } else {
+                    String errorMsg = response != null ? response.getMsg() : "响应为空";
+                    throw new RuntimeException("AI 服务业务失败: " + errorMsg);
                 }
             } catch (Exception e) {
-                try_count++;
                 log.warn("AI 服务调用失败，第 {} 次重试，{}", try_count, e.getMessage(), e);
                 // 等待配置的延迟时间后重试
                 sleep(properties.getRetry().getDelay());
@@ -101,6 +103,52 @@ public class AiServiceClient {
         // 所有重试都失败，抛出异常
         throw new RuntimeException("AI 服务调用失败，URL: " + url + ", 请检查配置: " + builder.toString());
     }
+
+    /**
+     * 自定义参数对话（JSON格式，阻塞方式）
+     * <p>
+     * 用于发送 JSON 格式的请求到 AI 服务，
+     * 适用于复杂对象参数。
+     *
+     * @param url    请求的 API 路径
+     * @param params 自定义参数映射
+     * @return AI 响应结果
+     */
+    public AiChatResponse chatWithOtherJson(String url, Map<String, Object> params) {
+        String token = AITokenUtil.createToken();
+        int try_count = 0;
+        while (try_count < properties.getRetry().getMaxAttempts()) {
+            try_count++;
+            try {
+                long startTime = System.currentTimeMillis();
+                log.info("调用 AI 服务(JSON格式)，URL: {}, 请求参数: {}, 尝试次数：{}", url, params, try_count);
+                AiChatResponse response = webClient.post()
+                        .uri(properties.getBaseUrl() + url)
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(params)
+                        .retrieve()
+                        .bodyToMono(AiChatResponse.class)
+                        .timeout(Duration.ofMillis(properties.getTimeout()))
+                        .block(Duration.ofMillis(properties.getTimeout()));
+
+                if (response != null && response.isState()) {
+                    long time = System.currentTimeMillis() - startTime;
+                    log.info("调用AI服务结束，耗时：{}ms", time);
+                    return response;
+                } else {
+                    String errorMsg = response != null ? response.getMsg() : "响应为空";
+                    throw new RuntimeException("AI 服务业务失败: " + errorMsg);
+                }
+            } catch (Exception e) {
+                log.warn("AI 服务调用失败，第 {} 次重试，{}", try_count, e.getMessage(), e);
+                sleep(properties.getRetry().getDelay());
+            }
+        }
+
+        throw new RuntimeException("AI 服务调用失败，URL: " + url + ", 请检查配置: " + params);
+    }
+
 
     /**
      * 调用 AI 服务（流式响应方式）
@@ -140,6 +188,10 @@ public class AiServiceClient {
                 });
     }
 
+    private boolean isNotEmpty(String str) {
+        return str != null && !str.isEmpty() && !"null".equals(str);
+    }
+
     /**
      * 构建多部分表单请求体
      *
@@ -148,10 +200,10 @@ public class AiServiceClient {
      */
     private MultipartBodyBuilder buildFileBody(AiChatRequest aiChatRequest) {
         MultipartBodyBuilder builder = new MultipartBodyBuilder();
-        if (aiChatRequest.getMessage() != null && !aiChatRequest.getMessage().isEmpty()) {
+        if (isNotEmpty(aiChatRequest.getMessage())) {
             builder.part("message", aiChatRequest.getMessage());
         }
-        if (aiChatRequest.getConversationId() != null) {
+        if (isNotEmpty(aiChatRequest.getConversationId())) {
             builder.part("conversationId", aiChatRequest.getConversationId());
         }
         if (aiChatRequest.getFiles() != null && !aiChatRequest.getFiles().isEmpty()) {
@@ -241,7 +293,7 @@ public class AiServiceClient {
      * @return AI 响应结果
      */
     public AiChatResponse chatWithMultipartFiles(String url, List<MultipartFile> multipartFiles,
-            String conversationId) {
+                                                 String conversationId) {
         AiChatRequest request = AiChatRequest.ofMultipartFiles(conversationId, null, multipartFiles);
         return callAiService(url, request);
     }
@@ -255,7 +307,7 @@ public class AiServiceClient {
      * @param conversationId 对话 ID
      * @return AI 响应结果
      */
-    public AiChatResponse chatWithMessageAndFiles(String url, String message, List<File> files, 
+    public AiChatResponse chatWithMessageAndFiles(String url, String message, List<File> files,
                                                   String conversationId) {
         AiChatRequest request = AiChatRequest.ofFiles(conversationId, message, files);
         return callAiService(url, request);
@@ -273,7 +325,7 @@ public class AiServiceClient {
      * @return AI 响应结果
      */
     public AiChatResponse chatWithMessageAndMultipartFiles(String url, String message, List<MultipartFile> files,
-            String conversationId) {
+                                                           String conversationId) {
         AiChatRequest request = AiChatRequest.ofMultipartFiles(conversationId, message, files);
         return callAiService(url, request);
     }
@@ -344,7 +396,7 @@ public class AiServiceClient {
      * @return 响应数据流
      */
     public Flux<String> chatWithMessageAndFilesStream(String url, String message, List<File> files,
-            String conversationId) {
+                                                      String conversationId) {
         AiChatRequest request = AiChatRequest.ofFiles(conversationId, message, files);
         return callAiServiceStream(url, request);
     }
@@ -361,7 +413,7 @@ public class AiServiceClient {
      * @return 响应数据流
      */
     public Flux<String> chatWithMessageAndMultipartFilesStream(String url, String message, List<MultipartFile> files,
-            String conversationId) {
+                                                               String conversationId) {
         AiChatRequest request = AiChatRequest.ofMultipartFiles(conversationId, message, files);
         return callAiServiceStream(url, request);
     }
