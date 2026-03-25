@@ -6,7 +6,7 @@ import type { FormInstance, FormRules } from 'element-plus'
 
 
 
-import { 
+import {
   DocumentAdd,
   Trophy,
   DataAnalysis,
@@ -37,9 +37,9 @@ import {
 import CareerFormUpload from '@/components/CareerForm_Upload.vue'
 import Quenation from '@/components/Quenation.vue'
 import { submitCareerFormApi, convertToSubmitDTO } from '@/api/career-form/formdata'
-import { submitQuiz, getQuestionsApi } from '@/api/career-form/questions'
-import type { CareerFormData } from '@/types/careerform_report'
-import type { Question } from '@/types/careerform_question'
+import { submitQuiz, getQuestionsApi, getPersonQuizApi } from '@/api/career-form/questions'
+import type { CareerFormData, QuizDetailItem } from '@/types/careerform_report'
+import type { Question, BackendPersonData } from '@/types/careerform_question'
 import type { JobMatchItem } from '@/types/job-match'
 import {
   majorOptions
@@ -205,8 +205,8 @@ const formData = reactive<CareerFormData>({
   projects: [],
   /** 实习经历列表：每项包含公司、职位、日期范围、描述 */
   internships: [],
-  /** 素质测评分数（沟通/抗压/学习，各0-100） */
-  quizScores: { communication: 0, stress: 0, learning: 0 },
+  /** 素质测评答题记录 */
+  quizDetail: [],
   /** 创新案例描述：用户填写的创新经历 */
   innovation: '',
   /** 目标岗位：用户期望的职位名称 */
@@ -247,13 +247,13 @@ const currentSectionTitle = computed(() => {
 const formProgress = computed(() => {
   let completed = 0
   const total = 5
-  
+
   if (formData.education) completed++
   if (formData.major.length > 0) completed++
   if (formData.skills.length > 0) completed++
   if (formData.projects.length > 0 || formData.internships.length > 0) completed++
   if (formData.targetJob) completed++
-  
+
   return Math.round((completed / total) * 100)
 })
 
@@ -606,8 +606,8 @@ const openEditInternshipDialog = (index: number) => {
   }
   internshipForm.company = internship.company
   internshipForm.role = internship.role
-  internshipForm.date = Array.isArray(internship.date) 
-    ? [...internship.date] as Date[] 
+  internshipForm.date = Array.isArray(internship.date)
+    ? [...internship.date] as Date[]
     : []
   internshipForm.desc = internship.desc
   internshipForm.isEdit = true
@@ -724,11 +724,11 @@ const formatDateRange = (dateRange: Date[]) => {
 const movePriority = (index: number, direction: number) => {
   const newIndex = index + direction
   if (newIndex < 0 || newIndex >= formData.priorities.length) return
-  
+
   const temp = formData.priorities[index]
   const target = formData.priorities[newIndex]
   if (!temp || !target) return
-  
+
   formData.priorities[index] = { ...target }
   formData.priorities[newIndex] = { ...temp }
 }
@@ -767,12 +767,12 @@ const handleDrop = (dropIndex: number) => {
     dragOverIndex.value = -1
     return
   }
-  
+
   // 移动数组元素
   const items = formData.priorities.splice(dragIndex.value, 1)
   if (items.length === 0 || !items[0]) return
   formData.priorities.splice(dropIndex, 0, items[0])
-  
+
   dragIndex.value = -1
   dragOverIndex.value = -1
 }
@@ -830,6 +830,7 @@ const testDialog = reactive({
 /** 后端返回的问卷数据 */
 const backendQuizData = ref<BackendQuizData | null>(null)
 
+
 /** Quenation组件引用 */
 const quenationRef = ref<InstanceType<typeof Quenation> | null>(null)
 
@@ -874,6 +875,36 @@ const fetchQuizData = async (type: string, name?: string): Promise<BackendQuizDa
   return result.data
 }
 
+
+/**
+ * 从后端获取素质测评/代码能力测评题目
+ * @param type - 测评类型：code / communication / stress / learning
+ */
+const fetchPersonData = async (type: string): Promise<BackendQuizData> => {
+  const res = await getPersonQuizApi(type)
+  const result = res.data as any
+  console.log('result', result)
+  if (result.code !== 200) {
+    throw new Error(result.msg || '获取题目失败')
+  }
+  const personQuestions: BackendPersonData[] = result.data || []
+  // 将 BackendPersonData[] 转换为 BackendQuizData 格式，供 Quenation 组件使用
+  return {
+    tool: type,
+    total_questions: personQuestions.length,
+    questions: personQuestions.map(item => ({
+      id: item.id,
+      type: item.type as 'choice' | 'open_ended',
+      content: item.text,
+      options: item.options,
+      correct_answer: null,
+      evaluation_criteria: undefined,
+      difficulty: 'medium' as const
+    }))
+  }
+}
+
+
 /**
  * 打开技能/工具/代码能力测试弹窗
  * 使用Quenation组件展示完整问卷
@@ -894,7 +925,7 @@ const openTestModal = async (type: 'skill' | 'tool', index?: number) => {
     currentTestSkill.value = name
     currentTestIndex.value = index
     testDialog.title = `${name} 工具测试`
-  } 
+  }
 
   testDialog.type = type
   testDialog.currentIndex = index ?? -1
@@ -903,8 +934,8 @@ const openTestModal = async (type: 'skill' | 'tool', index?: number) => {
   backendQuizData.value = null
 
 
-  console.log("类型",type)
-  console.log("名称",name)
+  console.log("类型", type)
+  console.log("名称", name)
 
   try {
     // 从后端获取题目数据
@@ -931,7 +962,6 @@ const openQuizModal = async (type: 'code' | 'communication' | 'stress' | 'learni
 
   console.log('类别', type)
 
-
   // 测评标题映射
   const titles: Record<string, string> = {
     'code': '代码能力测评',
@@ -948,11 +978,10 @@ const openQuizModal = async (type: 'code' | 'communication' | 'stress' | 'learni
 
 
 
-
-
   try {
     // 从后端获取题目数据（openQuizModal的类型不需要name参数）
-    const quizData = await fetchQuizData(type)
+    const quizData = await fetchPersonData(type)
+    console.log("quizData", quizData)
     backendQuizData.value = quizData
   } catch (error) {
     console.error('获取题目失败:', error)
@@ -995,7 +1024,49 @@ const scoreFailed = ref(false)
 const handleQuizSubmit = async (submitData: any) => {
   const { quizType, answers } = submitData
 
-  // 准备用户答案映射 { questionId: answer }
+  // ---- 素质测评（communication / stress / learning）：不做评分，直接收集答案 ----
+  if (['communication', 'stress', 'learning'].includes(quizType)) {
+    const questions = backendQuizData.value?.questions || []
+    const detailItems: QuizDetailItem[] = []
+
+    questions.forEach(q => {
+      const key = `q_${q.id}`
+      const rawAnswer = answers?.[key] || ''
+
+      // 选择题：将选项字母(如"A")还原为完整选项文本
+      let displayAnswer = rawAnswer
+      if (q.type === 'choice' && q.options && rawAnswer) {
+        const matched = q.options.find(opt =>
+          opt.startsWith(`${rawAnswer}.`) ||
+          opt.startsWith(`${rawAnswer}、`) ||
+          opt.startsWith(`${rawAnswer})`)
+        )
+        if (matched) {
+          displayAnswer = matched.replace(/^[A-Za-z][.．、)\s]+/, '').trim()
+        }
+      }
+
+      detailItems.push({
+        type: q.type as 'choice' | 'open_ended',
+        question: q.content,
+        answer: displayAnswer
+      })
+    })
+
+
+    // 追加到 quizDetail
+    formData.quizDetail.push(...detailItems)
+
+    // 标记完成
+    quizCompleted[quizType as 'communication' | 'stress' | 'learning'] = true
+    currentQuizType.value = ''
+
+    ElMessage.success(`${getQuizTypeName(quizType)}测评完成！`)
+    closeTestDialog()
+    return
+  }
+
+  // ---- 技能/工具/代码测试：走原有评分流程 ----
   const userAnswers: Record<number, string> = {}
   Object.entries(answers || {}).forEach(([key, value]) => {
     const match = key.match(/q_(\d+)/)
@@ -1040,11 +1111,6 @@ const updateQuizScore = (quizType: string, score: number) => {
     formData.skills[index].score = score
   } else if (quizType === 'tool' && index >= 0 && formData.tools[index]) {
     formData.tools[index].score = score
-  } else if (['communication', 'stress', 'learning'].includes(quizType)) {
-    if (!formData.quizScores) formData.quizScores = { communication: 0, stress: 0, learning: 0 }
-    formData.quizScores[quizType as keyof typeof formData.quizScores] = score
-    quizCompleted[quizType as keyof typeof quizCompleted] = true
-    currentQuizType.value = ''
   }
 }
 
@@ -1265,17 +1331,15 @@ const fillFormWithParsedData = (parsedFormData: any) => {
     }))
   }
 
-  // 填充素质测评分数
-  if (parsedFormData.quizScores && typeof parsedFormData.quizScores === 'object') {
-    formData.quizScores = {
-      communication: parsedFormData.quizScores.communication || 0,
-      stress: parsedFormData.quizScores.stress || 0,
-      learning: parsedFormData.quizScores.learning || 0
+  // 填充素质测评答题记录，并根据记录判断完成状态
+  if (parsedFormData.quizDetail && Array.isArray(parsedFormData.quizDetail)) {
+    formData.quizDetail = parsedFormData.quizDetail
+    // 有答题记录即标记全部素质测评已完成
+    if (parsedFormData.quizDetail.length > 0) {
+      quizCompleted.communication = true
+      quizCompleted.stress = true
+      quizCompleted.learning = true
     }
-    // 如果分数大于0，标记对应测评为已完成
-    quizCompleted.communication = !!parsedFormData.quizScores.communication
-    quizCompleted.stress = !!parsedFormData.quizScores.stress
-    quizCompleted.learning = !!parsedFormData.quizScores.learning
   }
 
   // 填充创新案例
@@ -1405,13 +1469,15 @@ const submitForm = async () => {
   submitting.value = true
   try {
     const submitData = convertToSubmitDTO(formData)
+    console.log('submitData', submitData)
     const res = await submitCareerFormApi(submitData)
+
+    console.log("表单提交返回结果:", res)
 
     if (res.data?.code !== 200) {
       ElMessage.error(res.data?.msg || '提交失败，请稍后重试')
       return
     }
-
     const matchResult = res.data.data as JobMatchItem[]
     localStorage.setItem('jobMatchResult', JSON.stringify(matchResult))
     ElMessage.success('人岗匹配分析完成！')
@@ -1466,10 +1532,10 @@ const submitFormWithMockData = async () => {
  */
 const resetForm = () => {
   if (!formRef.value) return
-  
+
   // 重置 Element Plus 表单组件的字段
   formRef.value.resetFields()
-  
+
   // 手动重置动态列表数据（resetFields 无法处理动态添加的数组项）
   formData.languages = [{ type: '', level: '', other: '' }]
   formData.certificates = []
@@ -1478,7 +1544,7 @@ const resetForm = () => {
   formData.tools = []
   formData.projects = []
   formData.internships = []
-  formData.quizScores = { communication: 0, stress: 0, learning: 0 }
+  formData.quizDetail = []
   quizCompleted.communication = false
   quizCompleted.stress = false
   quizCompleted.learning = false
@@ -1487,24 +1553,24 @@ const resetForm = () => {
     { value: 'salary', label: '薪资' },
     { value: 'stable', label: '稳定' }
   ]
-  
+
   // 重置临时输入值
   newSkill.value = ''
   newTool.value = ''
-  
+
   // 重置显示状态
   showEducationInput.value = false
   showCertificateInput.value = false
   hasUploadedResume.value = false
-  
+
   // 重置测试相关状态
   currentTestSkill.value = ''
   currentTestIndex.value = -1
   currentQuizType.value = ''
-  
+
   // 重置当前步骤到第一步
   activeMenu.value = '1'
-  
+
   ElMessage.success('表单已重置')
 }
 </script>
@@ -1518,94 +1584,93 @@ const resetForm = () => {
       <el-aside width="220px" class="sidebar">
         <div class="sidebar-brand">
           <div class="brand-icon">
-            <el-icon :size="26"><DocumentAdd /></el-icon>
+            <el-icon :size="26">
+              <DocumentAdd />
+            </el-icon>
           </div>
           <div class="brand-info">
             <div class="brand-text">能力画像</div>
             <div class="brand-subtitle">就业规划系统</div>
           </div>
         </div>
-        
+
         <!-- 进度概览 -->
         <div class="progress-overview">
           <div class="progress-text">
             <span>完成度</span>
             <span class="progress-percent">{{ formProgress }}%</span>
           </div>
-          <el-progress 
-            :percentage="formProgress" 
-            :show-text="false"
-            :stroke-width="6"
-            class="sidebar-progress"
-          />
+          <el-progress :percentage="formProgress" :show-text="false" :stroke-width="6" class="sidebar-progress" />
         </div>
-        
-        <el-menu
-          :default-active="activeMenu"
-          class="sidebar-menu"
-          @select="handleMenuSelect"
-        >
+
+        <el-menu :default-active="activeMenu" class="sidebar-menu" @select="handleMenuSelect">
           <el-menu-item index="1" :class="{ 'is-completed': isStepCompleted(1) }">
             <div class="menu-step">
-              <el-icon v-if="isStepCompleted(1)"><Check /></el-icon>
+              <el-icon v-if="isStepCompleted(1)">
+                <Check />
+              </el-icon>
               <span v-else>1</span>
             </div>
             <span class="menu-text">基本信息</span>
             <el-icon class="menu-check" v-if="isStepCompleted(1)"><Circle-Check /></el-icon>
           </el-menu-item>
-          
+
           <el-menu-item index="2" :class="{ 'is-completed': isStepCompleted(2) }">
             <div class="menu-step">
-              <el-icon v-if="isStepCompleted(2)"><Check /></el-icon>
+              <el-icon v-if="isStepCompleted(2)">
+                <Check />
+              </el-icon>
               <span v-else>2</span>
             </div>
             <span class="menu-text">技能证书</span>
             <el-icon class="menu-check" v-if="isStepCompleted(2)"><Circle-Check /></el-icon>
           </el-menu-item>
-          
+
           <el-menu-item index="3" :class="{ 'is-completed': isStepCompleted(3) }">
             <div class="menu-step">
-              <el-icon v-if="isStepCompleted(3)"><Check /></el-icon>
+              <el-icon v-if="isStepCompleted(3)">
+                <Check />
+              </el-icon>
               <span v-else>3</span>
             </div>
             <span class="menu-text">经历项目</span>
             <el-icon class="menu-check" v-if="isStepCompleted(3)"><Circle-Check /></el-icon>
           </el-menu-item>
-          
+
           <el-menu-item index="4" :class="{ 'is-completed': isStepCompleted(4) }">
             <div class="menu-step">
-              <el-icon v-if="isStepCompleted(4)"><Check /></el-icon>
+              <el-icon v-if="isStepCompleted(4)">
+                <Check />
+              </el-icon>
               <span v-else>4</span>
             </div>
             <span class="menu-text">素质测评</span>
             <el-icon class="menu-check" v-if="isStepCompleted(4)"><Circle-Check /></el-icon>
           </el-menu-item>
-          
+
           <el-menu-item index="5" :class="{ 'is-completed': isStepCompleted(5) }">
             <div class="menu-step">
-              <el-icon v-if="isStepCompleted(5)"><Check /></el-icon>
+              <el-icon v-if="isStepCompleted(5)">
+                <Check />
+              </el-icon>
               <span v-else>5</span>
             </div>
             <span class="menu-text">职业意向</span>
             <el-icon class="menu-check" v-if="isStepCompleted(5)"><Circle-Check /></el-icon>
           </el-menu-item>
         </el-menu>
-        
+
         <!-- 简历上传入口 -->
         <div class="resume-upload-section">
           <div class="upload-label">
           </div>
-          <el-button 
-            class="upload-btn"
-            :type="hasUploadedResume ? 'info' : 'primary'"
-            @click="showUploadDialog = true"
-            :icon="Upload"
-          >
+          <el-button class="upload-btn" :type="hasUploadedResume ? 'info' : 'primary'" @click="showUploadDialog = true"
+            :icon="Upload">
             {{ hasUploadedResume ? '重新上传简历' : '上传简历' }}
           </el-button>
         </div>
       </el-aside>
-      
+
       <!-- 主内容区 -->
       <el-main class="main-content">
         <el-card class="form-card">
@@ -1617,36 +1682,20 @@ const resetForm = () => {
               </div>
               <div class="progress-section">
                 <span class="progress-label">完成度 {{ formProgress }}%</span>
-                <el-progress 
-                  :percentage="formProgress" 
-                  :stroke-width="8"
-                  :show-text="false"
-                  class="progress-bar"
-                />
+                <el-progress :percentage="formProgress" :stroke-width="8" :show-text="false" class="progress-bar" />
               </div>
             </div>
           </template>
-          
-          <el-form 
-            ref="formRef" 
-            :model="formData" 
-            :rules="formRules" 
-            label-width="120px" 
-            size="default"
-          >
+
+          <el-form ref="formRef" :model="formData" :rules="formRules" label-width="120px" size="default">
             <!-- 1. 基本信息 -->
             <div v-show="activeMenu === '1'" class="section-content">
               <div class="form-section-title">教育背景</div>
               <el-row :gutter="24">
                 <el-col :span="12">
                   <el-form-item label="最高学历" prop="education">
-                    <el-select
-                      v-model="formData.education"
-                      placeholder="请选择最高学历"
-                      style="width: 100%"
-                      @change="handleEducationChange"
-                      clearable
-                    >
+                    <el-select v-model="formData.education" placeholder="请选择最高学历" style="width: 100%"
+                      @change="handleEducationChange" clearable>
                       <el-option label="专科" value="专科" />
                       <el-option label="本科" value="本科" />
                       <el-option label="硕士" value="硕士" />
@@ -1657,11 +1706,7 @@ const resetForm = () => {
                 </el-col>
                 <el-col :span="12" v-if="showEducationInput">
                   <el-form-item label="学历说明" prop="educationOther">
-                    <el-input
-                      v-model="formData.educationOther"
-                      placeholder="如：MBA、双学位等"
-                      clearable
-                    />
+                    <el-input v-model="formData.educationOther" placeholder="如：MBA、双学位等" clearable />
                   </el-form-item>
                 </el-col>
               </el-row>
@@ -1669,26 +1714,14 @@ const resetForm = () => {
               <el-row :gutter="24">
                 <el-col :span="12">
                   <el-form-item label="专业类别" prop="major">
-                    <el-cascader 
-                      v-model="formData.major" 
-                      :options="majorOptions" 
-                      placeholder="请选择专业类别"
-                      style="width: 100%"
-                      :props="{ expandTrigger: 'hover' }"
-                      clearable
-                    />
+                    <el-cascader v-model="formData.major" :options="majorOptions" placeholder="请选择专业类别"
+                      style="width: 100%" :props="{ expandTrigger: 'hover' }" clearable />
                   </el-form-item>
                 </el-col>
                 <el-col :span="12">
                   <el-form-item label="毕业时间" prop="graduationDate">
-                    <el-date-picker 
-                      v-model="formData.graduationDate" 
-                      type="month" 
-                      placeholder="选择毕业年月" 
-                      format="YYYY-MM"
-                      style="width: 100%"
-                      clearable
-                    />
+                    <el-date-picker v-model="formData.graduationDate" type="month" placeholder="选择毕业年月" format="YYYY-MM"
+                      style="width: 100%" clearable />
                   </el-form-item>
                 </el-col>
               </el-row>
@@ -1704,26 +1737,13 @@ const resetForm = () => {
               <div class="form-section-title">外语能力</div>
               <el-form-item label="外语水平" prop="languages">
                 <div class="list-container">
-                  <div
-                    v-for="(lang, index) in formData.languages"
-                    :key="index"
-                    class="list-row"
-                  >
-                    <el-select
-                      v-model="lang.type"
-                      placeholder="语种"
-                      style="width: 130px"
-                    >
+                  <div v-for="(lang, index) in formData.languages" :key="index" class="list-row">
+                    <el-select v-model="lang.type" placeholder="语种" style="width: 130px">
                       <el-option label="英语" value="英语" />
                       <el-option label="日语" value="日语" />
                       <el-option label="其他" value="其他" />
                     </el-select>
-                    <el-select
-                      v-model="lang.level"
-                      placeholder="水平"
-                      style="width: 130px"
-                      :disabled="lang.type === ''"
-                    >
+                    <el-select v-model="lang.level" placeholder="水平" style="width: 130px" :disabled="lang.type === ''">
                       <el-option label="四级" value="四级" />
                       <el-option label="六级" value="六级" />
                       <el-option label="托福/雅思" value="托福/雅思" />
@@ -1731,31 +1751,15 @@ const resetForm = () => {
                     </el-select>
                     <!-- 语种选择"其他"时的自定义输入 -->
                     <template v-if="lang.type === '其他'">
-                      <el-input
-                        v-model="lang.other"
-                        placeholder="请输入语种"
-                        style="width: 150px"
-                      />
-                      <el-button
-                        type="primary"
-                        size="small"
-                        @click="confirmCustomLanguage(index, 'type')"
-                      >
+                      <el-input v-model="lang.other" placeholder="请输入语种" style="width: 150px" />
+                      <el-button type="primary" size="small" @click="confirmCustomLanguage(index, 'type')">
                         确认
                       </el-button>
                     </template>
                     <!-- 水平选择"其他"时的自定义输入 -->
                     <template v-else-if="lang.level === '其他'">
-                      <el-input
-                        v-model="lang.other"
-                        placeholder="请输入证书"
-                        style="width: 150px"
-                      />
-                      <el-button
-                        type="primary"
-                        size="small"
-                        @click="confirmCustomLanguage(index, 'level')"
-                      >
+                      <el-input v-model="lang.other" placeholder="请输入证书" style="width: 150px" />
+                      <el-button type="primary" size="small" @click="confirmCustomLanguage(index, 'level')">
                         确认
                       </el-button>
                     </template>
@@ -1769,53 +1773,32 @@ const resetForm = () => {
 
               <div class="form-section-title">专业证书</div>
               <el-form-item label="核心证书" prop="certificates">
-                <el-select 
-                  v-model="formData.certificates" 
-                  multiple 
-                  placeholder="请选择证书" 
-                  style="width: 100%" 
-                  @change="handleCertificateChange"
-                >
+                <el-select v-model="formData.certificates" multiple placeholder="请选择证书" style="width: 100%"
+                  @change="handleCertificateChange">
                   <el-option label="软考中级" value="软考中级" />
                   <el-option label="软考高级" value="软考高级" />
                   <el-option label="英语六级" value="英语六级" />
                   <el-option label="PMP" value="PMP" />
                   <el-option label="其他" value="其他" />
                 </el-select>
-                <el-input 
-                  v-if="showCertificateInput" 
-                  v-model="formData.certificateOther" 
-                  placeholder="请输入证书名称，如：CPA、CFA 等" 
-                  style="margin-top: 12px"
-                />
+                <el-input v-if="showCertificateInput" v-model="formData.certificateOther"
+                  placeholder="请输入证书名称，如：CPA、CFA 等" style="margin-top: 12px" />
               </el-form-item>
 
               <div class="form-section-title">专业技能</div>
               <el-form-item label="专业技能" prop="skills">
                 <div class="input-list-group">
                   <div class="add-input-row">
-                    <el-input 
-                      v-model="newSkill" 
-                      placeholder="输入技能（如 Java、Python）" 
-                      @keyup.enter="addSkill"
-                      style="flex: 1"
-                    />
+                    <el-input v-model="newSkill" placeholder="输入技能（如 Java、Python）" @keyup.enter="addSkill"
+                      style="flex: 1" />
                     <el-button type="primary" :icon="Plus" @click="addSkill">
                       添加
                     </el-button>
                   </div>
-                  <div 
-                    v-for="(skill, index) in formData.skills" 
-                    :key="index" 
-                    class="skill-item"
-                  >
+                  <div v-for="(skill, index) in formData.skills" :key="index" class="skill-item">
                     <span class="skill-name">{{ skill.name }}</span>
-                    <el-progress
-                      :percentage="skill.score || 0"
-                      status="success"
-                      style="width: 120px"
-                      :stroke-width="8"
-                    />
+                    <el-progress :percentage="skill.score || 0" status="success" style="width: 120px"
+                      :stroke-width="8" />
                     <div class="skill-actions">
                       <el-button text type="primary" @click="openTestModal('skill', index)">测试</el-button>
                       <el-button text type="danger" :icon="Delete" @click="removeSkill(index)" />
@@ -1828,21 +1811,13 @@ const resetForm = () => {
               <el-form-item label="工具掌握" prop="tools">
                 <div class="input-list-group">
                   <div class="add-input-row">
-                    <el-input 
-                      v-model="newTool" 
-                      placeholder="输入工具（如 Git、Docker）" 
-                      @keyup.enter="addTool"
-                      style="flex: 1"
-                    />
+                    <el-input v-model="newTool" placeholder="输入工具（如 Git、Docker）" @keyup.enter="addTool"
+                      style="flex: 1" />
                     <el-button type="primary" :icon="Plus" @click="addTool">
                       添加
                     </el-button>
                   </div>
-                  <div 
-                    v-for="(tool, index) in formData.tools" 
-                    :key="index" 
-                    class="skill-item"
-                  >
+                  <div v-for="(tool, index) in formData.tools" :key="index" class="skill-item">
                     <span class="skill-name">{{ tool.name }}</span>
                     <div class="skill-actions">
                       <el-button text type="primary" @click="openTestModal('tool', index)">测试</el-button>
@@ -1853,7 +1828,7 @@ const resetForm = () => {
               </el-form-item>
 
               <!-- 代码能力 -->
-              <el-form-item 
+              <!-- <el-form-item 
                 label="代码能力" 
                 prop="codeAbility"
               >
@@ -1871,7 +1846,7 @@ const resetForm = () => {
                     AI 测试
                   </el-button>
                 </div>
-              </el-form-item>
+              </el-form-item> -->
             </div>
 
             <!-- 3. 经历与项目 -->
@@ -1879,16 +1854,16 @@ const resetForm = () => {
               <div class="form-section-title">项目经历</div>
               <el-form-item label="项目或竞赛">
                 <div class="experience-list">
-                  <div 
-                    v-for="(proj, index) in formData.projects" 
-                    :key="index" 
-                    class="experience-card"
-                    :class="{ 'is-competition': proj.isCompetition }"
-                  >
+                  <div v-for="(proj, index) in formData.projects" :key="index" class="experience-card"
+                    :class="{ 'is-competition': proj.isCompetition }">
                     <div class="experience-card-header">
                       <div class="experience-type-badge">
-                        <el-icon v-if="proj.isCompetition"><Trophy /></el-icon>
-                        <el-icon v-else><Folder /></el-icon>
+                        <el-icon v-if="proj.isCompetition">
+                          <Trophy />
+                        </el-icon>
+                        <el-icon v-else>
+                          <Folder />
+                        </el-icon>
                         <span>{{ proj.isCompetition ? '竞赛' : '项目' }}</span>
                       </div>
                       <div class="card-actions">
@@ -1915,14 +1890,13 @@ const resetForm = () => {
               <div class="form-section-title">实践经历</div>
               <el-form-item label="实习/工作" prop="internships">
                 <div class="experience-list">
-                  <div 
-                    v-for="(intern, index) in formData.internships" 
-                    :key="index" 
-                    class="experience-card internship-card"
-                  >
+                  <div v-for="(intern, index) in formData.internships" :key="index"
+                    class="experience-card internship-card">
                     <div class="experience-card-header">
                       <div class="experience-type-badge work-badge">
-                        <el-icon><Briefcase /></el-icon>
+                        <el-icon>
+                          <Briefcase />
+                        </el-icon>
                         <span>工作/实习</span>
                       </div>
                       <div class="card-actions">
@@ -1959,36 +1933,36 @@ const resetForm = () => {
               <el-row :gutter="24">
                 <el-col :span="8">
                   <el-form-item label="沟通能力">
-                    <el-button 
-                      :type="quizCompleted.communication ? 'success' : 'default'" 
+                    <el-button :type="quizCompleted.communication ? 'success' : 'default'"
                       :class="quizCompleted.communication ? 'quiz-complete' : 'quiz-pending'"
-                      @click="!quizCompleted.communication && openQuizModal('communication')"
-                    >
-                      <el-icon v-if="quizCompleted.communication"><Check /></el-icon>
+                      @click="!quizCompleted.communication && openQuizModal('communication')">
+                      <el-icon v-if="quizCompleted.communication">
+                        <Check />
+                      </el-icon>
                       {{ quizCompleted.communication ? '已完成' : '开始测试' }}
                     </el-button>
                   </el-form-item>
                 </el-col>
                 <el-col :span="8">
                   <el-form-item label="抗压能力">
-                    <el-button 
-                      :type="quizCompleted.stress ? 'success' : 'default'" 
+                    <el-button :type="quizCompleted.stress ? 'success' : 'default'"
                       :class="quizCompleted.stress ? 'quiz-complete' : 'quiz-pending'"
-                      @click="!quizCompleted.stress && openQuizModal('stress')"
-                    >
-                      <el-icon v-if="quizCompleted.stress"><Check /></el-icon>
+                      @click="!quizCompleted.stress && openQuizModal('stress')">
+                      <el-icon v-if="quizCompleted.stress">
+                        <Check />
+                      </el-icon>
                       {{ quizCompleted.stress ? '已完成' : '开始测试' }}
                     </el-button>
                   </el-form-item>
                 </el-col>
                 <el-col :span="8">
                   <el-form-item label="学习能力">
-                    <el-button 
-                      :type="quizCompleted.learning ? 'success' : 'default'" 
+                    <el-button :type="quizCompleted.learning ? 'success' : 'default'"
                       :class="quizCompleted.learning ? 'quiz-complete' : 'quiz-pending'"
-                      @click="!quizCompleted.learning && openQuizModal('learning')"
-                    >
-                      <el-icon v-if="quizCompleted.learning"><Check /></el-icon>
+                      @click="!quizCompleted.learning && openQuizModal('learning')">
+                      <el-icon v-if="quizCompleted.learning">
+                        <Check />
+                      </el-icon>
                       {{ quizCompleted.learning ? '已完成' : '开始测试' }}
                     </el-button>
                   </el-form-item>
@@ -1996,12 +1970,8 @@ const resetForm = () => {
               </el-row>
               <div class="form-section-title">创新案例</div>
               <el-form-item label="创新思维" prop="innovation">
-                <el-input 
-                  v-model="formData.innovation" 
-                  type="textarea" 
-                  :rows="4"
-                  placeholder="请填写一个改进案例，如：优化了某算法，效率提升 20%"
-                />
+                <el-input v-model="formData.innovation" type="textarea" :rows="4"
+                  placeholder="请填写一个改进案例，如：优化了某算法，效率提升 20%" />
               </el-form-item>
             </div>
 
@@ -2011,24 +1981,14 @@ const resetForm = () => {
               <el-row :gutter="24">
                 <el-col :span="12">
                   <el-form-item label="目标岗位" prop="targetJob">
-                    <el-autocomplete 
-                      v-model="formData.targetJob" 
-                      :fetch-suggestions="querySearch" 
-                      placeholder="输入意向岗位，如后端工程师"
-                      style="width: 100%"
-                      clearable
-                    />
+                    <el-autocomplete v-model="formData.targetJob" :fetch-suggestions="querySearch"
+                      placeholder="输入意向岗位，如后端工程师" style="width: 100%" clearable />
                   </el-form-item>
                 </el-col>
                 <el-col :span="12">
                   <el-form-item label="期望行业" prop="targetIndustries">
-                    <el-select 
-                      v-model="formData.targetIndustries" 
-                      multiple 
-                      placeholder="请选择期望行业"
-                      style="width: 100%"
-                      clearable
-                    >
+                    <el-select v-model="formData.targetIndustries" multiple placeholder="请选择期望行业" style="width: 100%"
+                      clearable>
                       <el-option label="互联网/IT" value="互联网" />
                       <el-option label="金融科技" value="金融" />
                       <el-option label="智能制造" value="制造" />
@@ -2041,14 +2001,18 @@ const resetForm = () => {
               </el-row>
 
               <div class="form-section-title">
-                <el-icon><Medal /></el-icon>
+                <el-icon>
+                  <Medal />
+                </el-icon>
                 发展优先级
               </div>
               <el-form-item label="优先级排序" prop="priorities">
                 <div class="priority-container">
                   <div class="priority-header">
                     <div class="priority-desc">
-                      <el-icon><InfoFilled /></el-icon>
+                      <el-icon>
+                        <InfoFilled />
+                      </el-icon>
                       拖拽调整优先级顺序，第1位为你的首要考虑因素
                     </div>
                     <div class="priority-legend">
@@ -2067,27 +2031,19 @@ const resetForm = () => {
                     </div>
                   </div>
                   <div class="priority-cards">
-                    <div 
-                      v-for="(item, index) in formData.priorities" 
-                      :key="item.value" 
-                      class="priority-card"
-                      :class="{ 
-                        'is-first': index === 0,
-                        'is-second': index === 1,
-                        'is-third': index === 2,
-                        'is-dragging': dragIndex === index,
-                        'is-drag-over': dragOverIndex === index 
-                      }"
-                      draggable="true"
-                      @dragstart="handleDragStart(index)"
-                      @dragover="handleDragOver($event, index)"
-                      @dragleave="handleDragLeave"
-                      @drop="handleDrop(index)"
-                      @dragend="handleDragEnd"
-                    >
+                    <div v-for="(item, index) in formData.priorities" :key="item.value" class="priority-card" :class="{
+                      'is-first': index === 0,
+                      'is-second': index === 1,
+                      'is-third': index === 2,
+                      'is-dragging': dragIndex === index,
+                      'is-drag-over': dragOverIndex === index
+                    }" draggable="true" @dragstart="handleDragStart(index)" @dragover="handleDragOver($event, index)"
+                      @dragleave="handleDragLeave" @drop="handleDrop(index)" @dragend="handleDragEnd">
                       <div class="card-rank">
                         <div class="rank-badge" :class="getPriorityClass(index)">
-                          <el-icon v-if="index === 0"><Trophy /></el-icon>
+                          <el-icon v-if="index === 0">
+                            <Trophy />
+                          </el-icon>
                           <span v-else>{{ index + 1 }}</span>
                         </div>
                       </div>
@@ -2096,29 +2052,15 @@ const resetForm = () => {
                         <div class="card-hint">{{ getPriorityHint(index) }}</div>
                       </div>
                       <div class="card-actions">
-                        <el-button 
-                          text 
-                          circle
-                          size="small"
-                          :disabled="index === 0" 
-                          @click="movePriority(index, -1)"
-                          :icon="ArrowUp"
-                          title="上移"
-                          class="action-btn"
-                        />
-                        <el-button 
-                          text 
-                          circle
-                          size="small"
-                          :disabled="index === formData.priorities.length - 1" 
-                          @click="movePriority(index, 1)"
-                          :icon="ArrowDown"
-                          title="下移"
-                          class="action-btn"
-                        />
+                        <el-button text circle size="small" :disabled="index === 0" @click="movePriority(index, -1)"
+                          :icon="ArrowUp" title="上移" class="action-btn" />
+                        <el-button text circle size="small" :disabled="index === formData.priorities.length - 1"
+                          @click="movePriority(index, 1)" :icon="ArrowDown" title="下移" class="action-btn" />
                       </div>
                       <div class="drag-indicator">
-                        <el-icon><Rank /></el-icon>
+                        <el-icon>
+                          <Rank />
+                        </el-icon>
                       </div>
                     </div>
                   </div>
@@ -2142,96 +2084,63 @@ const resetForm = () => {
     </el-container>
 
     <!-- 素质测评弹窗 - 使用Quenation组件 -->
-    <el-dialog
-      v-model="testDialog.visible"
-      :title="testDialog.title"
-      width="800px"
-      class="quiz-dialog"
-      destroy-on-close
-      @close="closeTestDialog"
-    >
+    <el-dialog v-model="testDialog.visible" :title="testDialog.title" width="800px" class="quiz-dialog" destroy-on-close
+      @close="closeTestDialog">
       <!-- 加载状态 -->
       <div v-if="testDialog.loading" class="quiz-loading">
-        <el-icon class="loading-icon" :size="48"><Loading /></el-icon>
+        <el-icon class="loading-icon" :size="48">
+          <Loading />
+        </el-icon>
         <p>正在加载题目...</p>
         <el-progress :percentage="50" :stroke-width="8" :indeterminate="true" />
       </div>
 
       <!-- 问卷内容 - 确保数据加载完成后再渲染 -->
-      <Quenation
-        v-if="backendQuizData"
-        ref="quenationRef"
-        :title="testDialog.title"
-        :quiz-type="testDialog.type"
-        :backend-data="backendQuizData"
-        :quiz-result="quizResult"
-        :score-failed="scoreFailed"
-        @submit="handleQuizSubmit"
-        @cancel="closeTestDialog"
-      />
+      <Quenation v-if="backendQuizData" ref="quenationRef" :title="testDialog.title" :quiz-type="testDialog.type"
+        :backend-data="backendQuizData" :quiz-result="quizResult" :score-failed="scoreFailed" @submit="handleQuizSubmit"
+        @cancel="closeTestDialog" />
     </el-dialog>
 
     <!-- 简历上传弹窗 -->
-    <el-dialog 
-      v-model="showUploadDialog" 
-      title="简历智能上传" 
-      width="650px"
-      destroy-on-close
-    >
-      <CareerFormUpload 
-        :show-close="true" 
-        @close="showUploadDialog = false"
-        @parsed="handleResumeParsed"
-      />
+    <el-dialog v-model="showUploadDialog" title="简历智能上传" width="650px" destroy-on-close>
+      <CareerFormUpload :show-close="true" @close="showUploadDialog = false" @parsed="handleResumeParsed" />
     </el-dialog>
 
     <!-- 项目经历弹窗 -->
-    <el-dialog
-      v-model="showProjectDialog"
-      :title="projectForm.isEdit ? '编辑项目/竞赛经历' : '添加项目/竞赛经历'"
-      width="600px"
-      destroy-on-close
-      class="experience-dialog"
-    >
+    <el-dialog v-model="showProjectDialog" :title="projectForm.isEdit ? '编辑项目/竞赛经历' : '添加项目/竞赛经历'" width="600px"
+      destroy-on-close class="experience-dialog">
       <div class="experience-form">
         <div class="form-item">
           <label class="form-label">
-            <el-icon><Switch /></el-icon>
+            <el-icon>
+              <Switch />
+            </el-icon>
             类型
           </label>
-          <el-switch
-            v-model="projectForm.isCompetition"
-            active-text="竞赛"
-            inactive-text="项目"
-            inline-prompt
-            style="--el-switch-on-color: #e6a23c; --el-switch-off-color: #409eff"
-          />
+          <el-switch v-model="projectForm.isCompetition" active-text="竞赛" inactive-text="项目" inline-prompt
+            style="--el-switch-on-color: #e6a23c; --el-switch-off-color: #409eff" />
         </div>
         <div class="form-item">
           <label class="form-label">
-            <el-icon><Document /></el-icon>
+            <el-icon>
+              <Document />
+            </el-icon>
             {{ projectForm.isCompetition ? '竞赛名称' : '项目名称' }}
           </label>
-          <el-input
-            v-model="projectForm.name"
-            :placeholder="projectForm.isCompetition ? '请输入竞赛名称' : '请输入项目名称'"
-            size="large"
-          />
+          <el-input v-model="projectForm.name" :placeholder="projectForm.isCompetition ? '请输入竞赛名称' : '请输入项目名称'"
+            size="large" />
         </div>
         <div class="form-item">
           <label class="form-label">
-            <el-icon><Edit /></el-icon>
+            <el-icon>
+              <Edit />
+            </el-icon>
             详细描述
           </label>
-          <el-input
-            v-model="projectForm.desc"
-            type="textarea"
-            :rows="5"
-            :placeholder="projectForm.isCompetition
-              ? '描述竞赛背景、你的角色分工、具体工作和最终成绩'
-              : '描述项目背景、你的职责、技术栈和取得的成果'
-            "
-          />
+          <el-input v-model="projectForm.desc" type="textarea" :rows="5" :placeholder="projectForm.isCompetition
+            ? '描述竞赛背景、你的角色分工、具体工作和最终成绩'
+            : '描述项目背景、你的职责、技术栈和取得的成果'
+            " />
         </div>
       </div>
       <template #footer>
@@ -2243,73 +2152,53 @@ const resetForm = () => {
     </el-dialog>
 
     <!-- 实践经历弹窗 -->
-    <el-dialog
-      v-model="showInternshipDialog"
-      :title="internshipForm.isEdit ? '编辑实践经历' : '添加实践经历'"
-      width="600px"
-      destroy-on-close
-      class="experience-dialog"
-    >
+    <el-dialog v-model="showInternshipDialog" :title="internshipForm.isEdit ? '编辑实践经历' : '添加实践经历'" width="600px"
+      destroy-on-close class="experience-dialog">
       <div class="experience-form">
         <div class="form-row two-col">
           <div class="form-item">
             <label class="form-label">
-              <el-icon><OfficeBuilding /></el-icon>
+              <el-icon>
+                <OfficeBuilding />
+              </el-icon>
               公司/组织
             </label>
-            <el-input
-              v-model="internshipForm.company"
-              placeholder="请输入公司或组织全称"
-              size="large"
-            />
+            <el-input v-model="internshipForm.company" placeholder="请输入公司或组织全称" size="large" />
           </div>
           <div class="form-item">
             <label class="form-label">
-              <el-icon><User /></el-icon>
+              <el-icon>
+                <User />
+              </el-icon>
               担任岗位
             </label>
-            <el-input
-              v-model="internshipForm.role"
-              placeholder="请输入你的职位"
-              size="large"
-            />
+            <el-input v-model="internshipForm.role" placeholder="请输入你的职位" size="large" />
           </div>
         </div>
         <div class="form-item">
           <label class="form-label">
-            <el-icon><Calendar /></el-icon>
+            <el-icon>
+              <Calendar />
+            </el-icon>
             起止时间
           </label>
-          <el-date-picker
-            v-model="internshipForm.date"
-            type="daterange"
-            range-separator="至"
-            start-placeholder="开始时间"
-            end-placeholder="结束时间"
-            style="width: 100%"
-            size="large"
-          />
+          <el-date-picker v-model="internshipForm.date" type="daterange" range-separator="至" start-placeholder="开始时间"
+            end-placeholder="结束时间" style="width: 100%" size="large" />
         </div>
         <div class="form-item">
           <label class="form-label">
-            <el-icon><EditPen /></el-icon>
+            <el-icon>
+              <EditPen />
+            </el-icon>
             工作描述
           </label>
-          <el-input
-            v-model="internshipForm.desc"
-            type="textarea"
-            :rows="5"
-            placeholder="详细描述工作内容、承担的责任和取得的成果"
-          />
+          <el-input v-model="internshipForm.desc" type="textarea" :rows="5" placeholder="详细描述工作内容、承担的责任和取得的成果" />
         </div>
       </div>
       <template #footer>
         <el-button @click="showInternshipDialog = false">取消</el-button>
-        <el-button
-          type="primary"
-          @click="confirmAddInternship"
-          :disabled="!internshipForm.company.trim() || !internshipForm.role.trim()"
-        >
+        <el-button type="primary" @click="confirmAddInternship"
+          :disabled="!internshipForm.company.trim() || !internshipForm.role.trim()">
           {{ internshipForm.isEdit ? '确认修改' : '确认添加' }}
         </el-button>
       </template>
@@ -2338,7 +2227,7 @@ const resetForm = () => {
   flex: 1;
 }
 
-.sidebar {  
+.sidebar {
   background: #fff;
   padding: 20px 0;
   display: flex;
@@ -2760,11 +2649,13 @@ const resetForm = () => {
 }
 
 /* 列表样式 */
-.list-container, .input-list-group {
+.list-container,
+.input-list-group {
   width: 100%;
 }
 
-.list-row, .skill-item {
+.list-row,
+.skill-item {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -2776,11 +2667,13 @@ const resetForm = () => {
   transition: all 0.2s ease;
 }
 
-.list-row:last-child, .skill-item:last-child {
+.list-row:last-child,
+.skill-item:last-child {
   margin-bottom: 0;
 }
 
-.list-row:hover, .skill-item:hover {
+.list-row:hover,
+.skill-item:hover {
   border-color: #c0c4cc;
   background: #f5f7fa;
 }
@@ -2800,7 +2693,8 @@ const resetForm = () => {
 .project-card {
   display: flex;
   flex-direction: column;
-  gap: 16px;  /* 统一控制内部间距 */
+  gap: 16px;
+  /* 统一控制内部间距 */
   padding: 20px;
   background: #fafbfc;
   border: 1px solid #e4e7ed;
@@ -2829,7 +2723,8 @@ const resetForm = () => {
   justify-content: space-between;
   align-items: center;
   border-bottom: 1px dashed #dcdfe6;
-  padding-bottom: 16px;  /* 这个 padding 不影响外部间距，因为 gap 已经处理了 */
+  padding-bottom: 16px;
+  /* 这个 padding 不影响外部间距，因为 gap 已经处理了 */
 }
 
 /* 项目操作区 */
@@ -3186,6 +3081,7 @@ const resetForm = () => {
     opacity: 0;
     transform: translateY(20px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -3196,9 +3092,17 @@ const resetForm = () => {
   animation: slideInUp 0.4s ease forwards;
 }
 
-.priority-card:nth-child(1) { animation-delay: 0.05s; }
-.priority-card:nth-child(2) { animation-delay: 0.1s; }
-.priority-card:nth-child(3) { animation-delay: 0.15s; }
+.priority-card:nth-child(1) {
+  animation-delay: 0.05s;
+}
+
+.priority-card:nth-child(2) {
+  animation-delay: 0.1s;
+}
+
+.priority-card:nth-child(3) {
+  animation-delay: 0.15s;
+}
 
 /* 底部操作按钮 */
 .form-actions {
@@ -3405,6 +3309,7 @@ const resetForm = () => {
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -3477,6 +3382,7 @@ const resetForm = () => {
   from {
     transform: rotate(0deg);
   }
+
   to {
     transform: rotate(360deg);
   }
@@ -3831,6 +3737,7 @@ const resetForm = () => {
   from {
     transform: rotate(0deg);
   }
+
   to {
     transform: rotate(360deg);
   }
@@ -4306,5 +4213,4 @@ const resetForm = () => {
   color: #409eff;
   font-weight: 500;
 }
-
 </style>

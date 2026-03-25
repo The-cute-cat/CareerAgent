@@ -77,11 +77,7 @@ export const mockResumeUploadSuccess: Result<UploadResponse> = {
         desc: '参与公司核心业务系统开发，负责订单管理模块的设计与实现'
       }
     ],
-    quizScores: {
-      communication: 80,
-      stress: 55,
-      learning: 85
-    },
+    quizDetail:undefined,
     innovation: '通过引入Redis缓存和数据库索引优化，将系统查询性能提升30%',
     targetJob: '', // 故意留空，测试必填检测
     targetIndustries: [], // 故意留空，测试必填检测
@@ -115,11 +111,7 @@ export const mockResumeUploadPartial: Result<UploadResponse> = {
     codeAbility: { links: '' },
     projects: [],
     internships: [],
-    quizScores: {
-      communication: 0,
-      stress: 0,
-      learning: 0
-    },
+    quizDetail:undefined,
     innovation: '', // 缺失
     targetJob: '', // 缺失
     targetIndustries: [], // 缺失
