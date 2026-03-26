@@ -2,10 +2,10 @@
 import { ref, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-
 import type { LoginFormDTO } from '@/types/user'
 import { userRegisterService, userSendCodeRegisterService } from '@/api/user/user'
 import { useUserStore } from '@/stores'
+import { ArrowRight, Hide, Lock, Message, User, View, Key } from '@element-plus/icons-vue'
 
 const form = ref<LoginFormDTO>({})
 const router = useRouter()
@@ -13,15 +13,11 @@ const userStore = useUserStore()
 const showPassword = ref(false)
 const showConfirmPassword = ref(false)
 const loading = ref(false)
-
-// 验证码相关状态
 const codeSending = ref(false)
 const codeCountdown = ref(0)
 let countdownTimer: number | null = null
 
-// 发送验证码函数
 const sendVerificationCode = async () => {
-  // 简单的邮箱格式校验
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   if (!form.value.email) {
     ElMessage.warning('请输入邮箱地址')
@@ -34,18 +30,15 @@ const sendVerificationCode = async () => {
 
   codeSending.value = true
   try {
-    console.log('发送验证码至邮箱:', form.value.email)
     const res = await userSendCodeRegisterService(form.value)
-    console.log('验证码发送结果:', res)
     if (res.data.code !== 200) {
       ElMessage.error(res.data.msg || '验证码发送失败')
       return
     }
     ElMessage.success(`验证码已发送至 ${form.value.email}，请查收`)
-    // 启动倒计时 60 秒
     codeCountdown.value = 60
     if (countdownTimer) clearInterval(countdownTimer)
-    countdownTimer = setInterval(() => {
+    countdownTimer = window.setInterval(() => {
       if (codeCountdown.value > 0) {
         codeCountdown.value--
       } else {
@@ -62,12 +55,10 @@ const sendVerificationCode = async () => {
 }
 
 const handleRegister = async () => {
-  // 前端验证：密码一致
   if (form.value.password !== form.value.passwordConfirm) {
     ElMessage.warning('两次输入的密码不一致')
     return
   }
-  // 验证码不能为空
   if (!form.value.code) {
     ElMessage.warning('请输入验证码')
     return
@@ -76,7 +67,6 @@ const handleRegister = async () => {
   loading.value = true
   try {
     const res = await userRegisterService(form.value)
-    console.log('注册结果:', res)
     if (res.data.code !== 200) {
       ElMessage.error(res.data.msg || '注册失败')
       return
@@ -88,13 +78,11 @@ const handleRegister = async () => {
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : '注册失败'
     ElMessage.error(errorMessage)
-    console.log("注册失败", error)
   } finally {
     loading.value = false
   }
 }
 
-// 清理定时器
 onUnmounted(() => {
   if (countdownTimer) {
     clearInterval(countdownTimer)
@@ -104,229 +92,421 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <link href="https://fonts.googleapis.com/css?family=Lato:300,400,700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+  <section class="auth-page">
+    <div class="auth-page__glow auth-page__glow--left"></div>
+    <div class="auth-page__glow auth-page__glow--right"></div>
 
-  <section class="ftco-section">
-    <div class="container">
-      <div class="row justify-content-center">
-        <div class="col-md-6 text-center mb-5">
-          <h2 class="heading-section">职业规划AI智能体</h2>
+    <div class="auth-shell">
+      <aside class="auth-aside">
+        <span class="auth-badge">新用户加入</span>
+        <h1>创建账号后，职业画像和分析结果都能持续沉淀。</h1>
+        <p>保留原有注册字段和验证码流程，只把界面升级为更符合当前审美和操作习惯的认证体验。</p>
+
+        <div class="aside-card">
+          <strong>注册后你可以</strong>
+          <ul>
+            <li>上传简历并自动填充画像表单</li>
+            <li>沉淀岗位推荐和能力分析记录</li>
+            <li>后续继续查看报告与发展路径</li>
+          </ul>
         </div>
-      </div>
-      <div class="row justify-content-center">
-        <div class="col-md-12 col-lg-10">
-          <div class="wrap d-md-flex">
-            <!-- 左侧背景图  -->
-            <div class="img" :style="{ backgroundImage: 'url(/images/bg-1.jpg)' }"></div>
+      </aside>
 
-            <!-- 右侧注册表单  -->
-            <div class="login-wrap p-4 p-md-5">
-              <div class="d-flex">
-                <div class="w-100">
-                  <h3 class="mb-4">注册</h3>
-                </div>
-              </div>
-
-              <form class="signin-form" @submit.prevent="handleRegister">
-                <!-- 昵称 -->
-                <div class="form-group mb-3">
-                  <label class="label" for="username">昵称</label>
-                  <input type="text" class="form-control" placeholder="请输入昵称" id="username" v-model="form.username"
-                    required />
-                </div>
-
-                <!-- 邮箱  -->
-                <div class="form-group mb-3">
-                  <label class="label" for="email">邮箱</label>
-                  <input type="email" class="form-control" placeholder="请输入邮箱地址" id="email" v-model="form.email"
-                    required />
-                </div>
-
-                <!-- 密码 -->
-                <div class="form-group mb-3">
-                  <label class="label" for="password">密码</label>
-                  <div class="position-relative">
-                    <input :type="showPassword ? 'text' : 'password'" class="form-control" placeholder="请输入密码"
-                      id="password" v-model="form.password" required />
-                    <span class="fa fa-fw" :class="showPassword ? 'fa-eye-slash' : 'fa-eye'"
-                      @click="showPassword = !showPassword"
-                      style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer;"></span>
-                  </div>
-                </div>
-
-                <!-- 确认密码 (带独立显示切换) -->
-                <div class="form-group mb-3">
-                  <label class="label" for="password_confirm">确认密码</label>
-                  <div class="position-relative">
-                    <input :type="showConfirmPassword ? 'text' : 'password'" class="form-control" placeholder="请再次输入密码"
-                      id="password_confirm" v-model="form.passwordConfirm" required />
-                    <span class="fa fa-fw" :class="showConfirmPassword ? 'fa-eye-slash' : 'fa-eye'"
-                      @click="showConfirmPassword = !showConfirmPassword"
-                      style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer;"></span>
-                  </div>
-                </div>
-
-                <!-- 验证码输入框 + 发送按钮 (放在最下面，位于同一行) -->
-                <div class="form-group mb-3">
-                  <label class="label" for="verification_code">验证码</label>
-                  <div class="d-flex align-items-center gap-2" style="gap: 8px;">
-                    <input type="text" class="form-control" placeholder="请输入邮箱收到的验证码" id="verification_code"
-                      v-model="form.code" required style="flex: 1;" />
-                    <button type="button" class="btn btn-outline-secondary" style="width: 120px; white-space: nowrap;"
-                      @click="sendVerificationCode" :disabled="codeSending || codeCountdown > 0">
-                      <span v-if="codeSending">发送中...</span>
-                      <span v-else-if="codeCountdown > 0">{{ codeCountdown }}秒后重发</span>
-                      <span v-else>发送验证码</span>
-                    </button>
-                  </div>
-                </div>
-
-                <!-- 注册按钮 -->
-                <div class="form-group">
-                  <button type="submit" class="form-control btn btn-primary rounded submit px-3" :disabled="loading">
-                    {{ loading ? '注册中...' : '注册' }}
-                  </button>
-                </div>
-              </form>
-
-              <!-- 登录链接 -->
-              <p class="text-center">
-                已有账号?
-                <router-link to="/login">登录</router-link>
-              </p>
-            </div>
+      <main class="auth-main">
+        <div class="auth-panel">
+          <div class="panel-header">
+            <span class="panel-eyebrow">创建账号</span>
+            <h2>注册 Career Pilot</h2>
+            <p>填写基础账号信息，完成邮箱验证后即可开始使用。</p>
           </div>
+
+          <form class="auth-form" @submit.prevent="handleRegister">
+            <label class="field">
+              <span class="field-label">昵称</span>
+              <div class="field-box">
+                <el-icon><User /></el-icon>
+                <input v-model="form.username" type="text" placeholder="请输入昵称" required />
+              </div>
+            </label>
+
+            <label class="field">
+              <span class="field-label">邮箱</span>
+              <div class="field-box">
+                <el-icon><Message /></el-icon>
+                <input v-model="form.email" type="email" placeholder="请输入邮箱地址" required />
+              </div>
+            </label>
+
+            <label class="field">
+              <span class="field-label">密码</span>
+              <div class="field-box">
+                <el-icon><Lock /></el-icon>
+                <input
+                  v-model="form.password"
+                  :type="showPassword ? 'text' : 'password'"
+                  placeholder="请输入密码"
+                  required
+                />
+                <button type="button" class="toggle-btn" @click="showPassword = !showPassword">
+                  <el-icon><component :is="showPassword ? Hide : View" /></el-icon>
+                </button>
+              </div>
+            </label>
+
+            <label class="field">
+              <span class="field-label">确认密码</span>
+              <div class="field-box">
+                <el-icon><Lock /></el-icon>
+                <input
+                  v-model="form.passwordConfirm"
+                  :type="showConfirmPassword ? 'text' : 'password'"
+                  placeholder="请再次输入密码"
+                  required
+                />
+                <button type="button" class="toggle-btn" @click="showConfirmPassword = !showConfirmPassword">
+                  <el-icon><component :is="showConfirmPassword ? Hide : View" /></el-icon>
+                </button>
+              </div>
+            </label>
+
+            <label class="field">
+              <span class="field-label">验证码</span>
+              <div class="field-box field-box--with-action">
+                <div class="field-box__input">
+                  <el-icon><Key /></el-icon>
+                  <input v-model="form.code" type="text" placeholder="请输入邮箱验证码" required />
+                </div>
+                <button
+                  type="button"
+                  class="secondary-btn"
+                  @click="sendVerificationCode"
+                  :disabled="codeSending || codeCountdown > 0"
+                >
+                  <span v-if="codeSending">发送中...</span>
+                  <span v-else-if="codeCountdown > 0">{{ codeCountdown }}s</span>
+                  <span v-else>发送验证码</span>
+                </button>
+              </div>
+            </label>
+
+            <button type="submit" class="primary-btn" :disabled="loading">
+              <span>{{ loading ? '注册中...' : '注册并开始使用' }}</span>
+              <el-icon><ArrowRight /></el-icon>
+            </button>
+          </form>
+
+          <p class="panel-footer">
+            已有账号？
+            <router-link to="/login" class="text-link">去登录</router-link>
+          </p>
         </div>
-      </div>
+      </main>
     </div>
   </section>
 </template>
 
 <style scoped>
-@import '/css/style.css';
-
-/* 全局居中布局 */
-.ftco-section {
+.auth-page {
+  position: relative;
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
-  width: 100vw;
-  background: linear-gradient(135deg, #7b7474 0%, #b0b2b4 50%, #7b7d7e 100%);
+  padding: 24px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at top left, rgba(15, 118, 110, 0.18), transparent 24%),
+    radial-gradient(circle at bottom right, rgba(249, 115, 22, 0.14), transparent 24%),
+    linear-gradient(180deg, #f4f7f4 0%, #f8f4ee 100%);
 }
 
-.ftco-section .container {
-  width: 100% !important;
-  max-width: 1200px !important;
-  margin: 0 auto !important;
-  padding-left: 20px;
-  padding-right: 20px;
+.auth-page__glow {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(64px);
+  pointer-events: none;
 }
 
-/* 增大的内容框 */
-.wrap {
-  min-height: 650px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+.auth-page__glow--left {
+  width: 320px;
+  height: 320px;
+  left: -100px;
+  top: 80px;
+  background: rgba(20, 184, 166, 0.18);
 }
 
-.wrap .img,
-.wrap .login-wrap {
-  width: 50%;
+.auth-page__glow--right {
+  width: 360px;
+  height: 360px;
+  right: -100px;
+  bottom: 40px;
+  background: rgba(251, 146, 60, 0.14);
 }
 
-.wrap .img {
-  min-height: 650px;
+.auth-shell {
+  position: relative;
+  z-index: 1;
+  width: min(1220px, 100%);
+  display: grid;
+  grid-template-columns: minmax(320px, 0.95fr) minmax(460px, 0.9fr);
+  border-radius: 32px;
+  overflow: hidden;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 30px 80px rgba(15, 23, 42, 0.14);
+  background: rgba(255, 255, 255, 0.68);
+  backdrop-filter: blur(24px);
 }
 
-.wrap .login-wrap {
-  padding: 45px !important;
+.auth-aside {
+  padding: 48px;
+  background: linear-gradient(160deg, rgba(18, 42, 39, 0.96), rgba(15, 118, 110, 0.88));
+  color: #f8fafc;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 28px;
 }
 
-/* 表单元素增大 */
-.form-control {
-  height: 52px;
-  font-size: 15px;
-  padding: 10px 14px;
-}
-
-.form-group .label {
+.auth-badge {
+  display: inline-flex;
+  width: fit-content;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
   font-size: 13px;
-  margin-bottom: 6px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
-.form-group {
-  margin-bottom: 16px !important;
+.auth-aside h1 {
+  font-size: 40px;
+  line-height: 1.15;
+  margin: 0;
 }
 
-.btn-primary {
-  height: 52px;
+.auth-aside p {
+  margin: 0;
+  color: rgba(241, 245, 249, 0.82);
+  font-size: 15px;
+  line-height: 1.9;
+}
+
+.aside-card {
+  padding: 22px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.aside-card strong {
+  display: block;
+  margin-bottom: 12px;
   font-size: 16px;
+}
+
+.aside-card ul {
+  margin: 0;
+  padding-left: 18px;
+  line-height: 2;
+  color: rgba(241, 245, 249, 0.88);
+}
+
+.auth-main {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 36px;
+}
+
+.auth-panel {
+  width: min(500px, 100%);
+  padding: 12px 6px;
+}
+
+.panel-header {
+  margin-bottom: 28px;
+}
+
+.panel-eyebrow {
+  display: inline-block;
+  margin-bottom: 10px;
+  color: var(--color-primary);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.panel-header h2 {
+  margin: 0 0 10px;
+  color: var(--color-heading);
+  font-size: 34px;
+  line-height: 1.15;
+}
+
+.panel-header p {
+  margin: 0;
+  color: var(--color-text-soft);
+  line-height: 1.8;
+}
+
+.auth-form {
+  display: grid;
+  gap: 18px;
+}
+
+.field {
+  display: grid;
+  gap: 10px;
+}
+
+.field-label {
+  color: var(--color-heading);
+  font-size: 14px;
   font-weight: 600;
 }
 
-h3.mb-4 {
-  font-size: 26px;
-  margin-bottom: 25px !important;
+.field-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 0 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.86);
 }
 
-/* 响应式调整 */
-@media (max-width: 991.98px) {
-  .wrap .img,
-  .wrap .login-wrap {
+.field-box .el-icon {
+  color: var(--color-text-soft);
+  font-size: 18px;
+}
+
+.field-box input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  outline: none;
+  color: var(--color-heading);
+  font-size: 15px;
+}
+
+.field-box--with-action {
+  justify-content: space-between;
+  padding-right: 8px;
+}
+
+.field-box__input {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.toggle-btn,
+.secondary-btn {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.toggle-btn {
+  color: var(--color-text-soft);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.secondary-btn {
+  min-width: 112px;
+  height: 42px;
+  padding: 0 14px;
+  border-radius: 14px;
+  background: rgba(15, 118, 110, 0.1);
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
+.secondary-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.text-link {
+  color: var(--color-primary);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.primary-btn {
+  min-height: 56px;
+  border: none;
+  border-radius: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.primary-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 18px 30px rgba(15, 118, 110, 0.22);
+}
+
+.primary-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.panel-footer {
+  margin: 22px 0 0;
+  color: var(--color-text-soft);
+  text-align: center;
+}
+
+@media (max-width: 960px) {
+  .auth-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .auth-aside {
+    padding: 32px;
+  }
+
+  .auth-aside h1 {
+    font-size: 30px;
+  }
+}
+
+@media (max-width: 640px) {
+  .auth-page {
+    padding: 14px;
+  }
+
+  .auth-main,
+  .auth-aside {
+    padding: 24px 20px;
+  }
+
+  .panel-header h2 {
+    font-size: 28px;
+  }
+
+  .field-box--with-action {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 10px;
+  }
+
+  .secondary-btn {
     width: 100%;
   }
-  
-  .wrap .img {
-    min-height: 180px;
-    height: 180px;
-  }
-}
-
-.heading-section {
-  font-size: 30px;
-  font-weight: 600;
-  color: #201f1f;
-  margin-bottom: 20px;
-}
-
-/* 补充样式，确保发送验证码按钮与输入框对齐 */
-.d-flex.gap-2 {
-  gap: 12px !important;
-}
-
-/* 发送验证码按钮样式 */
-.btn-outline-secondary {
-  height: 52px !important;
-  padding: 0 16px;
-  background: transparent;
-  border: 1px solid #d1d5db !important;
-  border-radius: 10px;
-  color: #6b7280 !important;
-  font-size: 14px;
-  font-weight: 500;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.btn-outline-secondary:hover:not(:disabled) {
-  border-color: #9ca3af !important;
-  color: #4b5563 !important;
-  background: #f9fafb;
-}
-
-.btn-outline-secondary:disabled {
-  border-color: #e5e7eb !important;
-  color: #d1d5db !important;
-  cursor: not-allowed;
-  background: transparent;
-}
-
-/* 保持按钮与输入框高度一致 */
-.form-group .btn {
-  height: 52px;
-  line-height: 1.5;
 }
 </style>

@@ -9,7 +9,7 @@ const ENABLE_MOCK = import.meta.env.VITE_ENABLE_MOCK === 'true'
 
 /**
  * 提交职业规划表单数据
- * 后端直接返回人岗匹配结果，无需轮询
+ * 后端直接返回人岗匹配结果数组，无需轮询
  * @param data 表单数据
  * @returns 人岗匹配分析结果（包含推荐岗位列表）
  */
@@ -18,7 +18,7 @@ export function submitCareerFormApi(data: CareerFormSubmitDTO) {
     console.log('[Mock] 提交表单数据:', data)
     return mockSubmitFormApi('success', 1000)
   }
-  return request.post<Result<JobMatchItem[]>>('/career/form/submit', data)
+  return request.post<Result<JobMatchItem[]>>('/convert/user_form_to_userprofile', data)
 }
 
 /**
