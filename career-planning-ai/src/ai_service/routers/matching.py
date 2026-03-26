@@ -28,7 +28,6 @@ async def match_jobs(
     """
     try:
         log.info(f"--- 正在为学生匹配最合适的岗位 ---")
-        print(student_profile)
 
         # 1. 向量数据库初步召回
         # 注意：如果 match_jobs_for_student 是同步阻塞方法且耗时较长，建议使用 asyncio.to_thread 包裹
