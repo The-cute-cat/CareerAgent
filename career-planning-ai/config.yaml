@@ -63,7 +63,7 @@ image:
   extra:
     temperature: 0.7
 test_question:
-  model_name: qwen-plus
+  model_name: qwen-max
   timeout: 60
   extra:
     temperature: 0.7

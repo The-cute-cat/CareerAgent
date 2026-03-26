@@ -58,7 +58,7 @@ public class ConvertDTO {
     private static class Internship {
         private String company;
         private String role;
-        private Date[] date;
+        private String[] date;
         private String desc;
     }
 
