@@ -3,13 +3,8 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
-  House,
-  Document,
-  DataAnalysis,
-  User,
-  Menu as IconMenu,
-  TrendCharts,
-  Setting
+  House,Document,DataAnalysis,User,
+  Menu as IconMenu,TrendCharts,Setting
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
@@ -38,10 +33,10 @@ const menuItems = [
 <template>
   <div class="sidebar-container">
     <div class="logo-wrapper">
-      <div class="logo-icon-box">
-        <el-icon :size="20" color="#fff"><IconMenu /></el-icon>
+      <div class="logo-icon-box" style="background: transparent; box-shadow: none;">
+        <img src="../assets/1234.png" alt="logo" style="width: 100%; height: 100%; object-fit: contain;" />
       </div>
-      <span class="logo-text">AI Career</span>
+      <span class="logo-text">职引未来</span>
     </div>
     
     <div class="menu-wrapper">
@@ -82,9 +77,9 @@ const menuItems = [
 }
 
 .logo-icon-box {
-  width: 38px;
-  height: 38px;
-  border-radius: 12px;
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
   background: linear-gradient(135deg, #409EFF 0%, #764BA2 100%);
   display: flex;
   align-items: center;
@@ -93,8 +88,8 @@ const menuItems = [
 }
 
 .logo-text {
-  margin-left: 14px;
-  font-size: 20px;
+  margin-left: 16px;
+  font-size: 22px;
   font-weight: 800;
   background: linear-gradient(135deg, #2b3240 0%, #409EFF 100%);
   -webkit-background-clip: text;
