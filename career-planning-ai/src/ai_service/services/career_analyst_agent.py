@@ -113,6 +113,7 @@ class CareerAnalystAgent:
                     "required": "岗位要求什么",
                     "current": "求职者目前如何",
                     "gap_analysis": "具体差距分析"
+                    “adaptability”：“对技能的评价（只有低/中/高）”
                 }}
             ],
             "actionable_advice": "一句话建议"

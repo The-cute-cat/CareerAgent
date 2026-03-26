@@ -41,6 +41,11 @@ public class ConvertController {
         params.put("targetIndustries", convertDTO.getTargetIndustries());
         params.put("priorities",convertDTO.getPriorities());
         AiChatResponse aiChatResponse = aiServiceClient.chatWithOtherJson("/convert/user_form_to_userprofile", params);
+
+        Map<String,Object>params2 = new HashMap<>();
+        params2.put("student_profile", aiChatResponse.getData());
+
+        aiChatResponse=aiServiceClient.chatWithOtherJson("/matching/jobs", params2);
         return aiChatResponse.getData();
     }
 
