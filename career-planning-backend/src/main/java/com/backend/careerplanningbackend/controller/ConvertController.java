@@ -26,26 +26,24 @@ public class ConvertController {
         log.info("userFormToUserProfile接收到的参数: {}", convertDTO);
         Map<String, Object> params = new HashMap<>();
         params.put("education", convertDTO.getEducation());
-        params.put("major",convertDTO.getMajor());
+        params.put("major", convertDTO.getMajor());
         params.put("graduationDate", convertDTO.getGraduationDate());
-        params.put("languages",convertDTO.getLanguages());
+        params.put("languages", convertDTO.getLanguages());
         params.put("certificates", convertDTO.getCertificates());
         params.put("skills", convertDTO.getSkills());
         params.put("tools", convertDTO.getTools());
         params.put("codeLinks", convertDTO.getCodeLinks());
-        params.put("projects",convertDTO.getProjects());
-        params.put("internships",convertDTO.getInternships());
-        params.put("quizDetail",convertDTO.getQuizDetail());
-        params.put("innovation",convertDTO.getInnovation());
+        params.put("projects", convertDTO.getProjects());
+        params.put("internships", convertDTO.getInternships());
+        params.put("quizDetail", convertDTO.getQuizDetail());
+        params.put("innovation", convertDTO.getInnovation());
         params.put("targetJob", convertDTO.getTargetJob());
         params.put("targetIndustries", convertDTO.getTargetIndustries());
-        params.put("priorities",convertDTO.getPriorities());
+        params.put("priorities", convertDTO.getPriorities());
         AiChatResponse aiChatResponse = aiServiceClient.chatWithOtherJson("/convert/user_form_to_userprofile", params);
-
-        Map<String,Object>params2 = new HashMap<>();
+        Map<String, Object> params2 = new HashMap<>();
         params2.put("student_profile", aiChatResponse.getData());
-
-        aiChatResponse=aiServiceClient.chatWithOtherJson("/matching/jobs", params2);
+        aiChatResponse = aiServiceClient.chatWithOtherJson("/matching/jobs", params2);
         return aiChatResponse.getData();
     }
 

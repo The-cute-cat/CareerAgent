@@ -38,5 +38,4 @@ async def user_form_to_userprofile(
         :param _:
     """
     user_profile = await struct_text_extractor.extract_from_user_form_to_userprofile(user_form)
-    # 这里直接返回输入的用户表单数据，实际应用中可以进行更复杂的转换逻辑
     return success(user_profile)
