@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/modules/user'
 import { ArrowDown, User, SwitchButton } from '@element-plus/icons-vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox } fromment-plus'
 
 const route = useRoute()
 const router = useRouter()
@@ -54,10 +54,10 @@ const confirmLogout = () => {
 </script>
 
 <template>
-  <header class="header">
+  <header class="header glass-header">
     <div class="header-left">
       <div class="breadcrumb">
-        <span class="app-name">职业规划智能体</span>
+        <span class="app-name">AI Career Agent</span>
         <span class="divider">/</span>
         <span class="page-title">{{ currentTitle }}</span>
       </div>
@@ -65,15 +65,15 @@ const confirmLogout = () => {
     <div class="header-right">
       <!-- 未登录状态：显示登录/注册按钮 -->
       <div v-if="!isLoggedIn" class="auth-buttons">
-        <el-button type="primary" size="small" @click="router.push('/login')">登录</el-button>
-        <el-button type="default" size="small" @click="router.push('/register')">注册</el-button>
+        <el-button class="custom-btn-primary" type="primary" round @click="router.push('/login')">登录</el-button>
+        <el-button class="custom-btn-default" round @click="router.push('/register')">注册</el-button>
       </div>
 
       <!-- 已登录状态：显示用户信息下拉菜单 -->
       <el-dropdown v-else @command="handleCommand" trigger="click">
         <div class="user-info">
           <div class="user-avatar">
-            {{ userName.charAt(0) }}
+            {{ userName.charAt(0).toUpperCase() }}
           </div>
           <span class="user-name">{{ userName }}</span>
           <el-icon class="dropdown-icon">
@@ -81,21 +81,15 @@ const confirmLogout = () => {
           </el-icon>
         </div>
         <template #dropdown>
-          <el-dropdown-menu>
+          <el-dropdown-menu class="custom-dropdown">
             <el-dropdown-item command="profile">
-              <el-icon>
-                <User />
-              </el-icon>
+              <el-icon><User /></el-icon>
               个人中心
             </el-dropdown-item>
-
-            <el-dropdown-item divided command="logout">
-              <el-icon>
-                <SwitchButton />
-              </el-icon>
+            <el-dropdown-item divided command="logout" class="logout-item">
+              <el-icon><SwitchButton /></el-icon>
               退出登录
             </el-dropdown-item>
-
           </el-dropdown-menu>
         </template>
       </el-dropdown>
@@ -104,15 +98,18 @@ const confirmLogout = () => {
 </template>
 
 <style scoped>
-.header {
+.glass-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  height: 60px;
-  padding: 0 24px;
-  background: #ffffff;
-  border-bottom: 1px solid #e4e7ed;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+  height: 64px;
+  padding: 0 28px;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.02);
+  z-index: 50;
 }
 
 .header-left {
@@ -124,17 +121,20 @@ const confirmLogout = () => {
   display: flex;
   align-items: center;
   gap: 12px;
-  font-size: 14px;
+  font-size: 15px;
 }
 
 .app-name {
-  font-weight: 600;
-  color: #409eff;
+  font-weight: 700;
+  background: linear-gradient(135deg, #409eff 0%, #764BA2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
   font-size: 16px;
+  letter-spacing: 0.5px;
 }
 
 .divider {
-  color: #dcdfe6;
+  color: #c0c4cc;
 }
 
 .page-title {
@@ -153,18 +153,47 @@ const confirmLogout = () => {
   gap: 12px;
 }
 
-.user-info {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 12px;
-  border-radius: 8px;
-  cursor: pointer;
+.custom-btn-primary {
+  background: linear-gradient(135deg, #409eff 0%, #1677ff 100%);
+  border: none;
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.3);
   transition: all 0.3s ease;
 }
 
+.custom-btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(64, 158, 255, 0.4);
+}
+
+.custom-btn-default {
+  border: 1px solid rgba(64, 158, 255, 0.5);
+  color: #409eff;
+  background: transparent;
+  transition: all 0.3s ease;
+}
+
+.custom-btn-default:hover {
+  background: rgba(64, 158, 255, 0.1);
+  color: #1677ff;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 .user-info:hover {
-  background-color: #f5f7fa;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transform: translateY(-1px);
 }
 
 .user-avatar {
@@ -178,12 +207,13 @@ const confirmLogout = () => {
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: 0 2px 6px rgba(64, 158, 255, 0.3);
 }
 
 .user-name {
   font-size: 14px;
-  color: #606266;
-  font-weight: 500;
+  color: #303133;
+  font-weight: 600;
 }
 
 .dropdown-icon {
@@ -194,5 +224,23 @@ const confirmLogout = () => {
 
 .user-info:hover .dropdown-icon {
   transform: rotate(180deg);
+  color: #409eff;
+}
+
+:deep(.custom-dropdown) {
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.9);
+}
+
+:deep(.logout-item) {
+  color: #f56c6c !important;
+}
+
+:deep(.logout-item:hover) {
+  background: rgba(245, 108, 108, 0.1) !important;
+  color: #f56c6c !important;
 }
 </style>
