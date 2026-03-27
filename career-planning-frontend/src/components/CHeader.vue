@@ -57,7 +57,7 @@ const confirmLogout = () => {
   <header class="header glass-header">
     <div class="header-left">
       <div class="breadcrumb">
-        <span class="app-name">AI Career Agent</span>
+        <span class="app-name">职引未来</span>
         <span class="divider">/</span>
         <span class="page-title">{{ currentTitle }}</span>
       </div>
