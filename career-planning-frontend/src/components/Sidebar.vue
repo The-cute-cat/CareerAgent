@@ -10,7 +10,7 @@ import {
   Menu as IconMenu,
   TrendCharts,
   Setting
-} from '@element-plus/icons-vue'//element-plus自带的图标组件
+} from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -38,59 +38,119 @@ const menuItems = [
 <template>
   <div class="sidebar-container">
     <div class="logo-wrapper">
-      <el-icon :size="24" color="#409EFF"><IconMenu /></el-icon>
-      <span class="logo-text">职业规划智能体</span>
+      <div class="logo-icon-box">
+        <el-icon :size="20" color="#fff"><IconMenu /></el-icon>
+      </div>
+      <span class="logo-text">AI Career</span>
     </div>
     
-    <el-menu
-      :default-active="activeIndex"
-      class="side-menu"
-      background-color="#304156"
-      text-color="#bfcbd9"
-      active-text-color="#409EFF"
-      :unique-opened="true"
-      @select="handleSelect"
-    >
-      <el-menu-item v-for="item in menuItems" :key="item.index" :index="item.index">
-        <el-icon><component :is="item.icon" /></el-icon>
-        <span>{{ item.text }}</span>
-      </el-menu-item>
-    </el-menu>
+    <div class="menu-wrapper">
+      <el-menu
+        :default-active="activeIndex"
+        class="side-menu"
+        :unique-opened="true"
+        @select="handleSelect"
+      >
+        <el-menu-item v-for="item in menuItems" :key="item.index" :index="item.index" class="custom-menu-item">
+          <el-icon><component :is="item.icon" /></el-icon>
+          <template #title>
+            <span class="menu-text">{{ item.text }}</span>
+          </template>
+        </el-menu-item>
+      </el-menu>
+    </div>
   </div>
 </template>
 
 <style scoped>
 .sidebar-container {
   height: 100%;
-  background-color: #304156;
+  background: transparent;
   display: flex;
   flex-direction: column;
+  position: relative;
+  z-index: 100;
 }
 
 .logo-wrapper {
-  height: 60px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  background: transparent;
+  margin-bottom: 10px;
+}
+
+.logo-icon-box {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #409EFF 0%, #764BA2 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #2b3a4b;
-  color: #fff;
-  font-size: 18px;
-  font-weight: bold;
-  border-bottom: 1px solid #3d4a5a;
+  box-shadow: 0 8px 16px rgba(64, 158, 255, 0.25);
 }
 
 .logo-text {
-  margin-left: 10px;
+  margin-left: 14px;
+  font-size: 20px;
+  font-weight: 800;
+  background: linear-gradient(135deg, #2b3240 0%, #409EFF 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: 0.5px;
+}
+
+.menu-wrapper {
+  flex: 1;
+  padding: 10px 16px;
+  overflow-y: auto;
 }
 
 .side-menu {
   border-right: none;
-  flex: 1;
-  overflow-y: auto;
+  background: transparent;
 }
 
-/* 隐藏滚动条但保留功能 */
+.custom-menu-item {
+  height: 52px;
+  line-height: 52px;
+  border-radius: 12px;
+  margin-bottom: 8px;
+  color: #606266;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.custom-menu-item:hover {
+  background: rgba(64, 158, 255, 0.08);
+  color: #409EFF;
+  transform: translateX(4px);
+}
+
+:deep(.el-menu-item.is-active) {
+  background: linear-gradient(90deg, rgba(64, 158, 255, 0.1) 0%, rgba(64, 158, 255, 0.02) 100%) !important;
+  color: #409EFF !important;
+  font-weight: 600;
+}
+
+:deep(.el-menu-item.is-active)::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 12px;
+  bottom: 12px;
+  width: 4px;
+  border-radius: 4px;
+  background: #409EFF;
+}
+
 .side-menu::-webkit-scrollbar {
   width: 0;
+}
+
+.menu-text {
+  font-size: 15px;
+  margin-left: 4px;
 }
 </style>
