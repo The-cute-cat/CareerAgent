@@ -1,565 +1,295 @@
-<script setup lang="ts">
-import type { UserStuInfo } from '@/types/user'
-import { userGetUserBasicFileInfoService } from '@/api/user/user'
-import { ref, reactive, onMounted } from 'vue'
+<script setup>
+import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import {
-  User, School, Reading, Collection, Key, Lock, Unlock,
-  Document, Edit, Check, Close, Phone, Link, TrendCharts
-} from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/modules/user'
-import {
-  educationLevels, graduationYearOptions, profileFormData,
-  privacySettingsData, progressColors
-} from '@/mock/data'
+
+import ProfileInfoPanel from '../components/CProfile_Component/ProfileInfoPanel.vue'
+import ProfileSidebar from '../components/CProfile_Component/ProfileSidebar.vue'
+import MemberPlanPanel from '../components/CProfile_Component/MemberPlanPanel.vue'
+import InviteFriendsPanel from '../components/CProfile_Component/InviteFriendsPanel.vue'
+import FeedbackPanel from '../components/CProfile_Component/FeedbackPanel.vue'
+import MoreSettingsPanel from '../components/CProfile_Component/MoreSettingsPanel.vue'
 
 const userStore = useUserStore()
+const sidebarCollapsed = ref(false)
 
-// 编辑状态
-const isEditing = ref(false)
+const activeMenu = ref('profile')
+const defaultAvatar = 'https://picsum.photos/200/200'
 
-// 个人档案表单
-const userInfo = ref<UserStuInfo>({})
-userInfo.value = { ...profileFormData }
-console.log("userInfo", userInfo.value);
-
-// const userInfo = reactive({ ...profileFormData })
-
-// 原始数据（用于取消编辑）
-let originalProfile = { ...userInfo }
-
-// 隐私设置
-const privacySettings = reactive({
-  ...privacySettingsData,
-  // 能力画像可见性
-  profileVisibility: 'private' as 'public' | 'private',
-  // 职业路径可见性
-  careerPathVisibility: 'public' as 'public' | 'private',
-  // 允许系统推荐匹配岗位
-  allowRecommendations: true,
-  // 允许企业查看基础信息
-  allowCompanyView: false
+const userInfo = ref({
+  name: `用户${userStore.userInfo?.id || 5442}`,
+  avatar: userStore.userInfo?.avatar || defaultAvatar,
+  signature: '成为更好的自己',
+  gender: '男',
+  education: '博士',
+  experience: '在校生',
+  industries: '互联网、电子商务、计算机',
+  jobs: 'Java、前端开发工程师'
 })
 
-// 进入编辑模式
-const startEdit = () => {
-  originalProfile = { ...userInfo }
-  isEditing.value = true
-}
+const displayPoints = computed(() => userStore.userInfo?.points || 300)
 
-// 保存个人信息
-const saveProfile = () => {
-  isEditing.value = false
-  ElMessage.success('个人信息已保存')
-  // 这里可以调用 API 保存到后端
-  console.log('保存的个人档案：', userInfo)
-}
+const menus = [
+  { key: 'profile', label: '个人资料' },
+  { key: 'member', label: '会员计划' },
+  { key: 'invite', label: '邀请好友' },
+  { key: 'feedback', label: '反馈建议' },
+  { key: 'setting', label: '更多设置' }
+]
 
-// 取消编辑
-const cancelEdit = () => {
-  Object.assign(userInfo, originalProfile)
-  isEditing.value = false
-  ElMessage.info('已取消编辑')
-}
-
-// 保存隐私设置
-const savePrivacy = () => {
-  ElMessage.success('隐私设置已保存')
-  // 这里可以调用 API 保存到后端
-  console.log('保存的隐私设置：', privacySettings)
-}
-
-// 获取用户数据
-onMounted(async () => {
-  const res = await userGetUserBasicFileInfoService()
-  if (res.data.code !== 200) {
-    throw new Error(res.data.msg || '获取用户信息失败')
+const pointRecords = ref([
+  {
+    id: 1,
+    type: '每日积分',
+    remain: 100,
+    total: 100,
+    expireText: ''
+  },
+  {
+    id: 2,
+    type: '邀请奖励',
+    remain: 200,
+    total: 200,
+    expireText: '距离到期还有 29 天'
   }
-  // 如果后端有数据，可以在这里加载
-  if (res.data.data) {
-    const resData = res.data.data
-    userInfo.value = resData
+])
+
+const inviteCode = ref('ZHILU2026')
+
+const panelTitleMap = {
+  profile: '个人资料',
+  member: '会员计划',
+  invite: '邀请好友',
+  feedback: '反馈建议',
+  setting: '更多设置'
+}
+
+const panelDescriptionMap = {
+  profile: '在这里完善你的资料、兴趣方向和职业偏好，让个人中心更像你的专属名片。',
+  member: '查看积分权益与会员状态，了解当前账户可使用的成长资源。',
+  invite: '把职业规划工具分享给朋友，一起解锁更多使用权益。',
+  feedback: '告诉我们你的使用感受和改进建议，帮助产品持续变得更好。',
+  setting: '统一管理隐私、协议、推荐偏好与账号相关设置。'
+}
+
+const updateUserInfo = (payload) => {
+  userInfo.value = {
+    ...userInfo.value,
+    ...payload
   }
-})
+
+  ElMessage({
+    message: '个人信息已更新',
+    type: 'success',
+    duration: 1800
+  })
+}
+
+const handleSettingAction = (key) => {
+  const actionMap = {
+    recommend: '后续可跳转到个性化推荐设置页',
+    agreement: '后续可跳转到用户协议页',
+    privacy: '后续可跳转到隐私政策页',
+    logout: '后续可接入退出登录逻辑',
+    cancel: '后续可接入注销账户逻辑',
+    contact: '后续可跳转到联系我们页面'
+  }
+
+  ElMessage({
+    message: actionMap[key] || '功能开发中',
+    type: 'info',
+    duration: 1800
+  })
+}
 </script>
 
 <template>
   <div class="profile-page">
-    <!-- 页面标题 -->
-    <div class="page-header">
-      <h2>个人中心</h2>
-      <span class="subtitle">管理您的个人信息和隐私设置</span>
+    <div class="page-glow page-glow-left"></div>
+    <div class="page-glow page-glow-right"></div>
+
+    <ProfileSidebar
+      v-model:activeMenu="activeMenu"
+      v-model:collapsed="sidebarCollapsed"
+      :menus="menus"
+      :user-info="userInfo"
+      :points="displayPoints"
+    />
+
+    <div class="right-panel">
+      <div class="panel-shell">
+        <div class="content-intro">
+          <div class="intro-badge">个人中心</div>
+          <h1>{{ panelTitleMap[activeMenu] }}</h1>
+          <p>{{ panelDescriptionMap[activeMenu] }}</p>
+        </div>
+
+        <transition name="fade-slide" mode="out-in">
+          <div :key="activeMenu" class="panel-content">
+            <ProfileInfoPanel
+              v-if="activeMenu === 'profile'"
+              :user-info="userInfo"
+              @update-user="updateUserInfo"
+            />
+
+            <MemberPlanPanel v-else-if="activeMenu === 'member'" :points="displayPoints" :records="pointRecords" />
+
+            <InviteFriendsPanel v-else-if="activeMenu === 'invite'" :invite-code="inviteCode" />
+
+            <FeedbackPanel v-else-if="activeMenu === 'feedback'" />
+
+            <MoreSettingsPanel v-else-if="activeMenu === 'setting'" @action="handleSettingAction" />
+          </div>
+        </transition>
+      </div>
     </div>
-
-    <el-row :gutter="20">
-      <!-- 左侧：个人档案 -->
-      <el-col :xs="24" :sm="24" :md="16">
-        <el-card class="profile-card" shadow="hover">
-          <template #header>
-            <div class="card-header">
-              <div class="header-left">
-                <el-icon :size="20">
-                  <User />
-                </el-icon>
-                <span>个人基础档案</span>
-              </div>
-              <div class="header-actions" v-if="!isEditing">
-                <el-button type="primary" size="small" @click="startEdit">
-                  <el-icon>
-                    <Edit />
-                  </el-icon>
-                  编辑
-                </el-button>
-              </div>
-              <div class="header-actions" v-else>
-                <el-button type="success" size="small" @click="saveProfile">
-                  <el-icon>
-                    <Check />
-                  </el-icon>
-                  保存
-                </el-button>
-                <el-button size="small" @click="cancelEdit">
-                  <el-icon>
-                    <Close />
-                  </el-icon>
-                  取消
-                </el-button>
-              </div>
-            </div>
-          </template>
-
-          <el-form :model="userInfo" label-width="100px" class="profile-form" :disabled="!isEditing">
-            <el-row :gutter="20">
-              <el-col :span="12">
-                <el-form-item label="姓名">
-                  <el-input v-model="userInfo.realName" placeholder="请输入姓名">
-                    <template #prefix>
-                      <el-icon>
-                        <User />
-                      </el-icon>
-                    </template>
-                  </el-input>
-                </el-form-item>
-              </el-col>
-              <el-col :span="12">
-                <el-form-item label="学校">
-                  <el-input v-model="userInfo.school" placeholder="请输入学校">
-                    <template #prefix>
-                      <el-icon>
-                        <School />
-                      </el-icon>
-                    </template>
-                  </el-input>
-                </el-form-item>
-              </el-col>
-            </el-row>
-
-            <el-row :gutter="20">
-              <el-col :span="12">
-                <el-form-item label="专业">
-                  <el-input v-model="userInfo.major" placeholder="请输入专业">
-                    <template #prefix>
-                      <el-icon>
-                        <Reading />
-                      </el-icon>
-                    </template>
-                  </el-input>
-                </el-form-item>
-              </el-col>
-              <el-col :span="12">
-                <el-form-item label="学历">
-                  <el-select v-model="userInfo.education" placeholder="请选择学历" style="width: 100%">
-                    <el-option v-for="level in educationLevels" :key="level.value" :label="level.label"
-                      :value="level.value" />
-                  </el-select>
-                </el-form-item>
-              </el-col>
-            </el-row>
-
-            <el-row :gutter="20">
-              <el-col :span="12">
-                <el-form-item label="毕业年份">
-                  <el-select v-model="userInfo.graduationYear" placeholder="请选择毕业年份" style="width: 100%">
-                    <el-option v-for="year in graduationYearOptions" :key="year.value" :label="year.label"
-                      :value="year.value" />
-                  </el-select>
-                </el-form-item>
-              </el-col>
-              <el-col :span="12">
-                <el-form-item label="邮箱">
-                  <el-input v-model="userInfo.email" placeholder="请输入邮箱">
-                    <template #prefix>
-                      <el-icon>
-                        <Key />
-                      </el-icon>
-                    </template>
-                  </el-input>
-                </el-form-item>
-              </el-col>
-            </el-row>
-
-            <el-row :gutter="20">
-              <el-col :span="12">
-                <el-form-item label="手机号">
-                  <el-input v-model="userInfo.phone" placeholder="请输入手机号">
-                    <template #prefix>
-                      <el-icon>
-                        <Phone />
-                      </el-icon>
-                    </template>
-                  </el-input>
-                </el-form-item>
-              </el-col>
-              <el-col :span="12">
-                <el-form-item label="GitHub">
-                  <el-input v-model="userInfo.github" placeholder="请输入 GitHub 地址">
-                    <template #prefix>
-                      <el-icon>
-                        <Link />
-                      </el-icon>
-                    </template>
-                  </el-input>
-                </el-form-item>
-              </el-col>
-            </el-row>
-
-            <el-form-item label="个人简介">
-              <el-input v-model="userInfo.bio" type="textarea" :rows="3" placeholder="请简单介绍自己，包括学习经历、项目经验、职业规划等" />
-            </el-form-item>
-          </el-form>
-
-          <div class="form-actions" v-if="isEditing">
-            <el-button type="primary" @click="saveProfile">
-              <el-icon>
-                <Check />
-              </el-icon>
-              保存修改
-            </el-button>
-            <el-button @click="cancelEdit">
-              <el-icon>
-                <Close />
-              </el-icon>
-              取消
-            </el-button>
-          </div>
-        </el-card>
-
-        <!-- 能力画像展示 -->
-        <el-card class="ability-card" shadow="hover">
-          <template #header>
-            <div class="card-header">
-              <el-icon :size="20">
-                <TrendCharts />
-              </el-icon>
-              <span>能力画像预览</span>
-            </div>
-          </template>
-          <div class="ability-preview">
-            <div class="ability-item">
-              <span class="ability-name">Java 基础</span>
-              <el-progress :percentage="85" :color="progressColors" />
-            </div>
-            <div class="ability-item">
-              <span class="ability-name">框架应用</span>
-              <el-progress :percentage="80" :color="progressColors" />
-            </div>
-            <div class="ability-item">
-              <span class="ability-name">数据库</span>
-              <el-progress :percentage="85" :color="progressColors" />
-            </div>
-            <div class="ability-item">
-              <span class="ability-name">算法逻辑</span>
-              <el-progress :percentage="90" :color="progressColors" />
-            </div>
-            <div class="ability-item">
-              <span class="ability-name">沟通协作</span>
-              <el-progress :percentage="75" :color="progressColors" />
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-
-      <!-- 右侧：隐私设置 -->
-      <el-col :xs="24" :sm="24" :md="8">
-        <el-card class="privacy-card" shadow="hover">
-          <template #header>
-            <div class="card-header">
-              <el-icon :size="20">
-                <Lock />
-              </el-icon>
-              <span>隐私设置</span>
-            </div>
-          </template>
-
-          <div class="privacy-section">
-            <h4>简历可见性</h4>
-            <el-radio-group v-model="privacySettings.resumeVisibility" class="radio-group">
-              <el-radio value="public">
-                <el-icon>
-                  <Unlock />
-                </el-icon>
-                公开 - 企业可查看
-              </el-radio>
-              <el-radio value="private">
-                <el-icon>
-                  <lock />
-                </el-icon>
-                私有 - 仅自己可见
-              </el-radio>
-            </el-radio-group>
-            <p class="privacy-tip">控制您的简历是否对招聘企业可见</p>
-          </div>
-
-          <el-divider />
-
-          <div class="privacy-section">
-            <h4>能力画像可见性</h4>
-            <el-radio-group v-model="privacySettings.profileVisibility" class="radio-group">
-              <el-radio value="public">
-                <el-icon>
-                  <Unlock />
-                </el-icon>
-                公开
-              </el-radio>
-              <el-radio value="private">
-                <el-icon>
-                  <lock />
-                </el-icon>
-                私有
-              </el-radio>
-            </el-radio-group>
-            <p class="privacy-tip">控制您的能力分析结果是否公开</p>
-          </div>
-
-          <el-divider />
-
-          <div class="privacy-section">
-            <h4>职业路径可见性</h4>
-            <el-radio-group v-model="privacySettings.careerPathVisibility" class="radio-group">
-              <el-radio value="public">
-                <el-icon>
-                  <Unlock />
-                </el-icon>
-                公开
-              </el-radio>
-              <el-radio value="private">
-                <el-icon>
-                  <lock />
-                </el-icon>
-                私有
-              </el-radio>
-            </el-radio-group>
-            <p class="privacy-tip">控制您的职业发展规划是否公开</p>
-          </div>
-
-          <el-divider />
-
-          <div class="privacy-section">
-            <h4>其他设置</h4>
-            <div class="checkbox-item">
-              <el-checkbox v-model="privacySettings.allowRecommendations">
-                允许系统推荐匹配岗位
-              </el-checkbox>
-              <p class="privacy-tip">开启后，系统会根据您的画像推荐合适的岗位</p>
-            </div>
-            <div class="checkbox-item">
-              <el-checkbox v-model="privacySettings.allowCompanyView">
-                允许企业查看基础信息
-              </el-checkbox>
-              <p class="privacy-tip">企业可查看您的姓名、学校、专业等基础信息</p>
-            </div>
-          </div>
-
-          <div class="save-section">
-            <el-button type="primary" @click="savePrivacy" style="width: 100%">
-              <el-icon>
-                <Check />
-              </el-icon>
-              保存隐私设置
-            </el-button>
-          </div>
-        </el-card>
-      </el-col>
-    </el-row>
   </div>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
 .profile-page {
+  position: relative;
+  display: flex;
+  gap: 20px;
   padding: 20px;
-  background: #f5f7fa;
-  min-height: calc(100vh - 84px);
+  min-height: calc(100vh - 80px);
+  box-sizing: border-box;
+  background:
+    radial-gradient(circle at top left, rgba(97, 154, 255, 0.2), transparent 28%),
+    radial-gradient(circle at right 20%, rgba(40, 199, 111, 0.14), transparent 24%),
+    linear-gradient(180deg, #f4f8ff 0%, #eef4fb 52%, #f8fbff 100%);
+  overflow: hidden;
 }
 
-.page-header {
-  margin-bottom: 24px;
+.page-glow {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(12px);
+  pointer-events: none;
 }
 
-.page-header h2 {
-  margin: 0 0 8px 0;
-  color: #303133;
-  font-size: 24px;
+.page-glow-left {
+  top: 72px;
+  left: -40px;
+  width: 180px;
+  height: 180px;
+  background: rgba(22, 119, 255, 0.12);
 }
 
-.subtitle {
-  color: #909399;
-  font-size: 14px;
+.page-glow-right {
+  right: 40px;
+  bottom: 32px;
+  width: 220px;
+  height: 220px;
+  background: rgba(14, 203, 102, 0.08);
 }
 
-.profile-card,
-.ability-card,
-.privacy-card,
-.security-card {
-  border-radius: 12px;
-  margin-bottom: 20px;
-}
-
-.card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.header-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.profile-form {
-  padding: 10px 0;
-}
-
-.form-actions {
-  display: flex;
-  gap: 12px;
-  justify-content: flex-end;
-  margin-top: 20px;
-  padding-top: 20px;
-  border-top: 1px solid #ebeef5;
-}
-
-.ability-card {
-  margin-top: 20px;
-}
-
-.ability-preview {
-  padding: 10px 0;
-}
-
-.ability-item {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 16px;
-}
-
-.ability-name {
-  width: 80px;
-  font-size: 14px;
-  color: #606266;
-  flex-shrink: 0;
-}
-
-.ability-item :deep(.el-progress) {
+.right-panel {
+  position: relative;
+  z-index: 1;
   flex: 1;
+  min-width: 0;
 }
 
-.privacy-section {
-  margin-bottom: 20px;
+.panel-shell {
+  min-height: 100%;
+  border: 1px solid rgba(219, 230, 244, 0.75);
+  border-radius: 24px;
+  padding: 32px;
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(20px);
+  box-shadow:
+    0 1px 3px rgba(27, 63, 104, 0.04),
+    0 20px 50px rgba(27, 63, 104, 0.07);
 }
 
-.privacy-section:last-child {
-  margin-bottom: 0;
+.content-intro {
+  margin-bottom: 28px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid rgba(219, 230, 244, 0.6);
 }
 
-.privacy-section h4 {
-  margin: 0 0 12px 0;
-  font-size: 14px;
-  color: #303133;
+.content-intro h1 {
+  margin: 10px 0 6px;
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1.2;
+  color: #163253;
+  letter-spacing: -0.02em;
 }
 
-.radio-group {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-bottom: 8px;
+.content-intro p {
+  margin: 0;
+  max-width: 600px;
+  font-size: 13px;
+  line-height: 1.75;
+  color: #7a8da3;
 }
 
-.radio-group :deep(.el-radio) {
-  margin-right: 0;
-  height: auto;
-}
-
-.radio-group :deep(.el-radio__label) {
-  display: flex;
+.intro-badge {
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(22, 119, 255, 0.1), rgba(103, 184, 255, 0.08));
+  color: #1668dc;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
-.privacy-tip {
-  margin: 8px 0 0 0;
-  font-size: 12px;
-  color: #909399;
-  line-height: 1.5;
+.panel-content {
+  min-height: 400px;
+  animation: contentIn 0.35s ease;
 }
 
-.checkbox-item {
-  margin-bottom: 16px;
+@keyframes contentIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.checkbox-item:last-child {
-  margin-bottom: 0;
+.fade-slide-enter-active,
+.fade-slide-leave-active {
+  transition: all 0.25s ease;
 }
 
-.save-section {
-  margin-top: 24px;
-  padding-top: 20px;
-  border-top: 1px solid #ebeef5;
+.fade-slide-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
 }
 
-.security-info {
-  padding: 10px 0;
+.fade-slide-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
 }
 
-.security-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 0;
-  border-bottom: 1px solid #f0f2f5;
-}
-
-.security-item:last-child {
-  border-bottom: none;
-}
-
-.security-item .label {
-  font-size: 14px;
-  color: #606266;
-}
-
-.security-item .value {
-  font-size: 14px;
-  color: #909399;
+@media (max-width: 1400px) {
+  .profile-page {
+    flex-direction: column;
+  }
 }
 
 @media (max-width: 768px) {
   .profile-page {
-    padding: 12px;
+    padding: 14px;
+    gap: 14px;
   }
 
-  .el-row {
-    margin: 0 !important;
+  .panel-shell {
+    padding: 20px 16px;
+    border-radius: 22px;
   }
 
-  .el-col {
-    padding: 0 !important;
+  .content-intro h1 {
+    font-size: 26px;
   }
 }
 </style>
