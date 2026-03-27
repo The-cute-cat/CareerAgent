@@ -7,11 +7,11 @@ from pathlib import Path
 from typing import Dict, Any, List
 
 import yaml
-from pydantic import BaseModel, field_validator, SecretStr, Field
+from pydantic import BaseModel, field_validator, SecretStr, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic_settings.sources import InitSettingsSource
 
-__all__ = ["settings", "LiteLLMBase"]
+__all__ = ["settings", "LLMModelBase"]
 
 from ai_service.utils.path_tool import abs_path, get_project_root, get_abs_path
 
@@ -57,9 +57,10 @@ class Communication(BaseModel):
     token: Token = Token()
 
 
-class LiteLLMBase(BaseModel):
+class LLMModelBase(BaseModel):
     """模型配置基类"""
-    api_key: SecretStr = SecretStr("")
+    name: str = "LLM"
+    api_key: SecretStr = SecretStr("")  # 敏感信息，使用时调用 .get_secret_value() 方法获取
     base_url: str = ""
     model_name: str = ""
     timeout: float = 30.0
@@ -73,68 +74,35 @@ class LiteLLMBase(BaseModel):
     def __str__(self):
         return self.__repr__()
 
-    @field_validator("api_key", mode="after")
-    @classmethod
-    def validate_api_key(cls, v: SecretStr) -> SecretStr:
-        if not v.get_secret_value() or v.get_secret_value() == "" or v.get_secret_value() == "<api_key>":
-            raise ValueError("请在 .env 文件中配置正确的 LLM API Key")
-        return v
+    @model_validator(mode="after")
+    def validate_api_key(self) -> "LLMModelBase":
+        if not self.api_key.get_secret_value() or self.api_key.get_secret_value() == "" or self.api_key.get_secret_value() == "<api_key>":
+            raise ValueError(f"请在 .env 文件中配置正确的 {self.name} API Key")
+        return self
 
 
-class LiteLLM(LiteLLMBase):
-    class Qwen(LiteLLMBase):
-        @field_validator("api_key")
-        @classmethod
-        def validate_api_key(cls, v: SecretStr) -> SecretStr:
-            if not v.get_secret_value() or v.get_secret_value() == "" or v.get_secret_value() == "<api_key>":
-                raise ValueError("请在 .env 文件中配置正确的 LLM_Qwen API Key")
-            return v
+class LiteLLM(LLMModelBase):
+    """模型配置基类"""
+    name: str = "LiteLLM"
+
+    class Qwen(LLMModelBase):
+        name: str = "LLM_Qwen"
 
     qwen: Qwen = Field(default_factory=Qwen)
 
-    class Deepseek(LiteLLMBase):
-        @field_validator("api_key")
-        @classmethod
-        def validate_api_key(cls, v: SecretStr) -> SecretStr:
-            if not v.get_secret_value() or v.get_secret_value() == "" or v.get_secret_value() == "<api_key>":
-                raise ValueError("请在 .env 文件中配置正确的 LLM_Deepseek API Key")
-            return v
+    class Deepseek(LLMModelBase):
+        name: str = "LLM_Deepseek"
 
     deepseek: Deepseek = Field(default_factory=Deepseek)
 
-    class Image(LiteLLMBase):
-        @field_validator("api_key")
-        @classmethod
-        def validate_api_key(cls, v: SecretStr) -> SecretStr:
-            if not v.get_secret_value() or v.get_secret_value() == "" or v.get_secret_value() == "<api_key>":
-                raise ValueError("请在 .env 文件中配置正确的 LLM_Image API Key")
-            return v
+    class Image(LLMModelBase):
+        name: str = "LLM_Image"
 
     image: Image = Field(default_factory=Image)
 
 
-class LLM(BaseModel):
+class LLM(LLMModelBase):
     """大模型通用配置"""
-    api_key: SecretStr = SecretStr("")  # 敏感信息，使用时调用 .get_secret_value() 方法获取
-    base_url: str = ""  # 大模型服务器地址
-    model_name: str = ""  # 大模型名称
-    timeout: float = 30.0  # 超时时间
-    max_retries: int = 3  # 最大重试次数
-    max_concurrent_requests: int = 3  # 最大并发请求数
-    extra: Dict[str, Any] = {}  # 额外参数
-
-    def __repr__(self):
-        return f"LLM(api_key={self.api_key}, base_url={self.base_url}, model_name={self.model_name}, timeout={self.timeout}, max_retries={self.max_retries}, extra={self.extra})"
-
-    def __str__(self):
-        return self.__repr__()
-
-    @field_validator("api_key", mode="after")
-    @classmethod
-    def validate_api_key(cls, v: SecretStr) -> SecretStr:
-        if not v.get_secret_value() or v.get_secret_value() == "" or v.get_secret_value() == "<api_key>":
-            raise ValueError("请在 .env 文件中配置正确的 LLM API Key")
-        return v
 
 
 class PDF(BaseModel):
@@ -218,6 +186,23 @@ class Milvus(BaseModel):
     cloud: Cloud = Field(default_factory=Cloud)
 
 
+class ChromaConfig(BaseModel):
+    save_path: str = ""
+    model_name: str = ""
+    base_url: str = ""
+    k: int = 5
+    extra: Dict[str, Any] = {}
+
+    def set_default_path(self, path: str):
+        if self.save_path == "<SAVE_PATH>" or not self.save_path or not Path(self.save_path).exists():
+            if path and path != "" and Path(path).exists():
+                save_path = os.path.join(path, "chroma")
+            else:
+                save_path = os.path.join(get_project_root(), "data", "chroma")
+            self.save_path = save_path
+            os.makedirs(self.save_path, exist_ok=True)
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=abs_path(".env"),
@@ -235,6 +220,13 @@ class Settings(BaseSettings):
     path_config: PathConfig = Field(default_factory=PathConfig)
     vector: Vector = Field(default_factory=Vector)
     milvus: Milvus = Field(default_factory=Milvus)
+    chroma_config: ChromaConfig = Field(default_factory=ChromaConfig)
+
+    @model_validator(mode="after")
+    def set_chroma_default_path(self) -> "Settings":
+        """设置默认值"""
+        self.chroma_config.set_default_path(self.path_config.data)
+        return self
 
     @classmethod
     def settings_customise_sources(
@@ -287,4 +279,5 @@ if __name__ == "__main__":
     # print(f"  API Key: {settings.llm.api_key.get_secret_value()}")
     # print(settings.lite_llm.qwen)
     # print(settings.milvus.cloud.token.get_secret_value())
+    print(settings.chroma_config.save_path)
     pass
