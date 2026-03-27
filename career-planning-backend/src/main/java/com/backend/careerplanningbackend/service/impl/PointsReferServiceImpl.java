@@ -176,6 +176,7 @@ public class PointsReferServiceImpl implements PointsReferService {
      * 5. 在PointsTransaction表中记录这笔积分变动，类型为充值，描述为充值积分
      * 6. 返回充值成功的积分信息
      */
+    
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Result<UserPoints> recharge(@RequestBody @Valid PointsChangeDTO dto) {
@@ -207,6 +208,17 @@ public class PointsReferServiceImpl implements PointsReferService {
         return Result.ok(account);
     }
 
+    /**
+     * consumePoints 消耗积分接口
+     * @param dto
+     * @return
+     * 1. 获取当前用户ID
+     * 2. 根据用户ID查询UserPoints表，获取当前积分账户信息
+     * 3. 如果用户积分账户不存在，返回错误提示
+     * 4. 根据传入的积分变动值，计算新的积分余额，并更新UserPoints表中的积分余额和更新时间
+     * 5. 在PointsTransaction表中记录这笔积分变动，类型为消费，描述为消费积分
+     * 6. 返回消费成功的积分信息
+     */
     
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -239,6 +251,18 @@ public class PointsReferServiceImpl implements PointsReferService {
         return Result.ok(account);
     }
 
+    /**
+     * deletePoints 删除积分接口
+     * @param dto
+     * @return
+     * 1. 获取当前用户ID
+     * 2. 根据用户ID查询UserPoints表，获取当前积分账户信息
+     * 3. 如果用户积分账户不存在，返回错误提示
+     * 4. 根据传入的积分变动值，计算新的积分余额，并更新UserPoints表中的积分余额和更新时间
+     * 5. 在PointsTransaction表中记录这笔积分变动，类型为删除，描述为删除积分
+     * 6. 返回删除成功的积分信息
+     */
+    
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Result deletePoints(PointsChangeDTO dto) {
