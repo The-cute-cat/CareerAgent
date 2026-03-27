@@ -8,6 +8,7 @@ import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores'
 import { ArrowRight, Lock, User, View, Hide } from '@element-plus/icons-vue'
 
+
 const router = useRouter()
 const loginform = reactive<LoginFormDTO>({})
 const userStore = useUserStore()
@@ -132,6 +133,11 @@ const showSuccessNotification = () => {
 
 <style scoped>
 .auth-page {
+  --auth-accent: #0f766e;
+  --auth-heading: #0f172a;
+  --auth-soft: #64748b;
+  --auth-input: #111827;
+  --auth-placeholder: #94a3b8;
   position: relative;
   min-height: 100vh;
   display: flex;
@@ -256,7 +262,7 @@ const showSuccessNotification = () => {
 .panel-eyebrow {
   display: inline-block;
   margin-bottom: 10px;
-  color: var(--color-primary);
+  color: var(--auth-accent);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -265,14 +271,14 @@ const showSuccessNotification = () => {
 
 .panel-header h2 {
   margin: 0 0 10px;
-  color: var(--color-heading);
+  color: var(--auth-heading);
   font-size: 34px;
   line-height: 1.15;
 }
 
 .panel-header p {
   margin: 0;
-  color: var(--color-text-soft);
+  color: var(--auth-soft);
   line-height: 1.8;
 }
 
@@ -287,7 +293,7 @@ const showSuccessNotification = () => {
 }
 
 .field-label {
-  color: var(--color-heading);
+  color: var(--auth-heading);
   font-size: 14px;
   font-weight: 600;
 }
@@ -305,7 +311,7 @@ const showSuccessNotification = () => {
 }
 
 .field-box .el-icon {
-  color: var(--color-text-soft);
+  color: var(--auth-soft);
   font-size: 18px;
 }
 
@@ -314,14 +320,19 @@ const showSuccessNotification = () => {
   border: none;
   background: transparent;
   outline: none;
-  color: var(--color-heading);
+  color: var(--auth-input);
+  caret-color: var(--auth-input);
   font-size: 15px;
+}
+
+.field-box input::placeholder {
+  color: var(--auth-placeholder);
 }
 
 .toggle-btn {
   border: none;
   background: transparent;
-  color: var(--color-text-soft);
+  color: var(--auth-soft);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -334,7 +345,7 @@ const showSuccessNotification = () => {
 }
 
 .text-link {
-  color: var(--color-primary);
+  color: var(--auth-accent);
   text-decoration: none;
   font-weight: 600;
 }
@@ -367,7 +378,7 @@ const showSuccessNotification = () => {
 
 .panel-footer {
   margin: 22px 0 0;
-  color: var(--color-text-soft);
+  color: var(--auth-soft);
   text-align: center;
 }
 

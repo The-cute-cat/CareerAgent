@@ -173,6 +173,11 @@ const resetPassword = async () => {
 
 <style scoped>
 .auth-page {
+  --auth-accent: #0f766e;
+  --auth-heading: #0f172a;
+  --auth-soft: #64748b;
+  --auth-input: #111827;
+  --auth-placeholder: #94a3b8;
   position: relative;
   min-height: 100vh;
   display: flex;
@@ -297,7 +302,7 @@ const resetPassword = async () => {
 .panel-eyebrow {
   display: inline-block;
   margin-bottom: 10px;
-  color: var(--color-primary);
+  color: var(--auth-accent);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -306,14 +311,14 @@ const resetPassword = async () => {
 
 .panel-header h2 {
   margin: 0 0 10px;
-  color: var(--color-heading);
+  color: var(--auth-heading);
   font-size: 34px;
   line-height: 1.15;
 }
 
 .panel-header p {
   margin: 0;
-  color: var(--color-text-soft);
+  color: var(--auth-soft);
   line-height: 1.8;
 }
 
@@ -328,7 +333,7 @@ const resetPassword = async () => {
   display: flex;
   align-items: center;
   gap: 10px;
-  color: var(--color-text-soft);
+  color: var(--auth-soft);
 }
 
 .step-item span {
@@ -344,7 +349,7 @@ const resetPassword = async () => {
 
 .step-item.active,
 .step-item.done {
-  color: var(--color-heading);
+  color: var(--auth-heading);
 }
 
 .step-item.active span,
@@ -370,7 +375,7 @@ const resetPassword = async () => {
 }
 
 .field-label {
-  color: var(--color-heading);
+  color: var(--auth-heading);
   font-size: 14px;
   font-weight: 600;
 }
@@ -387,7 +392,7 @@ const resetPassword = async () => {
 }
 
 .field-box .el-icon {
-  color: var(--color-text-soft);
+  color: var(--auth-soft);
   font-size: 18px;
 }
 
@@ -396,8 +401,13 @@ const resetPassword = async () => {
   border: none;
   background: transparent;
   outline: none;
-  color: var(--color-heading);
+  color: var(--auth-input);
+  caret-color: var(--auth-input);
   font-size: 15px;
+}
+
+.field-box input::placeholder {
+  color: var(--auth-placeholder);
 }
 
 .toggle-btn,
@@ -408,7 +418,7 @@ const resetPassword = async () => {
 }
 
 .toggle-btn {
-  color: var(--color-text-soft);
+  color: var(--auth-soft);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -416,7 +426,7 @@ const resetPassword = async () => {
 
 .text-btn,
 .text-link {
-  color: var(--color-primary);
+  color: var(--auth-accent);
   text-decoration: none;
   font-weight: 600;
 }
