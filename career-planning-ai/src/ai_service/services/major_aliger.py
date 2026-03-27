@@ -1,16 +1,18 @@
-from rapidfuzz import process, utils
+import os
 from functools import lru_cache
 from pathlib import Path
+
+from rapidfuzz import process, utils
 
 __all__ = ["major_aligner"]
 
 from ai_service.services import log
+from config import settings
 
 
 class MajorAligner:
     def __init__(self, file_path: str):
         self.file_path = Path(file_path)
-        # 1. 启动时一次性加载文件到内存（提速关键）
         self.standard_majors = self._load_file()
         log.info(f"[MajorAligner] 成功加载 {len(self.standard_majors)} 条标准专业数据")
 
@@ -23,7 +25,7 @@ class MajorAligner:
         with open(self.file_path, "r", encoding="utf-8") as f:
             # 去除空行和首尾空格
             return [line.strip() for line in f if line.strip()]
-        
+
     def align_list(self, queries: list[str], score_cutoff: float = 70.0) -> list[str]:
         """批量对齐专业名称"""
         return [self.align(query, score_cutoff) for query in queries]
@@ -38,12 +40,9 @@ class MajorAligner:
         if not query or query == "无":
             return query
 
-        # 2. 第一层：尝试完全匹配（0耗时）
         if query in self.standard_majors:
             return query
 
-        # 3. 第二层：RapidFuzz 模糊匹配
-        # 返回格式: (匹配到的字符串, 分数, 索引)
         result = process.extractOne(
             query,
             self.standard_majors,
@@ -55,11 +54,7 @@ class MajorAligner:
             matched_name, score, _ = result
             # log.info(f"匹配成功: {query} -> {matched_name} (分数: {score:.2f})")
             return matched_name
-
-        # 4. 第三层：匹配不到则返回原词
         return query
 
 
-# --- 初始化单例 ---
-# 假设 major.txt 放在 resources 文件夹下
-major_aligner = MajorAligner("data\\major.txt")
+major_aligner = MajorAligner(os.path.join(settings.path_config.data, "major.txt"))
