@@ -1,7 +1,8 @@
 @import './base.css';
 
 /* 移除 Vue 默认 #app 布局限制 */
-html, body {
+html,
+body {
   margin: 0;
   padding: 0;
   width: 100%;

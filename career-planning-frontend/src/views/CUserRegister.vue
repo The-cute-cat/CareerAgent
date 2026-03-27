@@ -207,6 +207,11 @@ onUnmounted(() => {
 
 <style scoped>
 .auth-page {
+  --auth-accent: #0f766e;
+  --auth-heading: #0f172a;
+  --auth-soft: #64748b;
+  --auth-input: #111827;
+  --auth-placeholder: #94a3b8;
   position: relative;
   min-height: 100vh;
   display: flex;
@@ -331,7 +336,7 @@ onUnmounted(() => {
 .panel-eyebrow {
   display: inline-block;
   margin-bottom: 10px;
-  color: var(--color-primary);
+  color: var(--auth-accent);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -340,14 +345,14 @@ onUnmounted(() => {
 
 .panel-header h2 {
   margin: 0 0 10px;
-  color: var(--color-heading);
+  color: var(--auth-heading);
   font-size: 34px;
   line-height: 1.15;
 }
 
 .panel-header p {
   margin: 0;
-  color: var(--color-text-soft);
+  color: var(--auth-soft);
   line-height: 1.8;
 }
 
@@ -362,7 +367,7 @@ onUnmounted(() => {
 }
 
 .field-label {
-  color: var(--color-heading);
+  color: var(--auth-heading);
   font-size: 14px;
   font-weight: 600;
 }
@@ -379,7 +384,7 @@ onUnmounted(() => {
 }
 
 .field-box .el-icon {
-  color: var(--color-text-soft);
+  color: var(--auth-soft);
   font-size: 18px;
 }
 
@@ -388,8 +393,13 @@ onUnmounted(() => {
   border: none;
   background: transparent;
   outline: none;
-  color: var(--color-heading);
+  color: var(--auth-input);
+  caret-color: var(--auth-input);
   font-size: 15px;
+}
+
+.field-box input::placeholder {
+  color: var(--auth-placeholder);
 }
 
 .field-box--with-action {
@@ -412,7 +422,7 @@ onUnmounted(() => {
 }
 
 .toggle-btn {
-  color: var(--color-text-soft);
+  color: var(--auth-soft);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -424,7 +434,7 @@ onUnmounted(() => {
   padding: 0 14px;
   border-radius: 14px;
   background: rgba(15, 118, 110, 0.1);
-  color: var(--color-primary);
+  color: var(--auth-accent);
   font-weight: 700;
 }
 
@@ -434,7 +444,7 @@ onUnmounted(() => {
 }
 
 .text-link {
-  color: var(--color-primary);
+  color: var(--auth-accent);
   text-decoration: none;
   font-weight: 600;
 }
@@ -467,7 +477,7 @@ onUnmounted(() => {
 
 .panel-footer {
   margin: 22px 0 0;
-  color: var(--color-text-soft);
+  color: var(--auth-soft);
   text-align: center;
 }
 
