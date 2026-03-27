@@ -13,7 +13,7 @@ public class UserReferral {
     @TableId(type = IdType.AUTO)
     private Long id;
     private Long referrerId;
-    private Long refereeId;
+    private Long userId;
     private String inviteCode;
     private Integer rewardPoints;
     private Integer status;

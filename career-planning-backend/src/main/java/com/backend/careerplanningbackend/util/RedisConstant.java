@@ -9,19 +9,43 @@ public class RedisConstant {
     public static final long EXPIRE_TIME = 300L;
     /** 防刷时隔 60 秒 */
     public static final long SENT_TIME = 60L;
-    /* 商家的key */
+    /** 商家的key */
     public static final String CACHE_MERCHANT_KEY = "cache:merchant:";
     /** 有效期 30 分钟 */
     public static final long CACHE_MERCHANT_TTL = 30L;
-    /* 缓存穿透 空值时间 */
+    /** 缓存穿透 空值时间 */
     public static final long CACHE_NULL_TTL = 2L;
-    /* 商家的key */
+    /** 商家的key */
     public static final String LOCAL_MERCHANT_KEY = "lock:merchant:";
-    /* 这是 ai智能助手缓存前缀*/
+    /** 这是 ai智能助手缓存前缀*/
     public static final String AI_KEY_PREFIX = "chat:memory:";
 
-    /* 缓存 ai智能助手*/
+    /** 缓存 ai智能助手*/
     public static final long AI_ASSISTANT_TTL = 7L;
 
 
+    /**
+     * 新用户注册领取积分接口
+     */
+    public static final String NEW_USER_REGISTER_POINTS_KEY = "points:user";
+
+
+    /**
+     * 邀请好友生成验证码的redis key前缀
+     */
+    public static final String INVITE_CODE_KEY_PREFIX = "invite:code";
+
+     /**
+     * 邀请好友生成验证码的redis key过期时间，单位为秒
+     */
+     
+     /**
+      * 积分充值 key 前缀
+      */
+     public static final String POINTS_RECHARGE_KEY_PREFIX = "points:transaction";
+
+    /**
+     * 积分消费 key 前缀
+     */
+    public static final String POINTS_CONSUME_KEY_PREFIX = "points:transaction";
 }
