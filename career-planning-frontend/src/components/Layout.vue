@@ -1,7 +1,10 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import Sidebar from '@/components/Sidebar.vue'
 import CHeader from '@/components/CHeader.vue'
 import ChatBot from '@/components/ChatBot.vue'
+
+const sidebarRef = ref<InstanceType<typeof Sidebar>>()
 </script>
 
 <template>
@@ -12,8 +15,8 @@ import ChatBot from '@/components/ChatBot.vue'
   </div>
   <el-container class="layout-container">
     <!-- 左侧侧边栏 -->
-    <el-aside width="260px" class="sidebar-wrapper">
-      <Sidebar />
+    <el-aside :width="sidebarRef?.collapsed ? '80px' : '260px'" class="sidebar-wrapper">
+      <Sidebar ref="sidebarRef" />
     </el-aside>
 
     <!-- 右侧主内容区 -->
@@ -32,7 +35,7 @@ import ChatBot from '@/components/ChatBot.vue'
     </el-container>
 
     <!-- AI 助手悬浮窗 -->
-    <ChatBot />
+    <!-- <ChatBot /> -->
   </el-container>
 </template>
 
@@ -106,6 +109,8 @@ import ChatBot from '@/components/ChatBot.vue'
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   box-shadow: 4px 0 24px rgba(0, 0, 0, 0.02);
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
 }
 
 .main-wrapper {
