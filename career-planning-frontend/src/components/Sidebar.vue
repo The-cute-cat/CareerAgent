@@ -3,15 +3,9 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
-  House,
-  Document,
-  DataAnalysis,
-  User,
-  TrendCharts,
-  Setting,
-  Star,
-  Collection,
-  Position
+  House,Document,DataAnalysis,
+  User,TrendCharts,Setting,
+  Star,Collection,Position
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
