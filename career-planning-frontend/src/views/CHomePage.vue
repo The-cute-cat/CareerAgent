@@ -2,7 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import * as echarts from 'echarts'
-import { Warning, Lock, DataLine } from '@element-plus/icons-vue'
+import { Warning, DataLine } from '@element-plus/icons-vue'
 import { quickActions, homeRadarData } from '@/mock/data'
 import { useUserStore } from '@/stores/modules/user'
 
@@ -11,7 +11,6 @@ const userStore = useUserStore()
 const radarChartRef = ref<HTMLElement | null>(null)
 
 // 计算登录状态
-const isLoggedIn = computed(() => userStore.isLoggedIn)
 const userName = computed(() => userStore.userInfo?.nickname || userStore.userInfo?.username || '用户')
 
 // 跳转到对应页面
@@ -21,7 +20,7 @@ const navigateTo = (route: string) => {
 
 // 初始化雷达图
 onMounted(() => {
-  if (radarChartRef.value && isLoggedIn.value) {
+  if (radarChartRef.value) {
     initRadarChart()
   }
 })
@@ -86,11 +85,6 @@ const initRadarChart = () => {
   chart.setOption(option)
   window.addEventListener('resize', () => chart.resize())
 }
-
-// 跳转到登录页
-const goToLogin = () => {
-  router.push('/login')
-}
 </script>
 
 <template>
@@ -140,28 +134,13 @@ const goToLogin = () => {
             <h2>能力概览</h2>
           </div>
           
-          <!-- 未登录状态：显示登录提醒 -->
-          <div v-if="!isLoggedIn" class="login-prompt">
-            <div class="lock-circle">
-              <el-icon :size="48"><Lock /></el-icon>
+          <div ref="radarChartRef" class="radar-chart"></div>
+          <div class="radar-legend">
+            <div class="legend-item">
+              <span class="legend-dot"></span>
+              <span>智能能力评估画像（基于简历及行为分析）</span>
             </div>
-            <h3>请先登录</h3>
-            <p>登录后即可查看基于简历的个人能力智能分析</p>
-            <el-button class="gradient-btn" size="large" round @click="goToLogin">
-              立即登录
-            </el-button>
           </div>
-          
-          <!-- 已登录状态：显示雷达图 -->
-          <template v-else>
-            <div ref="radarChartRef" class="radar-chart"></div>
-            <div class="radar-legend">
-              <div class="legend-item">
-                <span class="legend-dot"></span>
-                <span>智能能力评估画像（基于简历及行为分析）</span>
-              </div>
-            </div>
-          </template>
         </div>
       </el-col>
 
@@ -419,57 +398,6 @@ const goToLogin = () => {
   border-radius: 50%;
   background-color: #409eff;
   box-shadow: 0 0 4px #409eff;
-}
-
-.login-prompt {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 340px;
-  text-align: center;
-}
-
-.lock-circle {
-  width: 96px;
-  height: 96px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.8);
-  box-shadow: inset 0 2px 4px #fff, 0 8px 24px rgba(0, 0, 0, 0.06);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #c0c4cc;
-  margin-bottom: 24px;
-}
-
-.login-prompt h3 {
-  font-size: 20px;
-  font-weight: 700;
-  color: #2c3e50;
-  margin: 0 0 8px 0;
-}
-
-.login-prompt p {
-  color: #909399;
-  font-size: 14px;
-  margin: 0 0 24px 0;
-}
-
-.gradient-btn {
-  background: linear-gradient(135deg, #409EFF 0%, #764BA2 100%);
-  border: none;
-  font-weight: 600;
-  padding: 12px 32px;
-  box-shadow: 0 6px 16px rgba(64, 158, 255, 0.3);
-  color: #fff;
-  transition: all 0.3s ease;
-}
-
-.gradient-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(64, 158, 255, 0.4);
-  color: #fff;
 }
 
 .notice-content {
