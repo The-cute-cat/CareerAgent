@@ -13,6 +13,36 @@ const currentTitle = computed(() => route.meta.title || '欢迎使用职业规�
 const isLoggedIn = computed(() => userStore.isLoggedIn)
 const userName = computed(() => userStore.userInfo?.nickname || userStore.userInfo?.username || '用户')
 
+const userPoints = computed(() => {
+  const rawPoints = Number((userStore.userInfo as any)?.points ?? (userStore.userInfo as any)?.score ?? 500)
+  return Number.isNaN(rawPoints) ? 500 : rawPoints
+})
+
+const memberType = computed(() => ((userStore.userInfo as any)?.memberType || 'normal').toLowerCase())
+
+const memberLabel = computed(() => {
+  const memberMap: Record<string, string> = {
+    normal: '普通用户',
+    monthly: '月度会员',
+    quarter: '季度会员',
+    quarterly: '季度会员',
+    yearly: '年度会员',
+    annual: '年度会员'
+  }
+  return memberMap[memberType.value] || '普通用户'
+})
+
+const memberBadgeClass = computed(() => {
+  const classMap: Record<string, string> = {
+    monthly: 'is-monthly',
+    quarter: 'is-quarter',
+    quarterly: 'is-quarter',
+    yearly: 'is-yearly',
+    annual: 'is-yearly'
+  }
+  return classMap[memberType.value] || 'is-normal'
+})
+
 const handleLogout = () => {
   userStore.clearUserInfo()
   router.push('/login')
@@ -22,6 +52,8 @@ const handleCommand = (command: string) => {
   if (command === 'logout') {
     confirmLogout()
   } else if (command === 'profile') {
+    router.push('/profile')
+  } else if (command === 'membership') {
     router.push('/profile')
   }
 }
@@ -63,19 +95,27 @@ const confirmLogout = () => {
       </div>
     </div>
     <div class="header-right">
-      <!-- 未登录状态：显示登录/注册按钮 -->
       <div v-if="!isLoggedIn" class="auth-buttons">
         <el-button class="custom-btn-primary" type="primary" round @click="router.push('/login')">登录</el-button>
         <el-button class="custom-btn-default" round @click="router.push('/register')">注册</el-button>
       </div>
 
-      <!-- 已登录状态：显示用户信息下拉菜单 -->
       <el-dropdown v-else @command="handleCommand" trigger="click">
         <div class="user-info">
           <div class="user-avatar">
             {{ userName.charAt(0).toUpperCase() }}
           </div>
-          <span class="user-name">{{ userName }}</span>
+
+          <div class="user-main">
+            <div class="user-main-top">
+              <span class="user-name">{{ userName }}</span>
+              <span class="member-badge" :class="memberBadgeClass">{{ memberLabel }}</span>
+            </div>
+            <div class="user-main-bottom">
+              <span class="points-badge">积分 {{ userPoints }}</span>
+            </div>
+          </div>
+
           <el-icon class="dropdown-icon">
             <ArrowDown />
           </el-icon>
@@ -85,6 +125,10 @@ const confirmLogout = () => {
             <el-dropdown-item command="profile">
               <el-icon><User /></el-icon>
               个人中心
+            </el-dropdown-item>
+            <el-dropdown-item command="membership">
+              <el-icon><User /></el-icon>
+              会员权益
             </el-dropdown-item>
             <el-dropdown-item divided command="logout" class="logout-item">
               <el-icon><SwitchButton /></el-icon>
@@ -102,7 +146,7 @@ const confirmLogout = () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  height: 64px;
+  height: 72px;
   padding: 0 28px;
   background: rgba(255, 255, 255, 0.6);
   backdrop-filter: blur(20px);
@@ -181,24 +225,24 @@ const confirmLogout = () => {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 6px 14px;
-  border-radius: 20px;
+  padding: 8px 14px;
+  border-radius: 22px;
   cursor: pointer;
-  background: rgba(255, 255, 255, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.58);
+  border: 1px solid rgba(255, 255, 255, 0.85);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .user-info:hover {
-  background: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
   transform: translateY(-1px);
 }
 
 .user-avatar {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   background: linear-gradient(135deg, #409eff 0%, #1677ff 100%);
   color: #fff;
@@ -208,18 +252,86 @@ const confirmLogout = () => {
   align-items: center;
   justify-content: center;
   box-shadow: 0 2px 6px rgba(64, 158, 255, 0.3);
+  flex-shrink: 0;
+}
+
+.user-main {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.user-main-top,
+.user-main-bottom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .user-name {
   font-size: 14px;
   color: #303133;
   font-weight: 600;
+  max-width: 96px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.points-badge,
+.member-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 22px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.points-badge {
+  color: #b26a00;
+  background: linear-gradient(135deg, rgba(255, 218, 102, 0.95), rgba(255, 237, 180, 0.95));
+  box-shadow: inset 0 0 0 1px rgba(255, 185, 0, 0.18);
+}
+
+.member-badge {
+  color: #606266;
+  background: rgba(144, 147, 153, 0.1);
+}
+
+.member-badge.is-normal {
+  color: #606266;
+  background: rgba(144, 147, 153, 0.14);
+}
+
+.member-badge.is-monthly {
+  color: #1d4ed8;
+  background: linear-gradient(135deg, rgba(219, 234, 254, 0.95), rgba(191, 219, 254, 0.95));
+}
+
+.member-badge.is-quarter {
+  color: #6d28d9;
+  background: linear-gradient(135deg, rgba(237, 233, 254, 0.95), rgba(221, 214, 254, 0.95));
+}
+
+.member-badge.is-yearly {
+  color: #9a6700;
+  background: linear-gradient(135deg, rgba(255, 244, 204, 0.98), rgba(255, 224, 130, 0.98));
+}
+
+.gift-tip {
+  font-size: 12px;
+  color: #909399;
 }
 
 .dropdown-icon {
   color: #909399;
   font-size: 12px;
   transition: transform 0.3s ease;
+  margin-left: 2px;
 }
 
 .user-info:hover .dropdown-icon {
@@ -232,15 +344,43 @@ const confirmLogout = () => {
   border: 1px solid rgba(255, 255, 255, 0.8);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
   backdrop-filter: blur(10px);
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.92);
 }
 
 :deep(.logout-item) {
   color: #f56c6c !important;
 }
 
-:deep(.logout-item:hover) {
-  background: rgba(245, 108, 108, 0.1) !important;
-  color: #f56c6c !important;
+@media (max-width: 768px) {
+  .glass-header {
+    height: auto;
+    min-height: 72px;
+    padding: 12px 16px;
+    gap: 12px;
+  }
+
+  .breadcrumb {
+    gap: 8px;
+    font-size: 14px;
+  }
+
+  .page-title {
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .user-info {
+    padding: 8px 12px;
+  }
+
+  .gift-tip {
+    display: none;
+  }
+
+  .user-name {
+    max-width: 72px;
+  }
 }
 </style>

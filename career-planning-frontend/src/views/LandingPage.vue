@@ -156,10 +156,7 @@ const faqs = [
       <div class="nav-container">
         <div class="nav-logo" @click="scrollToSection('#career')">
           <div class="logo-icon">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <rect x="3" y="3" width="18" height="18" rx="5" fill="#1677ff" opacity="0.12" />
-              <path d="M7 12.5L10.2 15.5L17 8.5" stroke="#1677ff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
+            <img src="@/assets/1234.png" alt="Logo" class="logo-img" />
           </div>
           <span class="logo-text">职引未来</span>
         </div>
@@ -438,9 +435,10 @@ const faqs = [
   justify-content: center;
 }
 
-.logo-icon svg {
+.logo-img {
   width: 100%;
   height: 100%;
+  object-fit: contain;
 }
 
 .logo-text {
