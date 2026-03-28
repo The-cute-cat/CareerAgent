@@ -126,7 +126,7 @@ public class AiServiceClient {
                 log.info("调用{}结束，耗时：{}ms", serviceName, time);
                 return response;
             } catch (Exception e) {
-                log.warn("{}调用失败，第 {} 次重试，{}", serviceName, tryCount, e.getMessage(), e);
+                log.warn("{}调用失败，第 {} 次尝试失败，{}", serviceName, tryCount, e.getMessage(), e);
                 sleep(properties.getRetry().getDelay());
             }
         }

@@ -51,6 +51,25 @@ class InternshipExperience(BaseModel):
         description="实习职责与产出，优先提取动作+结果信息，如'搭建报表并将统计耗时从2小时降至20分钟'。"
     )
 
+    @field_validator("date", mode="before")
+    @classmethod
+    def parse_date_list(cls, v):
+        """支持 ISO 带时间格式和纯日期格式的解析"""
+        if not isinstance(v, list):
+            return v
+        result = []
+        for item in v:
+            if isinstance(item, str):
+                # 处理 ISO 格式 (如 2026-04-04T16:00:00.000Z)
+                if "T" in item:
+                    item = item.split("T")[0]
+                result.append(datetime.datetime.strptime(item, "%Y-%m-%d").date())
+            elif isinstance(item, datetime.date):
+                result.append(item)
+            else:
+                result.append(item)
+        return result
+
 
 class SkillDetail(BaseModel):
     name: str = Field(description="技能名称")
