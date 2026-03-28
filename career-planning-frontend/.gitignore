@@ -39,6 +39,7 @@ coverage
 __screenshots__/
 
 # Vite
+.vite/
 *.timestamp-*-*.mjs
 
 # Add this line to ignore .history directory
