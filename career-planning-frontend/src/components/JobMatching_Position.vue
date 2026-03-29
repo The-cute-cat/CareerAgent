@@ -283,10 +283,10 @@ onBeforeUnmount(() => {
               <div class="job-tags">
                 <el-tag
                   size="small"
-                  :color="getMatchScoreColor(jobItem.deep_analysis.score)"
+                  :color="getMatchScoreColor(Math.round((jobItem.score || 0) * 100))"
                   effect="dark"
                 >
-                  {{ jobItem.deep_analysis.score }}分匹配
+                  {{ Math.round((jobItem.score || 0) * 100) }}分匹配
                 </el-tag>
                 <el-tag
                   size="small"
@@ -297,7 +297,7 @@ onBeforeUnmount(() => {
                     <CircleCheck v-if="jobItem.deep_analysis.can_apply" />
                     <CircleClose v-else />
                   </el-icon>
-                  {{ jobItem.deep_analysis.can_apply ? '建议投递' : '不建议投递' }}
+                  {{ jobItem.deep_analysis.can_apply ? '推荐' : '不推荐' }}
                 </el-tag>
               </div>
             </div>
@@ -343,18 +343,18 @@ onBeforeUnmount(() => {
             <div 
               class="score-ring" 
               :style="{ 
-                background: `conic-gradient(${getMatchScoreColor(jobItem.deep_analysis.score)} ${jobItem.deep_analysis.score * 3.6}deg, #e4e7ed 0deg)`
+                background: `conic-gradient(${getMatchScoreColor(Math.round((jobItem.score || 0) * 100))} ${Math.round((jobItem.score || 0) * 100) * 3.6}deg, #e4e7ed 0deg)`
               }"
             >
               <div class="score-inner">
-                <span class="score-num">{{ jobItem.deep_analysis.score }}</span>
+                <span class="score-num">{{ Math.round((jobItem.score || 0) * 100) }}</span>
                 <span class="score-unit">分</span>
               </div>
             </div>
           </div>
           <div class="score-labels">
-            <div class="score-level" :style="{ color: getMatchScoreColor(jobItem.deep_analysis.score) }">
-              {{ getMatchScoreLevel(jobItem.deep_analysis.score) }}
+            <div class="score-level" :style="{ color: getMatchScoreColor(Math.round((jobItem.score || 0) * 100)) }">
+              {{ getMatchScoreLevel(Math.round((jobItem.score || 0) * 100)) }}
             </div>
             <div class="score-desc">综合匹配度</div>
           </div>

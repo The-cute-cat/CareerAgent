@@ -12,7 +12,7 @@ communication:
 lite_llm:
   model_name: dashscope/qwen-max
   base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
-  timeout: 30 # 超时时间
+  timeout: 120 # 超时时间
   max_retries: 3 # 最大重试次数
   max_concurrent_requests: 3 # 最大并发请求数
   extra: # 额外参数

@@ -13,6 +13,7 @@ const props = defineProps({
 const emit = defineEmits(['update-user'])
 
 const isEditing = ref(false)
+const editingInterestKey = ref('')
 
 const formData = reactive({
   name: '',
@@ -101,16 +102,33 @@ const interestBlocks = computed(() => [
 
 const startEdit = () => {
   isEditing.value = true
+  editingInterestKey.value = ''
 }
 
 const cancelEdit = () => {
   Object.assign(formData, props.userInfo)
   isEditing.value = false
+  editingInterestKey.value = ''
 }
 
 const saveEdit = () => {
   emit('update-user', { ...formData })
   isEditing.value = false
+  editingInterestKey.value = ''
+}
+
+const startInterestEdit = (key) => {
+  editingInterestKey.value = key
+}
+
+const cancelInterestEdit = () => {
+  Object.assign(formData, props.userInfo)
+  editingInterestKey.value = ''
+}
+
+const saveInterestEdit = () => {
+  emit('update-user', { ...formData })
+  editingInterestKey.value = ''
 }
 
 const handleAvatarUpload = (event) => {
@@ -227,10 +245,29 @@ const handleAvatarUpload = (event) => {
             <h3>{{ block.title }}</h3>
             <p>{{ block.desc }}</p>
           </div>
-          <div class="interest-count">{{ block.tags.length }}</div>
+          <div class="interest-tools">
+            <div class="interest-count">{{ block.tags.length }}</div>
+            <div v-if="editingInterestKey === block.key" class="interest-actions">
+              <el-button circle size="small" @click="cancelInterestEdit">
+                <el-icon><Close /></el-icon>
+              </el-button>
+              <el-button circle size="small" type="primary" @click="saveInterestEdit">
+                <el-icon><Check /></el-icon>
+              </el-button>
+            </div>
+            <el-button
+              v-else-if="!isEditing"
+              circle
+              size="small"
+              class="interest-edit-btn"
+              @click="startInterestEdit(block.key)"
+            >
+              <el-icon><EditPen /></el-icon>
+            </el-button>
+          </div>
         </div>
 
-        <template v-if="isEditing">
+        <template v-if="isEditing || editingInterestKey === block.key">
           <el-input
             v-model="formData[block.key]"
             type="textarea"
@@ -491,6 +528,19 @@ const handleAvatarUpload = (event) => {
   margin-bottom: 16px;
 }
 
+.interest-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.interest-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .interest-head h3 {
   margin: 0;
   font-size: 18px;
@@ -515,6 +565,11 @@ const handleAvatarUpload = (event) => {
   color: #1668dc;
   font-size: 18px;
   font-weight: 800;
+}
+
+.interest-edit-btn {
+  border-color: #dbe6f4;
+  color: #1668dc;
 }
 
 .tag-list {

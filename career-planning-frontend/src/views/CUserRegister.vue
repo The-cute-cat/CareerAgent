@@ -5,7 +5,7 @@ import { ElMessage } from 'element-plus'
 import type { LoginFormDTO } from '@/types/user'
 import { userRegisterService, userSendCodeRegisterService } from '@/api/user/user'
 import { useUserStore } from '@/stores'
-import { ArrowRight, Hide, Lock, Message, User, View, Key } from '@element-plus/icons-vue'
+import { ArrowRight, Hide, Lock, Message, User, View, Key, Ticket } from '@element-plus/icons-vue'
 
 const form = ref<LoginFormDTO>({})
 const router = useRouter()
@@ -79,7 +79,7 @@ const handleRegister = async () => {
     }
     userStore.clearUserALLInfo()
     ElMessage.success('注册成功，请登录')
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    await new Promise((resolve) => setTimeout(resolve, 1000))
     router.push('/login')
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : '注册失败'
@@ -105,15 +105,15 @@ onUnmounted(() => {
     <div class="auth-shell">
       <aside class="auth-aside">
         <span class="auth-badge">新用户加入</span>
-        <h1>创建账号后，职业画像和分析结果都能持续沉淀。</h1>
-        <p>保留原有注册字段和验证码流程，只把界面升级为更符合当前审美和操作习惯的认证体验。</p>
+        <h1>创建账号后，把职业探索、成长记录和报告内容统一沉淀下来。</h1>
+        <p>注册完成后即可开启个人成长档案，持续积累画像、任务轨迹和职业规划结果。</p>
 
         <div class="aside-card">
-          <strong>注册后你可以</strong>
+          <strong>注册后你可以获得</strong>
           <ul>
-            <li>上传简历并自动填充画像表单</li>
-            <li>沉淀岗位推荐和能力分析记录</li>
-            <li>后续继续查看报告与发展路径</li>
+            <li>专属账号与职业成长档案</li>
+            <li>岗位推荐与能力分析记录</li>
+            <li>持续查看报告与发展路径</li>
           </ul>
         </div>
       </aside>
@@ -195,6 +195,18 @@ onUnmounted(() => {
               </div>
             </label>
 
+            <label class="field">
+              <span class="field-label">邀请码</span>
+              <div class="field-box">
+                <el-icon><Ticket /></el-icon>
+                <input
+                  v-model="form.inviteCode"
+                  type="text"
+                  placeholder="请输入邀请码（选填）"
+                />
+              </div>
+            </label>
+
             <button type="submit" class="primary-btn" :disabled="loading">
               <span>{{ loading ? '注册中...' : '注册并开始使用' }}</span>
               <el-icon><ArrowRight /></el-icon>
@@ -213,9 +225,9 @@ onUnmounted(() => {
 
 <style scoped>
 .auth-page {
-  --auth-accent: #0f766e;
-  --auth-heading: #0f172a;
-  --auth-soft: #64748b;
+  --auth-accent: #1668dc;
+  --auth-heading: #163253;
+  --auth-soft: #6d84a0;
   --auth-input: #111827;
   --auth-placeholder: #94a3b8;
   position: relative;
@@ -226,9 +238,9 @@ onUnmounted(() => {
   padding: 24px;
   overflow: hidden;
   background:
-    radial-gradient(circle at top left, rgba(15, 118, 110, 0.18), transparent 24%),
-    radial-gradient(circle at bottom right, rgba(249, 115, 22, 0.14), transparent 24%),
-    linear-gradient(180deg, #f4f7f4 0%, #f8f4ee 100%);
+    radial-gradient(circle at top left, rgba(97, 154, 255, 0.22), transparent 24%),
+    radial-gradient(circle at bottom right, rgba(103, 184, 255, 0.18), transparent 24%),
+    linear-gradient(180deg, #f4f8ff 0%, #eef4fb 52%, #f8fbff 100%);
 }
 
 .auth-page__glow {
@@ -243,7 +255,7 @@ onUnmounted(() => {
   height: 320px;
   left: -100px;
   top: 80px;
-  background: rgba(20, 184, 166, 0.18);
+  background: rgba(22, 119, 255, 0.18);
 }
 
 .auth-page__glow--right {
@@ -251,7 +263,7 @@ onUnmounted(() => {
   height: 360px;
   right: -100px;
   bottom: 40px;
-  background: rgba(251, 146, 60, 0.14);
+  background: rgba(103, 184, 255, 0.16);
 }
 
 .auth-shell {
@@ -270,7 +282,7 @@ onUnmounted(() => {
 
 .auth-aside {
   padding: 48px;
-  background: linear-gradient(160deg, rgba(18, 42, 39, 0.96), rgba(15, 118, 110, 0.88));
+  background: linear-gradient(160deg, rgba(23, 58, 93, 0.96), rgba(22, 119, 255, 0.82));
   color: #f8fafc;
   display: flex;
   flex-direction: column;
@@ -298,7 +310,7 @@ onUnmounted(() => {
 
 .auth-aside p {
   margin: 0;
-  color: rgba(241, 245, 249, 0.82);
+  color: rgba(241, 245, 249, 0.84);
   font-size: 15px;
   line-height: 1.9;
 }
@@ -439,7 +451,7 @@ onUnmounted(() => {
   height: 42px;
   padding: 0 14px;
   border-radius: 14px;
-  background: rgba(15, 118, 110, 0.1);
+  background: rgba(22, 119, 255, 0.1);
   color: var(--auth-accent);
   font-weight: 700;
 }
@@ -463,7 +475,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   gap: 10px;
-  background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
+  background: linear-gradient(135deg, #1677ff 0%, #67b8ff 100%);
   color: #ffffff;
   font-size: 15px;
   font-weight: 700;
@@ -473,7 +485,7 @@ onUnmounted(() => {
 
 .primary-btn:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 18px 30px rgba(15, 118, 110, 0.22);
+  box-shadow: 0 18px 30px rgba(22, 119, 255, 0.22);
 }
 
 .primary-btn:disabled {
