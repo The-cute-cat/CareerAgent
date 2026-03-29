@@ -28,7 +28,7 @@ public class PointsReferController {
     }
 
     /**
-     * register 新用户赠送积分接口
+     * insertUserPoints 新用户赠送积分接口
      * 注册接口
      * @param referralDTO
      */

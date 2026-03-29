@@ -25,6 +25,12 @@ public class ThreadLocalUtil {
         userThreadLocal.remove();
     }
 
+    /**
+     * 获取当前用户ID
+     * @return
+     * @throws RuntimeException 如果用户未登录
+     * 主要是判断为空,这里写的好
+     */
     public static Long getCurrentUserId() {
         String idStr = ThreadLocalUtil.get();
         if (StrUtil.isBlank(idStr)) {

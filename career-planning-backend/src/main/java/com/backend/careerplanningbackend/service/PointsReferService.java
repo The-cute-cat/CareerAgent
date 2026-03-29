@@ -8,7 +8,7 @@ import jakarta.validation.Valid;
 public interface PointsReferService {
 
 
-    Result getAccountPoints(Long id);
+    Result getAccountPoints(Long userId);
 
     Result register(ReferralDTO referralDTO);
 

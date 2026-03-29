@@ -10,7 +10,7 @@ communication:
     secret: <SECRET>
     expire: 1800
 lite_llm:
-  model_name: dashscope/qwen-plus
+  model_name: dashscope/qwen-max
   base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
   timeout: 30 # 超时时间
   max_retries: 3 # 最大重试次数
@@ -43,9 +43,9 @@ lite_llm:
       temperature: 0.7
 vector:
   model_name: text-embedding-v4
-  llm_model_name: qwen-plus
+  llm_model_name: qwen-max
 llm:
-  model_name: qwen-plus
+  model_name: qwen-max
   base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
   timeout: 30 # 超时时间
   max_retries: 3 # 最大重试次数
@@ -80,3 +80,10 @@ milvus:
   cloud:
     url: <url>
     token: <token>
+chroma_config:
+  save_path: <SAVE_PATH>
+  model_name: text-embedding-v4
+  base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+  k: 5
+  extra:
+    temperature: 0.7

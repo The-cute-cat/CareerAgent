@@ -2,6 +2,7 @@ package com.backend.careerplanningbackend.controller;
 
 import com.backend.careerplanningbackend.domain.dto.AiChatResponse;
 import com.backend.careerplanningbackend.domain.dto.ConvertDTO;
+import com.backend.careerplanningbackend.domain.po.Result;
 import com.backend.careerplanningbackend.util.AiServiceClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -44,7 +45,7 @@ public class ConvertController {
         Map<String, Object> params2 = new HashMap<>();
         params2.put("student_profile", aiChatResponse.getData());
         aiChatResponse = aiServiceClient.chatWithOtherJson("/matching/jobs", params2);
-        return aiChatResponse.getData();
+        return Result.ok(aiChatResponse.getData());
     }
 
 }

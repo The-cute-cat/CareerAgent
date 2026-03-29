@@ -17,7 +17,7 @@ import java.io.File;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.Optional;
 
 /**
  * AI 服务客户端
@@ -57,9 +57,6 @@ public class AiServiceClient {
 
     /**
      * 通用 AI 服务调用方法（同步阻塞方式）
-     * <p>
-     * 支持自动重试机制，根据配置的最大重试次数和延迟时间进行重试。
-     * 适用于各种类型的请求体构建器。
      *
      * @param url     请求的 API 路径（相对路径，会拼接 baseUrl）
      * @param builder 已构建好的多部分表单请求体
@@ -67,86 +64,102 @@ public class AiServiceClient {
      * @throws RuntimeException 当所有重试都失败时抛出
      */
     private AiChatResponse universalAiService(String url, MultipartBodyBuilder builder) {
-        String token = AITokenUtil.createToken();
-        int try_count = 0;
-        while (try_count < properties.getRetry().getMaxAttempts()) {
-            try_count++;
-            try {
-                long startTime = System.currentTimeMillis();
-                log.info("调用 AI 服务，URL: {}, 请求参数: {}, 尝试次数：{}", url, builder.toString(), try_count + 1);
-                AiChatResponse response = webClient.post()
-                        .uri(properties.getBaseUrl() + url)
-                        // 添加认证 Token
-                        .header("Authorization", "Bearer " + token)
-                        .contentType(MediaType.MULTIPART_FORM_DATA)
-                        .body(BodyInserters.fromMultipartData(builder.build()))
-                        .retrieve()
-                        .bodyToMono(AiChatResponse.class)
-                        // 设置超时时间
-                        .timeout(Duration.ofMillis(properties.getTimeout()))
-                        .block(Duration.ofMillis(properties.getTimeout()));
-                // 检查响应状态
-                if (response != null && response.isState()) {
-                    long time = System.currentTimeMillis() - startTime;
-                    log.info("调用AI服务结束，耗时：{}ms", time);
-                    return response;
-                } else {
-                    String errorMsg = response != null ? response.getMsg() : "响应为空";
-                    throw new RuntimeException("AI 服务业务失败: " + errorMsg);
-                }
-            } catch (Exception e) {
-                log.warn("AI 服务调用失败，第 {} 次重试，{}", try_count, e.getMessage(), e);
-                // 等待配置的延迟时间后重试
-                sleep(properties.getRetry().getDelay());
-            }
-        }
-        // 所有重试都失败，抛出异常
-        throw new RuntimeException("AI 服务调用失败，URL: " + url + ", 请检查配置: " + builder.toString());
+        return executeWithRetry(url, webClientBuilder -> {
+            String token = AITokenUtil.createToken();
+            return webClient.post()
+                    .uri(properties.getBaseUrl() + url)
+                    .header("Authorization", "Bearer " + token)
+                    .contentType(MediaType.MULTIPART_FORM_DATA)
+                    .body(BodyInserters.fromMultipartData(builder.build()))
+                    .retrieve()
+                    .bodyToMono(AiChatResponse.class)
+                    .timeout(Duration.ofMillis(properties.getTimeout()))
+                    .block(Duration.ofMillis(properties.getTimeout()));
+        }, () -> builder, "AI服务");
     }
 
     /**
      * 自定义参数对话（JSON格式，阻塞方式）
-     * <p>
-     * 用于发送 JSON 格式的请求到 AI 服务，
-     * 适用于复杂对象参数。
      *
      * @param url    请求的 API 路径
      * @param params 自定义参数映射
      * @return AI 响应结果
      */
     public AiChatResponse chatWithOtherJson(String url, Map<String, Object> params) {
-        String token = AITokenUtil.createToken();
-        int try_count = 0;
-        while (try_count < properties.getRetry().getMaxAttempts()) {
-            try_count++;
+        return executeWithRetry(url, ignored -> {
+            String token = AITokenUtil.createToken();
+            return webClient.post()
+                    .uri(properties.getBaseUrl() + url)
+                    .header("Authorization", "Bearer " + token)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(params)
+                    .retrieve()
+                    .bodyToMono(AiChatResponse.class)
+                    .timeout(Duration.ofMillis(properties.getTimeout()))
+                    .block(Duration.ofMillis(properties.getTimeout()));
+        }, () -> null, "AI服务(JSON格式)");
+    }
+
+    /**
+     * 带重试机制的通用执行方法
+     *
+     * @param url              请求的 API 路径
+     * @param requestExecutor  请求执行函数
+     * @param bodySupplier     请求体构建函数
+     * @param serviceName      服务名称（用于日志）
+     * @return AI 响应结果
+     * @throws RuntimeException 当所有重试都失败时抛出
+     */
+    private AiChatResponse executeWithRetry(String url,
+                                            RequestExecutor requestExecutor,
+                                            BodySupplier bodySupplier,
+                                            String serviceName) {
+        int tryCount = 0;
+        while (tryCount < properties.getRetry().getMaxAttempts()) {
+            tryCount++;
             try {
                 long startTime = System.currentTimeMillis();
-                log.info("调用 AI 服务(JSON格式)，URL: {}, 请求参数: {}, 尝试次数：{}", url, params, try_count);
-                AiChatResponse response = webClient.post()
-                        .uri(properties.getBaseUrl() + url)
-                        .header("Authorization", "Bearer " + token)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .bodyValue(params)
-                        .retrieve()
-                        .bodyToMono(AiChatResponse.class)
-                        .timeout(Duration.ofMillis(properties.getTimeout()))
-                        .block(Duration.ofMillis(properties.getTimeout()));
-
-                if (response != null && response.isState()) {
-                    long time = System.currentTimeMillis() - startTime;
-                    log.info("调用AI服务结束，耗时：{}ms", time);
-                    return response;
-                } else {
-                    String errorMsg = response != null ? response.getMsg() : "响应为空";
-                    throw new RuntimeException("AI 服务业务失败: " + errorMsg);
-                }
+                log.info("调用 {}，URL: {}, 尝试次数：{}", serviceName, url, tryCount);
+                AiChatResponse response = requestExecutor.execute(bodySupplier != null ? bodySupplier.get() : null);
+                validateResponse(response, serviceName);
+                long time = System.currentTimeMillis() - startTime;
+                log.info("调用{}结束，耗时：{}ms", serviceName, time);
+                return response;
             } catch (Exception e) {
-                log.warn("AI 服务调用失败，第 {} 次重试，{}", try_count, e.getMessage(), e);
+                log.warn("{}调用失败，第 {} 次尝试失败，{}", serviceName, tryCount, e.getMessage(), e);
                 sleep(properties.getRetry().getDelay());
             }
         }
+        throw new RuntimeException(serviceName + "调用失败，URL: " + url + ", 已达到最大重试次数");
+    }
 
-        throw new RuntimeException("AI 服务调用失败，URL: " + url + ", 请检查配置: " + params);
+    /**
+     * 验证响应状态
+     *
+     * @param response     AI 响应
+     * @param serviceName 服务名称
+     */
+    private void validateResponse(AiChatResponse response, String serviceName) {
+        if (response == null || !response.isState()) {
+            String errorMsg = response != null ? response.getMsg() : "响应为空";
+            throw new RuntimeException(serviceName + "业务失败: " + errorMsg);
+        }
+    }
+
+    /**
+     * 请求执行函数接口
+     */
+    @FunctionalInterface
+    private interface RequestExecutor {
+        AiChatResponse execute(MultipartBodyBuilder builder);
+    }
+
+    /**
+     * 请求体构建函数接口
+     */
+    @FunctionalInterface
+    private interface BodySupplier {
+        MultipartBodyBuilder get();
     }
 
 
@@ -173,17 +186,17 @@ public class AiServiceClient {
      * @return 响应数据流，支持背压处理
      */
     private Flux<String> universalAiServiceStream(String url, MultipartBodyBuilder builder) {
-        AtomicReference<String> token = new AtomicReference<>(AITokenUtil.createToken());
+        String token = AITokenUtil.createToken();
         return webClient.post()
                 .uri(properties.getBaseUrl() + url)
-                .header("Authorization", "Bearer " + token.get())
+                .header("Authorization", "Bearer " + token)
                 .contentType(MediaType.MULTIPART_FORM_DATA)
                 .body(BodyInserters.fromMultipartData(builder.build()))
                 .retrieve()
                 .bodyToFlux(String.class)
-                .doOnError(e -> log.error("流式调用失败", e))
+                .doOnError(e -> log.error("流式调用失败，URL: {}", url, e))
                 .onErrorResume(e -> {
-                    log.warn("流式调用出错", e);
+                    log.warn("流式调用出错，URL: {}, 错误信息: {}", url, e.getMessage());
                     return Flux.error(new RuntimeException("AI服务流式调用失败: " + e.getMessage(), e));
                 });
     }
@@ -200,30 +213,56 @@ public class AiServiceClient {
      */
     private MultipartBodyBuilder buildFileBody(AiChatRequest aiChatRequest) {
         MultipartBodyBuilder builder = new MultipartBodyBuilder();
-        if (isNotEmpty(aiChatRequest.getMessage())) {
-            builder.part("message", aiChatRequest.getMessage());
-        }
-        if (isNotEmpty(aiChatRequest.getConversationId())) {
-            builder.part("conversationId", aiChatRequest.getConversationId());
-        }
-        if (aiChatRequest.getFiles() != null && !aiChatRequest.getFiles().isEmpty()) {
-            if (aiChatRequest.getFiles().size() > 1) {
-                for (File file : aiChatRequest.getFiles()) {
-                    builder.part("files", new FileSystemResource(file));
-                }
-            } else {
-                builder.part("file", new FileSystemResource(aiChatRequest.getFiles().getFirst()));
-            }
-        } else if (aiChatRequest.getMultipartFiles() != null && !aiChatRequest.getMultipartFiles().isEmpty()) {
-            if (aiChatRequest.getMultipartFiles().size() > 1) {
-                for (MultipartFile multipartFile : aiChatRequest.getMultipartFiles()) {
-                    builder.part("files", multipartFile.getResource());
-                }
-            } else {
-                builder.part("file", aiChatRequest.getMultipartFiles().getFirst().getResource());
-            }
-        }
+        Optional.ofNullable(aiChatRequest.getMessage()).filter(this::isNotEmpty)
+                .ifPresent(message -> builder.part("message", message));
+        Optional.ofNullable(aiChatRequest.getConversationId()).filter(this::isNotEmpty)
+                .ifPresent(conversationId -> builder.part("conversationId", conversationId));
+
+        // 处理文件上传
+        addFilesToBuilder(builder, aiChatRequest.getFiles(), FileSystemResource::new);
+        addMultipartFilesToBuilder(builder, aiChatRequest.getMultipartFiles());
+
         return builder;
+    }
+
+    /**
+     * 添加文件到多部分表单构建器
+     *
+     * @param builder   多部分表单构建器
+     * @param files     文件列表
+     * @param converter 文件资源转换器
+     * @param <T>       文件类型
+     */
+    private <T> void addFilesToBuilder(MultipartBodyBuilder builder, List<T> files, java.util.function.Function<T, FileSystemResource> converter) {
+        if (files != null && !files.isEmpty()) {
+            String partName = files.size() > 1 ? "files" : "file";
+            if (files.size() > 1) {
+                for (T file : files) {
+                    builder.part(partName, converter.apply(file));
+                }
+            } else {
+                builder.part(partName, converter.apply(files.getFirst()));
+            }
+        }
+    }
+
+    /**
+     * 添加 MultipartFile 到多部分表单构建器
+     *
+     * @param builder         多部分表单构建器
+     * @param multipartFiles MultipartFile 文件列表
+     */
+    private void addMultipartFilesToBuilder(MultipartBodyBuilder builder, List<MultipartFile> multipartFiles) {
+        if (multipartFiles != null && !multipartFiles.isEmpty()) {
+            String partName = multipartFiles.size() > 1 ? "files" : "file";
+            if (multipartFiles.size() > 1) {
+                for (MultipartFile file : multipartFiles) {
+                    builder.part(partName, file.getResource());
+                }
+            } else {
+                builder.part(partName, multipartFiles.getFirst().getResource());
+            }
+        }
     }
 
     /**
@@ -380,7 +419,6 @@ public class AiServiceClient {
      * @param conversationId 对话 ID，若为空则不传递
      * @return 响应数据流
      */
-
     public Flux<String> chatWithMultipartFilesStream(String url, List<MultipartFile> files, String conversationId) {
         AiChatRequest request = AiChatRequest.ofMultipartFiles(conversationId, null, files);
         return callAiServiceStream(url, request);

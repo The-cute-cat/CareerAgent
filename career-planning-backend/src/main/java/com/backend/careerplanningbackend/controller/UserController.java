@@ -37,7 +37,7 @@ public class UserController {
         return userService.login(user);
     }
     /**
-     * register
+     * insertUserPoints
      * 注册
      */
     @PostMapping("/register")
