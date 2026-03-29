@@ -122,7 +122,7 @@ onUnmounted(() => {
 
           <form class="auth-form" @submit.prevent="handleRegister">
             <label class="field">
-              <span class="field-label">昵称</span>
+              <span class="field-label">用户名</span>
               <div class="field-box">
                 <el-icon><User /></el-icon>
                 <input v-model="form.username" type="text" placeholder="请输入昵称" required />
