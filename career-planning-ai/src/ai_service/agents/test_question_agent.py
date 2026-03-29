@@ -94,7 +94,7 @@ async def main():
     #     "我觉得可能是数据库查询太慢了，可以用 Redis 做缓存。另外代码里有很多地方在循环里查数据库，可以优化一下。还可以用 Python 的 async 功能来处理并发请求。"
     # )
     tools = "Docker"
-    skills = "Python"
+    # skills = "Python"
     result1 = await test_question_agent.generate_test_questions(tool="Docker")
     result = await test_question_agent.check_test_questions(result1, tools)
     result = await test_question_agent.modify_test_questions(result1, tools, result)

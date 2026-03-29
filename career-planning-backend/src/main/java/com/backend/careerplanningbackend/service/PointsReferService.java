@@ -12,7 +12,9 @@ public interface PointsReferService {
 
     Result register(ReferralDTO referralDTO);
 
-    Result invite(ReferralDTO referralDTO);
+    Result generateInvite(ReferralDTO referralDTO);
+    
+    Result receiverPoints(ReferralDTO referralDTO);
 
     Result registerStudent(ReferralDTO referralDTO);
 

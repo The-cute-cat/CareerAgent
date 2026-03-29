@@ -22,7 +22,8 @@ public class UserReferral {
     private String inviteCode;
     private Integer rewardPoints;
     private Integer status;
-    private LocalDateTime createTime;
     private LocalDateTime endTime;
+    private LocalDateTime ActivityEndTime;
+    private LocalDateTime createTime;
     private LocalDateTime updateTime;
 }
