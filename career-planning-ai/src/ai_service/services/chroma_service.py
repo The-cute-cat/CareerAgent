@@ -11,10 +11,8 @@ from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
 from langchain_core.vectorstores import VectorStoreRetriever
 
-from ai_service.utils.logger_handler import get_logger
+from ai_service.services import log as logger
 from config import settings
-
-logger = get_logger("chroma_service")
 
 _instances: dict[str, "ChromaService"] = {}
 
@@ -23,7 +21,7 @@ def get_default_embedding() -> Embeddings:
     """获取默认的 Embedding 模型"""
     return DashScopeEmbeddings(
         model=settings.chroma_config.model_name,
-        dashscope_api_key=settings.lite_llm.api_key.get_secret_value(),
+        dashscope_api_key=settings.llm.api_key.get_secret_value(),
     )
 
 
@@ -52,10 +50,10 @@ class ChromaService:
     """
 
     def __init__(
-        self,
-        collection_name: str = "default",
-        embedding_function: Embeddings | None = None,
-        persist_directory: str | None = None,
+            self,
+            collection_name: str = "default",
+            embedding_function: Embeddings | None = None,
+            persist_directory: str | None = None,
     ):
         """
         初始化 Chroma 服务
@@ -79,15 +77,15 @@ class ChromaService:
                 f"Chroma 服务初始化成功: collection={collection_name}, path={self._persist_directory}"
             )
         except Exception as e:
-            logger.error(f"Chroma 服务初始化失败: {e}")
+            logger.error(f"Chroma 服务初始化失败: {e}", exc_info=True)
             raise
 
     @classmethod
     def get_instance(
-        cls,
-        collection_name: str = "default",
-        embedding_function: Embeddings | None = None,
-        persist_directory: str | None = None,
+            cls,
+            collection_name: str = "default",
+            embedding_function: Embeddings | None = None,
+            persist_directory: str | None = None,
     ) -> "ChromaService":
         """
         获取单例实例
@@ -129,9 +127,9 @@ class ChromaService:
         return self._collection_name
 
     def get_retriever(
-        self,
-        search_type: str = "similarity",
-        search_kwargs: dict[str, Any] | None = None,
+            self,
+            search_type: str = "similarity",
+            search_kwargs: dict[str, Any] | None = None,
     ) -> VectorStoreRetriever:
         """
         获取检索器
@@ -163,9 +161,9 @@ class ChromaService:
         return self.add_documents([Document(page_content=content, metadata=metadata or {})])
 
     def add_documents(
-        self,
-        documents: list[Document],
-        ids: list[str] | None = None,
+            self,
+            documents: list[Document],
+            ids: list[str] | None = None,
     ) -> list[str]:
         """
         批量添加文档
@@ -190,17 +188,17 @@ class ChromaService:
             raise
 
     def add_texts(
-        self,
-        texts: list[str],
-        metadatas: list[dict[str, Any]] | None = None,
-        ids: list[str] | None = None,
+            self,
+            texts: list[str],
+            metadata: list[dict[str, Any]] | None = None,
+            ids: list[str] | None = None,
     ) -> list[str]:
         """
         批量添加文本
 
         Args:
             texts: 文本列表
-            metadatas: 元数据列表
+            metadata: 元数据列表
             ids: 可选的文档 ID 列表
 
         Returns:
@@ -211,7 +209,7 @@ class ChromaService:
             return []
 
         try:
-            result = self._vector_store.add_texts(texts, metadatas=metadatas, ids=ids)
+            result = self._vector_store.add_texts(texts, metadatas=metadata, ids=ids)
             logger.info(f"成功添加 {len(texts)} 条文本到集合 {self._collection_name}")
             return result
         except Exception as e:
@@ -231,10 +229,10 @@ class ChromaService:
         return self.get_retriever().invoke(query)
 
     def similarity_search(
-        self,
-        query: str,
-        k: int | None = None,
-        filter_dict: dict[str, Any] | None = None,
+            self,
+            query: str,
+            k: int | None = None,
+            filter_dict: dict[str, Any] | None = None,
     ) -> list[Document]:
         """
         相似度搜索
@@ -255,10 +253,10 @@ class ChromaService:
             raise
 
     def similarity_search_with_score(
-        self,
-        query: str,
-        k: int | None = None,
-        filter_dict: dict[str, Any] | None = None,
+            self,
+            query: str,
+            k: int | None = None,
+            filter_dict: dict[str, Any] | None = None,
     ) -> list[tuple[Document, float]]:
         """
         带分数的相似度搜索
@@ -279,12 +277,12 @@ class ChromaService:
             raise
 
     def max_marginal_relevance_search(
-        self,
-        query: str,
-        k: int = 4,
-        fetch_k: int = 20,
-        lambda_mult: float = 0.5,
-        filter_dict: dict[str, Any] | None = None,
+            self,
+            query: str,
+            k: int = 4,
+            fetch_k: int = 20,
+            lambda_mult: float = 0.5,
+            filter_dict: dict[str, Any] | None = None,
     ) -> list[Document]:
         """
         最大边际相关性搜索（MMR），平衡相关性和多样性
@@ -356,7 +354,8 @@ class ChromaService:
     def count(self) -> int:
         """获取文档数量"""
         try:
-            collection = self._vector_store._collection  # noqa: SLF001
+            # noinspection PyProtectedMember
+            collection = self._vector_store._collection
             return collection.count()
         except Exception as e:
             logger.error(f"获取文档数量失败: {e}")
@@ -371,10 +370,11 @@ class ChromaService:
             where: 过滤条件
 
         Returns:
-            GetResult: 包含 ids, documents, metadatas 等字段的对象
+            GetResult: 包含 ids, documents, metadata 等字段的对象
         """
         try:
-            collection = self._vector_store._collection  # noqa: SLF001
+            # noinspection PyProtectedMember
+            collection = self._vector_store._collection
             return collection.get(ids=ids, where=where)
         except Exception as e:
             logger.error(f"获取文档失败: {e}")

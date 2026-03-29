@@ -1,0 +1,68 @@
+请分析以下开发者的代码平台数据：
+
+## 账号信息
+- 平台: {platform}
+- 账号年限: {account_years}年
+- 公开仓库数: {public_repos}
+- 关注者: {followers}
+
+## 项目统计
+- 原创仓库: {original_count}
+- 获Star总数: {total_stars}
+- 获Fork总数: {total_forks}
+- 最受欢迎仓库Star数: {max_star}
+
+## Top 5 仓库
+{top_repos_detail}
+
+## 编程语言
+- 使用语言总数: {lang_count}
+- 主要语言: {primary_language}
+- 语言分布: {lang_distribution}
+- 涉及技术领域: {lang_categories}
+- 全栈潜力: {full_stack}
+
+## 活跃度
+- 近3个月活跃仓库: {active_3m}
+- 活跃度评级: {activity_level}
+
+## 工程化评估
+- 工程化评分: {engineering_score}/100
+- 详情: {engineering_details}
+
+请输出JSON格式的评估报告：
+{{
+    "overall_assessment": {{
+        "score": <0-100>,
+        "level": "<S/A/B/C/D/E>",
+        "summary": "<一句话总结>",
+        "highlights": ["<亮点>"],
+        "concerns": ["<需改进点>"]
+    }},
+    "tech_stack_analysis": {{
+        "primary_languages": ["<主要语言>"],
+        "tech_domains": ["<技术领域>"],
+        "depth_assessment": "<技术深度评价>",
+        "breadth_assessment": "<技术广度评价>",
+        "suggestion": "<发展建议>"
+    }},
+    "project_quality_analysis": {{
+        "quality_rating": "<优秀/良好/一般/待提升>",
+        "engineering_habits": "<工程化习惯评价>",
+        "project_scale": "<项目规模评价>",
+        "suggestion": "<提升建议>"
+    }},
+    "activity_analysis": {{
+        "consistency": "<编码一致性>",
+        "recent_focus": "<近期关注方向>",
+        "suggestion": "<活跃度建议>"
+    }},
+    "career_alignment": {{
+        "suitable_roles": ["<适合岗位>"],
+        "growth_direction": "<成长方向>",
+        "skill_gaps": ["<需补充技能>"]
+    }},
+    "actionable_advice": [
+        {{"priority": "<高/中/低>", "action": "<行动项>", "reason": "<原因>", "expected_outcome": "<预期效果>"}}
+    ]
+}}

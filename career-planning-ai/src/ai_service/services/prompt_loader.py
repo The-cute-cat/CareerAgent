@@ -1,5 +1,8 @@
 from pathlib import Path
 
+import yaml
+
+from ai_service.services import log
 from config import settings
 
 
@@ -16,6 +19,7 @@ class PromptLoader:
         self._prompt_dir = Path(prompt_path)
         self._cache: dict[str, str] = {}
         self._available_prompts: set = set()
+        self.small_prompts: dict[str, str] = {}
         self._scan_prompts()
 
     def _scan_prompts(self) -> None:
@@ -25,6 +29,13 @@ class PromptLoader:
 
         for file in self._prompt_dir.glob("*.txt"):
             self._available_prompts.add(file.stem)
+
+        if Path(self._prompt_dir / "small_prompts.yaml").exists():
+            with open(self._prompt_dir / "small_prompts.yaml", "r", encoding="utf-8") as f:
+                self.small_prompts = yaml.safe_load(f) or {}
+            log.info(f"成功加载 {len(self.small_prompts)} 个小段提示词")
+        else:
+            log.warning(f"small_prompts.yaml 不存在，无法加载使用小段提示词")
 
     def _load_prompt(self, name: str) -> str:
         """加载单个提示词文件"""
