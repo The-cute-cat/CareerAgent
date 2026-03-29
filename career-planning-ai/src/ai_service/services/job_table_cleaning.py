@@ -625,7 +625,7 @@ def process_excel_jobs(file_path: str, url_column_name: str='岗位来源地址'
 
         try:
             # 调用你提供的抓取函数
-            from ai_service.scripts.py.zhaopin_spider import fetch_job_info
+            from ai_service.scripts.py.recruitment_spider import fetch_job_info
             job_info = fetch_job_info(url=url)
 
             # 3. 判断字典是否为空（以及是否抓到了有效内容）
