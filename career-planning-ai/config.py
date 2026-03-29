@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Dict, Any, List
 
 import yaml
-from pydantic import BaseModel, field_validator, SecretStr, Field, model_validator
+from pydantic import BaseModel, field_validator, SecretStr, Field, model_validator, PrivateAttr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic_settings.sources import InitSettingsSource
 
@@ -59,68 +59,124 @@ class Communication(BaseModel):
 
 class LLMModelBase(BaseModel):
     """模型配置基类"""
-    name: str = "LLM"
+    _skip_verify: bool = PrivateAttr(default=False)
+    name: str = ""
     api_key: SecretStr = SecretStr("")  # 敏感信息，使用时调用 .get_secret_value() 方法获取
     base_url: str = ""
     model_name: str = ""
-    timeout: float = 30.0
-    max_retries: int = 3
-    max_concurrent_requests: int = 3
+    timeout: float = -1
+    max_retries: int = -1
+    max_concurrent_requests: int = -1
     extra: Dict[str, Any] = {}
 
     def __repr__(self):
-        return f"{self.__class__.__name__}(api_key={self.api_key}, base_url={self.base_url}, model_name={self.model_name}, timeout={self.timeout}, max_retries={self.max_retries}, extra={self.extra})"
+        return f"{self.__class__.__name__}(api_key={self.api_key}, base_url={self.base_url}, model_name={self.model_name}, timeout={self.timeout}, max_retries={self.max_retries},max_concurrent_requests={self.max_concurrent_requests}, extra={self.extra})"
 
     def __str__(self):
         return self.__repr__()
 
-    @model_validator(mode="after")
-    def validate_api_key(self) -> "LLMModelBase":
-        if not self.api_key.get_secret_value() or self.api_key.get_secret_value() == "" or self.api_key.get_secret_value() == "<api_key>":
-            raise ValueError(f"请在 .env 文件中配置正确的 {self.name} API Key")
+    def set_skip_verify(self, skip_verify: bool):
+        self._skip_verify = skip_verify
         return self
 
-
-class LiteLLM(LLMModelBase):
-    """模型配置基类"""
-    name: str = "LiteLLM"
-
-    class Qwen(LLMModelBase):
-        name: str = "LLM_Qwen"
-
-    qwen: Qwen = Field(default_factory=Qwen)
-
-    class Deepseek(LLMModelBase):
-        name: str = "LLM_Deepseek"
-
-    deepseek: Deepseek = Field(default_factory=Deepseek)
-
-    class Image(LLMModelBase):
-        name: str = "LLM_Image"
-
-    image: Image = Field(default_factory=Image)
+    @model_validator(mode="after")
+    def validate_default_value(self) -> "LLMModelBase":
+        if self._skip_verify:
+            return self
+        if not self.api_key.get_secret_value() or self.api_key.get_secret_value() == "" or self.api_key.get_secret_value() == "<api_key>":
+            raise ValueError(
+                f"请在 .env 文件中配置正确的 {self.name if self.name else self.__class__.__name__} API Key"
+            )
+        if not self.base_url or self.base_url == "":
+            raise ValueError(
+                f"请在 .env 文件中配置正确的 {self.name if self.name else self.__class__.__name__} Base URL"
+            )
+        if not self.model_name or self.model_name == "":
+            raise ValueError(
+                f"请在 .env 文件中配置正确的 {self.name if self.name else self.__class__.__name__} Model Name"
+            )
+        if self.timeout <= 0:
+            raise ValueError(
+                f"请在 .env 文件中配置正确的 {self.name if self.name else self.__class__.__name__} Timeout"
+            )
+        if self.max_retries <= 0:
+            raise ValueError(
+                f"请在 .env 文件中配置正确的 {self.name if self.name else self.__class__.__name__} Max Retries"
+            )
+        if self.max_concurrent_requests <= 0:
+            raise ValueError(
+                f"请在 .env 文件中配置正确的 {self.name if self.name else self.__class__.__name__} Max Concurrent Requests"
+            )
+        return self
 
 
 class LLM(LLMModelBase):
     """大模型通用配置"""
 
+    def set_default_value(self, llm: LLMModelBase):
+        if not self.api_key.get_secret_value():
+            self.api_key = llm.api_key
+        if not self.base_url:
+            self.base_url = llm.base_url
+        if not self.model_name:
+            self.model_name = llm.model_name
+        if self.timeout == -1:
+            self.timeout = llm.timeout
+        if self.max_retries == -1:
+            self.max_retries = llm.max_retries
+        if self.max_concurrent_requests == -1:
+            self.max_concurrent_requests = llm.max_concurrent_requests
+        if not self.extra:
+            self.extra = llm.extra
 
-class PDF(BaseModel):
+
+class LiteLLM(LLM):
+    """模型配置基类"""
+    _skip_verify: bool = PrivateAttr(default=True)
+    name: str = "LiteLLM"
+    model_name: str = ""
+
+    class Qwen(LLM):
+        _skip_verify: bool = PrivateAttr(default=True)
+        name: str = "LLM_Qwen"
+        model_name: str = ""
+
+    qwen: Qwen = Field(default_factory=Qwen)
+
+    class Deepseek(LLM):
+        _skip_verify: bool = PrivateAttr(default=True)
+        name: str = "LLM_Deepseek"
+        model_name: str = ""
+
+    deepseek: Deepseek = Field(default_factory=Deepseek)
+
+    class Image(LLM):
+        _skip_verify: bool = PrivateAttr(default=True)
+        name: str = "LLM_Image"
+        model_name: str = ""
+
+    image: Image = Field(default_factory=Image)
+
+
+class PDF(LLM):
+    _skip_verify: bool = PrivateAttr(default=True)
     model_name: str = ""
     extra: Dict[str, Any] = {}
 
 
-class Image(BaseModel):
+class Image(LLM):
+    _skip_verify: bool = PrivateAttr(default=True)
     model_name: str = ""
+    extra: Dict[str, Any] = {}
     suffix: List[str] = []
     max_size: int = 0  # 单位 MB
     max_dimension: int = 0  # 单位 px
-    extra: Dict[str, Any] = {}
 
 
-class TestQuestion(BaseModel):
+class TestQuestion(LLM):
+    _skip_verify: bool = PrivateAttr(default=True)
     model_name: str = ""
-    timeout: int = 30
+    timeout: float = 30
     extra: Dict[str, Any] = {}
 
 
@@ -186,12 +242,14 @@ class Milvus(BaseModel):
     cloud: Cloud = Field(default_factory=Cloud)
 
 
-class ChromaConfig(BaseModel):
-    save_path: str = ""
+class ChromaConfig(LLM):
+    name: str = "Chroma"
+    _skip_verify: bool = PrivateAttr(default=True)
     model_name: str = ""
     base_url: str = ""
-    k: int = 5
     extra: Dict[str, Any] = {}
+    save_path: str = ""
+    k: int = 5
 
     def set_default_path(self, path: str):
         if self.save_path == "<SAVE_PATH>" or not self.save_path or not Path(self.save_path).exists():
@@ -201,6 +259,13 @@ class ChromaConfig(BaseModel):
                 save_path = os.path.join(get_project_root(), "data", "chroma")
             self.save_path = save_path
             os.makedirs(self.save_path, exist_ok=True)
+
+
+class CodeAbility(LLM):
+    name: str = "CodeAbility"
+    _skip_verify: bool = PrivateAttr(default=True)
+    model_name: str = ""
+    extra: Dict[str, Any] = {}
 
 
 class Settings(BaseSettings):
@@ -221,11 +286,15 @@ class Settings(BaseSettings):
     vector: Vector = Field(default_factory=Vector)
     milvus: Milvus = Field(default_factory=Milvus)
     chroma_config: ChromaConfig = Field(default_factory=ChromaConfig)
+    code_ability: CodeAbility = Field(default_factory=CodeAbility)
 
     @model_validator(mode="after")
-    def set_chroma_default_path(self) -> "Settings":
+    def set_default_values(self) -> "Settings":
         """设置默认值"""
         self.chroma_config.set_default_path(self.path_config.data)
+        for key, value in self.__dict__.items():
+            if isinstance(value, LLM):
+                value.set_default_value(self.llm)
         return self
 
     @classmethod
@@ -279,5 +348,5 @@ if __name__ == "__main__":
     # print(f"  API Key: {settings.llm.api_key.get_secret_value()}")
     # print(settings.lite_llm.qwen)
     # print(settings.milvus.cloud.token.get_secret_value())
-    print(settings.chroma_config.save_path)
+    # print(settings.chroma_config.save_path)
     pass

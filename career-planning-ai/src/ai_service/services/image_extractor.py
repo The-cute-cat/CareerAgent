@@ -25,10 +25,10 @@ class ImageExtractor:
 
     def __init__(self):
         self.llm = ChatOpenAI(
-            api_key=settings.llm.api_key.get_secret_value(),
-            base_url=settings.llm.base_url,
-            timeout=settings.llm.timeout,
-            max_retries=settings.llm.max_retries,
+            api_key=settings.image.api_key.get_secret_value(),
+            base_url=settings.image.base_url,
+            timeout=settings.image.timeout,
+            max_retries=settings.image.max_retries,
             model=settings.image.model_name,
             temperature=settings.image.extra["temperature"]
         )
