@@ -11,7 +11,10 @@ const userStore = useUserStore()
 
 const currentTitle = computed(() => route.meta.title || '欢迎使用职业规划智能体')
 const isLoggedIn = computed(() => userStore.isLoggedIn)
-const userName = computed(() => userStore.userInfo?.nickname || userStore.userInfo?.username || '用户')
+const userName = computed(
+  () => (userStore.userInfo as any)?.name || userStore.userInfo?.nickname || userStore.userInfo?.username || '用户'
+)
+const userAvatar = computed(() => (userStore.userInfo as any)?.avatar || '')
 
 const userPoints = computed(() => {
   const rawPoints = Number((userStore.userInfo as any)?.points ?? (userStore.userInfo as any)?.score ?? 500)
@@ -51,35 +54,29 @@ const handleLogout = () => {
 const handleCommand = (command: string) => {
   if (command === 'logout') {
     confirmLogout()
-  } else if (command === 'profile') {
-    router.push('/profile')
-  } else if (command === 'membership') {
+  } else if (command === 'profile' || command === 'membership') {
     router.push('/profile')
   }
 }
 
 const confirmLogout = () => {
-  ElMessageBox.confirm(
-    '确认退出？',
-    '提示',
-    {
-      confirmButtonText: '确认',
-      cancelButtonText: '取消',
-      type: 'warning',
-    }
-  )
+  ElMessageBox.confirm('确认退出？', '提示', {
+    confirmButtonText: '确认',
+    cancelButtonText: '取消',
+    type: 'warning'
+  })
     .then(() => {
       userStore.clearUserALLInfo()
       ElMessage({
         type: 'success',
-        message: '退出成功',
+        message: '退出成功'
       })
       handleLogout()
     })
     .catch(() => {
       ElMessage({
         type: 'info',
-        message: '取消退出',
+        message: '取消退出'
       })
     })
 }
@@ -103,7 +100,8 @@ const confirmLogout = () => {
       <el-dropdown v-else @command="handleCommand" trigger="click">
         <div class="user-info">
           <div class="user-avatar">
-            {{ userName.charAt(0).toUpperCase() }}
+            <img v-if="userAvatar" :src="userAvatar" alt="avatar" class="user-avatar-image" />
+            <span v-else>{{ userName.charAt(0).toUpperCase() }}</span>
           </div>
 
           <div class="user-main">
@@ -170,7 +168,7 @@ const confirmLogout = () => {
 
 .app-name {
   font-weight: 700;
-  background: linear-gradient(135deg, #409eff 0%, #764BA2 100%);
+  background: linear-gradient(135deg, #409eff 0%, #764ba2 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   font-size: 16px;
@@ -253,6 +251,16 @@ const confirmLogout = () => {
   justify-content: center;
   box-shadow: 0 2px 6px rgba(64, 158, 255, 0.3);
   flex-shrink: 0;
+  overflow: hidden;
+}
+
+.user-avatar-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: 36px;
+  max-height: 36px;
+  object-fit: cover;
 }
 
 .user-main {
@@ -322,11 +330,6 @@ const confirmLogout = () => {
   background: linear-gradient(135deg, rgba(255, 244, 204, 0.98), rgba(255, 224, 130, 0.98));
 }
 
-.gift-tip {
-  font-size: 12px;
-  color: #909399;
-}
-
 .dropdown-icon {
   color: #909399;
   font-size: 12px;
@@ -373,10 +376,6 @@ const confirmLogout = () => {
 
   .user-info {
     padding: 8px 12px;
-  }
-
-  .gift-tip {
-    display: none;
   }
 
   .user-name {

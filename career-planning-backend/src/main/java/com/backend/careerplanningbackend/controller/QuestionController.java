@@ -20,15 +20,14 @@ import java.util.Map;
  * 2. 调用 AiServiceClient 与 AI 服务进行交互，获取问题相关的结果
  * 3. 返回结果给前端
  * 4. 记录日志，便于调试和监控
- *
  * @modeule QuestionController
  */
 @Slf4j
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/test_question")
+@RequestMapping("/question")
 public class QuestionController {
-
+    
     private final AiServiceClient aiServiceClient;
 
     /**
@@ -42,23 +41,26 @@ public class QuestionController {
     public Result<Object> Generate(QuestionDTO questionDTO) {
         log.info("skill-generate接收到的参数: {}", questionDTO.toString());
         Map<String, Object> params = new HashMap<>();
-        AiChatResponse aiChatResponse = new AiChatResponse();
-        System.out.println("questionDTO.getType():" + questionDTO.getType());
-        System.out.println("questionDTO.getName():" + questionDTO.getName());
-        if ("skill".equals(questionDTO.getType())) {
+        AiChatResponse aiChatResponse = null;
+
+        System.out.println("questionDTO.getType():"+questionDTO.getType());
+        System.out.println("questionDTO.getName():"+questionDTO.getName());
+
+        if("skill".equals(questionDTO.getType())){
             params.put("skill", questionDTO.getName());
             aiChatResponse = aiServiceClient.chatWithOther("/question/skill_generate", params);
-        } else if ("tool".equals(questionDTO.getType())) {
+        }else if("tool".equals(questionDTO.getType())){
             params.put("tool", questionDTO.getName());
             aiChatResponse = aiServiceClient.chatWithOther("/question/tool_generate", params);
         }
+
         return Result.ok(aiChatResponse.getData());
     }
 
     /**
      * checkStudentAnswer
      * 检查问答题的答案
-     *
+     * 
      * @param questionDTO
      * @return
      */
@@ -74,5 +76,5 @@ public class QuestionController {
         AiChatResponse aiChatResponse = aiServiceClient.chatWithOther("/question/check_student_answer", params);
         return Result.ok(aiChatResponse.getData());
     }
-
+    
 }

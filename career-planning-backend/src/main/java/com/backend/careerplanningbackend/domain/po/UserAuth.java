@@ -25,8 +25,8 @@ public class UserAuth {
     private String password;
 
     /** 绑定时间 */
-    private LocalDateTime createdAt;
+    private LocalDateTime createTime;
 
     /** 更新时间 */
-    private LocalDateTime updatedAt;
+    private LocalDateTime updateTime;
 }

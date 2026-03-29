@@ -1473,12 +1473,19 @@ const submitForm = async () => {
     const res = await submitCareerFormApi(submitData)
 
     console.log("表单提交返回结果:", res)
+    console.log("res.data:",res.data)
+    console.log("res.data.data:",res.data.data)
 
-    if (res.data?.code !== 200) {
+    // 处理两种响应格式：1) res.data 是数组 2) res.data 是 {code, data} 对象
+    let matchResult: JobMatchItem[]
+    if (Array.isArray(res.data)) {
+      matchResult = res.data as JobMatchItem[]
+    } else if (res.data?.code === 200) {
+      matchResult = res.data.data as JobMatchItem[]
+    } else {
       ElMessage.error(res.data?.msg || '提交失败，请稍后重试')
       return
     }
-    const matchResult = res.data.data as JobMatchItem[]
     localStorage.setItem('jobMatchResult', JSON.stringify(matchResult))
     ElMessage.success('人岗匹配分析完成！')
     router.push('/job-matching')
