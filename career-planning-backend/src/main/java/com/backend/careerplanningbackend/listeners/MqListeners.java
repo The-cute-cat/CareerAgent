@@ -39,12 +39,21 @@ public class MqListeners {
     }
 
     @RabbitListener(bindings = @QueueBinding(
-            value = @Queue(name = "direct.career2", durable = "true"),
+            value = @Queue(name = "points.invite.queue", durable = "true"),
             exchange = @Exchange(name = "career.direct", type = ExchangeTypes.DIRECT),
-            key = {"red", "yellow"}
+            key = {"user.invited.points"}
     ))
-    public void listenDirectQueue2(String msg) throws InterruptedException {
-        System.out.println("消费者2 收到了 direct.queue2的消息：【" + msg +"】");
+    public void listenDirectQueue2(ReferralDTO referralDTO) throws InterruptedException {
+        log.info("消费者 收到了 points.register.queue 的消息：【{}】,listenDirectQueue1", referralDTO);
+
+        try {
+            Result register = pointsReferService.receiverPoints(referralDTO);
+            log.info("处理 points.register.queue 消息完成，用户ID: {}, Result 结果: {},listenDirectQueue1", referralDTO.getUserId(), register);
+        }catch (Exception e) {
+            log.info("error 处理 points.register.queue 消息失败，用户ID: {}, 错误信息: {},listenDirectQueue1", referralDTO.getUserId(), e.getMessage());
+            // 可以选择抛出异常以触发重试机制，或者记录错误后继续
+            throw e; // 这里选择抛出异常以触发重试
+        }
     }
 
 }

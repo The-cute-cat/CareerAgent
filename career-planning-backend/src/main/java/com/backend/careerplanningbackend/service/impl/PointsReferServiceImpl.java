@@ -18,16 +18,21 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.AmqpException;
+import org.springframework.amqp.core.Message;
+import org.springframework.amqp.core.MessagePostProcessor;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.RequestBody;
 
 import java.time.LocalDateTime;
 
+import static com.backend.careerplanningbackend.util.PointsConstant.POINTS_FOR_REFERRAL;
 import static com.backend.careerplanningbackend.util.PointsConstant.POINTS_FOR_REGISTRATION;
 import static com.backend.careerplanningbackend.util.RedisConstant.*;
-import static com.backend.careerplanningbackend.util.SystemConstant.Activity_End_Time;
-import static com.backend.careerplanningbackend.util.SystemConstant.Activity_Start_Time;
+import static com.backend.careerplanningbackend.util.SystemActivityConstant.Activity_End_Time;
+import static com.backend.careerplanningbackend.util.SystemActivityConstant.Activity_Start_Time;
 
 @Service
 @RequiredArgsConstructor
@@ -39,6 +44,7 @@ public class PointsReferServiceImpl implements PointsReferService {
     private final UserReferralMapper userReferralMapper;
     private final UserMapper userMapper;
     private final RedisIdWorker redisIdWorker;
+    private final RabbitTemplate rabbitTemplate;
     
     /**
      * getAccountPoints 
@@ -80,166 +86,273 @@ public class PointsReferServiceImpl implements PointsReferService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Result<Object> register(@RequestBody ReferralDTO referralDTO) {
-        try {
-            Thread.sleep(5000);
-        }catch (Exception e){
-            log.error("Thread.sleep--register 注册失败");
-            e.printStackTrace();
-        }
+        /* 模拟延迟 */
+//        try {
+//            Thread.sleep(5000);
+//        }catch (Exception e){
+//            log.error("Thread.sleep--register 注册失败");
+//            e.printStackTrace();
+//        }
         Long userId = referralDTO.getUserId();
         String inviteCode = referralDTO.getInviteCode();
-        
-        if(StrUtil.isNotBlank(inviteCode)){
+        if (StrUtil.isNotBlank(inviteCode)) {
             UserReferral userReferral = userReferralMapper.selectOne(
                     new LambdaQueryWrapper<UserReferral>()
                             .eq(UserReferral::getInviteCode, inviteCode)
             );
-            if(userReferral == null) {
+            if (userReferral == null) {
                 log.error("用户 {} 还没有注册成功", userId);
                 return Result.fail("用户还没有注册成功");
             }
-            if(userReferral.getStatus() != 1){
+            if (userReferral.getStatus() != 1) {
                 log.error("用户 {} 已经被封了", userId);
                 return Result.fail("用户已经被封了");
             }
-
-            /** UserPoints insert */
-            UserPoints userPoints = new UserPoints();
-            userPoints.setUserId(userId);
-            /* 初始积分 POINTS_FOR_REGISTRATION */
-            userPoints.setPointsBalance(POINTS_FOR_REGISTRATION);
-            /* 1-正常 */
-            userPoints.setStatus(1);
-            /* 创建-更新-开始-结束时间*/
-            // to do 活动时间
-            userPoints.setCreateTime(Activity_Start_Time);
-            userPoints.setUpdateTime(Activity_End_Time);
-
-            userPoints.setStartTime(LocalDateTime.now());
-            /* 1年后结束 */
-            userPoints.setEndTime(LocalDateTime.now().plusYears(1));
-            int insert = userpointsMapper.insert(userPoints);
-
-            if(insert == 0) {
-                log.error("创建用户积分账户失败");
-                return Result.fail("创建用户积分账户失败");
-            }
-            log.info("userReferralMapper 表插入 {} 成功注册，邀请码: {}, UserReferral表更新成功", userId, inviteCode);
-
-            /** PointsTransaction insert */
-            PointsTransaction pointsTransaction = new PointsTransaction();
-            pointsTransaction.setUserId(userId);
-            /* POINTS_FOR_REGISTRATION-充值 */
-            pointsTransaction.setAmount(POINTS_FOR_REGISTRATION);
-            /* 5-系统赠送 */
-            pointsTransaction.setType(5);
-            /* 新用户注册赠送积分 */
-            pointsTransaction.setDescription("新用户注册赠送积分");
-            int inserted = pointsTransactionMapper.insert(pointsTransaction);
-
-            if (inserted == 0) {
-                log.error("记录积分变动失败");
-                return Result.fail("记录积分变动失败");
-            }
-            log.info("userReferralMapper 表插入 {} 成功注册，邀请码: {}, UserReferral表更新成功", userId, inviteCode);
-
-            if(StrUtil.isBlank(inviteCode)) {
-                log.info("用户 {} 注册成功，没有邀请码，直接创建积分账户", userId);
-                return Result.ok("注册的积分已返回");
-            }
-
-            /** UserReferral update */
-            int updated = userReferralMapper.update(null, new LambdaUpdateWrapper<UserReferral>()
-                    .eq(UserReferral::getInviteCode, inviteCode)
-                    .set(UserReferral::getUserId, userId)
-                    .set(UserReferral::getId,redisIdWorker.nextId(NEW_USER_REGISTER_POINTS_KEY))
-                    .set(UserReferral::getRewardPoints, POINTS_FOR_REGISTRATION)
-                    .set(UserReferral::getEndTime, Activity_End_Time)
-            );
-
-            if(updated == 0) {
-                log.error("修改用户信息失败");
-                return Result.fail("修改用户信息失败");
-            }
-            log.info("userReferralMapper 表插入 {} 成功注册，邀请码: {}, UserReferral表更新成功", userId, inviteCode);
-
-            return Result.ok("注册的积分已返回");
         }else{
             User selectedOne = userMapper.selectOne(
                     new LambdaQueryWrapper<User>()
                             .eq(User::getId, userId)
             );
-            if(selectedOne == null) {
+            if (selectedOne == null) {
                 log.error("用户 {} 还没有注册成功", userId);
                 return Result.fail("用户还没有注册成功");
             }
-            if(selectedOne.getStatus() != 1){
+            if (selectedOne.getStatus() != 1) {
                 log.error("用户 {} 已经被封了", userId);
                 return Result.fail("用户已经被封了");
             }
+        }
 
-            /** UserPoints insert */
-            UserPoints userPoints = new UserPoints();
-            userPoints.setUserId(userId);
-            /* 初始积分 POINTS_FOR_REGISTRATION */
-            userPoints.setPointsBalance(POINTS_FOR_REGISTRATION);
-            /* 1-正常 */
-            userPoints.setStatus(1);
-            /* 创建-更新-开始-结束时间*/
-            // to do 活动时间
-            userPoints.setCreateTime(Activity_Start_Time);
-            userPoints.setUpdateTime(Activity_End_Time);
+        /** PointsTransaction insert */
+        PointsTransaction pointsTransaction = new PointsTransaction();
+        pointsTransaction.setUserId(userId);
+        /* POINTS_FOR_REGISTRATION-充值 */
+        pointsTransaction.setAmount(POINTS_FOR_REGISTRATION);
+        /* 5-系统赠送 */
+        pointsTransaction.setType(5);
+        /* 新用户注册赠送积分 */
+        pointsTransaction.setDescription("新用户注册赠送积分");
 
-            userPoints.setStartTime(LocalDateTime.now());
-            /* 1年后结束 */
-            userPoints.setEndTime(LocalDateTime.now().plusYears(1));
-            int insert = userpointsMapper.insert(userPoints);
+        int inserted = pointsTransactionMapper.insert(pointsTransaction);
+        if (inserted == 0) {
+            log.error("记录积分变动失败");
+            return Result.fail("记录积分变动失败");
+        }
+        log.info("pointsTransactionMapper 表插入 userId{} 成功注册，inviteCode邀请码: {}, " +
+                "pointsTransactionMapper 表更新成功", userId, inviteCode);
 
-            if(insert == 0) {
-                log.error("创建用户积分账户失败");
-                return Result.fail("创建用户积分账户失败");
-            }
-            log.info("userReferralMapper 表插入 {} 成功注册，邀请码: {}, UserReferral表更新成功", userId, inviteCode);
+        /** UserPoints insert */
+        UserPoints userPoints = new UserPoints();
+        userPoints.setUserId(userId);
+        /* 初始积分 POINTS_FOR_REGISTRATION */
+        userPoints.setPointsBalance(POINTS_FOR_REGISTRATION);
+        userPoints.setPointsRemainAmount(POINTS_FOR_REGISTRATION);
 
-            /** PointsTransaction insert */
-            PointsTransaction pointsTransaction = new PointsTransaction();
-            pointsTransaction.setUserId(userId);
-            /* POINTS_FOR_REGISTRATION-充值 */
-            pointsTransaction.setAmount(POINTS_FOR_REGISTRATION);
-            /* 5-系统赠送 */
-            pointsTransaction.setType(5);
-            /* 新用户注册赠送积分 */
-            pointsTransaction.setDescription("新用户注册赠送积分");
-            int inserted = pointsTransactionMapper.insert(pointsTransaction);
+        /* 创建-更新-开始-结束时间*/
+        /* 积分有效期1年后结束 */
+        userPoints.setEndTime(LocalDateTime.now().plusYears(1));
+        userPoints.setActivityEndTime(Activity_End_Time);
 
-            if (inserted == 0) {
-                log.error("记录积分变动失败");
-                return Result.fail("记录积分变动失败");
-            }
-            log.info("userReferralMapper 表插入 {} 成功注册，邀请码: {}, UserReferral表更新成功", userId, inviteCode);
+        int insert = userpointsMapper.insert(userPoints);
 
-            if(StrUtil.isBlank(inviteCode)) {
-                log.info("用户 {} 注册成功，没有邀请码，直接创建积分账户", userId);
-                return Result.ok("注册的积分已返回");
-            }
+        if (insert == 0) {
+            log.error("创建用户积分账户失败");
+            return Result.fail("创建用户积分账户失败");
+        }
+        log.info("userpointsMapper 表插入 userId {} 成功注册，inviteCode邀请码: {}, " +
+                "userpointsMapper 表更新成功", userId, inviteCode);
 
-            /** UserReferral update */
-            int updated = userReferralMapper.update(null, new LambdaUpdateWrapper<UserReferral>()
-                    .eq(UserReferral::getInviteCode, inviteCode)
-                    .set(UserReferral::getUserId, userId)
-                    .set(UserReferral::getId,redisIdWorker.nextId(NEW_USER_REGISTER_POINTS_KEY))
-                    .set(UserReferral::getRewardPoints, POINTS_FOR_REGISTRATION)
-                    .set(UserReferral::getEndTime, Activity_End_Time)
-            );
-
-            if(updated == 0) {
-                log.error("修改用户信息失败");
-                return Result.fail("修改用户信息失败");
-            }
-            log.info("userReferralMapper 表插入 {} 成功注册，邀请码: {}, UserReferral表更新成功", userId, inviteCode);
-
+        if (StrUtil.isBlank(inviteCode)) {
+            // 没有邀请码，直接返回积分
+            log.info("用户 {} 注册成功，没有邀请码，直接创建积分账户", userId);
             return Result.ok("注册的积分已返回");
         }
+
+        /** 1-UserReferral update */
+        int updated = userReferralMapper.update(null, new LambdaUpdateWrapper<UserReferral>()
+                .eq(UserReferral::getInviteCode, inviteCode)
+                .set(UserReferral::getUserId, userId)
+                .set(UserReferral::getRewardPoints, POINTS_FOR_REFERRAL)
+                .set(UserReferral::getEndTime, LocalDateTime.now().plusYears(1))
+                .set(UserReferral::getActivityEndTime, Activity_End_Time)
+        );
+
+        if (updated == 0) {
+            log.error("修改用户信息失败");
+            return Result.fail("修改用户信息失败");
+        }
+        log.info("userReferralMapper 表 插入 userId {} 成功注册，inviteCode 邀请码: {}, " +
+                "UserReferral表更新成功", userId, inviteCode);
+
+        // 2. 发送rabbitmq,积分表创建
+        String exchange = "career.direct";
+        String routingKey = "user.invited.points";
+        ReferralDTO newReferralDTO = new ReferralDTO();
+        referralDTO.setInviteCode(inviteCode);
+        referralDTO.setUserId(userId); // 注册没有推荐人，设置为0或null
+
+        rabbitTemplate.convertAndSend(exchange, routingKey, referralDTO, new MessagePostProcessor() {
+            @Override
+            public Message postProcessMessage(Message message) throws AmqpException {
+                message.getMessageProperties()
+                        .setExpiration("10000");
+                return message;
+            }
+        });
+
+        log.info("消息发送成功！");
+
+//        if (StrUtil.isNotBlank(inviteCode)) {
+//            UserReferral userReferral = userReferralMapper.selectOne(
+//                    new LambdaQueryWrapper<UserReferral>()
+//                            .eq(UserReferral::getInviteCode, inviteCode)
+//            );
+//            if (userReferral == null) {
+//                log.error("用户 {} 还没有注册成功", userId);
+//                return Result.fail("用户还没有注册成功");
+//            }
+//            if (userReferral.getStatus() != 1) {
+//                log.error("用户 {} 已经被封了", userId);
+//                return Result.fail("用户已经被封了");
+//            }
+//
+//            /** PointsTransaction insert */
+//            PointsTransaction pointsTransaction = new PointsTransaction();
+//            pointsTransaction.setUserId(userId);
+//            /* POINTS_FOR_REGISTRATION-充值 */
+//            pointsTransaction.setAmount(POINTS_FOR_REGISTRATION);
+//            /* 5-系统赠送 */
+//            pointsTransaction.setType(5);
+//            /* 新用户注册赠送积分 */
+//            pointsTransaction.setDescription("新用户注册赠送积分");
+//
+//            int inserted = pointsTransactionMapper.insert(pointsTransaction);
+//            if (inserted == 0) {
+//                log.error("记录积分变动失败");
+//                return Result.fail("记录积分变动失败");
+//            }
+//            log.info("userReferralMapper 表插入 {} 成功注册，邀请码: {}, UserReferral表更新成功", userId, inviteCode);
+//
+//            /** UserPoints insert */
+//            UserPoints userPoints = new UserPoints();
+//            userPoints.setUserId(userId);
+//            /* 初始积分 POINTS_FOR_REGISTRATION */
+//            userPoints.setPointsBalance(POINTS_FOR_REGISTRATION);
+//            userPoints.setPointsRemainAmount(POINTS_FOR_REGISTRATION);
+//
+//            /* 创建-更新-开始-结束时间*/
+//            /* 积分有效期1年后结束 */
+//            userPoints.setEndTime(LocalDateTime.now().plusYears(1));
+//            userPoints.setEndActivityTime(Activity_End_Time);
+//
+//            int insert = userpointsMapper.insert(userPoints);
+//
+//            if (insert == 0) {
+//                log.error("创建用户积分账户失败");
+//                return Result.fail("创建用户积分账户失败");
+//            }
+//            log.info("userReferralMapper 表插入 {} 成功注册，邀请码: {}, UserReferral表更新成功", userId, inviteCode);
+//
+//            if (StrUtil.isBlank(inviteCode)) {
+//                // 没有邀请码，直接返回积分
+//                log.info("用户 {} 注册成功，没有邀请码，直接创建积分账户", userId);
+//                return Result.ok("注册的积分已返回");
+//            }
+//
+//            /** 1-UserReferral update */
+//            int updated = userReferralMapper.update(null, new LambdaUpdateWrapper<UserReferral>()
+//                    .eq(UserReferral::getInviteCode, inviteCode)
+//                    .set(UserReferral::getUserId, userId)
+//                    .set(UserReferral::getRewardPoints, POINTS_FOR_REFERRAL)
+//                    .set(UserReferral::getEndTime, LocalDateTime.now().plusYears(1))
+//                    .set(UserReferral::getActivityEndTime, Activity_End_Time)
+//            );
+//
+//            if (updated == 0) {
+//                log.error("修改用户信息失败");
+//                return Result.fail("修改用户信息失败");
+//            }
+//            log.info("userReferralMapper 表插入 {} 成功注册，邀请码: {}, UserReferral表更新成功", userId, inviteCode);
+//
+//            // 2. 发送rabbitmq,积分表创建
+//            String exchange = "career.direct";
+//            String routingKey = "user.invited.points";
+//            ReferralDTO newReferralDTO = new ReferralDTO();
+//            referralDTO.setInviteCode(inviteCode);
+//            referralDTO.setUserId(userId); // 注册没有推荐人，设置为0或null
+//
+//            rabbitTemplate.convertAndSend(exchange, routingKey, referralDTO, new MessagePostProcessor() {
+//                @Override
+//                public Message postProcessMessage(Message message) throws AmqpException {
+//                    message.getMessageProperties()
+//                            .setExpiration("10000");
+//                    return message;
+//                }
+//            });
+//
+//            log.info("消息发送成功！");
+//
+//        } else {
+//            User selectedOne = userMapper.selectOne(
+//                    new LambdaQueryWrapper<User>()
+//                            .eq(User::getId, userId)
+//            );
+//            if (selectedOne == null) {
+//                log.error("用户 {} 还没有注册成功", userId);
+//                return Result.fail("用户还没有注册成功");
+//            }
+//            if (selectedOne.getStatus() != 1) {
+//                log.error("用户 {} 已经被封了", userId);
+//                return Result.fail("用户已经被封了");
+//            }
+//
+//            /** UserPoints insert */
+//            UserPoints userPoints = new UserPoints();
+//            userPoints.setUserId(userId);
+//            /* 初始积分 POINTS_FOR_REGISTRATION */
+//            userPoints.setPointsBalance(POINTS_FOR_REGISTRATION);
+//            /* 1-正常 */
+//            userPoints.setStatus(1);
+//            /* 创建-更新-开始-结束时间*/
+//            // to do 活动时间
+//            userPoints.setCreateTime(Activity_Start_Time);
+//            userPoints.setUpdateTime(Activity_End_Time);
+//
+//            userPoints.setStartTime(LocalDateTime.now());
+//            /* 1年后结束 */
+//            userPoints.setEndTime(LocalDateTime.now().plusYears(1));
+//            int insert = userpointsMapper.insert(userPoints);
+//
+//            if (insert == 0) {
+//                log.error("创建用户积分账户失败");
+//                return Result.fail("创建用户积分账户失败");
+//            }
+//            log.info("userReferralMapper 表插入 {} 成功注册，邀请码: {}, UserReferral表更新成功", userId, inviteCode);
+//
+//            /** PointsTransaction insert */
+//            PointsTransaction pointsTransaction = new PointsTransaction();
+//            pointsTransaction.setUserId(userId);
+//            /* POINTS_FOR_REGISTRATION-充值 */
+//            pointsTransaction.setAmount(POINTS_FOR_REGISTRATION);
+//            /* 5-系统赠送 */
+//            pointsTransaction.setType(5);
+//            /* 新用户注册赠送积分 */
+//            pointsTransaction.setDescription("新用户注册赠送积分");
+//            int inserted = pointsTransactionMapper.insert(pointsTransaction);
+//
+//            if (inserted == 0) {
+//                log.error("记录积分变动失败");
+//                return Result.fail("记录积分变动失败");
+//            }
+//            log.info("userReferralMapper 表插入 {} 成功注册，邀请码: {}, UserReferral表更新成功", userId, inviteCode);
+//
+//            if (StrUtil.isBlank(inviteCode)) {
+//                log.info("用户 {} 注册成功，没有邀请码，直接创建积分账户", userId);
+//                return Result.ok("注册的积分已返回");
+//            }
+//
+//        }
+        return Result.ok("注册的积分已返回");
     }
 
     /**
@@ -252,7 +365,7 @@ public class PointsReferServiceImpl implements PointsReferService {
      * 3. 返回邀请码
      */
     @Override
-    public Result<ReferralDTO> invite(@RequestBody ReferralDTO referralDTO) {
+    public Result<ReferralDTO> generateInvite(@RequestBody ReferralDTO referralDTO) {
         Long currentUserId = ThreadLocalUtil.getCurrentUserId();
 
         long nextId = redisIdWorker.nextId(INVITE_CODE_KEY_PREFIX);
@@ -261,6 +374,26 @@ public class PointsReferServiceImpl implements PointsReferService {
         data.setInviteCode(String.valueOf(nextId));
         data.setUserId(currentUserId);
         return Result.ok(data);
+    }
+
+    @Override
+    public Result receiverPoints(ReferralDTO referralDTO) {
+        Long userId = referralDTO.getUserId();
+        String inviteCode = referralDTO.getInviteCode();
+
+        /** UserReferral update */
+        int updatedReferral = userReferralMapper.update(null, new LambdaUpdateWrapper<UserReferral>()
+                .eq(UserReferral::getInviteCode, inviteCode)
+                .set(UserReferral::getUserId, userId)
+                .set(UserReferral::getRewardPoints, POINTS_FOR_REFERRAL)
+                .set(UserReferral::getEndTime, LocalDateTime.now().plusYears(1))
+                .set(UserReferral::getActivityEndTime, Activity_End_Time)
+        );
+        if(updatedReferral == 0) {
+            log.error("更新用户推荐信息失败");
+            return Result.fail("更新用户推荐信息失败");
+        }
+        return Result.ok("邀请好友注册赠送积分已到账");
     }
 
     /** todo 这里是给学生用户留着的 */
