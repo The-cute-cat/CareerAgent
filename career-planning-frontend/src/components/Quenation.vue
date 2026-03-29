@@ -3,7 +3,10 @@
     <el-card class="questionnaire-card" shadow="hover">
       <template #header>
         <div class="card-header">
-          <h2>{{ title }}</h2>
+          <div class="card-header-main">
+            <h2>{{ title }}</h2>
+            <p class="card-header-subtitle">请结合真实经历作答，系统会基于你的回答生成更贴近实际的能力评估。</p>
+          </div>
           <el-tag type="info">共{{ totalSteps }}题，请认真填写</el-tag>
         </div>
       </template>
@@ -43,6 +46,7 @@
         status-icon
       >
         <!-- 后端数据模式：分步渲染题目 -->
+        <div class="question-stage" :class="{ 'is-submitted-stage': submitted }">
         <template v-if="props.backendData">
           <div v-for="(question, index) in props.backendData.questions" :key="question.id" v-show="currentStep === index + 1">
             <!-- 单选题 -->
@@ -266,6 +270,7 @@
             </el-form-item>
           </div>
         </template>
+        </div>
 
         <!-- 底部操作按钮 -->
         <el-form-item v-if="!submitted" class="step-actions">
@@ -1201,14 +1206,18 @@ defineExpose({
 
 .questionnaire-card {
   width: 100%;
-  max-width: 720px;
-  border-radius: 8px;
-  border: 1px solid #ebeef5;
+  max-width: 760px;
+  border-radius: 28px;
+  border: 1px solid rgba(222, 232, 244, 0.94);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(247, 250, 255, 0.94));
+  box-shadow:
+    0 20px 48px rgba(20, 58, 102, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.86);
 
   :deep(.el-card__header) {
-    padding: 14px 24px;
-    border-bottom: 1px solid #ebeef5;
-    background: #fafbfc;
+    padding: 22px 28px 18px;
+    border-bottom: 1px solid rgba(229, 236, 245, 0.94);
+    background: linear-gradient(180deg, rgba(247, 251, 255, 0.96), rgba(242, 248, 255, 0.92));
   }
 
   :deep(.el-card__body) {
@@ -1219,22 +1228,46 @@ defineExpose({
 .card-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  gap: 20px;
 
   h2 {
     margin: 0;
-    font-size: 16px;
-    font-weight: 600;
-    color: #303133;
+    font-size: 24px;
+    font-weight: 700;
+    color: #173a5d;
   }
+}
+
+.card-header-main {
+  display: grid;
+  gap: 8px;
+}
+
+.card-header-subtitle {
+  margin: 0;
+  max-width: 470px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: #7f94aa;
+}
+
+.card-header :deep(.el-tag) {
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(135deg, #e7f1ff 0%, #d7e9ff 100%);
+  color: #2f7df6 !important;
+  box-shadow: 0 10px 20px rgba(47, 125, 246, 0.18);
 }
 
 // ==================== 步骤导航栏 ====================
 
 .step-nav {
-  padding: 16px 24px;
-  border-bottom: 1px solid #f0f0f0;
-  background: #fafbfc;
+  padding: 18px 28px;
+  border-bottom: 1px solid rgba(235, 241, 247, 0.96);
+  background: linear-gradient(180deg, rgba(249, 252, 255, 0.95), rgba(244, 248, 255, 0.92));
 }
 
 .step-header {
@@ -1245,21 +1278,22 @@ defineExpose({
 
   .step-indicator {
     font-size: 13px;
-    color: #909399;
+    color: #7e93ab;
 
     strong {
-      font-size: 16px;
-      color: #303133;
-      font-weight: 600;
+      font-size: 18px;
+      color: #173a5d;
+      font-weight: 700;
     }
   }
 
   .step-type-tag {
     font-size: 12px;
-    color: #909399;
-    background: #f0f2f5;
-    padding: 2px 8px;
-    border-radius: 10px;
+    color: #2f7df6;
+    background: rgba(47, 125, 246, 0.1);
+    padding: 5px 10px;
+    border-radius: 999px;
+    font-weight: 700;
   }
 }
 
@@ -1323,17 +1357,18 @@ defineExpose({
   outline: none;
 
   .step-dot-number {
-    width: 28px;
-    height: 28px;
+    width: 32px;
+    height: 32px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 13px;
     font-weight: 500;
-    color: #a8abb2;
+    color: #92a0b1;
     background: #fff;
-    border: 2px solid #dcdfe6;
+    border: 2px solid #dce6f0;
+    box-shadow: 0 6px 14px rgba(17, 53, 99, 0.05);
     transition: all 0.2s;
   }
 
@@ -1365,7 +1400,7 @@ defineExpose({
 
 .step-dot-label {
   font-size: 11px;
-  color: #a8abb2;
+  color: #96a5b6;
   white-space: nowrap;
 
   .step-dot.is-active ~ &,
@@ -1375,19 +1410,45 @@ defineExpose({
 }
 
 // ==================== 题目区域 ====================
-
 :deep(.el-form) {
-  padding: 24px;
+  padding: 28px;
+}
+
+.question-stage {
+  margin: 22px 24px 0;
+  padding: 22px 22px 18px;
+  border-radius: 24px;
+  border: 1px solid rgba(227, 236, 245, 0.94);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 251, 255, 0.94));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.86);
+  position: relative;
+  overflow: hidden;
+}
+
+.question-stage::after {
+  content: '';
+  position: absolute;
+  top: -50px;
+  right: -34px;
+  width: 130px;
+  height: 130px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(47, 125, 246, 0.09), transparent 70%);
+  pointer-events: none;
+}
+
+.question-stage.is-submitted-stage {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(249, 252, 255, 0.96));
 }
 
 :deep(.el-form-item) {
   margin-bottom: 0;
 
   .el-form-item__label {
-    font-size: 15px;
-    font-weight: 500;
+    font-size: 16px;
+    font-weight: 700;
     color: #1d2129;
-    padding-bottom: 16px;
+    padding-bottom: 18px;
     line-height: 1.6;
     letter-spacing: 0.2px;
     word-break: break-word;
@@ -1415,6 +1476,7 @@ defineExpose({
 .difficulty-tag {
   margin-top: 16px;
   display: inline-block;
+  border-radius: 999px;
 }
 
 // ==================== 答题结果样式 ====================
@@ -1848,36 +1910,36 @@ defineExpose({
 :deep(.el-radio-group) {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
   width: 100%;
 }
 
 :deep(.el-radio) {
   margin-right: 0;
-  padding: 12px 20px;
-  border: 1.5px solid #dcdee0;
-  border-radius: 12px;
-  min-height: 52px;
+  padding: 14px 18px;
+  border: 1.5px solid rgba(219, 228, 239, 0.96);
+  border-radius: 18px;
+  min-height: 60px;
   width: 100%;
   display: flex;
   align-items: flex-start;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  background: #fafbfc;
+  background: linear-gradient(180deg, #fafcff 0%, #f5f9ff 100%);
   cursor: pointer;
   box-sizing: border-box;
 }
 
 :deep(.el-radio:hover) {
-  border-color: #a0cfff;
+  border-color: rgba(47, 125, 246, 0.34);
   background: #fff;
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(64, 158, 255, 0.12);
+  box-shadow: 0 12px 24px rgba(47, 125, 246, 0.12);
 }
 
 :deep(.el-radio.is-checked) {
   border-color: #409eff;
   background: #fff;
-  box-shadow: 0 4px 16px rgba(64, 158, 255, 0.15), inset 0 0 0 1px rgba(64, 158, 255, 0.1);
+  box-shadow: 0 10px 24px rgba(64, 158, 255, 0.15), inset 0 0 0 1px rgba(64, 158, 255, 0.1);
 }
 
 :deep(.el-radio__input) {
@@ -1908,8 +1970,8 @@ defineExpose({
   width: 32px;
   height: 32px;
   min-width: 32px;
-  background: #e8eaed;
-  border-radius: 8px;
+  background: #eaf0f7;
+  border-radius: 10px;
   transition: all 0.3s ease;
   flex-shrink: 0;
   margin-top: 1px;
@@ -1932,6 +1994,7 @@ defineExpose({
   flex: 1;
   word-break: break-word;
   overflow-wrap: break-word;
+  line-height: 1.75;
 }
 
 :deep(.el-radio.is-checked) .option-text {
@@ -1953,8 +2016,8 @@ defineExpose({
 
 .step-actions {
   margin-top: 32px !important;
-  padding-top: 16px;
-  border-top: 1px solid #ebeef5;
+  padding-top: 18px;
+  border-top: 1px solid rgba(230, 237, 245, 0.96);
   margin-bottom: 0 !important;
 
   :deep(.el-form-item__content) {
@@ -1967,11 +2030,19 @@ defineExpose({
   justify-content: space-between;
   align-items: center;
   width: 100%;
+  gap: 16px;
 }
 
 .step-actions-right {
   display: flex;
-  gap: 8px;
+  gap: 10px;
+}
+
+.step-actions :deep(.el-button) {
+  min-width: 108px;
+  min-height: 42px;
+  border-radius: 14px;
+  font-weight: 600;
 }
 
 // ==================== 响应式 ====================
@@ -1979,23 +2050,31 @@ defineExpose({
 @media (max-width: 768px) {
   .questionnaire-card {
     max-width: 100%;
-    border-radius: 0;
-    border-left: none;
-    border-right: none;
+    border-radius: 20px;
   }
 
   :deep(.el-form) {
-    padding: 16px;
+    padding: 18px;
   }
 
   .step-nav {
-    padding: 12px 16px;
+    padding: 14px 18px;
   }
 
   .card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+
     h2 {
-      font-size: 15px;
+      font-size: 20px;
     }
+  }
+
+  .question-stage {
+    margin: 16px 16px 0;
+    padding: 18px 16px 14px;
+    border-radius: 20px;
   }
 
   .step-dots {
@@ -2027,6 +2106,7 @@ defineExpose({
 
   .step-actions-right {
     width: 100%;
+    justify-content: stretch;
 
     .el-button {
       flex: 1;

@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import { ElNotification } from 'element-plus'
+import { ElNotification, ElMessage } from 'element-plus'
 import { reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
 import type { LoginFormDTO } from '@/types/user'
 import { userLoginService } from '@/api/user/user'
 import { useRouter } from 'vue-router'
@@ -48,7 +47,7 @@ const getGreeting = () => {
 const showSuccessNotification = () => {
   ElNotification({
     title: '登录成功',
-    message: `${getGreeting()}，欢迎您，${loginform.username}`,
+    message: `${getGreeting()}，欢迎你，${loginform.username || '用户'}`,
     type: 'success'
   })
 }
@@ -61,9 +60,11 @@ const showSuccessNotification = () => {
 
     <div class="auth-shell">
       <aside class="auth-aside">
-        <span class="auth-badge">Career Pilot</span>
-        <h1>回到你的职业成长空间，继续完成已经开启的规划旅程。</h1>
-        <p>登录后可以继续查看职业画像、岗位匹配、发展地图与成长报告，让每一步探索都保持连贯。</p>
+        <div class="aside-top">
+          <span class="auth-badge">Career Pilot</span>
+          <h1>回到你的职业成长空间，继续完成已经开启的规划旅程。</h1>
+          <p>登录后可继续查看职业画像、岗位匹配、发展地图与成长报告，让每一步探索都保持连贯。</p>
+        </div>
 
         <div class="aside-card">
           <strong>登录后你可以继续</strong>
@@ -72,6 +73,21 @@ const showSuccessNotification = () => {
             <li>查看岗位匹配与推荐结果</li>
             <li>追踪发展地图与成长报告</li>
           </ul>
+        </div>
+
+        <div class="aside-metrics">
+          <div class="metric-item">
+            <strong>24H</strong>
+            <span>成长进度随时续接</span>
+          </div>
+          <div class="metric-item">
+            <strong>AI</strong>
+            <span>测评与推荐结果同步保留</span>
+          </div>
+          <div class="metric-item">
+            <strong>1v1</strong>
+            <span>你的资料与规划记录专属沉淀</span>
+          </div>
         </div>
       </aside>
 
@@ -176,23 +192,42 @@ const showSuccessNotification = () => {
   z-index: 1;
   width: min(1180px, 100%);
   display: grid;
-  grid-template-columns: minmax(320px, 0.95fr) minmax(420px, 0.85fr);
-  border-radius: 32px;
+  grid-template-columns: minmax(340px, 1fr) minmax(430px, 0.88fr);
+  border-radius: 34px;
   overflow: hidden;
   border: 1px solid rgba(15, 23, 42, 0.08);
   box-shadow: 0 30px 80px rgba(15, 23, 42, 0.14);
-  background: rgba(255, 255, 255, 0.68);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.84), rgba(246, 250, 255, 0.72)),
+    rgba(255, 255, 255, 0.68);
   backdrop-filter: blur(24px);
 }
 
 .auth-aside {
+  position: relative;
+  overflow: hidden;
   padding: 48px;
   background: linear-gradient(160deg, rgba(23, 58, 93, 0.96), rgba(22, 119, 255, 0.82));
   color: #f8fafc;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
   gap: 28px;
+}
+
+.auth-aside::before {
+  content: '';
+  position: absolute;
+  right: -52px;
+  bottom: -70px;
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.aside-top {
+  display: grid;
+  gap: 18px;
 }
 
 .auth-badge {
@@ -208,9 +243,9 @@ const showSuccessNotification = () => {
 }
 
 .auth-aside h1 {
+  margin: 0;
   font-size: 40px;
   line-height: 1.15;
-  margin: 0;
 }
 
 .auth-aside p {
@@ -220,11 +255,17 @@ const showSuccessNotification = () => {
   line-height: 1.9;
 }
 
+.aside-card,
+.metric-item {
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(8px);
+}
+
 .aside-card {
   padding: 22px;
   border-radius: 22px;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .aside-card strong {
@@ -240,6 +281,31 @@ const showSuccessNotification = () => {
   color: rgba(241, 245, 249, 0.88);
 }
 
+.aside-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.metric-item {
+  padding: 16px 14px;
+  border-radius: 20px;
+}
+
+.metric-item strong {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.metric-item span {
+  display: block;
+  color: rgba(241, 245, 249, 0.8);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
 .auth-main {
   display: flex;
   align-items: center;
@@ -248,8 +314,14 @@ const showSuccessNotification = () => {
 }
 
 .auth-panel {
-  width: min(460px, 100%);
-  padding: 12px 6px;
+  width: min(468px, 100%);
+  padding: 32px;
+  border-radius: 30px;
+  border: 1px solid rgba(210, 224, 241, 0.88);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 250, 255, 0.92));
+  box-shadow:
+    0 18px 40px rgba(21, 60, 110, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.88);
 }
 
 .panel-header {
@@ -303,8 +375,17 @@ const showSuccessNotification = () => {
   padding: 0 16px;
   border-radius: 18px;
   border: 1px solid rgba(15, 23, 42, 0.08);
-  background: rgba(255, 255, 255, 0.86);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.field-box:focus-within {
+  border-color: rgba(22, 119, 255, 0.42);
+  box-shadow:
+    0 0 0 4px rgba(22, 119, 255, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  transform: translateY(-1px);
 }
 
 .field-box .el-icon {
@@ -360,7 +441,7 @@ const showSuccessNotification = () => {
   font-size: 15px;
   font-weight: 700;
   cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
 }
 
 .primary-btn:hover:not(:disabled) {
@@ -391,6 +472,10 @@ const showSuccessNotification = () => {
   .auth-aside h1 {
     font-size: 30px;
   }
+
+  .aside-metrics {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 640px) {
@@ -401,6 +486,11 @@ const showSuccessNotification = () => {
   .auth-main,
   .auth-aside {
     padding: 24px 20px;
+  }
+
+  .auth-panel {
+    padding: 24px 20px;
+    border-radius: 24px;
   }
 
   .panel-header h2 {

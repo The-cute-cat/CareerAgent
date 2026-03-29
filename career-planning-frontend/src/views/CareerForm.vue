@@ -257,6 +257,18 @@ const formProgress = computed(() => {
   return Math.round((completed / total) * 100)
 })
 
+const completedStepCount = computed(() => {
+  return [1, 2, 3, 4, 5].filter((step) => isStepCompleted(step)).length
+})
+
+const hasValidLanguage = (languages: Array<{ type: string; level: string }>) => {
+  return Array.isArray(languages) && languages.some((language) => {
+    const type = typeof language?.type === 'string' ? language.type.trim() : ''
+    const level = typeof language?.level === 'string' ? language.level.trim() : ''
+    return !!(type && level)
+  })
+}
+
 
 
 /**
@@ -265,7 +277,7 @@ const formProgress = computed(() => {
  * @returns 该步骤是否已完成
  *
  * 步骤1: 基本信息 - 需要填写学历和专业
- * 步骤2: 技能证书 - 需要至少添加一项技能或证书
+ * 步骤2: 技能证书 - 需要填写至少一项外语水平和一项专业技能
  * 步骤3: 经历项目 - 需要至少添加一个项目或实习经历
  * 步骤4: 素质测评 - 需要完成所有三项测评并填写创新案例
  * 步骤5: 职业意向 - 需要填写目标岗位和目标行业
@@ -275,7 +287,7 @@ const isStepCompleted = (step: number) => {
     case 1:
       return !!(formData.education && formData.major.length > 0)
     case 2:
-      return !!(formData.skills.length > 0 || formData.certificates.length > 0)
+      return hasValidLanguage(formData.languages) && formData.skills.length > 0
     case 3:
       return !!(formData.projects.length > 0 || formData.internships.length > 0)
     case 4:
@@ -1165,7 +1177,7 @@ const requiredFields = [
   { field: 'education', label: '学历', step: '1', validate: (v: any) => !!v },
   { field: 'major', label: '专业', step: '1', validate: (v: any) => Array.isArray(v) && v.length > 0 },
   { field: 'graduationDate', label: '预计毕业日期', step: '1', validate: (v: any) => !!v },
-  { field: 'languages', label: '外语能力', step: '2', validate: (v: any) => Array.isArray(v) && v.some((l: any) => l.type && l.level) },
+  { field: 'languages', label: '外语能力', step: '2', validate: (v: any) => hasValidLanguage(v) },
   { field: 'skills', label: '专业技能', step: '2', validate: (v: any) => Array.isArray(v) && v.length > 0 },
   { field: 'targetJob', label: '目标岗位', step: '5', validate: (v: any) => !!v },
   { field: 'targetIndustries', label: '期望行业', step: '5', validate: (v: any) => Array.isArray(v) && v.length > 0 }
@@ -1246,6 +1258,54 @@ const showMissingFieldsReminder = (missingFields: typeof requiredFields) => {
   })
 }
 
+const findMajorPath = (options: typeof majorOptions, target: string): string[] | null => {
+  for (const option of options) {
+    if (option.value === target || option.label === target) {
+      return [option.value]
+    }
+
+    if (option.children?.length) {
+      for (const child of option.children) {
+        if (child.value === target || child.label === target) {
+          return [option.value, child.value]
+        }
+      }
+    }
+  }
+
+  return null
+}
+
+const normalizeMajorValue = (major: unknown): string[] => {
+  if (Array.isArray(major)) {
+    if (major.length >= 2) {
+      return major.map((item) => String(item))
+    }
+
+    if (major.length === 1) {
+      const matchPath = findMajorPath(majorOptions, String(major[0]))
+      return matchPath || [String(major[0])]
+    }
+  }
+
+  if (typeof major === 'string' && major.trim()) {
+    const normalized = major.trim()
+
+    if (normalized.includes('/')) {
+      return normalized.split('/').map((item) => item.trim()).filter(Boolean)
+    }
+
+    if (normalized.includes('／')) {
+      return normalized.split('／').map((item) => item.trim()).filter(Boolean)
+    }
+
+    const matchPath = findMajorPath(majorOptions, normalized)
+    return matchPath || [normalized]
+  }
+
+  return []
+}
+
 /**
  * 将后端返回的表单数据填充到前端表单
  * @param parsedFormData 后端返回的解析后的表单数据
@@ -1263,8 +1323,8 @@ const fillFormWithParsedData = (parsedFormData: any) => {
   }
 
   // 填充专业
-  if (parsedFormData.major && Array.isArray(parsedFormData.major)) {
-    formData.major = parsedFormData.major
+  if (parsedFormData.major) {
+    formData.major = normalizeMajorValue(parsedFormData.major)
   }
 
   // 填充毕业日期
@@ -1427,8 +1487,7 @@ const formRules = reactive<FormRules>({
   languages: [{
     required: true,
     validator: (_rule, value: Array<{ type: string; level: string }>, callback) => {
-      const hasValidLanguage = value.some(l => l.type && l.level)
-      if (!hasValidLanguage) {
+      if (!hasValidLanguage(value)) {
         callback(new Error('请至少填写一项外语水平'))
       } else {
         callback()
@@ -1686,10 +1745,31 @@ const resetForm = () => {
               <div class="title-section">
                 <h2>{{ currentSectionTitle }}</h2>
                 <p class="subtitle">第 {{ activeMenu }} 步，共 5 步</p>
+                <div class="header-badges">
+                  <span class="header-badge">画像完整度 {{ profileCompleteness }}%</span>
+                  <span class="header-badge header-badge--soft">逐步完善后可生成更准确评估</span>
+                </div>
               </div>
               <div class="progress-section">
                 <span class="progress-label">完成度 {{ formProgress }}%</span>
                 <el-progress :percentage="formProgress" :stroke-width="8" :show-text="false" class="progress-bar" />
+              </div>
+            </div>
+            <div class="header-stats">
+              <div class="header-stat-card">
+                <span class="stat-label">当前阶段</span>
+                <strong>{{ currentSectionTitle }}</strong>
+                <small>聚焦本步核心信息完善</small>
+              </div>
+              <div class="header-stat-card">
+                <span class="stat-label">已完成步骤</span>
+                <strong>{{ completedStepCount }}/5</strong>
+                <small>每完成一步都会提升画像可用性</small>
+              </div>
+              <div class="header-stat-card">
+                <span class="stat-label">评估准备度</span>
+                <strong>{{ profileCompleteness >= 80 ? '良好' : profileCompleteness >= 60 ? '提升中' : '待完善' }}</strong>
+                <small>完善越充分，后续建议越准确</small>
               </div>
             </div>
           </template>
@@ -2209,7 +2289,9 @@ const resetForm = () => {
 <style scoped>
 .career-form-layout {
   min-height: calc(100vh - 60px);
-  background: #f5f7fa;
+  background:
+    radial-gradient(circle at top left, rgba(64, 158, 255, 0.12), transparent 22%),
+    linear-gradient(180deg, #f4f8ff 0%, #edf4fb 56%, #f8fbff 100%);
   display: flex;
   flex-direction: column;
 }
@@ -2228,7 +2310,7 @@ const resetForm = () => {
 }
 
 .sidebar {
-  background: #fff;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(246, 250, 255, 0.92));
   padding: 20px 0;
   display: flex;
   flex-direction: column;
@@ -2238,9 +2320,10 @@ const resetForm = () => {
   height: 100%;
   position: relative;
   flex-shrink: 0;
-  border-right: 1px solid #e4e7ed;
+  border-right: 1px solid rgba(212, 224, 238, 0.9);
   overflow-y: auto;
   overflow-x: hidden;
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.7);
 }
 
 .sidebar-brand {
@@ -2248,20 +2331,21 @@ const resetForm = () => {
   align-items: center;
   gap: 14px;
   padding: 0 20px 24px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid rgba(222, 232, 244, 0.9);
   margin-bottom: 16px;
 }
 
 .brand-icon {
-  width: 40px;
-  height: 40px;
-  background: #409eff;
-  border-radius: 8px;
+  width: 44px;
+  height: 44px;
+  background: linear-gradient(135deg, #2f7df6 0%, #63b7ff 100%);
+  border-radius: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #fff;
   flex-shrink: 0;
+  box-shadow: 0 12px 24px rgba(47, 125, 246, 0.22);
 }
 
 .brand-info {
@@ -2271,21 +2355,24 @@ const resetForm = () => {
 }
 
 .brand-text {
-  color: #303133;
-  font-size: 16px;
-  font-weight: 600;
+  color: #173a5d;
+  font-size: 17px;
+  font-weight: 700;
 }
 
 .brand-subtitle {
-  color: #909399;
+  color: #88a0ba;
   font-size: 12px;
   font-weight: 400;
 }
 
 /* 进度概览 */
 .progress-overview {
-  padding: 0 20px 20px;
-  margin-bottom: 8px;
+  padding: 0 20px 18px;
+  margin: 0 12px 10px;
+  border-radius: 18px;
+  background: rgba(240, 246, 255, 0.9);
+  border: 1px solid rgba(220, 231, 244, 0.92);
 }
 
 .progress-text {
@@ -2323,14 +2410,14 @@ const resetForm = () => {
 }
 
 .sidebar-menu :deep(.el-menu-item) {
-  height: 44px;
-  line-height: 44px;
+  height: 48px;
+  line-height: 48px;
   padding: 0 16px;
-  margin: 2px 12px;
-  border-radius: 4px;
-  color: #606266;
+  margin: 4px 12px;
+  border-radius: 14px;
+  color: #5f738b;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   transition: all 0.2s ease;
   display: flex;
   align-items: center;
@@ -2338,13 +2425,14 @@ const resetForm = () => {
 }
 
 .sidebar-menu :deep(.el-menu-item:hover) {
-  background: #f5f7fa;
-  color: #409eff;
+  background: rgba(237, 245, 255, 0.96);
+  color: #2f7df6;
 }
 
 .sidebar-menu :deep(.el-menu-item.is-active) {
-  background: #ecf5ff;
-  color: #409eff;
+  background: linear-gradient(135deg, rgba(229, 241, 255, 0.98), rgba(242, 248, 255, 0.98));
+  color: #2f7df6;
+  box-shadow: 0 8px 18px rgba(47, 125, 246, 0.08);
 }
 
 .sidebar-menu :deep(.el-menu-item.is-completed) {
@@ -2362,8 +2450,8 @@ const resetForm = () => {
 .menu-step {
   width: 24px;
   height: 24px;
-  border-radius: 4px;
-  background: #f5f7fa;
+  border-radius: 8px;
+  background: #eef4fb;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2403,9 +2491,9 @@ const resetForm = () => {
 .resume-upload-section {
   padding: 16px;
   margin: 12px;
-  background: #f5f7fa;
-  border-radius: 4px;
-  border: 1px solid #e4e7ed;
+  background: linear-gradient(180deg, rgba(244, 248, 255, 0.95), rgba(238, 245, 255, 0.92));
+  border-radius: 18px;
+  border: 1px solid rgba(220, 231, 244, 0.96);
 }
 
 .upload-label {
@@ -2424,18 +2512,19 @@ const resetForm = () => {
 
 .upload-btn {
   width: 100%;
-  border-radius: 4px;
+  border-radius: 14px;
   font-weight: 500;
   font-size: 13px;
   padding: 10px 0;
-  background: #67c23a;
+  background: linear-gradient(135deg, #2f7df6 0%, #63b7ff 100%);
   border: none;
   color: #ffffff !important;
   transition: all 0.2s ease;
+  box-shadow: 0 10px 22px rgba(47, 125, 246, 0.18);
 }
 
 .upload-btn:hover {
-  background: #85ce61;
+  background: linear-gradient(135deg, #4d8ff6 0%, #73c4ff 100%);
 }
 
 /* 已上传简历状态 */
@@ -2459,30 +2548,34 @@ const resetForm = () => {
 
 /* 主内容区样式 */
 .main-content {
-  padding: 24px;
+  padding: 28px;
   display: flex;
   flex-direction: column;
 }
 
 .form-card {
   width: 100%;
-  max-width: 1000px;
+  max-width: 1040px;
   margin: 0 auto;
-  border-radius: 4px;
-  background: #fff;
-  border: 1px solid #e4e7ed;
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(220, 231, 244, 0.96);
   height: auto;
   min-height: fit-content;
+  box-shadow:
+    0 18px 42px rgba(22, 59, 102, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.84);
+  overflow: hidden;
 }
 
 .form-card :deep(.el-card__header) {
-  padding: 20px 24px;
-  border-bottom: 1px solid #e4e7ed;
-  background: #fafbfc;
+  padding: 24px 28px;
+  border-bottom: 1px solid rgba(225, 234, 244, 0.94);
+  background: linear-gradient(180deg, rgba(248, 251, 255, 0.94), rgba(244, 248, 255, 0.92));
 }
 
 .form-card :deep(.el-card__body) {
-  padding: 24px;
+  padding: 28px;
   height: auto;
   min-height: auto;
 }
@@ -2498,20 +2591,84 @@ const resetForm = () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 20px;
 }
 
 .title-section h2 {
   margin: 0 0 4px 0;
-  font-size: 18px;
-  font-weight: 600;
-  color: #303133;
+  font-size: 26px;
+  font-weight: 700;
+  color: #173a5d;
 }
 
 .subtitle {
   margin: 0;
   font-size: 13px;
-  color: #909399;
-  font-weight: 400;
+  color: #8aa0b7;
+  font-weight: 500;
+}
+
+.header-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.header-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(47, 125, 246, 0.1);
+  color: #2f7df6;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.header-badge--soft {
+  background: rgba(136, 160, 186, 0.12);
+  color: #6f839a;
+}
+
+.header-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 20px;
+}
+
+.header-stat-card {
+  padding: 16px 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(221, 232, 244, 0.96);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(243, 248, 255, 0.92));
+  box-shadow: 0 10px 22px rgba(21, 60, 110, 0.05);
+}
+
+.stat-label {
+  display: inline-block;
+  margin-bottom: 8px;
+  color: #7b91a7;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.header-stat-card strong {
+  display: block;
+  margin-bottom: 6px;
+  color: #173a5d;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.header-stat-card small {
+  display: block;
+  color: #8aa0b7;
+  font-size: 12px;
+  line-height: 1.6;
 }
 
 .progress-section {
@@ -2523,12 +2680,12 @@ const resetForm = () => {
 
 .progress-label {
   font-size: 12px;
-  color: #595959;
-  font-weight: 500;
+  color: #6c8199;
+  font-weight: 600;
 }
 
 .progress-bar {
-  width: 160px;
+  width: 180px;
 }
 
 .progress-bar :deep(.el-progress-bar__outer) {
@@ -2544,20 +2701,47 @@ const resetForm = () => {
 
 /* 表单内容样式 */
 .section-content {
-  padding: 8px 0;
+  padding: 18px 20px;
+  border: 1px solid rgba(227, 236, 245, 0.92);
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(248, 251, 255, 0.96));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.86);
+  position: relative;
+  overflow: hidden;
+}
+
+.section-content::after {
+  content: '';
+  position: absolute;
+  top: -48px;
+  right: -42px;
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(47, 125, 246, 0.08), transparent 68%);
+  pointer-events: none;
 }
 
 /* 分组标题 */
 .form-section-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: #303133;
-  margin: 24px 0 16px;
-  padding-left: 12px;
-  border-left: 3px solid #409eff;
+  font-size: 16px;
+  font-weight: 700;
+  color: #173a5d;
+  margin: 28px 0 18px;
+  padding-left: 0;
+  border-left: none;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+}
+
+.form-section-title::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #2f7df6 0%, #66c4ff 100%);
+  box-shadow: 0 0 0 6px rgba(47, 125, 246, 0.1);
 }
 
 .form-section-title:first-child {
@@ -2570,13 +2754,14 @@ const resetForm = () => {
   align-items: flex-start;
   gap: 8px;
   margin-top: 20px;
-  padding: 12px 16px;
-  background: #f5f7fa;
-  border-radius: 4px;
+  padding: 14px 16px;
+  background: rgba(241, 247, 255, 0.92);
+  border-radius: 16px;
   border-left: 3px solid #409eff;
   color: #606266;
   font-size: 13px;
   line-height: 1.6;
+  box-shadow: 0 10px 20px rgba(47, 125, 246, 0.05);
 }
 
 .form-tips .el-icon {
@@ -2588,8 +2773,8 @@ const resetForm = () => {
 
 :deep(.el-form-item__label) {
   font-size: 14px;
-  color: #303133;
-  font-weight: 500;
+  color: #274766;
+  font-weight: 600;
   padding-right: 16px;
   height: 40px;
   line-height: 40px;
@@ -2598,18 +2783,25 @@ const resetForm = () => {
 /* 输入框样式优化 */
 :deep(.el-input__wrapper),
 :deep(.el-textarea__inner) {
-  box-shadow: 0 0 0 1px #dcdfe6 inset;
+  box-shadow: 0 0 0 1px rgba(214, 225, 238, 0.96) inset;
   transition: all 0.2s ease;
-  border-radius: 4px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.96);
+}
+
+:deep(.el-input__wrapper) {
+  min-height: 42px;
 }
 
 :deep(.el-input__wrapper:hover),
 :deep(.el-textarea__inner:hover) {
-  box-shadow: 0 0 0 1px #409eff inset;
+  box-shadow: 0 0 0 1px rgba(47, 125, 246, 0.72) inset;
 }
 
 :deep(.el-input__wrapper.is-focus) {
-  box-shadow: 0 0 0 1px #409eff inset;
+  box-shadow:
+    0 0 0 1px rgba(47, 125, 246, 0.8) inset,
+    0 0 0 4px rgba(47, 125, 246, 0.08);
 }
 
 /* 选择器样式 */
@@ -2659,12 +2851,13 @@ const resetForm = () => {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 10px;
-  padding: 10px 14px;
-  background: #f5f7fa;
-  border-radius: 4px;
-  border: 1px solid #e4e7ed;
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  background: linear-gradient(180deg, #f7fbff 0%, #f2f7fd 100%);
+  border-radius: 16px;
+  border: 1px solid rgba(220, 231, 244, 0.96);
   transition: all 0.2s ease;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
 .list-row:last-child,
@@ -2674,8 +2867,9 @@ const resetForm = () => {
 
 .list-row:hover,
 .skill-item:hover {
-  border-color: #c0c4cc;
-  background: #f5f7fa;
+  border-color: rgba(47, 125, 246, 0.26);
+  background: linear-gradient(180deg, #fbfdff 0%, #f4f9ff 100%);
+  box-shadow: 0 10px 22px rgba(25, 72, 122, 0.06);
 }
 
 /* 技能项特殊样式 */
@@ -2763,18 +2957,20 @@ const resetForm = () => {
 
 /* 按钮样式 */
 :deep(.el-button--primary) {
-  background: #409eff;
+  background: linear-gradient(135deg, #2f7df6 0%, #63b7ff 100%);
   border: none;
-  border-radius: 4px;
-  font-weight: 500;
+  border-radius: 14px;
+  font-weight: 600;
   font-size: 14px;
   color: #ffffff !important;
   transition: all 0.2s ease;
+  box-shadow: 0 12px 22px rgba(47, 125, 246, 0.18);
 }
 
 :deep(.el-button--primary:hover) {
-  background: #66b1ff;
+  background: linear-gradient(135deg, #4d8ff6 0%, #73c4ff 100%);
   color: #ffffff !important;
+  transform: translateY(-1px);
 }
 
 :deep(.el-button--primary:active) {
@@ -2818,10 +3014,10 @@ const resetForm = () => {
 /* ========== 发展优先级样式 - 卡片式设计 ========== */
 
 .priority-container {
-  background: #fafbfc;
-  border-radius: 16px;
+  background: linear-gradient(180deg, #f9fbff 0%, #f3f8ff 100%);
+  border-radius: 20px;
   padding: 24px;
-  border: 1px solid #e4e7ed;
+  border: 1px solid rgba(220, 231, 244, 0.96);
 }
 
 .priority-header {
@@ -2896,7 +3092,7 @@ const resetForm = () => {
   gap: 16px;
   padding: 16px 20px;
   background: #ffffff;
-  border-radius: 12px;
+  border-radius: 16px;
   border: 2px solid transparent;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -2904,6 +3100,7 @@ const resetForm = () => {
   user-select: none;
   position: relative;
   overflow: hidden;
+  backdrop-filter: blur(8px);
 }
 
 .priority-card::before {
@@ -3109,17 +3306,17 @@ const resetForm = () => {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
-  margin-top: 24px;
-  padding-top: 20px;
-  border-top: 1px solid #e4e7ed;
+  margin-top: 28px;
+  padding-top: 22px;
+  border-top: 1px solid rgba(225, 234, 244, 0.94);
 }
 
 .form-actions .el-button {
-  padding: 10px 28px;
+  padding: 12px 28px;
   font-size: 14px;
-  border-radius: 4px;
-  min-width: 100px;
-  font-weight: 500;
+  border-radius: 14px;
+  min-width: 112px;
+  font-weight: 600;
   transition: all 0.2s ease;
 }
 
@@ -3792,6 +3989,15 @@ const resetForm = () => {
 
   .progress-section {
     align-items: flex-start;
+  }
+
+  .header-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .section-content {
+    padding: 16px;
+    border-radius: 20px;
   }
 }
 

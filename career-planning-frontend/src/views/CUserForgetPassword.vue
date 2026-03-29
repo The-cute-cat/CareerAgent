@@ -61,9 +61,11 @@ const resetPassword = async () => {
 
     <div class="auth-shell">
       <aside class="auth-aside">
-        <span class="auth-badge">账号恢复</span>
-        <h1>通过邮箱快速找回账号访问权，让你的成长进度不中断。</h1>
-        <p>只需完成身份验证和新密码设置，就能重新进入个人空间，继续之前的职业规划内容。</p>
+        <div class="aside-top">
+          <span class="auth-badge">账号恢复</span>
+          <h1>通过邮箱快速找回账号访问权限，让你的成长进度不中断。</h1>
+          <p>只需完成身份验证和新密码设置，就能重新进入个人空间，继续之前的职业规划内容。</p>
+        </div>
 
         <div class="aside-card">
           <strong>找回流程</strong>
@@ -71,6 +73,21 @@ const resetPassword = async () => {
             <li>输入注册邮箱并发送验证码</li>
             <li>填写验证码与新密码完成重置</li>
           </ol>
+        </div>
+
+        <div class="aside-metrics">
+          <div class="metric-item">
+            <strong>2 步</strong>
+            <span>完成身份验证与密码更新</span>
+          </div>
+          <div class="metric-item">
+            <strong>邮箱验证</strong>
+            <span>重置动作更安全更清晰</span>
+          </div>
+          <div class="metric-item">
+            <strong>无缝返回</strong>
+            <span>恢复后可继续此前的规划进度</span>
+          </div>
         </div>
       </aside>
 
@@ -219,23 +236,42 @@ const resetPassword = async () => {
   z-index: 1;
   width: min(1180px, 100%);
   display: grid;
-  grid-template-columns: minmax(320px, 0.95fr) minmax(440px, 0.85fr);
-  border-radius: 32px;
+  grid-template-columns: minmax(340px, 1fr) minmax(440px, 0.9fr);
+  border-radius: 34px;
   overflow: hidden;
   border: 1px solid rgba(15, 23, 42, 0.08);
   box-shadow: 0 30px 80px rgba(15, 23, 42, 0.14);
-  background: rgba(255, 255, 255, 0.68);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.84), rgba(246, 250, 255, 0.72)),
+    rgba(255, 255, 255, 0.68);
   backdrop-filter: blur(24px);
 }
 
 .auth-aside {
+  position: relative;
+  overflow: hidden;
   padding: 48px;
   background: linear-gradient(160deg, rgba(23, 58, 93, 0.96), rgba(22, 119, 255, 0.82));
   color: #f8fafc;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
   gap: 28px;
+}
+
+.auth-aside::before {
+  content: '';
+  position: absolute;
+  right: -52px;
+  bottom: -70px;
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.aside-top {
+  display: grid;
+  gap: 18px;
 }
 
 .auth-badge {
@@ -247,13 +283,12 @@ const resetPassword = async () => {
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 
 .auth-aside h1 {
+  margin: 0;
   font-size: 40px;
   line-height: 1.15;
-  margin: 0;
 }
 
 .auth-aside p {
@@ -263,11 +298,16 @@ const resetPassword = async () => {
   line-height: 1.9;
 }
 
+.aside-card,
+.metric-item {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(8px);
+}
+
 .aside-card {
   padding: 22px;
   border-radius: 22px;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .aside-card strong {
@@ -283,6 +323,31 @@ const resetPassword = async () => {
   color: rgba(241, 245, 249, 0.88);
 }
 
+.aside-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.metric-item {
+  padding: 16px 14px;
+  border-radius: 20px;
+}
+
+.metric-item strong {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.metric-item span {
+  display: block;
+  color: rgba(241, 245, 249, 0.8);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
 .auth-main {
   display: flex;
   align-items: center;
@@ -292,7 +357,13 @@ const resetPassword = async () => {
 
 .auth-panel {
   width: min(500px, 100%);
-  padding: 12px 6px;
+  padding: 32px;
+  border-radius: 30px;
+  border: 1px solid rgba(210, 224, 241, 0.88);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 250, 255, 0.92));
+  box-shadow:
+    0 18px 40px rgba(21, 60, 110, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.88);
 }
 
 .panel-header {
@@ -337,8 +408,8 @@ const resetPassword = async () => {
 }
 
 .step-item span {
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   display: inline-flex;
   align-items: center;
@@ -388,7 +459,14 @@ const resetPassword = async () => {
   padding: 0 16px;
   border-radius: 18px;
   border: 1px solid rgba(15, 23, 42, 0.08);
-  background: rgba(255, 255, 255, 0.86);
+  background: rgba(255, 255, 255, 0.9);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.field-box:focus-within {
+  border-color: rgba(22, 119, 255, 0.42);
+  box-shadow: 0 0 0 4px rgba(22, 119, 255, 0.08);
+  transform: translateY(-1px);
 }
 
 .field-box .el-icon {
@@ -444,7 +522,7 @@ const resetPassword = async () => {
   font-size: 15px;
   font-weight: 700;
   cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
 }
 
 .primary-btn:hover:not(:disabled) {
@@ -479,6 +557,10 @@ const resetPassword = async () => {
   .auth-aside h1 {
     font-size: 30px;
   }
+
+  .aside-metrics {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 640px) {
@@ -489,6 +571,11 @@ const resetPassword = async () => {
   .auth-main,
   .auth-aside {
     padding: 24px 20px;
+  }
+
+  .auth-panel {
+    padding: 24px 20px;
+    border-radius: 24px;
   }
 
   .panel-header h2 {
