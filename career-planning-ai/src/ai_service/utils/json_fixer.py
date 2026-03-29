@@ -11,6 +11,7 @@ import shutil
 from pathlib import Path
 from datetime import datetime
 from typing import Tuple, List, Dict, Any, Optional, Union
+from ai_service.utils.logger_handler import log
 
 
 class JSONFixer:
@@ -266,7 +267,7 @@ class JSONFixer:
         }
 
         if verbose:
-            print(f"\n🔧 正在修复：{path.absolute()}")
+            log.info(f"\n🔧 正在修复：{path.absolute()}")
 
         # 检查文件
         if not path.exists():
@@ -293,14 +294,14 @@ class JSONFixer:
         success, data, error = JSONFixer.try_parse(original_content)
         if success:
             if verbose:
-                print("✓ 文件格式正确，无需修复")
+                log.info("✓ 文件格式正确，无需修复")
             report['success'] = True
             report['data_count'] = len(data) if isinstance(data, list) else 1
             return True, "✓ 文件格式正确，无需修复", report
 
         if verbose:
-            print(f"⚠ 检测到格式问题：{error}")
-            print("🔍 开始尝试修复...")
+            log.error(f"⚠ 检测到格式问题：{error}")
+            log.info("🔍 开始尝试修复...")
 
         # 创建备份
         backup_path = None
@@ -311,10 +312,10 @@ class JSONFixer:
                 shutil.copy2(path, backup_path)
                 report['backup_path'] = str(backup_path.absolute())
                 if verbose:
-                    print(f"✓ 已创建备份：{backup_path.name}")
+                    log.info(f"✓ 已创建备份：{backup_path.name}")
             except Exception as e:
                 if verbose:
-                    print(f"⚠ 创建备份失败：{e}")
+                    log.info(f"⚠ 创建备份失败：{e}")
 
         # 逐步应用修复方法
         content = original_content
@@ -339,11 +340,11 @@ class JSONFixer:
                     success, data, error = JSONFixer.try_parse(content)
                     if success:
                         if verbose:
-                            print(f"✓ 应用修复：{method_name}")
+                            log.info(f"✓ 应用修复：{method_name}")
                         break
             except Exception as e:
                 if verbose:
-                    print(f"⚠ 修复方法 {method_name} 失败：{e}")
+                    log.error(f"⚠ 修复方法 {method_name} 失败：{e}")
                 continue
 
         # 如果还没成功，尝试提取并合并数组/对象
@@ -352,28 +353,28 @@ class JSONFixer:
             arrays = JSONFixer.extract_json_arrays(content)
             if len(arrays) > 0:
                 if verbose:
-                    print(f"📊 发现 {len(arrays)} 个 JSON 数组")
+                    log.info(f"📊 发现 {len(arrays)} 个 JSON 数组")
                 data_list = JSONFixer.merge_json_items(arrays)
                 if data_list:
                     success = True
                     data = data_list
                     fixes_applied.append('merge_multiple_arrays')
                     if verbose:
-                        print(f"✓ 合并 {len(arrays)} 个数组，共 {len(data_list)} 条数据")
+                        log.info(f"✓ 合并 {len(arrays)} 个数组，共 {len(data_list)} 条数据")
 
             # 尝试提取对象
             if not success:
                 objects = JSONFixer.extract_json_objects(content)
                 if len(objects) > 0:
                     if verbose:
-                        print(f"📊 发现 {len(objects)} 个 JSON 对象")
+                        log.info(f"📊 发现 {len(objects)} 个 JSON 对象")
                     data_list = JSONFixer.merge_json_items(objects)
                     if data_list:
                         success = True
                         data = data_list
                         fixes_applied.append('extract_json_objects')
                         if verbose:
-                            print(f"✓ 提取 {len(objects)} 个对象，共 {len(data_list)} 条数据")
+                            log.info(f"✓ 提取 {len(objects)} 个对象，共 {len(data_list)} 条数据")
 
         # 如果修复成功，保存文件
         if success:
@@ -396,11 +397,11 @@ class JSONFixer:
                 msg = f"✓ 修复成功！应用了 {len(fixes_applied)} 个修复方法，共 {len(data)} 条数据"
 
                 if verbose:
-                    print(f"\n{msg}")
+                    log.info(f"\n{msg}")
                     if fixes_applied:
-                        print("📝 应用的修复方法:")
+                        log.info("📝 应用的修复方法:")
                         for fix in fixes_applied:
-                            print(f"  - {fix}")
+                            log.info(f"  - {fix}")
 
                 return True, msg, report
 
@@ -413,7 +414,7 @@ class JSONFixer:
                     try:
                         shutil.copy2(backup_path, path)
                         if verbose:
-                            print("⚠ 已恢复原始文件")
+                            log.info("⚠ 已恢复原始文件")
                     except:
                         pass
 
@@ -423,19 +424,19 @@ class JSONFixer:
             report['errors'].append(msg)
 
             if verbose:
-                print(f"\n{msg}")
-                print("\n💡 建议:")
-                print("  1. 检查第 91 行或第 404 行附近的格式")
-                print("  2. 确保只有一个最外层数组 [...]")
-                print("  3. 移除所有注释（// 和 /* */）")
-                print("  4. 检查括号是否匹配")
+                log.info(f"\n{msg}")
+                log.info("\n💡 建议:")
+                log.info("  1. 检查第 91 行或第 404 行附近的格式")
+                log.info("  2. 确保只有一个最外层数组 [...]")
+                log.info("  3. 移除所有注释（// 和 /* */）")
+                log.info("  4. 检查括号是否匹配")
 
             # 恢复备份
             if backup_path and create_backup:
                 try:
                     shutil.copy2(backup_path, path)
                     if verbose:
-                        print("⚠ 已恢复原始文件")
+                        log.info("⚠ 已恢复原始文件")
                 except:
                     pass
 
