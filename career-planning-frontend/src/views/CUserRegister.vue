@@ -30,7 +30,11 @@ const sendVerificationCode = async () => {
 
   codeSending.value = true
   try {
+     console.log("sss123");
+
     const res = await userSendCodeRegisterService(form.value)
+     console.log(1223);
+
     if (res.data.code !== 200) {
       ElMessage.error(res.data.msg || '验证码发送失败')
       return
@@ -66,7 +70,9 @@ const handleRegister = async () => {
 
   loading.value = true
   try {
+    console.log(123);
     const res = await userRegisterService(form.value)
+    console.log(1232);
     if (res.data.code !== 200) {
       ElMessage.error(res.data.msg || '注册失败')
       return
@@ -122,7 +128,7 @@ onUnmounted(() => {
 
           <form class="auth-form" @submit.prevent="handleRegister">
             <label class="field">
-              <span class="field-label">昵称</span>
+              <span class="field-label">用户名</span>
               <div class="field-box">
                 <el-icon><User /></el-icon>
                 <input v-model="form.username" type="text" placeholder="请输入昵称" required />

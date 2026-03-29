@@ -1,9 +1,15 @@
 package com.backend.careerplanningbackend.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import com.backend.careerplanningbackend.domain.dto.ReferralDTO;
 import com.backend.careerplanningbackend.domain.po.UserStuInfo;
 import com.backend.careerplanningbackend.mapper.UserStuInfoMapper;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.amqp.AmqpException;
+import org.springframework.amqp.core.Message;
+import org.springframework.amqp.core.MessagePostProcessor;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.mail.javamail.JavaMailSender;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.extra.mail.MailException;
@@ -23,18 +29,19 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
-import static com.backend.careerplanningbackend.util.RedisConstant.EXPIRE_TIME;
-import static com.backend.careerplanningbackend.util.RedisConstant.SENT_TIME;
+import static com.backend.careerplanningbackend.util.RedisConstant.*;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements UserService {
+    private final RedisIdWorker redisIdWorker;
     //导入application.yml里面的发件人邮箱
     @Value("${spring.mail.username}")
     private String fromEmail;
@@ -43,6 +50,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     private final UserStuInfoMapper userStuInfoMapper;
     private final StringRedisTemplate stringRedisTemplate;
     private final AliOSSUtils aliOSSUtils;
+    private final RabbitTemplate rabbitTemplate;
 
     @Override
     public Result login(LoginFormDTO user) {
@@ -87,6 +95,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class) // 确保有事务
     public Result register(LoginFormDTO user) {
         log.debug("用户注册请求: {}", user);
         String password = user.getPassword();
@@ -134,12 +143,34 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         String encode = PwdUtil.encode(password);
         user.setPassword(encode);
 
+        User newUser = new User();
+        BeanUtil.copyProperties(user, newUser, "passwordConfirm", "code");
         //注册功能点实现
-        int rows = userMapper.register(user);
+        int rows = userMapper.register(newUser);
         if (rows == 0) {
             return Result.fail("服务器开小差了，注册失败");
         }
-        // 4. 验证成功后立即删除，防止同一验证码被二次使用（幂等性）
+        
+        // 4. 发送rabbitmq,积分表创建
+        String exchange = "career.direct";
+        String routingKey = "user.registered.points";
+//        String inviteCode = String.valueOf(redisIdWorker.nextId(INVITE_CODE_KEY_PREFIX));
+        ReferralDTO referralDTO = new ReferralDTO();
+        referralDTO.setInviteCode(user.getInviteCode());
+        referralDTO.setUserId(newUser.getId()); // 注册没有推荐人，设置为0或null
+        
+        rabbitTemplate.convertAndSend(exchange, routingKey, referralDTO, new MessagePostProcessor() {
+            @Override
+            public Message postProcessMessage(Message message) throws AmqpException {
+                message.getMessageProperties()
+                        .setExpiration("10000");
+                return message;
+            }
+        });
+        
+        log.info("消息发送成功！");
+        
+        // 5. 验证成功后立即删除，防止同一验证码被二次使用（幂等性）
         stringRedisTemplate.delete(codeKey);
         stringRedisTemplate.delete(sentKey);
         return Result.ok();
@@ -251,15 +282,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
      */
     @Override
     public Result sendCodeRegister(LoginFormDTO user) {
-        User userByName = userMapper.selectByUsername(user.getUsername());
-        if (userByName != null) {
-            return Result.fail("用户名已被占用");
-        }
-        User ByEmail = userMapper.selectByEmail(user.getEmail());
-        if (ByEmail != null) {
-            return Result.fail("邮箱已经存在");
-        }
-
         String username = user.getUsername();
         String toEmail = user.getEmail();
         // 判断参数不合法
@@ -269,6 +291,16 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         if (RegexUtil.isEmailInvalid(toEmail)) {
             return Result.fail("邮箱格式无效");
         }
+        
+        User userByName = userMapper.selectByUsername(user.getUsername());
+        if (userByName != null) {
+            return Result.fail("用户名已被占用");
+        }
+        User ByEmail = userMapper.selectByEmail(user.getEmail());
+        if (ByEmail != null) {
+            return Result.fail("邮箱已经存在");
+        }
+
         // 2. 防刷校验：使用 ":" 分隔符规范 Key 结构
         // 建议格式：项目名:模块:业务:标识 这个用来计算60秒内是否重置 
         String sentKey = RedisConstant.EMAIL_SENT + ":" + username + ":" + toEmail;
@@ -308,24 +340,29 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
      */
     @Override
     public Result sendCodeForget(LoginFormDTO user) {
-        User userByName = userMapper.selectByUsername(user.getUsername());
-        if (userByName == null) {
-            return Result.fail("用户名不存在");
-        }
-        User ByEmail = userMapper.selectByEmail(user.getEmail());
-        if (ByEmail == null) {
-            return Result.fail("邮箱不存在");
-        }
-
-        String username = user.getUsername();
         String toEmail = user.getEmail();
-        // 判断参数不合法
-        if (StrUtil.isEmpty(username)) {
-            return Result.fail("用户名无效");
-        }
         if (RegexUtil.isEmailInvalid(toEmail)) {
             return Result.fail("邮箱格式无效");
         }
+//        String username = user.getUsername();
+//        // 判断参数不合法
+//        if (StrUtil.isEmpty(username)) {
+//            return Result.fail("用户名无效");
+//        }
+        User selectedOne = userMapper.selectOne(
+                new LambdaQueryWrapper<User>()
+                        .eq(User::getEmail, user.getEmail())
+        );
+        if(selectedOne == null){
+            return Result.fail("邮箱不存在,请检查输入的邮箱是否正确");
+        }
+       /* if (user.getUsername() == null) {
+            return Result.fail("用户名不存在");
+        }
+        if (user.getEmail() == null) {
+            return Result.fail("邮箱不存在");
+        }*/
+        String username = selectedOne.getUsername();
         // 2. 防刷校验：使用 ":" 分隔符规范 Key 结构
         // 建议格式：项目名:模块:业务:标识 这个用来计算60秒内是否重置 
         String sentKey = RedisConstant.EMAIL_SENT + ":" + username + ":" + toEmail;

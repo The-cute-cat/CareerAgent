@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@TableName("user_stu")
 public class User {
     
     private Long id;
@@ -24,8 +25,6 @@ public class User {
     
     private String password;
     
-    private String passwordConfirm;
-
     /** 用户头像URL */
     private String avatar;
 
@@ -38,8 +37,8 @@ public class User {
     private String info;
 
     /** 注册时间 */
-    private LocalDateTime createdAt;
+    private LocalDateTime createTime;
 
     /** 更新时间 */
-    private LocalDateTime updatedAt;
+    private LocalDateTime updateTime;
 }
