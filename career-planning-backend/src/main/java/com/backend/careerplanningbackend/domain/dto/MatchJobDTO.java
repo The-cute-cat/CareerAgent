@@ -1,11 +1,15 @@
 package com.backend.careerplanningbackend.domain.dto;
 
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class MatchJobDTO {
-    private final String studentProfile;
-    private final Integer recallTopK;
-    private final Integer finalTopK;
+    private String studentProfile;
+    private Integer recallTopK;
+    private Integer finalTopK;
     
 }

@@ -1,0 +1,49 @@
+package com.backend.careerplanningbackend.listeners;
+
+import com.backend.careerplanningbackend.domain.dto.ReferralDTO;
+import com.backend.careerplanningbackend.domain.po.Result;
+import com.backend.careerplanningbackend.service.PointsReferService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.core.ExchangeTypes;
+import org.springframework.amqp.rabbit.annotation.Exchange;
+import org.springframework.amqp.rabbit.annotation.Queue;
+import org.springframework.amqp.rabbit.annotation.QueueBinding;
+import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.stereotype.Component;
+
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class MqListeners {
+    
+    private final PointsReferService pointsReferService;
+
+    @RabbitListener(bindings = @QueueBinding(
+            value = @Queue(name = "points.register.queue", durable = "true"),
+            exchange = @Exchange(name = "career.direct", type = ExchangeTypes.DIRECT),
+            key = {"user.registered.points"}
+    ))
+    public void listenDirectQueue1(ReferralDTO referralDTO) throws InterruptedException {
+        log.info("消费者 收到了 points.register.queue 的消息：【{}】", referralDTO);
+        
+        try {
+            Result register = pointsReferService.register(referralDTO);
+            log.info("处理 points.register.queue 消息完成，用户ID: {}, Result 结果: {}", referralDTO.getUserId(), register);
+        }catch (Exception e) {
+            log.info("error 处理 points.register.queue 消息失败，用户ID: {}, 错误信息: {}", referralDTO.getUserId(), e.getMessage());
+            // 可以选择抛出异常以触发重试机制，或者记录错误后继续
+            throw e; // 这里选择抛出异常以触发重试
+        }
+    }
+
+    @RabbitListener(bindings = @QueueBinding(
+            value = @Queue(name = "direct.career2", durable = "true"),
+            exchange = @Exchange(name = "career.direct", type = ExchangeTypes.DIRECT),
+            key = {"red", "yellow"}
+    ))
+    public void listenDirectQueue2(String msg) throws InterruptedException {
+        System.out.println("消费者2 收到了 direct.queue2的消息：【" + msg +"】");
+    }
+
+}

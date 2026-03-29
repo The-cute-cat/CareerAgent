@@ -23,7 +23,9 @@ import java.io.IOException;
 @RequestMapping("/user")
 @RequiredArgsConstructor
 public class UserController {
+    
     private final UserService userService;
+    
     /**
      * login
      * 登录
@@ -36,6 +38,7 @@ public class UserController {
         log.info("login接收到的登录参数: {}", user.toString()); // 需要在 DTO 中重写 toString()
         return userService.login(user);
     }
+    
     /**
      * insertUserPoints
      * 注册
@@ -45,6 +48,7 @@ public class UserController {
         log.info("register接收到的注册参数: {}", user.toString()); 
         return userService.register(user);
     }
+    
     /**
      * forget
      * 忘记密码
@@ -54,6 +58,7 @@ public class UserController {
         log.info("forget-password接收到的参数: {}", user.toString());
         return userService.forget(user);
     }
+    
     /**
      * sendCodeRegister
      * 发送注册验证码
@@ -63,6 +68,7 @@ public class UserController {
         log.info("send-code-register接收到的参数: {}", user.toString());
         return userService.sendCodeRegister(user);
     }
+    
     /**
      * sendCodeForget
      * 发送注册验证码
@@ -72,6 +78,7 @@ public class UserController {
         log.info("send-code-forget接收到的参数: {}", user.toString());
         return userService.sendCodeForget(user);
     }
+    
     /**
      * edit
      * 修改个人信息
@@ -111,6 +118,7 @@ public class UserController {
         log.info("updateAvatar接收到的参数: {}", avatar.getOriginalFilename());
         return userService.updateAvatar(avatar);
     }
+    
     /**
      * refreshToken
      * 更新 双token

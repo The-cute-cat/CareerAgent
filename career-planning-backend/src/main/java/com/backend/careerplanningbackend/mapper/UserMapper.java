@@ -6,7 +6,6 @@ import com.backend.careerplanningbackend.domain.po.User;
 import com.backend.careerplanningbackend.domain.po.UserStuInfo;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;
-import org.apache.ibatis.annotations.Select;
 
 @Mapper
 public interface UserMapper extends BaseMapper<User> {
@@ -14,7 +13,7 @@ public interface UserMapper extends BaseMapper<User> {
 
     User selectByEmail(String email);
 
-    int register(LoginFormDTO user);
+    int register(User user);
 
     int forget(LoginFormDTO user);
 
@@ -27,6 +26,6 @@ public interface UserMapper extends BaseMapper<User> {
     int updateAvatar(String upload, Long id);
 
     //    @Select("select * from user_stu_info where user_id = #{currentUserId}")
-    UserStuInfo getUserBasicFileInfoService(Long currentUserId);
+//    UserStuInfo getUserBasicFileInfoService(Long currentUserId);
 
 }

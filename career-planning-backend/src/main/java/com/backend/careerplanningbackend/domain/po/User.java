@@ -24,8 +24,6 @@ public class User {
     
     private String password;
     
-    private String passwordConfirm;
-
     /** 用户头像URL */
     private String avatar;
 

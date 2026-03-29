@@ -1,11 +1,15 @@
 package com.backend.careerplanningbackend.domain.po;
 
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 /**
  * UserStuInfo
  */
 @Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class UserStuInfo {
     /**
      * 学生学历信息表

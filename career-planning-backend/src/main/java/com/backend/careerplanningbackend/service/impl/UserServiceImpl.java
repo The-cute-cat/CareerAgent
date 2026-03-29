@@ -1,9 +1,14 @@
 package com.backend.careerplanningbackend.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import com.backend.careerplanningbackend.domain.dto.ReferralDTO;
 import com.backend.careerplanningbackend.domain.po.UserStuInfo;
 import com.backend.careerplanningbackend.mapper.UserStuInfoMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.amqp.AmqpException;
+import org.springframework.amqp.core.Message;
+import org.springframework.amqp.core.MessagePostProcessor;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.mail.javamail.JavaMailSender;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.extra.mail.MailException;
@@ -28,13 +33,13 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
-import static com.backend.careerplanningbackend.util.RedisConstant.EXPIRE_TIME;
-import static com.backend.careerplanningbackend.util.RedisConstant.SENT_TIME;
+import static com.backend.careerplanningbackend.util.RedisConstant.*;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements UserService {
+    private final RedisIdWorker redisIdWorker;
     //导入application.yml里面的发件人邮箱
     @Value("${spring.mail.username}")
     private String fromEmail;
@@ -43,6 +48,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     private final UserStuInfoMapper userStuInfoMapper;
     private final StringRedisTemplate stringRedisTemplate;
     private final AliOSSUtils aliOSSUtils;
+    private final RabbitTemplate rabbitTemplate;
 
     @Override
     public Result login(LoginFormDTO user) {
@@ -134,12 +140,34 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         String encode = PwdUtil.encode(password);
         user.setPassword(encode);
 
+        User newUser = new User();
+        BeanUtil.copyProperties(user, newUser, "passwordConfirm", "code");
         //注册功能点实现
-        int rows = userMapper.register(user);
+        int rows = userMapper.register(newUser);
         if (rows == 0) {
             return Result.fail("服务器开小差了，注册失败");
         }
-        // 4. 验证成功后立即删除，防止同一验证码被二次使用（幂等性）
+        
+        // 4. 发送rabbitmq,积分表创建
+        String exchange = "career.direct";
+        String routingKey = "user.registered.points";
+        String inviteCode = String.valueOf(redisIdWorker.nextId(INVITE_CODE_KEY_PREFIX));
+        ReferralDTO referralDTO = new ReferralDTO();
+        referralDTO.setInviteCode(inviteCode);
+        referralDTO.setReferrerId(newUser.getId()); // 注册没有推荐人，设置为0或null
+        
+        rabbitTemplate.convertAndSend(exchange, routingKey, referralDTO, new MessagePostProcessor() {
+            @Override
+            public Message postProcessMessage(Message message) throws AmqpException {
+                message.getMessageProperties()
+                        .setExpiration("10000");
+                return message;
+            }
+        });
+        
+        log.info("消息发送成功！");
+        
+        // 5. 验证成功后立即删除，防止同一验证码被二次使用（幂等性）
         stringRedisTemplate.delete(codeKey);
         stringRedisTemplate.delete(sentKey);
         return Result.ok();

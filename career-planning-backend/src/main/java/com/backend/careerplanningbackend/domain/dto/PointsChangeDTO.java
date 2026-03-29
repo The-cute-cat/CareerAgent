@@ -3,13 +3,17 @@ package com.backend.careerplanningbackend.domain.dto;
 
 //import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 /**
  * 积分充值消费邀请等等
  * 
  */
 @Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class PointsChangeDTO {
     @NotNull(message = "用户ID不能为空")
     private Long userId;
