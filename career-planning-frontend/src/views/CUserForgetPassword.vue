@@ -62,8 +62,8 @@ const resetPassword = async () => {
     <div class="auth-shell">
       <aside class="auth-aside">
         <span class="auth-badge">账号恢复</span>
-        <h1>两步完成密码找回，尽量减少用户中断感。</h1>
-        <p>保留原本的邮箱验证码与密码重置流程，只对步骤展示和表单组织方式进行了现代化重构。</p>
+        <h1>通过邮箱快速找回账号访问权，让你的成长进度不中断。</h1>
+        <p>只需完成身份验证和新密码设置，就能重新进入个人空间，继续之前的职业规划内容。</p>
 
         <div class="aside-card">
           <strong>找回流程</strong>
@@ -173,9 +173,9 @@ const resetPassword = async () => {
 
 <style scoped>
 .auth-page {
-  --auth-accent: #0f766e;
-  --auth-heading: #0f172a;
-  --auth-soft: #64748b;
+  --auth-accent: #1668dc;
+  --auth-heading: #163253;
+  --auth-soft: #6d84a0;
   --auth-input: #111827;
   --auth-placeholder: #94a3b8;
   position: relative;
@@ -186,9 +186,9 @@ const resetPassword = async () => {
   padding: 24px;
   overflow: hidden;
   background:
-    radial-gradient(circle at top left, rgba(15, 118, 110, 0.18), transparent 24%),
-    radial-gradient(circle at bottom right, rgba(249, 115, 22, 0.14), transparent 24%),
-    linear-gradient(180deg, #f4f7f4 0%, #f8f4ee 100%);
+    radial-gradient(circle at top left, rgba(97, 154, 255, 0.22), transparent 24%),
+    radial-gradient(circle at bottom right, rgba(103, 184, 255, 0.18), transparent 24%),
+    linear-gradient(180deg, #f4f8ff 0%, #eef4fb 52%, #f8fbff 100%);
 }
 
 .auth-page__glow {
@@ -203,7 +203,7 @@ const resetPassword = async () => {
   height: 320px;
   left: -100px;
   top: 80px;
-  background: rgba(20, 184, 166, 0.18);
+  background: rgba(22, 119, 255, 0.18);
 }
 
 .auth-page__glow--right {
@@ -211,7 +211,7 @@ const resetPassword = async () => {
   height: 360px;
   right: -100px;
   bottom: 40px;
-  background: rgba(251, 146, 60, 0.14);
+  background: rgba(103, 184, 255, 0.16);
 }
 
 .auth-shell {
@@ -230,7 +230,7 @@ const resetPassword = async () => {
 
 .auth-aside {
   padding: 48px;
-  background: linear-gradient(160deg, rgba(18, 42, 39, 0.96), rgba(15, 118, 110, 0.88));
+  background: linear-gradient(160deg, rgba(23, 58, 93, 0.96), rgba(22, 119, 255, 0.82));
   color: #f8fafc;
   display: flex;
   flex-direction: column;
@@ -258,7 +258,7 @@ const resetPassword = async () => {
 
 .auth-aside p {
   margin: 0;
-  color: rgba(241, 245, 249, 0.82);
+  color: rgba(241, 245, 249, 0.84);
   font-size: 15px;
   line-height: 1.9;
 }
@@ -354,7 +354,7 @@ const resetPassword = async () => {
 
 .step-item.active span,
 .step-item.done span {
-  background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
+  background: linear-gradient(135deg, #1677ff 0%, #67b8ff 100%);
   color: #fff;
 }
 
@@ -439,7 +439,7 @@ const resetPassword = async () => {
   align-items: center;
   justify-content: center;
   gap: 10px;
-  background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
+  background: linear-gradient(135deg, #1677ff 0%, #67b8ff 100%);
   color: #ffffff;
   font-size: 15px;
   font-weight: 700;
@@ -449,7 +449,7 @@ const resetPassword = async () => {
 
 .primary-btn:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 18px 30px rgba(15, 118, 110, 0.22);
+  box-shadow: 0 18px 30px rgba(22, 119, 255, 0.22);
 }
 
 .primary-btn:disabled {

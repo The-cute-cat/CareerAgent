@@ -28,12 +28,11 @@ class PDFExtractor:
     """
 
     def __init__(self):
-
         self.llm = ChatOpenAI(
-            api_key=settings.llm.api_key.get_secret_value(),
-            base_url=settings.llm.base_url,
-            timeout=settings.llm.timeout,
-            max_retries=settings.llm.max_retries,
+            api_key=settings.pdf.api_key.get_secret_value(),
+            base_url=settings.pdf.base_url,
+            timeout=settings.pdf.timeout,
+            max_retries=settings.pdf.max_retries,
             model=settings.pdf.model_name,
             temperature=settings.pdf.extra["temperature"],
         )

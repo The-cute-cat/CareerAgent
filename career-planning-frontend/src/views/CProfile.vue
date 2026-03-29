@@ -1,7 +1,9 @@
 <script setup>
 import { computed, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { useRouter } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/modules/user'
+import { logout as userLogoutService } from '@/api/user'
 
 import ProfileInfoPanel from '../components/CProfile_Component/ProfileInfoPanel.vue'
 import ProfileSidebar from '../components/CProfile_Component/ProfileSidebar.vue'
@@ -11,20 +13,22 @@ import FeedbackPanel from '../components/CProfile_Component/FeedbackPanel.vue'
 import MoreSettingsPanel from '../components/CProfile_Component/MoreSettingsPanel.vue'
 
 const userStore = useUserStore()
+const router = useRouter()
 const sidebarCollapsed = ref(false)
 
 const activeMenu = ref('profile')
 const defaultAvatar = 'https://picsum.photos/200/200'
+const storedUser = userStore.userInfo || {}
 
 const userInfo = ref({
-  name: `用户${userStore.userInfo?.id || 5442}`,
-  avatar: userStore.userInfo?.avatar || defaultAvatar,
-  signature: '成为更好的自己',
-  gender: '男',
-  education: '博士',
-  experience: '在校生',
-  industries: '互联网、电子商务、计算机',
-  jobs: 'Java、前端开发工程师'
+  name: storedUser?.name || storedUser?.nickname || storedUser?.username || `用户${userStore.userInfo?.id || 5442}`,
+  avatar: storedUser?.avatar || defaultAvatar,
+  signature: storedUser?.signature || storedUser?.info || '成为更好的自己',
+  gender: storedUser?.gender || '男',
+  education: storedUser?.education || '博士',
+  experience: storedUser?.experience || '在校生',
+  industries: storedUser?.industries || '互联网、电子商务、计算机',
+  jobs: storedUser?.jobs || 'Java、前端开发工程师'
 })
 
 const displayPoints = computed(() => userStore.userInfo?.points || 300)
@@ -78,6 +82,19 @@ const updateUserInfo = (payload) => {
     ...payload
   }
 
+  if (userStore.userInfo) {
+    userStore.userInfo = {
+      ...userStore.userInfo,
+      ...payload,
+      name: payload.name ?? userStore.userInfo.name,
+      nickname: payload.nickname ?? userStore.userInfo.nickname,
+      username: payload.username ?? userStore.userInfo.username,
+      avatar: payload.avatar ?? userStore.userInfo.avatar,
+      signature: payload.signature ?? userStore.userInfo.signature,
+      info: payload.info ?? userStore.userInfo.info
+    }
+  }
+
   ElMessage({
     message: '个人信息已更新',
     type: 'success',
@@ -85,12 +102,51 @@ const updateUserInfo = (payload) => {
   })
 }
 
+const confirmLogout = async () => {
+  try {
+    await ElMessageBox.confirm(
+      '确认退出当前账号吗？退出后需要重新登录才能继续使用个人中心相关功能。',
+      '退出登录',
+      {
+        confirmButtonText: '确认退出',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+  } catch {
+    ElMessage({
+      message: '已取消退出登录',
+      type: 'info',
+      duration: 1800
+    })
+    return
+  }
+
+  try {
+    await userLogoutService()
+  } catch (error) {
+    console.warn('退出登录接口调用失败，已执行本地退出逻辑', error)
+  } finally {
+    userStore.clearUserALLInfo()
+    ElMessage({
+      message: '已退出登录',
+      type: 'success',
+      duration: 1800
+    })
+    router.push('/login')
+  }
+}
+
 const handleSettingAction = (key) => {
+  if (key === 'logout') {
+    confirmLogout()
+    return
+  }
+
   const actionMap = {
     recommend: '后续可跳转到个性化推荐设置页',
     agreement: '后续可跳转到用户协议页',
     privacy: '后续可跳转到隐私政策页',
-    logout: '后续可接入退出登录逻辑',
     cancel: '后续可接入注销账户逻辑',
     contact: '后续可跳转到联系我们页面'
   }

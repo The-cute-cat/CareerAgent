@@ -8,7 +8,6 @@ import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores'
 import { ArrowRight, Lock, User, View, Hide } from '@element-plus/icons-vue'
 
-
 const router = useRouter()
 const loginform = reactive<LoginFormDTO>({})
 const userStore = useUserStore()
@@ -50,7 +49,7 @@ const showSuccessNotification = () => {
   ElNotification({
     title: '登录成功',
     message: `${getGreeting()}，欢迎您，${loginform.username}`,
-    type: 'success',
+    type: 'success'
   })
 }
 </script>
@@ -63,17 +62,15 @@ const showSuccessNotification = () => {
     <div class="auth-shell">
       <aside class="auth-aside">
         <span class="auth-badge">Career Pilot</span>
-        <h1>把职业规划流程，变成一套更顺手的工作台。</h1>
-        <p>
-          登录后可以继续完成职业画像、岗位匹配和生涯报告查看。接口、字段和业务流程保持不变，界面体验已整体升级。
-        </p>
+        <h1>回到你的职业成长空间，继续完成已经开启的规划旅程。</h1>
+        <p>登录后可以继续查看职业画像、岗位匹配、发展地图与成长报告，让每一步探索都保持连贯。</p>
 
         <div class="aside-card">
-          <strong>登录后可直接进入</strong>
+          <strong>登录后你可以继续</strong>
           <ul>
-            <li>职业画像完善与简历导入</li>
-            <li>岗位匹配推荐结果查看</li>
-            <li>发展地图与生涯报告分析</li>
+            <li>完善职业画像与简历信息</li>
+            <li>查看岗位匹配与推荐结果</li>
+            <li>追踪发展地图与成长报告</li>
           </ul>
         </div>
       </aside>
@@ -133,9 +130,9 @@ const showSuccessNotification = () => {
 
 <style scoped>
 .auth-page {
-  --auth-accent: #0f766e;
-  --auth-heading: #0f172a;
-  --auth-soft: #64748b;
+  --auth-accent: #1668dc;
+  --auth-heading: #163253;
+  --auth-soft: #6d84a0;
   --auth-input: #111827;
   --auth-placeholder: #94a3b8;
   position: relative;
@@ -146,9 +143,9 @@ const showSuccessNotification = () => {
   padding: 24px;
   overflow: hidden;
   background:
-    radial-gradient(circle at top left, rgba(15, 118, 110, 0.18), transparent 24%),
-    radial-gradient(circle at bottom right, rgba(249, 115, 22, 0.14), transparent 24%),
-    linear-gradient(180deg, #f4f7f4 0%, #f8f4ee 100%);
+    radial-gradient(circle at top left, rgba(97, 154, 255, 0.22), transparent 24%),
+    radial-gradient(circle at bottom right, rgba(103, 184, 255, 0.18), transparent 24%),
+    linear-gradient(180deg, #f4f8ff 0%, #eef4fb 52%, #f8fbff 100%);
 }
 
 .auth-page__glow {
@@ -163,7 +160,7 @@ const showSuccessNotification = () => {
   height: 320px;
   left: -100px;
   top: 80px;
-  background: rgba(20, 184, 166, 0.18);
+  background: rgba(22, 119, 255, 0.18);
 }
 
 .auth-page__glow--right {
@@ -171,7 +168,7 @@ const showSuccessNotification = () => {
   height: 360px;
   right: -100px;
   bottom: 40px;
-  background: rgba(251, 146, 60, 0.14);
+  background: rgba(103, 184, 255, 0.16);
 }
 
 .auth-shell {
@@ -190,7 +187,7 @@ const showSuccessNotification = () => {
 
 .auth-aside {
   padding: 48px;
-  background: linear-gradient(160deg, rgba(18, 42, 39, 0.96), rgba(15, 118, 110, 0.88));
+  background: linear-gradient(160deg, rgba(23, 58, 93, 0.96), rgba(22, 119, 255, 0.82));
   color: #f8fafc;
   display: flex;
   flex-direction: column;
@@ -218,7 +215,7 @@ const showSuccessNotification = () => {
 
 .auth-aside p {
   margin: 0;
-  color: rgba(241, 245, 249, 0.82);
+  color: rgba(241, 245, 249, 0.84);
   font-size: 15px;
   line-height: 1.9;
 }
@@ -358,7 +355,7 @@ const showSuccessNotification = () => {
   align-items: center;
   justify-content: center;
   gap: 10px;
-  background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
+  background: linear-gradient(135deg, #1677ff 0%, #67b8ff 100%);
   color: #ffffff;
   font-size: 15px;
   font-weight: 700;
@@ -368,7 +365,7 @@ const showSuccessNotification = () => {
 
 .primary-btn:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 18px 30px rgba(15, 118, 110, 0.22);
+  box-shadow: 0 18px 30px rgba(22, 119, 255, 0.22);
 }
 
 .primary-btn:disabled {
