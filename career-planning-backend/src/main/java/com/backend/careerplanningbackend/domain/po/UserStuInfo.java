@@ -1,5 +1,6 @@
 package com.backend.careerplanningbackend.domain.po;
 
+import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -10,6 +11,7 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@TableName("user_stu_info")
 public class UserStuInfo {
     /**
      * 学生学历信息表

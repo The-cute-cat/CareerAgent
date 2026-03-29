@@ -18,4 +18,6 @@ public class LoginFormDTO {
     private String email;
     // 验证码
     private String code;
+    // 邀请码
+    private String inviteCode;
 }

@@ -33,8 +33,8 @@ public class InterviewQuestion {
     /** 原始响应内容（便于排查） */
     private String rawPayload;
     /** 创建时间 */
-    private LocalDateTime createdAt;
+    private LocalDateTime createTime;
     /** 更新时间 */
-    private LocalDateTime updatedAt;
+    private LocalDateTime updateTime;
 }
 

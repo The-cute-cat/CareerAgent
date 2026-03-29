@@ -16,7 +16,7 @@ public class ReferralDTO {
 //    @NotNull(message = "接受被邀请人ID不能为空")
     private Long userId;
     
-    @NotNull(message = "邀请码不能为空")
+//    @NotNull(message = "邀请码不能为空")
     private String inviteCode;
     
     private Integer rewardPoints;

@@ -40,7 +40,7 @@ public class UserController {
     }
     
     /**
-     * insertUserPoints
+     * register
      * 注册
      */
     @PostMapping("/register")
@@ -53,7 +53,7 @@ public class UserController {
      * forget
      * 忘记密码
      */
-    @PutMapping("/forget-password")
+    @PostMapping("/forget-password")
     public Result<String> forget(@RequestBody LoginFormDTO user) {
         log.info("forget-password接收到的参数: {}", user.toString());
         return userService.forget(user);

@@ -25,7 +25,7 @@ import java.util.Map;
 @Slf4j
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/test_question")
+@RequestMapping("/question")
 public class QuestionController {
     
     private final AiServiceClient aiServiceClient;
@@ -48,10 +48,10 @@ public class QuestionController {
 
         if("skill".equals(questionDTO.getType())){
             params.put("skill", questionDTO.getName());
-            aiChatResponse = aiServiceClient.chatWithOther("/test_question/skill_generate", params);
+            aiChatResponse = aiServiceClient.chatWithOther("/question/skill_generate", params);
         }else if("tool".equals(questionDTO.getType())){
             params.put("tool", questionDTO.getName());
-            aiChatResponse = aiServiceClient.chatWithOther("/test_question/tool_generate", params);
+            aiChatResponse = aiServiceClient.chatWithOther("/question/tool_generate", params);
         }
 
         return Result.ok(aiChatResponse.getData());
@@ -73,7 +73,7 @@ public class QuestionController {
         params.put("questions", questionDTO.getQuestions());
         params.put("student_answer", questionDTO.getStudentAnswer());
         params.put("evaluation_criteria", questionDTO.getEvaluationCriteria());
-        AiChatResponse aiChatResponse = aiServiceClient.chatWithOther("/test_question/check_student_answer", params);
+        AiChatResponse aiChatResponse = aiServiceClient.chatWithOther("/question/check_student_answer", params);
         return Result.ok(aiChatResponse.getData());
     }
     

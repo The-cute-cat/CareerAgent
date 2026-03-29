@@ -25,13 +25,13 @@ public class MqListeners {
             key = {"user.registered.points"}
     ))
     public void listenDirectQueue1(ReferralDTO referralDTO) throws InterruptedException {
-        log.info("消费者 收到了 points.register.queue 的消息：【{}】", referralDTO);
+        log.info("消费者 收到了 points.register.queue 的消息：【{}】,listenDirectQueue1", referralDTO);
         
         try {
             Result register = pointsReferService.register(referralDTO);
-            log.info("处理 points.register.queue 消息完成，用户ID: {}, Result 结果: {}", referralDTO.getUserId(), register);
+            log.info("处理 points.register.queue 消息完成，用户ID: {}, Result 结果: {},listenDirectQueue1", referralDTO.getUserId(), register);
         }catch (Exception e) {
-            log.info("error 处理 points.register.queue 消息失败，用户ID: {}, 错误信息: {}", referralDTO.getUserId(), e.getMessage());
+            log.info("error 处理 points.register.queue 消息失败，用户ID: {}, 错误信息: {},listenDirectQueue1", referralDTO.getUserId(), e.getMessage());
             // 可以选择抛出异常以触发重试机制，或者记录错误后继续
             throw e; // 这里选择抛出异常以触发重试
         }

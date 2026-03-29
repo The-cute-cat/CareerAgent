@@ -16,8 +16,10 @@ public class WebConfig implements WebMvcConfigurer {
          // 暂时不启用拦截器
          registry.addInterceptor(loginInterceptor)
                  .addPathPatterns("/**")//设置拦截器拦截的请求路径（ /** 表示拦截所有请求）
-                 .excludePathPatterns("/user/login","/user/insertUserPoints",
-                         "/user/send-code","/user/forget","/user/refreshToken"
+                 .excludePathPatterns("/user/login","/user/register","/user/forget",
+                         "/user/send-code-register", "/user/send-code-forget",
+                         "/user/refreshToken",
+                         "/user/forget-password"
                  );//设置不拦截的请求路径
     }
 //    @Override
