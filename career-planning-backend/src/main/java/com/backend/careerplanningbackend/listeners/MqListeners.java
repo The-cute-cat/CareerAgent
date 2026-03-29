@@ -28,6 +28,7 @@ public class MqListeners {
         log.info("消费者 收到了 points.register.queue 的消息：【{}】,listenDirectQueue1", referralDTO);
         
         try {
+            
             Result register = pointsReferService.register(referralDTO);
             log.info("处理 points.register.queue 消息完成，用户ID: {}, Result 结果: {},listenDirectQueue1", referralDTO.getUserId(), register);
         }catch (Exception e) {
