@@ -33,13 +33,13 @@ const loading = ref(false)
 
 /** 推荐岗位列表（按匹配度降序排列） */
 const sortedJobs = computed<JobMatchItem[]>(() => {
-  return [...matchItems.value].sort((a, b) => b.deep_analysis.score - a.deep_analysis.score)
+  return [...matchItems.value].sort((a, b) => (b.score || 0) * 100 - (a.score || 0) * 100)
 })
 
 /** 最高匹配分数 */
 const topScore = computed(() => {
   if (sortedJobs.value.length === 0) return 0
-  return sortedJobs.value[0]?.deep_analysis.score ?? 0
+  return Math.round((sortedJobs.value[0]?.score || 0) * 100)
 })
 
 /** 建议投递的岗位数量 */
@@ -162,7 +162,7 @@ onMounted(() => {
             <div class="stat-divider"></div>
             <div class="stat-item">
               <span class="stat-num highlight">{{ canApplyCount }}</span>
-              <span class="stat-label">建议投递</span>
+              <span class="stat-label">推荐</span>
             </div>
           </div>
         </div>
@@ -181,8 +181,8 @@ onMounted(() => {
               <div class="summary-rank">{{ index + 1 }}</div>
               <div class="summary-info">
                 <span class="summary-name">{{ item.raw_data.job_name }}</span>
-                <span class="summary-score" :style="{ color: getMatchScoreColor(item.deep_analysis.score) }">
-                  {{ item.deep_analysis.score }}分
+                <span class="summary-score" :style="{ color: getMatchScoreColor(Math.round((item.score || 0) * 100)) }">
+                  {{ Math.round((item.score || 0) * 100) }}分
                 </span>
               </div>
               <el-tag
@@ -190,7 +190,7 @@ onMounted(() => {
                 :type="item.deep_analysis.can_apply ? 'success' : 'danger'"
                 effect="plain"
               >
-                {{ item.deep_analysis.can_apply ? '建议投递' : '不建议投递' }}
+                {{ item.deep_analysis.can_apply ? '推荐' : '不推荐' }}
               </el-tag>
             </div>
           </div>
@@ -244,11 +244,11 @@ onMounted(() => {
                   <div class="job-title-tags">
                     <el-tag
                       size="small"
-                      :color="getMatchScoreColor(item.deep_analysis.score)"
+                      :color="getMatchScoreColor(Math.round((item.score || 0) * 100))"
                       effect="dark"
                       class="match-tag"
                     >
-                      {{ item.deep_analysis.score }}分 · {{ getMatchScoreLevel(item.deep_analysis.score) }}
+                      {{ Math.round((item.score || 0) * 100) }}分 · {{ getMatchScoreLevel(Math.round((item.score || 0) * 100)) }}
                     </el-tag>
                     <el-tag
                       size="small"
@@ -259,7 +259,7 @@ onMounted(() => {
                         <CircleCheck v-if="item.deep_analysis.can_apply" />
                         <CircleClose v-else />
                       </el-icon>
-                      {{ item.deep_analysis.can_apply ? '建议投递' : '不建议' }}
+                      {{ item.deep_analysis.can_apply ? '推荐' : '不推荐' }}
                     </el-tag>
                   </div>
                 </div>

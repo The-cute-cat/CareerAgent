@@ -39,6 +39,10 @@ export interface LoginFormDTO {
    */
   code?: string | null
   /**
+   * 邀请码
+   */
+  inviteCode?: string | null
+  /**
    * 邮箱
    */
   email?: string | null
@@ -116,6 +120,8 @@ export interface userInfoResponseData {
 export interface LoginFormDTO {
   /** 验证码 */
   code?: string | null
+  /** 邀请码 */
+  inviteCode?: string | null
   /** 邮箱 */
   email?: string | null
   /** 密码 */
