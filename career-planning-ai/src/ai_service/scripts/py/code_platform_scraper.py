@@ -2,8 +2,18 @@
 代码平台数据采集器
 支持 GitHub API 和 Gitee API
 """
+import os
 import time
+
+import certifi
 import requests
+import urllib3
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+from config import settings
+
+os.environ['SSL_CERT_FILE'] = certifi.where()
 
 
 class CodePlatformScraper:
@@ -17,11 +27,9 @@ class CodePlatformScraper:
             "Accept": "application/vnd.github.v3+json",
             "User-Agent": "CareerGuide-Bot/1.0"
         }
+        self.gitee_params = {}
         if github_token:
             self.github_headers["Authorization"] = f"token {github_token}"
-
-        self.gitee_params = {}
-        if gitee_token:
             self.gitee_params["access_token"] = gitee_token
 
     # ==================== GitHub 数据采集 ====================
@@ -29,9 +37,10 @@ class CodePlatformScraper:
     def fetch_github_profile(self, username: str) -> dict:
         """获取GitHub用户基本信息"""
         url = f"https://api.github.com/users/{username}"
-        resp = requests.get(url, headers=self.github_headers, timeout=10)
+        resp = requests.get(url, headers=self.github_headers, timeout=10, verify=settings.other.ssl_verify)
         if resp.status_code != 200:
             raise Exception(f"GitHub API 请求失败: {resp.status_code} - {resp.text}")
+        print(f"已获取获取GitHub用户 {username} 的基本信息")
         data = resp.json()
         return {
             "username": data.get("login"),
@@ -65,10 +74,11 @@ class CodePlatformScraper:
             "per_page": per_page,
             "type": "owner"
         }
-        resp = requests.get(url, headers=self.github_headers, params=params, timeout=15)
+        resp = requests.get(url, headers=self.github_headers, params=params, timeout=15,
+                            verify=settings.other.ssl_verify)
         if resp.status_code != 200:
             raise Exception(f"GitHub Repos API 请求失败: {resp.status_code}")
-
+        print(f"已获取获取GitHub用户 {username} 的仓库列表")
         repos = []
         for repo in resp.json():
             repos.append({
@@ -97,8 +107,9 @@ class CodePlatformScraper:
     def fetch_github_repo_languages(self, username: str, repo_name: str) -> dict:
         """获取单个仓库的语言构成"""
         url = f"https://api.github.com/repos/{username}/{repo_name}/languages"
-        resp = requests.get(url, headers=self.github_headers, timeout=10)
+        resp = requests.get(url, headers=self.github_headers, timeout=10, verify=settings.other.ssl_verify)
         if resp.status_code == 200:
+            print(f"已获取获取GitHub用户 {username} 的仓库 {repo_name} 的语言构成")
             return resp.json()
         return {}
 
@@ -108,9 +119,10 @@ class CodePlatformScraper:
         """获取Gitee用户基本信息"""
         url = f"https://gitee.com/api/v5/users/{username}"
         params = self.gitee_params.copy()
-        resp = requests.get(url, params=params, timeout=10)
+        resp = requests.get(url, params=params, timeout=10, verify=settings.other.ssl_verify)
         if resp.status_code != 200:
             raise Exception(f"Gitee API 请求失败: {resp.status_code}")
+        print(f"已获取获取Gitee用户 {username} 的基本信息")
         data = resp.json()
         return {
             "username": data.get("login"),
@@ -138,10 +150,11 @@ class CodePlatformScraper:
             "per_page": per_page,
             "type": "owner"
         }
-        resp = requests.get(url, params=params, timeout=15)
+        resp = requests.get(url, params=params, timeout=15, verify=settings.other.ssl_verify)
         if resp.status_code != 200:
             raise Exception(f"Gitee Repos API 请求失败: {resp.status_code}")
 
+        print(f"已获取获取Gitee用户 {username} 的仓库列表")
         repos = []
         for repo in resp.json():
             repos.append({
@@ -178,4 +191,8 @@ class CodePlatformScraper:
             print(f"计算账号注册年限失败: {e}")
             return 0
 
-code_platform_scraper = CodePlatformScraper()
+
+code_platform_scraper = CodePlatformScraper(
+    github_token=settings.code_ability.github_token.get_secret_value(),
+    gitee_token=settings.code_ability.gitee_token.get_secret_value()
+)

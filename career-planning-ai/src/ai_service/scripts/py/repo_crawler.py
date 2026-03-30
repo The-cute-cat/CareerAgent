@@ -1,5 +1,7 @@
 import asyncio
+import os
 
+import certifi
 import requests
 import base64
 import re
@@ -9,16 +11,19 @@ from urllib.parse import urlparse
 
 from ai_service.agents.common_agent import common_agent
 from ai_service.services.prompt_loader import prompt_loader
+from config import settings
+import urllib3
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+os.environ['SSL_CERT_FILE'] = certifi.where()
 
 # noinspection SpellCheckingInspection
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Accept": "application/vnd.github.v3+json"  # GitHub API 要求
+    "Accept": "application/vnd.github.v3+json"
 }
 
-
-# 如果有 GitHub Token，可以取消注释下面这行，能大幅提高访问速率限制（从60次/小时提升到5000次/小时）
-# HEADERS["Authorization"] = "token YOUR_GITHUB_TOKEN_HERE"
 
 def clean_markdown(text):
     """
@@ -56,14 +61,7 @@ def parse_ai_response(ai_response: str) -> dict:
         return default_result
 
     try:
-        # 尝试提取 JSON 块（可能被 ```json 包裹）
-        json_str = ai_response
-        if "```json" in ai_response:
-            json_str = ai_response.split("```json")[1].split("```")[0].strip()
-        elif "```" in ai_response:
-            json_str = ai_response.split("```")[1].split("```")[0].strip()
-
-        result = json.loads(json_str)
+        result = json.loads(ai_response)
         return {
             "summary": result.get("summary", ""),
             "tech_tags": result.get("tech_tags", []),
@@ -80,7 +78,7 @@ async def fetch_readme_content(api_url, owner, repo):
     """通过 API 获取 README 的纯文本内容并 AI 分析提取结构化信息"""
     readme_api_url = f"{api_url}/repos/{owner}/{repo}/readme"
     try:
-        resp = requests.get(readme_api_url, headers=HEADERS, timeout=10)
+        resp = requests.get(readme_api_url, headers=HEADERS, timeout=10, verify=settings.other.ssl_verify)
         if resp.status_code == 200:
             content_base64 = resp.json().get('content', '')
             content = base64.b64decode(content_base64).decode('utf-8', errors='ignore')
@@ -103,7 +101,8 @@ async def crawl_github(url):
     repo_url = f"{api_url}/repos/{owner}/{repo}"
 
     try:
-        resp = requests.get(repo_url, headers=HEADERS, timeout=10)
+        HEADERS['Authorization'] = f"token {settings.code_ability.github_token.get_secret_value()}"
+        resp = requests.get(repo_url, headers=HEADERS, timeout=10, verify=settings.other.ssl_verify)
         if resp.status_code == 200:
             data = resp.json()
             print(f"  ✓ 成功获取 GitHub: {data.get('full_name')}")
@@ -162,7 +161,8 @@ async def crawl_gitee(url):
     repo_url = f"{api_url}/repos/{owner}/{repo}"
 
     try:
-        resp = requests.get(repo_url, headers=HEADERS, timeout=10)
+        params = {"access_token": settings.code_ability.gitee_token.get_secret_value()}
+        resp = requests.get(repo_url, headers=HEADERS, params=params, timeout=10, verify=settings.other.ssl_verify)
         if resp.status_code == 200:
             data = resp.json()
             print(f"  ✓ 成功获取 Gitee: {data.get('full_name')}")
@@ -218,12 +218,12 @@ async def main():
     # 待爬取的 URL 列表
     url_list = [
         "https://github.com/Snailclimb/interview-guide",
-        "https://github.com/itwanger/PaiAgent",
+        # "https://github.com/itwanger/PaiAgent",
         "https://gitee.com/xiaonuobase/snowy",
-        "https://gitee.com/y_project/RuoYi",
-        "https://github.com/elunez/eladmin",
-        "https://github.com/macrozheng/mall",
-        "https://gitee.com/kekingcn/file-online-preview"
+        # "https://gitee.com/y_project/RuoYi",
+        # "https://github.com/elunez/eladmin",
+        # "https://github.com/macrozheng/mall",
+        # "https://gitee.com/kekingcn/file-online-preview"
     ]
 
     results = []
