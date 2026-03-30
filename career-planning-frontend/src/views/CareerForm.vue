@@ -1194,15 +1194,16 @@ const getCodeRepoMeta = (url: string) => {
     }
   }
 
-  const [, host, owner, repo] = match
+ const matchResult = match as RegExpMatchArray
+const [, host, owner, repo] = matchResult
 
-  return {
-    hostLabel: host.toLowerCase() === 'gitee.com' ? 'Gitee' : 'GitHub',
-    owner,
-    repo,
-    fullName: `${owner}/${repo}`,
-    normalized
-  }
+return {
+  hostLabel: host?.toLowerCase() === 'gitee.com' ? 'Gitee' : 'GitHub',
+  owner: owner || '',
+  repo: repo || '',
+  fullName: `${owner || ''}/${repo || ''}`,
+  normalized
+}
 }
 
 const getRepoDisplayNames = (urls: string[]) => {
