@@ -30,11 +30,7 @@ const sendVerificationCode = async () => {
 
   codeSending.value = true
   try {
-     console.log("sss123");
-
     const res = await userSendCodeRegisterService(form.value)
-     console.log(1223);
-
     if (res.data.code !== 200) {
       ElMessage.error(res.data.msg || '验证码发送失败')
       return
@@ -51,7 +47,7 @@ const sendVerificationCode = async () => {
       }
     }, 1000)
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : '验证码发送失败，请重试'
+    const errorMessage = error instanceof Error ? error.message : '验证码发送失败，请稍后重试'
     ElMessage.error(errorMessage)
   } finally {
     codeSending.value = false
@@ -70,15 +66,13 @@ const handleRegister = async () => {
 
   loading.value = true
   try {
-    console.log(123);
     const res = await userRegisterService(form.value)
-    console.log(1232);
     if (res.data.code !== 200) {
       ElMessage.error(res.data.msg || '注册失败')
       return
     }
     userStore.clearUserALLInfo()
-    ElMessage.success('注册成功，请登录')
+    ElMessage.success('注册成功，已赠送 500 新人积分，请登录后查看')
     await new Promise((resolve) => setTimeout(resolve, 1000))
     router.push('/login')
   } catch (error) {
@@ -104,17 +98,35 @@ onUnmounted(() => {
 
     <div class="auth-shell">
       <aside class="auth-aside">
-        <span class="auth-badge">新用户加入</span>
-        <h1>创建账号后，把职业探索、成长记录和报告内容统一沉淀下来。</h1>
-        <p>注册完成后即可开启个人成长档案，持续积累画像、任务轨迹和职业规划结果。</p>
+        <div class="aside-top">
+          <span class="auth-badge">新用户加入</span>
+          <h1>创建账号后，把职业探索、成长记录和报告内容统一沉淀下来。</h1>
+          <p>注册完成后即可开启个人成长档案，持续积累画像、任务轨迹和职业规划结果。</p>
+        </div>
 
         <div class="aside-card">
+          <span class="aside-card__tag">注册权益</span>
           <strong>注册后你可以获得</strong>
           <ul>
             <li>专属账号与职业成长档案</li>
             <li>岗位推荐与能力分析记录</li>
             <li>持续查看报告与发展路径</li>
           </ul>
+        </div>
+
+        <div class="aside-metrics">
+          <div class="metric-item">
+            <strong>+500</strong>
+            <span>注册成功即送新人积分</span>
+          </div>
+          <div class="metric-item">
+            <strong>成长档案</strong>
+            <span>资料、报告与路径统一管理</span>
+          </div>
+          <div class="metric-item">
+            <strong>邀请码</strong>
+            <span>可填可不填，后续便于邀请协同</span>
+          </div>
         </div>
       </aside>
 
@@ -235,7 +247,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: 18px;
   overflow: hidden;
   background:
     radial-gradient(circle at top left, rgba(97, 154, 255, 0.22), transparent 24%),
@@ -269,124 +281,200 @@ onUnmounted(() => {
 .auth-shell {
   position: relative;
   z-index: 1;
-  width: min(1220px, 100%);
+  width: min(1080px, 100%);
   display: grid;
-  grid-template-columns: minmax(320px, 0.95fr) minmax(460px, 0.9fr);
-  border-radius: 32px;
+  grid-template-columns: minmax(300px, 0.82fr) minmax(430px, 0.9fr);
+  border-radius: 28px;
   overflow: hidden;
   border: 1px solid rgba(15, 23, 42, 0.08);
   box-shadow: 0 30px 80px rgba(15, 23, 42, 0.14);
-  background: rgba(255, 255, 255, 0.68);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.84), rgba(246, 250, 255, 0.72)),
+    rgba(255, 255, 255, 0.68);
   backdrop-filter: blur(24px);
 }
 
 .auth-aside {
-  padding: 48px;
+  position: relative;
+  overflow: hidden;
+  padding: 34px 32px;
   background: linear-gradient(160deg, rgba(23, 58, 93, 0.96), rgba(22, 119, 255, 0.82));
   color: #f8fafc;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  gap: 28px;
+  justify-content: center;
+  gap: 22px;
+}
+
+.auth-aside::before {
+  content: '';
+  position: absolute;
+  right: -52px;
+  bottom: -70px;
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.aside-top {
+  display: grid;
+  gap: 12px;
+  max-width: 420px;
 }
 
 .auth-badge {
   display: inline-flex;
   width: fit-content;
-  padding: 8px 14px;
+  padding: 6px 12px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.12);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.08em;
-  text-transform: uppercase;
 }
 
 .auth-aside h1 {
-  font-size: 40px;
-  line-height: 1.15;
   margin: 0;
+  max-width: 14ch;
+  font-size: clamp(26px, 3vw, 40px);
+  line-height: 1.24;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
 }
 
 .auth-aside p {
   margin: 0;
+  max-width: 420px;
   color: rgba(241, 245, 249, 0.84);
-  font-size: 15px;
-  line-height: 1.9;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.aside-card,
+.metric-item {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(8px);
 }
 
 .aside-card {
-  padding: 22px;
-  border-radius: 22px;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  max-width: 420px;
+  padding: 16px 18px;
+  border-radius: 18px;
+}
+
+.aside-card__tag {
+  display: inline-flex;
+  margin-bottom: 8px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .aside-card strong {
   display: block;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   font-size: 16px;
 }
 
 .aside-card ul {
   margin: 0;
   padding-left: 18px;
-  line-height: 2;
+  line-height: 1.75;
+  font-size: 14px;
   color: rgba(241, 245, 249, 0.88);
+}
+
+.aside-metrics {
+  display: grid;
+  max-width: 420px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.metric-item {
+  min-height: 96px;
+  padding: 14px;
+  border-radius: 16px;
+}
+
+.metric-item strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.metric-item span {
+  display: block;
+  color: rgba(241, 245, 249, 0.8);
+  font-size: 12px;
+  line-height: 1.55;
 }
 
 .auth-main {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 36px;
+  padding: 28px;
 }
 
 .auth-panel {
-  width: min(500px, 100%);
-  padding: 12px 6px;
+  width: min(460px, 100%);
+  padding: 24px;
+  border-radius: 24px;
+  border: 1px solid rgba(210, 224, 241, 0.88);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 250, 255, 0.92));
+  box-shadow:
+    0 18px 40px rgba(21, 60, 110, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.88);
 }
 
 .panel-header {
-  margin-bottom: 28px;
+  margin-bottom: 22px;
 }
 
 .panel-eyebrow {
   display: inline-block;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   color: var(--auth-accent);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .panel-header h2 {
-  margin: 0 0 10px;
+  margin: 0 0 8px;
   color: var(--auth-heading);
-  font-size: 34px;
-  line-height: 1.15;
+  font-size: 30px;
+  line-height: 1.18;
 }
 
 .panel-header p {
   margin: 0;
   color: var(--auth-soft);
-  line-height: 1.8;
+  font-size: 14px;
+  line-height: 1.7;
 }
 
 .auth-form {
   display: grid;
-  gap: 18px;
+  gap: 16px;
 }
 
 .field {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .field-label {
   color: var(--auth-heading);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
 }
 
@@ -394,16 +482,23 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
-  min-height: 56px;
-  padding: 0 16px;
-  border-radius: 18px;
+  min-height: 50px;
+  padding: 0 14px;
+  border-radius: 16px;
   border: 1px solid rgba(15, 23, 42, 0.08);
-  background: rgba(255, 255, 255, 0.86);
+  background: rgba(255, 255, 255, 0.9);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.field-box:focus-within {
+  border-color: rgba(22, 119, 255, 0.42);
+  box-shadow: 0 0 0 4px rgba(22, 119, 255, 0.08);
+  transform: translateY(-1px);
 }
 
 .field-box .el-icon {
   color: var(--auth-soft);
-  font-size: 18px;
+  font-size: 17px;
 }
 
 .field-box input {
@@ -413,7 +508,7 @@ onUnmounted(() => {
   outline: none;
   color: var(--auth-input);
   caret-color: var(--auth-input);
-  font-size: 15px;
+  font-size: 14px;
 }
 
 .field-box input::placeholder {
@@ -447,10 +542,10 @@ onUnmounted(() => {
 }
 
 .secondary-btn {
-  min-width: 112px;
-  height: 42px;
-  padding: 0 14px;
-  border-radius: 14px;
+  min-width: 108px;
+  height: 38px;
+  padding: 0 12px;
+  border-radius: 12px;
   background: rgba(22, 119, 255, 0.1);
   color: var(--auth-accent);
   font-weight: 700;
@@ -468,19 +563,19 @@ onUnmounted(() => {
 }
 
 .primary-btn {
-  min-height: 56px;
+  min-height: 50px;
   border: none;
-  border-radius: 18px;
+  border-radius: 16px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
   background: linear-gradient(135deg, #1677ff 0%, #67b8ff 100%);
   color: #ffffff;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
   cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
 }
 
 .primary-btn:hover:not(:disabled) {
@@ -494,9 +589,10 @@ onUnmounted(() => {
 }
 
 .panel-footer {
-  margin: 22px 0 0;
+  margin: 18px 0 0;
   color: var(--auth-soft);
   text-align: center;
+  font-size: 14px;
 }
 
 @media (max-width: 960px) {
@@ -505,26 +601,40 @@ onUnmounted(() => {
   }
 
   .auth-aside {
-    padding: 32px;
+    padding: 28px;
   }
 
   .auth-aside h1 {
-    font-size: 30px;
+    max-width: none;
+    font-size: 28px;
+  }
+
+  .aside-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 640px) {
   .auth-page {
-    padding: 14px;
+    padding: 12px;
   }
 
   .auth-main,
   .auth-aside {
-    padding: 24px 20px;
+    padding: 22px 18px;
+  }
+
+  .auth-panel {
+    padding: 20px 18px;
+    border-radius: 20px;
   }
 
   .panel-header h2 {
-    font-size: 28px;
+    font-size: 26px;
+  }
+
+  .aside-metrics {
+    grid-template-columns: 1fr;
   }
 
   .field-box--with-action {

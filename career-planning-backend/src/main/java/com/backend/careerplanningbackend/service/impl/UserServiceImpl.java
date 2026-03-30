@@ -30,6 +30,8 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -116,12 +118,19 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         if (RegexUtil.isEmailInvalid(email)) {
             return Result.fail("邮箱格式无效");
         }
-        User ByEmail = userMapper.selectByEmail(email);
-        if (ByEmail != null) {
+
+        Long selectCount = userMapper.selectCount(
+                new LambdaQueryWrapper<User>()
+                        .eq(User::getEmail, email)
+        );
+        if (selectCount != 0) {
             return Result.fail("邮箱已经存在");
         }
-        User userByName = userMapper.selectByUsername(user.getUsername());
-        if (userByName != null) {
+        Long selectedCount = userMapper.selectCount(
+                new LambdaQueryWrapper<User>()
+                        .eq(User::getUsername, username)
+        );
+        if (selectedCount != 0) {
             return Result.fail("用户名已被占用");
         }
 
@@ -150,29 +159,37 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         if (rows == 0) {
             return Result.fail("服务器开小差了，注册失败");
         }
-        
-        // 4. 发送rabbitmq,积分表创建
-        String exchange = "career.direct";
-        String routingKey = "user.registered.points";
-//        String inviteCode = String.valueOf(redisIdWorker.nextId(INVITE_CODE_KEY_PREFIX));
-        ReferralDTO referralDTO = new ReferralDTO();
-        referralDTO.setInviteCode(user.getInviteCode());
-        referralDTO.setUserId(newUser.getId()); // 注册没有推荐人，设置为0或null
-        
-        rabbitTemplate.convertAndSend(exchange, routingKey, referralDTO, new MessagePostProcessor() {
-            @Override
-            public Message postProcessMessage(Message message) throws AmqpException {
-                message.getMessageProperties()
-                        .setExpiration("10000");
-                return message;
-            }
-        });
-        
-        log.info("消息发送成功！");
-        
+
         // 5. 验证成功后立即删除，防止同一验证码被二次使用（幂等性）
         stringRedisTemplate.delete(codeKey);
         stringRedisTemplate.delete(sentKey);
+        
+        if(TransactionSynchronizationManager.isActualTransactionActive()){
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    // 4. 发送rabbitmq,积分表创建
+                    String exchange = "career.direct";
+                    String routingKey = "user.registered.points";
+//        String inviteCode = String.valueOf(redisIdWorker.nextId(INVITE_CODE_KEY_PREFIX));
+                    ReferralDTO referralDTO = new ReferralDTO();
+                    referralDTO.setInviteCode(user.getInviteCode());
+                    referralDTO.setUserId(newUser.getId()); // 注册没有推荐人，设置为0或null
+
+                    rabbitTemplate.convertAndSend(exchange, routingKey, referralDTO, new MessagePostProcessor() {
+                        @Override
+                        public Message postProcessMessage(Message message) throws AmqpException {
+                            message.getMessageProperties()
+                                    .setExpiration("10000");
+                            return message;
+                        }
+                    });
+
+                    log.info("消息发送成功！");
+                }
+            });
+        }
+       
         return Result.ok();
     }
 

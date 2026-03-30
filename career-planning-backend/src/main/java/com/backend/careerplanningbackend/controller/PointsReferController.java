@@ -46,7 +46,7 @@ public class PointsReferController {
     @PostMapping("/invite")
     public Result invite(ReferralDTO referralDTO) {
         log.info("referralDTO: {}", referralDTO);
-        return referralService.invite(referralDTO);
+        return referralService.generateInvite(referralDTO);
     }
 
     /**

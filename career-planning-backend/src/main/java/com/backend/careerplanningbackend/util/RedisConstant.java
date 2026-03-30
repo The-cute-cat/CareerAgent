@@ -34,14 +34,10 @@ public class RedisConstant {
      * 邀请好友生成验证码的redis key前缀
      */
     public static final String INVITE_CODE_KEY_PREFIX = "invite:code";
-
-     /**
-     * 邀请好友生成验证码的redis key过期时间，单位为秒
+    
+    /**
+     * 积分充值 key 前缀
      */
-     
-     /**
-      * 积分充值 key 前缀
-      */
      public static final String POINTS_RECHARGE_KEY_PREFIX = "points:transaction";
 
     /**
