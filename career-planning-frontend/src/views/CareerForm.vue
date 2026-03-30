@@ -35,11 +35,14 @@ import {
   Medal
 } from '@element-plus/icons-vue'
 import CareerFormUpload from '@/components/CareerForm_Upload.vue'
+import ResumeMissingFieldsChat from '@/components/ResumeMissingFieldsChat.vue'
 import Quenation from '@/components/Quenation.vue'
 import { submitCareerFormApi, convertToSubmitDTO } from '@/api/career-form/formdata'
+import { evaluateCodeAbilityApi } from '@/api/career-form/codeAbility'
 import { submitQuiz, getQuestionsApi, getPersonQuizApi } from '@/api/career-form/questions'
 import type { CareerFormData, QuizDetailItem } from '@/types/careerform_report'
 import type { Question, BackendPersonData } from '@/types/careerform_question'
+import type { CodeAbilityEvaluateData } from '@/types/code-ability'
 import type { JobMatchItem } from '@/types/job-match'
 import {
   majorOptions
@@ -71,6 +74,7 @@ const showUploadDialog = ref(false)
 
 /** 标记用户是否已上传简历 */
 const hasUploadedResume = ref(false)
+const showMissingFieldsChat = ref(false)
 
 /** 控制学历"其他"输入框的显示/隐藏 */
 const showEducationInput = ref(false)
@@ -90,6 +94,13 @@ const showProjectDialog = ref(false)
 
 /** 控制实践经历弹窗显示/隐藏 */
 const showInternshipDialog = ref(false)
+const codeAbilityUseAi = ref(false)
+const codeAbilityEvaluating = ref(false)
+const codeAbilityResultVisible = ref(false)
+const codeAbilityResult = ref<CodeAbilityEvaluateData | null>(null)
+const lastEvaluatedCodeRepoUrls = ref<string[]>([])
+type MissingFieldKey = keyof CareerFormData | 'qualityAssessment'
+const pendingMissingFields = ref<Array<{ field: MissingFieldKey; label: string; step: string }>>([])
 
 
 
@@ -1027,6 +1038,7 @@ const quizResult = ref<{
 
 /** 后端评分是否失败 */
 const scoreFailed = ref(false)
+const quizSubmitting = ref(false)
 
 /**
  * 处理问卷提交完成
@@ -1086,6 +1098,10 @@ const handleQuizSubmit = async (submitData: any) => {
   })
 
   try {
+    if (['skill', 'tool'].includes(quizType)) {
+      quizSubmitting.value = true
+    }
+
     const result = await submitQuiz({
       quizType,
       name: ['skill', 'tool'].includes(quizType) ? currentTestSkill.value || '' : undefined,
@@ -1110,6 +1126,8 @@ const handleQuizSubmit = async (submitData: any) => {
     console.error('提交问卷失败:', error)
     scoreFailed.value = true
     ElMessage.error('提交失败，请稍后重试')
+  } finally {
+    quizSubmitting.value = false
   }
 }
 
@@ -1151,6 +1169,112 @@ const getScoreColor = (score: number, maxScore: number): string => {
   return '#f56c6c'
 }
 
+const getCodeAbilityUrls = (rawLinks: string) => {
+  return rawLinks
+    .split(/[\n,，]/)
+    .map(item => item.trim())
+    .filter(Boolean)
+}
+
+const isValidCodeRepoUrl = (url: string) => {
+  return /^https?:\/\/(www\.)?(github\.com|gitee\.com)\/[^/]+\/[^/]+\/?$/i.test(url)
+}
+
+const getCodeRepoMeta = (url: string) => {
+  const normalized = url.trim().replace(/\/+$/, '')
+  const match = normalized.match(/^https?:\/\/(?:www\.)?(github\.com|gitee\.com)\/([^/]+)\/([^/]+)$/i)
+
+  if (!match) {
+    return {
+      hostLabel: '未知平台',
+      owner: '',
+      repo: '',
+      fullName: '',
+      normalized
+    }
+  }
+
+  const [, host, owner, repo] = match
+
+  return {
+    hostLabel: host.toLowerCase() === 'gitee.com' ? 'Gitee' : 'GitHub',
+    owner,
+    repo,
+    fullName: `${owner}/${repo}`,
+    normalized
+  }
+}
+
+const getRepoDisplayNames = (urls: string[]) => {
+  return urls.map((url) => {
+    const meta = getCodeRepoMeta(url)
+    return meta.fullName || meta.normalized || url
+  })
+}
+
+const getCodeAbilityResultModeText = () => {
+  return codeAbilityResult.value?.ai_analysis ? '深度分析结果' : '基础评估'
+}
+
+const getCodeAbilityResultModeTagType = () => {
+  return codeAbilityResult.value?.ai_analysis ? 'warning' : 'info'
+}
+
+const getCodeAbilityTagType = (score?: number) => {
+  if ((score ?? 0) >= 85) return 'success'
+  if ((score ?? 0) >= 70) return 'warning'
+  return 'danger'
+}
+
+const showCodeAbilityResultDialog = () => {
+  if (!codeAbilityResult.value) {
+    ElMessage.warning('请先完成代码能力评估')
+    return
+  }
+  codeAbilityResultVisible.value = true
+}
+
+const handleCodeAbilityEvaluate = async () => {
+  const rawLinks = formData.codeAbility.links.trim()
+  const repoUrls = getCodeAbilityUrls(rawLinks)
+
+  if (!repoUrls.length) {
+    ElMessage.warning('请输入至少一个 GitHub 或 Gitee 仓库链接')
+    return
+  }
+
+  const invalidUrl = repoUrls.find(url => !isValidCodeRepoUrl(url))
+  if (invalidUrl) {
+    ElMessage.warning(`存在无效仓库链接：${invalidUrl}`)
+    return
+  }
+
+  codeAbilityEvaluating.value = true
+  lastEvaluatedCodeRepoUrls.value = repoUrls
+
+  try {
+    const res = await evaluateCodeAbilityApi({
+      urls: repoUrls,
+      use_ai: codeAbilityUseAi.value
+    })
+    const result = res.data as any
+
+    if (result?.code !== 200 || !result?.data) {
+      throw new Error(result?.msg || '代码能力评估失败')
+    }
+
+    codeAbilityResult.value = result.data
+    codeAbilityResultVisible.value = true
+
+    ElMessage.success(result.data?.ai_analysis ? '代码能力深度分析完成' : '代码能力评估完成')
+  } catch (error: any) {
+    console.error('代码能力评估失败:', error)
+    ElMessage.error(error?.message || '代码能力评估失败，请稍后重试')
+  } finally {
+    codeAbilityEvaluating.value = false
+  }
+}
+
 /**
  * 关闭测试弹窗
  */
@@ -1161,6 +1285,7 @@ const closeTestDialog = () => {
   currentQuizType.value = ''
   quizResult.value = null
   scoreFailed.value = false
+  quizSubmitting.value = false
   backendQuizData.value = null
   // 重置Quenation组件
   quenationRef.value?.reset()
@@ -1173,12 +1298,13 @@ const closeTestDialog = () => {
  * 必填字段配置
  * 定义哪些字段是必填项以及如何验证
  */
-const requiredFields = [
+const requiredFields: Array<{ field: MissingFieldKey; label: string; step: string; validate: (value: any) => boolean }> = [
   { field: 'education', label: '学历', step: '1', validate: (v: any) => !!v },
   { field: 'major', label: '专业', step: '1', validate: (v: any) => Array.isArray(v) && v.length > 0 },
   { field: 'graduationDate', label: '预计毕业日期', step: '1', validate: (v: any) => !!v },
   { field: 'languages', label: '外语能力', step: '2', validate: (v: any) => hasValidLanguage(v) },
   { field: 'skills', label: '专业技能', step: '2', validate: (v: any) => Array.isArray(v) && v.length > 0 },
+  { field: 'qualityAssessment', label: '素质测评', step: '4', validate: () => quizCompleted.communication && quizCompleted.stress && quizCompleted.learning },
   { field: 'targetJob', label: '目标岗位', step: '5', validate: (v: any) => !!v },
   { field: 'targetIndustries', label: '期望行业', step: '5', validate: (v: any) => Array.isArray(v) && v.length > 0 }
 ]
@@ -1188,8 +1314,28 @@ const requiredFields = [
  * @returns 缺失的字段配置数组
  */
 const checkRequiredFields = () => {
-  return requiredFields.filter(item => !item.validate(formData[item.field as keyof CareerFormData]))
+  return requiredFields.filter((item) => {
+    if (item.field === 'qualityAssessment') {
+      return !item.validate(undefined)
+    }
+    return !item.validate(formData[item.field as keyof CareerFormData])
+  })
 }
+
+const mapPendingMissingFields = (missingFields: typeof requiredFields) => {
+  return missingFields.map((field) => ({
+    field: field.field,
+    label: field.label,
+    step: field.step
+  }))
+}
+
+const syncPendingMissingFields = () => {
+  pendingMissingFields.value = mapPendingMissingFields(checkRequiredFields())
+}
+
+const missingFieldCount = computed(() => checkRequiredFields().length)
+const showResumeContinueButton = computed(() => hasUploadedResume.value && missingFieldCount.value > 0)
 
 /**
  * 显示缺失字段提醒，引导用户补充
@@ -1197,65 +1343,74 @@ const checkRequiredFields = () => {
  */
 const showMissingFieldsReminder = (missingFields: typeof requiredFields) => {
   if (missingFields.length === 0) {
+    pendingMissingFields.value = []
     ElMessage.success('简历信息已完整填充，可以直接提交！')
     return
   }
+  pendingMissingFields.value = mapPendingMissingFields(missingFields)
+  activeMenu.value = pendingMissingFields.value[0]?.step || '1'
+  showMissingFieldsChat.value = true
+}
 
-  // 按步骤分组
-  const stepGroups = missingFields.reduce<Record<string, typeof requiredFields>>((acc, field) => {
-    const stepKey = field.step
-    if (!acc[stepKey]) {
-      acc[stepKey] = []
-    }
-    // 使用非空断言，因为前面已经确保数组存在
-    acc[stepKey]!.push(field)
-    return acc
-  }, {})
+const reopenMissingFieldsChat = () => {
+  syncPendingMissingFields()
 
-  const stepNames: Record<string, string> = {
-    '1': '基本信息',
-    '2': '技能与证书',
-    '3': '经历与项目',
-    '4': '素质测评',
-    '5': '职业意向'
+  if (pendingMissingFields.value.length === 0) {
+    ElMessage.success('待补充信息已完成，无需继续补全')
+    return
   }
 
-  // 构建提示消息
-  let message = `<div style="text-align: left; max-height: 300px; overflow-y: auto;">
-    <p style="margin-bottom: 12px; color: #e6a23c;"><strong>简历已自动填充，但以下信息需要补充：</strong></p>`
+  activeMenu.value = pendingMissingFields.value[0]?.step || activeMenu.value
+  showMissingFieldsChat.value = true
+}
 
-  Object.entries(stepGroups).forEach(([step, fields]) => {
-    const fieldList = fields
-    if (!fieldList) return
-    message += `<div style="margin-bottom: 10px;">
-      <p style="color: #409eff; margin: 8px 0 4px 0; font-weight: 500;">【${stepNames[step]}】</p>
-      <ul style="margin: 0; padding-left: 20px; color: #606266;">`
-    fieldList.forEach(f => {
-      message += `<li>${f.label}</li>`
-    })
-    message += `</ul></div>`
-  })
+const handleMissingFieldSave = (payload: { field: string; value: unknown }) => {
+  switch (payload.field) {
+    case 'education':
+      formData.education = String(payload.value || '')
+      showEducationInput.value = formData.education === '其他'
+      if (formData.education !== '其他') {
+        formData.educationOther = ''
+      }
+      break
+    case 'major':
+      formData.major = Array.isArray(payload.value)
+        ? payload.value.map((item) => String(item))
+        : []
+      break
+    case 'graduationDate':
+      formData.graduationDate = String(payload.value || '')
+      break
+    case 'languages':
+      formData.languages = Array.isArray(payload.value)
+        ? payload.value as CareerFormData['languages']
+        : [{ type: '', level: '', other: '' }]
+      break
+    case 'skills':
+      formData.skills = Array.isArray(payload.value)
+        ? payload.value as CareerFormData['skills']
+        : []
+      break
+    case 'targetJob':
+      formData.targetJob = String(payload.value || '')
+      break
+    case 'targetIndustries':
+      formData.targetIndustries = Array.isArray(payload.value)
+        ? payload.value.map((item) => String(item))
+        : []
+      break
+  }
+}
 
-  message += `<p style="margin-top: 12px; color: #909399; font-size: 12px;">点击确定跳转到第一个需要补充的步骤</p></div>`
+const handleMissingFieldComplete = () => {
+  syncPendingMissingFields()
 
-  ElMessageBox.confirm(message, '信息待完善', {
-    confirmButtonText: '去补充',
-    cancelButtonText: '暂不补充',
-    dangerouslyUseHTMLString: true,
-    type: 'warning',
-    customClass: 'missing-fields-dialog'
-  }).then(() => {
-    // 跳转到第一个缺失字段的步骤
-    const firstField = missingFields[0]
-    if (firstField) {
-      const firstMissingStep = firstField.step
-      activeMenu.value = firstMissingStep
-      const stepName = stepNames[firstMissingStep] || '对应步骤'
-      ElMessage.info(`请补充${stepName}中的必填项`)
-    }
-  }).catch(() => {
-    ElMessage.info('您可以稍后通过左侧菜单补充信息')
-  })
+  if (pendingMissingFields.value.length === 0) {
+    ElMessage.success('必填信息已补充完成，可以继续完善其他内容或直接提交')
+    return
+  }
+
+  ElMessage.info(`还剩 ${pendingMissingFields.value.length} 项待补充，可继续在表单中完善`)
 }
 
 const findMajorPath = (options: typeof majorOptions, target: string): string[] | null => {
@@ -1447,7 +1602,8 @@ const handleResumeParsed = (parsedData: unknown) => {
   // 检查并提示缺失的必填字段
   const missingFields = checkRequiredFields()
   if (missingFields.length > 0) {
-    setTimeout(() => showMissingFieldsReminder(missingFields), 500)
+    ElMessage.warning(`识别完成，但还有 ${missingFields.length} 项必填信息待补充`)
+    setTimeout(() => showMissingFieldsReminder(missingFields), 300)
   }
 }
 
@@ -1734,6 +1890,18 @@ const resetForm = () => {
             :icon="Upload">
             {{ hasUploadedResume ? '重新上传简历' : '上传简历' }}
           </el-button>
+          <el-button
+            v-if="showResumeContinueButton"
+            class="resume-continue-btn"
+            plain
+            :icon="Warning"
+            @click="reopenMissingFieldsChat"
+          >
+            继续补全信息
+          </el-button>
+          <div v-if="showResumeContinueButton" class="resume-continue-tip">
+            识别后还有 {{ missingFieldCount }} 项必填信息待补充，稍后也可以从这里继续。
+          </div>
         </div>
       </el-aside>
 
@@ -1915,18 +2083,73 @@ const resetForm = () => {
               </el-form-item>
 
               <!-- 代码能力 -->
-              <!-- <el-form-item 
+              <el-form-item 
                 label="代码能力" 
                 prop="codeAbility"
               >
-                <div class="code-ability-row">
-                  <el-input v-model="formData.codeAbility.links" placeholder="GitHub/Gitee 链接，多个用逗号分隔"
-                    style="flex: 1" />
-                  <el-button type="warning" @click="openQuizModal('code')" :icon="DataAnalysis">
-                    AI 测试
-                  </el-button>
+                <div class="code-ability-panel">
+                  <div class="code-ability-row">
+                    <el-input
+                      v-model="formData.codeAbility.links"
+                      placeholder="请输入 GitHub / Gitee 仓库链接，如 https://github.com/user/repo"
+                      style="flex: 1"
+                    />
+                    <el-button
+                      type="warning"
+                      :icon="DataAnalysis"
+                      :loading="codeAbilityEvaluating"
+                      @click="handleCodeAbilityEvaluate"
+                    >
+                      {{ codeAbilityEvaluating ? '评估中...' : '开始评估' }}
+                    </el-button>
+                    <el-button
+                      v-if="codeAbilityResult"
+                      plain
+                      :icon="Rank"
+                      @click="showCodeAbilityResultDialog"
+                    >
+                      查看结果
+                    </el-button>
+                  </div>
+
+                  <div class="code-ability-toolbar">
+                    <div class="code-ability-ai-toggle">
+                      <span class="toggle-label">深度分析</span>
+                      <el-switch
+                        v-model="codeAbilityUseAi"
+                        inline-prompt
+                        active-text="开"
+                        inactive-text="关"
+                      />
+                      <span class="toggle-hint">开启后会返回 AI 深度分析的内容</span>
+                    </div>
+                    <div class="code-ability-input-hint">
+                      支持多个代码仓库联合评估，可用换行、英文逗号或中文逗号分隔多个仓库地址。
+                    </div>
+                  </div>
+
+                  <div v-if="codeAbilityResult" class="code-ability-summary">
+                    <div class="summary-main">
+                      <div class="summary-score">{{ codeAbilityResult.composite_score }}</div>
+                      <div class="summary-meta">
+                        <div class="summary-title">
+                          {{ lastEvaluatedCodeRepoUrls.length > 1 ? `已评估 ${lastEvaluatedCodeRepoUrls.length} 个仓库` : (getCodeRepoMeta(lastEvaluatedCodeRepoUrls[0] || '').repo || '未命名仓库') }}
+                          <el-tag size="small" :type="getCodeAbilityTagType(codeAbilityResult.composite_score)">
+                            {{ codeAbilityResult.level || '未评级' }}
+                          </el-tag>
+                        </div>
+                        <div class="summary-subtitle">
+                          {{ getRepoDisplayNames(lastEvaluatedCodeRepoUrls).slice(0, 3).join(' · ') }}
+                          <span v-if="lastEvaluatedCodeRepoUrls.length > 3"> 等 {{ lastEvaluatedCodeRepoUrls.length }} 个仓库</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="summary-actions">
+                      <el-button text type="primary" @click="showCodeAbilityResultDialog">展开完整评估</el-button>
+                    </div>
+                  </div>
                 </div>
-              </el-form-item> -->
+              </el-form-item>
             </div>
 
             <!-- 3. 经历与项目 -->
@@ -2163,6 +2386,25 @@ const resetForm = () => {
       </el-main>
     </el-container>
 
+    <transition name="submit-overlay-fade">
+      <div v-if="submitting" class="submit-overlay">
+        <div class="submit-overlay-card">
+          <div class="submit-overlay-badge">AI 正在分析中</div>
+          <el-icon class="loading-icon submit-overlay-icon" :size="54">
+            <Loading />
+          </el-icon>
+          <h3>正在生成你的能力画像</h3>
+          <p>我们正在整理表单信息、分析岗位匹配结果，并为你准备下一步的职业建议。</p>
+          <div class="submit-overlay-progress">
+            <span class="progress-dot"></span>
+            <span class="progress-dot"></span>
+            <span class="progress-dot"></span>
+          </div>
+          <div class="submit-overlay-tip">页面会在分析完成后自动跳转，请稍候片刻。</div>
+        </div>
+      </div>
+    </transition>
+
     <!-- 素质测评弹窗 - 使用Quenation组件 -->
     <el-dialog v-model="testDialog.visible" :title="testDialog.title" width="800px" class="quiz-dialog" destroy-on-close
       @close="closeTestDialog">
@@ -2179,12 +2421,37 @@ const resetForm = () => {
       <Quenation v-if="backendQuizData" ref="quenationRef" :title="testDialog.title" :quiz-type="testDialog.type"
         :backend-data="backendQuizData" :quiz-result="quizResult" :score-failed="scoreFailed" @submit="handleQuizSubmit"
         @cancel="closeTestDialog" />
+
+      <transition name="submit-overlay-fade">
+        <div v-if="quizSubmitting" class="quiz-submit-overlay">
+          <div class="quiz-submit-overlay-card">
+            <div class="submit-overlay-badge">问卷提交中</div>
+            <el-icon class="loading-icon submit-overlay-icon" :size="44">
+              <Loading />
+            </el-icon>
+            <h3>正在批改{{ testDialog.type === 'skill' ? '专业技能' : '工具掌握' }}测试</h3>
+            <p>系统正在分析你的作答表现并生成评分结果，请稍候。</p>
+          </div>
+        </div>
+      </transition>
     </el-dialog>
 
     <!-- 简历上传弹窗 -->
     <el-dialog v-model="showUploadDialog" title="简历智能上传" width="650px" destroy-on-close>
       <CareerFormUpload :show-close="true" @close="showUploadDialog = false" @parsed="handleResumeParsed" />
     </el-dialog>
+
+    <ResumeMissingFieldsChat
+      v-model="showMissingFieldsChat"
+      :fields="pendingMissingFields"
+      :form-data="formData"
+      :major-options="majorOptions"
+      :quiz-status="quizCompleted"
+      @save="handleMissingFieldSave"
+      @complete="handleMissingFieldComplete"
+      @step-change="activeMenu = $event"
+      @open-quiz="openQuizModal"
+    />
 
     <!-- 项目经历弹窗 -->
     <el-dialog v-model="showProjectDialog" :title="projectForm.isEdit ? '编辑项目/竞赛经历' : '添加项目/竞赛经历'" width="600px"
@@ -2281,6 +2548,186 @@ const resetForm = () => {
           :disabled="!internshipForm.company.trim() || !internshipForm.role.trim()">
           {{ internshipForm.isEdit ? '确认修改' : '确认添加' }}
         </el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog
+      v-model="codeAbilityResultVisible"
+      title="代码能力评估结果"
+      width="920px"
+      destroy-on-close
+      class="code-ability-result-dialog"
+    >
+      <template v-if="codeAbilityResult">
+        <div class="code-result-hero">
+          <div class="hero-topline">
+            <span class="hero-eyebrow">代码仓库评估报告</span>
+            <el-tag :type="getCodeAbilityResultModeTagType()" effect="dark">
+              {{ getCodeAbilityResultModeText() }}
+            </el-tag>
+          </div>
+          <div class="hero-main">
+            <div class="code-result-score">
+              <div class="score-value">{{ codeAbilityResult.composite_score }}</div>
+              <div class="score-label">综合评分</div>
+            </div>
+            <div class="hero-content">
+              <h3>{{ lastEvaluatedCodeRepoUrls.length > 1 ? `${lastEvaluatedCodeRepoUrls.length} 个仓库联合评估` : (getCodeRepoMeta(lastEvaluatedCodeRepoUrls[0] || '').repo || '未命名仓库') }}</h3>
+              <p>{{ lastEvaluatedCodeRepoUrls.length > 1 ? '综合多个代码仓库的结构、活跃度与工程化表现进行评估' : (getCodeRepoMeta(lastEvaluatedCodeRepoUrls[0] || '').fullName || codeAbilityResult.username || '-') }}</p>
+              <div v-if="lastEvaluatedCodeRepoUrls.length" class="hero-link-list">
+                <a
+                  v-for="url in lastEvaluatedCodeRepoUrls"
+                  :key="url"
+                  :href="url"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="hero-link"
+                >
+                  {{ getCodeRepoMeta(url).fullName || url }}
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="code-result-overview">
+          <div class="code-result-meta">
+            <div class="meta-line featured">
+              <span class="meta-label">评估等级</span>
+              <el-tag :type="getCodeAbilityTagType(codeAbilityResult.composite_score)" size="large">
+                {{ codeAbilityResult.level || '-' }}
+              </el-tag>
+            </div>
+            <div class="meta-line">
+              <span class="meta-label">仓库平台</span>
+              <span class="meta-value">{{ codeAbilityResult.platform || getCodeRepoMeta(lastEvaluatedCodeRepoUrls[0] || '').hostLabel || '-' }}</span>
+            </div>
+            <div class="meta-line">
+              <span class="meta-label">评估仓库数</span>
+              <span class="meta-value">{{ lastEvaluatedCodeRepoUrls.length || 0 }}</span>
+            </div>
+            <div class="meta-line" v-if="codeAbilityResult.features?.composite?.percentile !== undefined">
+              <span class="meta-label">超过用户</span>
+              <span class="meta-value">{{ codeAbilityResult.features?.composite?.percentile }}%</span>
+            </div>
+          </div>
+
+          <div v-if="codeAbilityResult.features?.composite?.dimensions" class="dimension-grid dimension-grid-hero">
+            <div class="dimension-card">
+              <span>项目规模</span>
+              <strong>{{ codeAbilityResult.features.composite.dimensions.project_scale }}</strong>
+            </div>
+            <div class="dimension-card">
+              <span>技术广度</span>
+              <strong>{{ codeAbilityResult.features.composite.dimensions.tech_breadth }}</strong>
+            </div>
+            <div class="dimension-card">
+              <span>活跃度</span>
+              <strong>{{ codeAbilityResult.features.composite.dimensions.activity }}</strong>
+            </div>
+            <div class="dimension-card">
+              <span>工程化</span>
+              <strong>{{ codeAbilityResult.features.composite.dimensions.engineering }}</strong>
+            </div>
+            <div class="dimension-card">
+              <span>社区影响力</span>
+              <strong>{{ codeAbilityResult.features.composite.dimensions.influence }}</strong>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="codeAbilityResult.ai_analysis" class="code-result-section">
+          <h4>AI 深度分析</h4>
+
+          <div v-if="codeAbilityResult.ai_analysis.overall_assessment" class="analysis-block">
+            <h5>整体评价</h5>
+            <p>{{ codeAbilityResult.ai_analysis.overall_assessment.summary }}</p>
+            <div class="analysis-tags" v-if="codeAbilityResult.ai_analysis.overall_assessment.strengths?.length">
+              <el-tag v-for="item in codeAbilityResult.ai_analysis.overall_assessment.strengths" :key="`strength-${item}`" type="success" effect="light">
+                {{ item }}
+              </el-tag>
+            </div>
+            <div class="analysis-tags" v-if="codeAbilityResult.ai_analysis.overall_assessment.weaknesses?.length">
+              <el-tag v-for="item in codeAbilityResult.ai_analysis.overall_assessment.weaknesses" :key="`weakness-${item}`" type="danger" effect="light">
+                {{ item }}
+              </el-tag>
+            </div>
+          </div>
+
+          <div v-if="codeAbilityResult.ai_analysis.tech_stack_analysis" class="analysis-block">
+            <h5>技术栈分析</h5>
+            <p>{{ codeAbilityResult.ai_analysis.tech_stack_analysis.stack_maturity }}</p>
+            <div class="analysis-list-grid">
+              <div>
+                <div class="list-title">主技术栈</div>
+                <ul>
+                  <li v-for="item in codeAbilityResult.ai_analysis.tech_stack_analysis.primary_stack" :key="`primary-${item}`">{{ item }}</li>
+                </ul>
+              </div>
+              <div>
+                <div class="list-title">辅助技术栈</div>
+                <ul>
+                  <li v-for="item in codeAbilityResult.ai_analysis.tech_stack_analysis.secondary_stack" :key="`secondary-${item}`">{{ item }}</li>
+                </ul>
+              </div>
+            </div>
+            <div v-if="codeAbilityResult.ai_analysis.tech_stack_analysis.stack_recommendations?.length" class="analysis-list">
+              <div class="list-title">技术栈建议</div>
+              <ul>
+                <li v-for="item in codeAbilityResult.ai_analysis.tech_stack_analysis.stack_recommendations" :key="`stack-rec-${item}`">{{ item }}</li>
+              </ul>
+            </div>
+          </div>
+
+          <div v-if="codeAbilityResult.ai_analysis.project_quality_analysis" class="analysis-block">
+            <h5>项目质量分析</h5>
+            <p>{{ codeAbilityResult.ai_analysis.project_quality_analysis.code_quality }}</p>
+            <p>{{ codeAbilityResult.ai_analysis.project_quality_analysis.architecture }}</p>
+            <div class="analysis-list-grid">
+              <div v-if="codeAbilityResult.ai_analysis.project_quality_analysis.best_practices?.length">
+                <div class="list-title">最佳实践</div>
+                <ul>
+                  <li v-for="item in codeAbilityResult.ai_analysis.project_quality_analysis.best_practices" :key="`best-${item}`">{{ item }}</li>
+                </ul>
+              </div>
+              <div v-if="codeAbilityResult.ai_analysis.project_quality_analysis.improvement_areas?.length">
+                <div class="list-title">待改进项</div>
+                <ul>
+                  <li v-for="item in codeAbilityResult.ai_analysis.project_quality_analysis.improvement_areas" :key="`improve-${item}`">{{ item }}</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="codeAbilityResult.ai_analysis.actionable_advice" class="analysis-block">
+            <h5>行动建议</h5>
+            <div class="analysis-list-grid">
+              <div v-if="codeAbilityResult.ai_analysis.actionable_advice.short_term?.length">
+                <div class="list-title">短期</div>
+                <ul>
+                  <li v-for="item in codeAbilityResult.ai_analysis.actionable_advice.short_term" :key="`short-${item}`">{{ item }}</li>
+                </ul>
+              </div>
+              <div v-if="codeAbilityResult.ai_analysis.actionable_advice.mid_term?.length">
+                <div class="list-title">中期</div>
+                <ul>
+                  <li v-for="item in codeAbilityResult.ai_analysis.actionable_advice.mid_term" :key="`mid-${item}`">{{ item }}</li>
+                </ul>
+              </div>
+              <div v-if="codeAbilityResult.ai_analysis.actionable_advice.long_term?.length">
+                <div class="list-title">长期</div>
+                <ul>
+                  <li v-for="item in codeAbilityResult.ai_analysis.actionable_advice.long_term" :key="`long-${item}`">{{ item }}</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <el-empty
+          v-else
+          description="本次未开启 AI 深度分析，当前结果仅展示基础评分数据。"
+        />
       </template>
     </el-dialog>
   </div>
@@ -2494,6 +2941,8 @@ const resetForm = () => {
   background: linear-gradient(180deg, rgba(244, 248, 255, 0.95), rgba(238, 245, 255, 0.92));
   border-radius: 18px;
   border: 1px solid rgba(220, 231, 244, 0.96);
+  flex-shrink: 0;
+  box-shadow: 0 12px 30px rgba(22, 59, 102, 0.08);
 }
 
 .upload-label {
@@ -2536,6 +2985,50 @@ const resetForm = () => {
 
 .upload-btn.el-button--info:hover {
   background: #a6a9ad;
+}
+
+.resume-continue-btn {
+  width: 100%;
+  margin-top: 10px;
+  margin-left: auto;
+  padding: 10px 18px;
+  border-radius: 14px;
+  box-sizing: border-box;
+  border-color: rgba(230, 162, 60, 0.45);
+  color: #b76a00;
+  background: rgba(255, 247, 237, 0.92);
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.resume-continue-btn:hover {
+  border-color: rgba(230, 162, 60, 0.68);
+  color: #9a5a00;
+  background: rgba(255, 243, 224, 0.96);
+}
+
+.resume-continue-btn :deep(> span) {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.resume-continue-btn :deep(.el-icon) {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+.resume-continue-tip {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #8a6a2f;
 }
 
 .upload-tip {
@@ -3486,15 +3979,341 @@ const resetForm = () => {
 }
 
 /* 代码能力行 */
+.code-ability-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+}
+
 .code-ability-row {
   display: flex;
   gap: 10px;
   align-items: center;
+  width: 100%;
 }
 
 .code-ability-row .el-button {
   border-radius: 4px;
   padding: 8px 16px;
+}
+
+.code-ability-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.code-ability-ai-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #fff8e8 0%, #fffdf6 100%);
+  border: 1px solid #f5deb3;
+}
+
+.toggle-label {
+  font-weight: 600;
+  color: #7c4a03;
+}
+
+.toggle-hint {
+  color: #8a6a35;
+  font-size: 13px;
+}
+
+.code-ability-input-hint {
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: #f5f8ff;
+  border: 1px dashed #bfd3ff;
+  color: #5d6f92;
+  font-size: 13px;
+}
+
+.code-ability-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #f0f7ff 0%, #f8fbff 100%);
+  border: 1px solid #cfe1ff;
+}
+
+.summary-main {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.summary-score {
+  min-width: 72px;
+  height: 72px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #409eff 0%, #1d4ed8 100%);
+  color: #fff;
+  font-size: 28px;
+  font-weight: 800;
+}
+
+.summary-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #22324d;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.summary-subtitle {
+  margin-top: 6px;
+  color: #6c7b94;
+  font-size: 13px;
+}
+
+.summary-actions {
+  flex-shrink: 0;
+}
+
+.code-ability-result-dialog :deep(.el-dialog__body) {
+  padding-top: 12px;
+}
+
+.code-result-hero {
+  padding: 22px 24px;
+  margin-bottom: 18px;
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at top right, rgba(147, 197, 253, 0.28), transparent 28%),
+    linear-gradient(135deg, #0f172a 0%, #1d4ed8 55%, #60a5fa 100%);
+  color: #fff;
+  box-shadow: 0 24px 56px rgba(29, 78, 216, 0.24);
+}
+
+.hero-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+.hero-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.hero-main {
+  display: grid;
+  grid-template-columns: 170px 1fr;
+  gap: 22px;
+  align-items: center;
+}
+
+.code-result-overview {
+  display: grid;
+  grid-template-columns: minmax(260px, 320px) 1fr;
+  gap: 18px;
+  margin-bottom: 20px;
+}
+
+.code-result-score {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 20px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #1d4ed8 0%, #409eff 100%);
+  color: #fff;
+}
+
+.code-result-score .score-value {
+  font-size: 44px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.code-result-score .score-label {
+  margin-top: 10px;
+  font-size: 14px;
+  opacity: 0.92;
+}
+
+.hero-content h3 {
+  margin: 0 0 8px;
+  font-size: 32px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.hero-content p {
+  margin: 0 0 10px;
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.hero-link-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.hero-link {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #f8fbff;
+  text-decoration: none;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.hero-link:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.code-result-meta {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.meta-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: #f7f9fc;
+  border: 1px solid #e6edf7;
+}
+
+.meta-line.featured {
+  background: linear-gradient(135deg, #eef4ff 0%, #f8fbff 100%);
+  border-color: #bfd3ff;
+}
+
+.meta-label {
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.meta-value {
+  color: #1f2937;
+  font-weight: 600;
+}
+
+.code-result-section {
+  margin-top: 22px;
+  padding: 18px 20px;
+  border-radius: 18px;
+  background: #fbfcff;
+  border: 1px solid #e8eef8;
+}
+
+.code-result-section h4,
+.analysis-block h5 {
+  margin: 0 0 14px;
+  color: #22324d;
+}
+
+.dimension-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.dimension-grid-hero {
+  align-content: start;
+}
+
+.dimension-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  border: 1px solid #dfe8f5;
+  box-shadow: 0 10px 22px rgba(148, 163, 184, 0.08);
+}
+
+.dimension-card span {
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.dimension-card strong {
+  color: #1d4ed8;
+  font-size: 24px;
+}
+
+.analysis-block + .analysis-block {
+  margin-top: 18px;
+}
+
+.analysis-block p {
+  margin: 0 0 12px;
+  color: #4b5563;
+  line-height: 1.8;
+}
+
+.analysis-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.analysis-list-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.analysis-list,
+.analysis-list-grid > div {
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: #fff;
+  border: 1px solid #e5ebf5;
+}
+
+.list-title {
+  margin-bottom: 10px;
+  color: #22324d;
+  font-weight: 700;
+}
+
+.analysis-list ul,
+.analysis-list-grid ul {
+  margin: 0;
+  padding-left: 18px;
+  color: #4b5563;
+  line-height: 1.8;
 }
 
 /* 步骤切换动画 */
@@ -3530,6 +4349,7 @@ const resetForm = () => {
   background: #f5f7fa;
   max-height: 70vh;
   overflow-y: auto;
+  position: relative;
 }
 
 .quiz-dialog :deep(.el-dialog__footer) {
@@ -3552,6 +4372,155 @@ const resetForm = () => {
 
 .quiz-dialog :deep(.questionnaire-card .el-card__body) {
   padding: 24px;
+}
+
+/* 测试提交等待界面 */
+.quiz-submit-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(241, 247, 255, 0.84);
+  backdrop-filter: blur(8px);
+}
+
+.quiz-submit-overlay-card {
+  width: min(100%, 420px);
+  padding: 28px 26px 24px;
+  border-radius: 24px;
+  text-align: center;
+  background:
+    radial-gradient(circle at top left, rgba(96, 165, 250, 0.18), transparent 32%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 250, 255, 0.98));
+  border: 1px solid rgba(191, 219, 254, 0.85);
+  box-shadow: 0 22px 50px rgba(37, 99, 235, 0.14);
+}
+
+.quiz-submit-overlay-card h3 {
+  margin: 0 0 10px;
+  color: #173a5d;
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.quiz-submit-overlay-card p {
+  margin: 0;
+  color: #5f738b;
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+/* 提交等待界面 */
+.submit-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(241, 247, 255, 0.82);
+  backdrop-filter: blur(10px);
+}
+
+.submit-overlay-card {
+  width: min(100%, 520px);
+  padding: 32px 32px 28px;
+  border-radius: 28px;
+  text-align: center;
+  background:
+    radial-gradient(circle at top left, rgba(96, 165, 250, 0.2), transparent 32%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 250, 255, 0.98));
+  border: 1px solid rgba(191, 219, 254, 0.85);
+  box-shadow: 0 24px 60px rgba(37, 99, 235, 0.14);
+}
+
+.submit-overlay-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 0 14px;
+  margin-bottom: 16px;
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563eb;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.submit-overlay-icon {
+  margin-bottom: 18px;
+}
+
+.submit-overlay-card h3 {
+  margin: 0 0 12px;
+  color: #173a5d;
+  font-size: 30px;
+  font-weight: 800;
+}
+
+.submit-overlay-card p {
+  margin: 0 auto;
+  max-width: 420px;
+  color: #5f738b;
+  font-size: 15px;
+  line-height: 1.8;
+}
+
+.submit-overlay-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 22px 0 16px;
+}
+
+.progress-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #60a5fa 0%, #2563eb 100%);
+  animation: submitPulse 1.2s ease-in-out infinite;
+}
+
+.progress-dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.progress-dot:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+.submit-overlay-tip {
+  color: #7b91a7;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+@keyframes submitPulse {
+  0%, 80%, 100% {
+    transform: scale(0.85);
+    opacity: 0.45;
+  }
+
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* 提交等待界面过渡 */
+.submit-overlay-fade-enter-active,
+.submit-overlay-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.submit-overlay-fade-enter-from,
+.submit-overlay-fade-leave-to {
+  opacity: 0;
 }
 
 /* 加载状态样式 */
@@ -3971,6 +4940,33 @@ const resetForm = () => {
     width: 160px !important;
     min-width: 160px !important;
     max-width: 160px !important;
+  }
+
+  .code-ability-row,
+  .code-ability-summary {
+    flex-direction: column;
+  }
+
+  .hero-main,
+  .code-result-overview,
+  .code-result-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-content h3 {
+    font-size: 24px;
+  }
+
+  .summary-main {
+    width: 100%;
+  }
+
+  .summary-actions {
+    width: 100%;
+  }
+
+  .summary-actions .el-button {
+    width: 100%;
   }
 
   .el-main {
