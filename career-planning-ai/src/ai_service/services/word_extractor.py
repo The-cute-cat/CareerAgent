@@ -7,6 +7,7 @@ import tempfile
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from PIL import Image
 from typing import List, Optional, Any, Awaitable
 
 import docx
@@ -475,6 +476,31 @@ class WordExtractor:
             return []
         return texts
 
+    @staticmethod
+    def is_valid_image(base64_str: str) -> bool:
+        """
+        检查图片是否满足模型最小尺寸要求
+        input:
+            base64_str: 图片的base64字符串
+        output:
+            bool: 是否满足尺寸要求
+        """ 
+        try:
+            # 去掉 data:image/png;base64, 等前缀
+            if "," in base64_str:
+                base64_str = base64_str.split(",")[1]
+
+            img_data = base64.b64decode(base64_str)
+            with Image.open(io.BytesIO(img_data)) as img:
+                width, height = img.size
+            # 根据报错提示：Qwen 要求至少大于 10px
+            # 建议设定为 42px（通常是能看清内容的最小尺寸）
+            if width <= 42 or height <= 42:
+                return False
+            return True
+        except Exception:
+            return False
+
     # 从文件中提取图片
     @staticmethod
     def _extract_images_bytes(
@@ -551,6 +577,10 @@ class WordExtractor:
 
             # 将图片的二进制数据转化为base64字符串列表,以便传递给API
             image_data_base64 = base64.b64encode(image_data).decode("utf-8")
+
+            if not self.is_valid_image(image_data_base64):
+                log.warning("图片尺寸过小，无法进行有效检测")
+                return None
 
             # 构造文件头信息,以便API正确识别图片格式
             file_header = f"data:image/{image_suffix};base64,{image_data_base64}"
