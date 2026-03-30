@@ -98,8 +98,13 @@ public class PointsReferServiceImpl implements PointsReferService {
         if (StrUtil.isNotBlank(inviteCode)) {
             UserReferral userReferral = userReferralMapper.selectOne(
                     new LambdaQueryWrapper<UserReferral>()
+                            .select(UserReferral::getUserId, UserReferral::getStatus)
                             .eq(UserReferral::getInviteCode, inviteCode)
             );
+//            UserReferral userReferral = userReferralMapper.selectOne(
+//                    new LambdaQueryWrapper<UserReferral>()
+//                            .eq(UserReferral::getInviteCode, inviteCode)
+//            );
             if (userReferral == null) {
                 log.error("用户 {} 还没有注册成功", userId);
                 return Result.fail("用户还没有注册成功");
@@ -111,8 +116,13 @@ public class PointsReferServiceImpl implements PointsReferService {
         }else{
             User selectedOne = userMapper.selectOne(
                     new LambdaQueryWrapper<User>()
+                            .select(User::getId, User::getStatus)
                             .eq(User::getId, userId)
             );
+//            User selectedOne = userMapper.selectOne(
+//                    new LambdaQueryWrapper<User>()
+//                            .eq(User::getId, userId)
+//            );
             if (selectedOne == null) {
                 log.error("用户 {} 还没有注册成功", userId);
                 return Result.fail("用户还没有注册成功");
@@ -201,7 +211,7 @@ public class PointsReferServiceImpl implements PointsReferService {
         });
 
         log.info("消息发送成功！");
-
+        return Result.ok("注册的积分已返回");
 //        if (StrUtil.isNotBlank(inviteCode)) {
 //            UserReferral userReferral = userReferralMapper.selectOne(
 //                    new LambdaQueryWrapper<UserReferral>()
@@ -352,7 +362,6 @@ public class PointsReferServiceImpl implements PointsReferService {
 //            }
 //
 //        }
-        return Result.ok("注册的积分已返回");
     }
 
     /**

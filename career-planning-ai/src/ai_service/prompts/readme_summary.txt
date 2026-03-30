@@ -36,7 +36,6 @@
 # Example
 【输入】：interview-guide 的原始 README...
 【输出】：
-```json
 {{
   "summary": "interview-guide 是一个基于 Spring Boot 4.0、Java 21 和 Spring AI 构建的智能面试辅导平台。该项目深度整合了 PostgreSQL 与 pgvector 实现知识库 RAG 检索，并引入 RustFS 和 Redis 保障高性能存储。其核心功能包括精准的简历智能分析、高度拟真化的 AI 模拟面试对话，以及基于私有知识库的问答。项目代码结构清晰，学习门槛低，极其适合作为 Java 开发者学习 AI 应用落地的实战项目，也可直接用于个人技术简历的亮点展示。",
   "tech_tags": ["Spring AI", "RAG检索", "智能对话", "向量数据库"],
@@ -44,7 +43,7 @@
   "difficulty": "进阶",
   "business_domains": ["智能教育", "AI助手"]
 }}
-```
+纯 JSON 格式，不要包含 ```json 代码块标记。
 
 # Input Data
 【开源项目原始信息】：

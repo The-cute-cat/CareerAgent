@@ -4,8 +4,9 @@ import shutil
 import tempfile
 from functools import lru_cache
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Any, Self
 
+import certifi
 import yaml
 from pydantic import BaseModel, field_validator, SecretStr, Field, model_validator, PrivateAttr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -50,7 +51,7 @@ class Communication(BaseModel):
         @field_validator("secret")
         @classmethod
         def validate_secret(cls, v):
-            if v == "<SECRET>":
+            if v == "<SECRET>" or v == "<secret>" or not v:
                 raise ValueError("请在.env文件中配置通信密钥")
             return v
 
@@ -67,7 +68,7 @@ class LLMModelBase(BaseModel):
     timeout: float = -1
     max_retries: int = -1
     max_concurrent_requests: int = -1
-    extra: Dict[str, Any] = {}
+    extra: dict[str, Any] = {}
 
     def __repr__(self):
         return f"{self.__class__.__name__}(api_key={self.api_key}, base_url={self.base_url}, model_name={self.model_name}, timeout={self.timeout}, max_retries={self.max_retries},max_concurrent_requests={self.max_concurrent_requests}, extra={self.extra})"
@@ -83,15 +84,15 @@ class LLMModelBase(BaseModel):
     def validate_default_value(self) -> "LLMModelBase":
         if self._skip_verify:
             return self
-        if not self.api_key.get_secret_value() or self.api_key.get_secret_value() == "" or self.api_key.get_secret_value() == "<api_key>":
+        if not self.api_key.get_secret_value() or self.api_key.get_secret_value() == "<api_key>":
             raise ValueError(
                 f"请在 .env 文件中配置正确的 {self.name if self.name else self.__class__.__name__} API Key"
             )
-        if not self.base_url or self.base_url == "":
+        if not self.base_url:
             raise ValueError(
                 f"请在 .env 文件中配置正确的 {self.name if self.name else self.__class__.__name__} Base URL"
             )
-        if not self.model_name or self.model_name == "":
+        if not self.model_name:
             raise ValueError(
                 f"请在 .env 文件中配置正确的 {self.name if self.name else self.__class__.__name__} Model Name"
             )
@@ -112,8 +113,11 @@ class LLMModelBase(BaseModel):
 
 class LLM(LLMModelBase):
     """大模型通用配置"""
+    _skip_verify: bool = PrivateAttr(default=True)
 
     def set_default_value(self, llm: LLMModelBase):
+        if self.api_key.get_secret_value() == "<api_key>":
+            raise ValueError(f"{self.__class__.__name__} api_key 应该是需要配置的但现在未配置")
         if not self.api_key.get_secret_value():
             self.api_key = llm.api_key
         if not self.base_url:
@@ -132,52 +136,51 @@ class LLM(LLMModelBase):
 
 class LiteLLM(LLM):
     """模型配置基类"""
-    _skip_verify: bool = PrivateAttr(default=True)
     name: str = "LiteLLM"
     model_name: str = ""
 
     class Qwen(LLM):
-        _skip_verify: bool = PrivateAttr(default=True)
         name: str = "LLM_Qwen"
         model_name: str = ""
 
     qwen: Qwen = Field(default_factory=Qwen)
 
     class Deepseek(LLM):
-        _skip_verify: bool = PrivateAttr(default=True)
         name: str = "LLM_Deepseek"
         model_name: str = ""
 
     deepseek: Deepseek = Field(default_factory=Deepseek)
 
     class Image(LLM):
-        _skip_verify: bool = PrivateAttr(default=True)
         name: str = "LLM_Image"
         model_name: str = ""
 
     image: Image = Field(default_factory=Image)
 
+    def set_default_value(self, llm: LLMModelBase):
+        super().set_default_value(llm)
+        for key, value in self.__dict__.items():
+            if isinstance(value, LLM):
+                value.set_default_value(llm)
+
 
 class PDF(LLM):
-    _skip_verify: bool = PrivateAttr(default=True)
     model_name: str = ""
-    extra: Dict[str, Any] = {}
+    extra: dict[str, Any] = {}
 
 
 class Image(LLM):
-    _skip_verify: bool = PrivateAttr(default=True)
     model_name: str = ""
-    extra: Dict[str, Any] = {}
-    suffix: List[str] = []
+    extra: dict[str, Any] = {}
+    suffix: list[str] = []
     max_size: int = 0  # 单位 MB
     max_dimension: int = 0  # 单位 px
 
 
 class TestQuestion(LLM):
-    _skip_verify: bool = PrivateAttr(default=True)
     model_name: str = ""
     timeout: float = 30
-    extra: Dict[str, Any] = {}
+    extra: dict[str, Any] = {}
 
 
 class PathConfig(BaseModel):
@@ -244,10 +247,9 @@ class Milvus(BaseModel):
 
 class ChromaConfig(LLM):
     name: str = "Chroma"
-    _skip_verify: bool = PrivateAttr(default=True)
     model_name: str = ""
     base_url: str = ""
-    extra: Dict[str, Any] = {}
+    extra: dict[str, Any] = {}
     save_path: str = ""
     k: int = 5
 
@@ -263,9 +265,61 @@ class ChromaConfig(LLM):
 
 class CodeAbility(LLM):
     name: str = "CodeAbility"
-    _skip_verify: bool = PrivateAttr(default=True)
     model_name: str = ""
-    extra: Dict[str, Any] = {}
+    extra: dict[str, Any] = {}
+    github_token: SecretStr = SecretStr("")
+    gitee_token: SecretStr = SecretStr("")
+
+    @field_validator("github_token")
+    @classmethod
+    def validate_secret(cls, v):
+        if v.get_secret_value() in ("<GITHUB_TOKEN>", "<token>", "", None):
+            print(
+                "⚠️警告：请在.env文件中配置github个人访问令牌，否则可能因github访问速率限制，导致无法获取github仓库信息。")
+            return SecretStr("")
+        return v
+
+    @field_validator("gitee_token")
+    @classmethod
+    def validate(cls, v):
+        if v.get_secret_value() in ("<GITEE_TOKEN>", "<token>", "", None):
+            print(
+                "⚠️警告：请在.env文件中配置gitee个人访问令牌，否则可能因gitee访问速率限制，导致无法获取gitee仓库信息。")
+            return SecretStr("")
+        return v
+
+
+class RedisConfig(BaseModel):
+    is_can_use: bool = True  # redis缓存是否能用
+    host: str = ""
+    port: int = 6379
+    username: str = ""
+    password: SecretStr = SecretStr("")
+    connect_timeout: int = 2000
+
+    class CacheTimeout(BaseModel):
+        default: int = 3600
+        file_parse: int = 3600
+        code_ability: int = 3600
+
+    cache_timeout: CacheTimeout = Field(default_factory=CacheTimeout)
+
+    @model_validator(mode="after")
+    def validate_availability(self):
+        if self.host in ("<HOST>", "<host>", "", None) or self.port <= 0:
+            self.is_can_use = False
+            print("⚠️警告：请在.env文件中配置redis相关配置，否则导致无法使用redis缓存。")
+        return self
+
+
+class Other(BaseModel):
+    ssl_verify: bool | str = True
+
+    @model_validator(mode="after")
+    def set_default_value(self):
+        if self.ssl_verify:
+            self.ssl_verify = certifi.where()
+        return self
 
 
 class Settings(BaseSettings):
@@ -278,7 +332,7 @@ class Settings(BaseSettings):
     database: Database = Field(default_factory=Database)
     communication: Communication = Field(default_factory=Communication)
     lite_llm: LiteLLM = Field(default_factory=LiteLLM)
-    llm: LLM = Field(default_factory=LLM)
+    llm: LLMModelBase = Field(default_factory=LLMModelBase)
     pdf: PDF = Field(default_factory=PDF)
     image: Image = Field(default_factory=Image)
     test_question: TestQuestion = Field(default_factory=TestQuestion)
@@ -287,6 +341,8 @@ class Settings(BaseSettings):
     milvus: Milvus = Field(default_factory=Milvus)
     chroma_config: ChromaConfig = Field(default_factory=ChromaConfig)
     code_ability: CodeAbility = Field(default_factory=CodeAbility)
+    redis: RedisConfig = Field(default_factory=RedisConfig)
+    other: Other = Field(default_factory=Other)
 
     @model_validator(mode="after")
     def set_default_values(self) -> "Settings":

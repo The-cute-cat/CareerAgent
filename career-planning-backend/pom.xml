@@ -154,10 +154,19 @@
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
 
+        <!--hutool-->
         <dependency>
             <groupId>cn.hutool</groupId>
             <artifactId>hutool-all</artifactId>
         </dependency>
+
+        <!-- 支付宝 SDK（已包含 json、commons-logging 等传递依赖） -->
+        <dependency>
+            <groupId>com.alipay.sdk</groupId>
+            <artifactId>alipay-sdk-java</artifactId>
+            <version>4.9.28.ALL</version>   <!-- 用官网最新版 -->
+        </dependency>
+        
     </dependencies>
 
     <build>

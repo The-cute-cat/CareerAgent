@@ -34,7 +34,7 @@ pdf:
     temperature: 0.1
 image:
   model_name: qwen-vl-plus
-  suffix: ["JPG", "JPEG", "PNG", "BMP", "GIF"]
+  suffix: [ "JPG", "JPEG", "PNG", "BMP", "GIF" ]
   max_size: 10 # 最大尺寸 MB
   max_dimension: 4096 # 最大尺寸
   extra:
@@ -68,3 +68,17 @@ code_ability:
   model_name: qwen-max
   extra:
     temperature: 0.3
+  github_token: <GITHUB_TOKEN>
+  gitee_token: <GITEE_TOKEN>
+redis:
+  host: <HOST>
+  port: 0
+  username: <USERNAME>
+  password: <PASSWORD>
+  connect_timeout: 2000 # 连接超时时间，单位毫秒
+  cache_timeout:
+    default: 86400 # 默认缓存超时时间，单位秒
+    file_parse: 86400
+    code_ability: 86400
+other:
+  ssl_verify: false

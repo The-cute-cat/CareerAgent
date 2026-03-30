@@ -14,11 +14,11 @@ public interface PointsReferService {
 
     Result generateInvite(ReferralDTO referralDTO);
     
-    Result receiverPoints(ReferralDTO referralDTO);
-
     Result registerStudent(ReferralDTO referralDTO);
 
     Result recharge(@Valid PointsChangeDTO dto);
+
+    Result receiverPoints(ReferralDTO referralDTO);
 
     Result consumePoints(@Valid PointsChangeDTO dto);
 

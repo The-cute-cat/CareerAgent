@@ -1,6 +1,8 @@
 import datetime
 import re
+import unicodedata
 from typing import List, Optional, Literal
+from dateutil import parser
 
 from pydantic import (
     BaseModel,
@@ -8,6 +10,7 @@ from pydantic import (
     ConfigDict,
     field_validator,
 )
+from ai_service.services import log
 
 __all__=[
     "QuizDetailItem",
@@ -18,6 +21,7 @@ __all__=[
     "LanguageDetail",
     "StudentFormProfile"
 ]
+
 
 # --- 嵌套子模型 ---
 
@@ -45,7 +49,7 @@ class InternshipExperience(BaseModel):
         ...,
         min_length=2,
         max_length=2,
-        description="实习日期范围，必须包含两个元素：[开始日期, 结束日期]。格式统一为 YYYY-MM-DD。"
+        description="""实习日期范围，必须包含两个元素：[开始日期, 结束日期]。格式统一为 YYYY-MM-DD, 如果是类似"至今"这样描述当前时间日期，直接输出"至今"。"""
     )
     desc: str = Field(
         description="实习职责与产出，优先提取动作+结果信息，如'搭建报表并将统计耗时从2小时降至20分钟'。"
@@ -54,21 +58,54 @@ class InternshipExperience(BaseModel):
     @field_validator("date", mode="before")
     @classmethod
     def parse_date_list(cls, v):
-        """支持 ISO 带时间格式和纯日期格式的解析"""
-        if not isinstance(v, list):
-            return v
-        result = []
+        if not isinstance(v, list): return v
+
+        PRESENT_RE = re.compile(r"(今|目|现|present|current|now|active|today|至今)", re.IGNORECASE)
+
+        cleaned_dates = []
         for item in v:
-            if isinstance(item, str):
-                # 处理 ISO 格式 (如 2026-04-04T16:00:00.000Z)
-                if "T" in item:
-                    item = item.split("T")[0]
-                result.append(datetime.datetime.strptime(item, "%Y-%m-%d").date())
-            elif isinstance(item, datetime.date):
-                result.append(item)
-            else:
-                result.append(item)
-        return result
+            # 如果已经是 datetime.date 对象，直接保留
+            if isinstance(item, datetime.date):
+                cleaned_dates.append(item)
+                continue
+
+            s = str(item).strip()
+
+            # Unicode 归一化 (NFKC 格式可以把各种变体字符转为标准形式)
+            s = unicodedata.normalize('NFKC', s)
+            # 强制过滤掉所有非打印字符
+            s = "".join(ch for ch in s if ch.isprintable())
+
+            s = s.lower()  # 统一小写，方便后续语义匹配
+
+            # 1. 优先处理语义词 (dateutil 搞不定的)
+            if PRESENT_RE.search(s):
+                cleaned_dates.append(datetime.date.today())
+                log.info(f"解析到语义日期 '{item}'，已转换为当前日期 {datetime.date.today()}")
+                continue
+
+            # 将中文字符替换为 dateutil 认识的横杠
+            s = s.replace("年", "-").replace("月", "-").replace("日", "")
+            # 强力去除所有空格（解决 '2024 . 05' 这种问题）
+            s = re.sub(r'\s+', '', s)
+            # 将连续的非数字字符替换为单个横杠（解决 '--' 或 '...' 这种问题）
+            s = re.sub(r'[^0-9]+', '-', s)
+            # 修剪两端的横杠
+            s = s.strip('-')
+
+            try:
+                # 2. 利用 dateutil 的黑科技进行解析
+                # fuzzy=True: 自动忽略字符串里的杂质
+                # yearfirst=True: 优先按年-月-日的顺序解析，符合中文习惯
+                # default: 当字符串缺失某部分时用默认值补齐，避免解析失败（如缺月日时补齐为1月1日）
+                default_date = datetime.datetime(2000, 1, 1)
+                parsed_dt = parser.parse(s, fuzzy=True, yearfirst=True, default=default_date)
+                cleaned_dates.append(parsed_dt.date())
+            except (ValueError, OverflowError):
+                # 3. 如果 dateutil 也跪了，尝试简单的正则补齐逻辑 (如 2024-5 -> 2024-05-01)
+                # 或者直接放行，让 Pydantic 抛错触发 Instructor 的 AI 重试
+                log.warning(f"无法解析的日期: {item}")
+        return cleaned_dates
 
 
 class SkillDetail(BaseModel):
