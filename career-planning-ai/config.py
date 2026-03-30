@@ -4,8 +4,9 @@ import shutil
 import tempfile
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
+from typing import Any, Self
 
+import certifi
 import yaml
 from pydantic import BaseModel, field_validator, SecretStr, Field, model_validator, PrivateAttr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -50,7 +51,7 @@ class Communication(BaseModel):
         @field_validator("secret")
         @classmethod
         def validate_secret(cls, v):
-            if v == "<SECRET>":
+            if v == "<SECRET>" or v == "<secret>" or not v:
                 raise ValueError("请在.env文件中配置通信密钥")
             return v
 
@@ -266,6 +267,59 @@ class CodeAbility(LLM):
     name: str = "CodeAbility"
     model_name: str = ""
     extra: dict[str, Any] = {}
+    github_token: SecretStr = SecretStr("")
+    gitee_token: SecretStr = SecretStr("")
+
+    @field_validator("github_token")
+    @classmethod
+    def validate_secret(cls, v):
+        if v.get_secret_value() in ("<GITHUB_TOKEN>", "<token>", "", None):
+            print(
+                "⚠️警告：请在.env文件中配置github个人访问令牌，否则可能因github访问速率限制，导致无法获取github仓库信息。")
+            return SecretStr("")
+        return v
+
+    @field_validator("gitee_token")
+    @classmethod
+    def validate(cls, v):
+        if v.get_secret_value() in ("<GITEE_TOKEN>", "<token>", "", None):
+            print(
+                "⚠️警告：请在.env文件中配置gitee个人访问令牌，否则可能因gitee访问速率限制，导致无法获取gitee仓库信息。")
+            return SecretStr("")
+        return v
+
+
+class RedisConfig(BaseModel):
+    is_can_use: bool = True  # redis缓存是否能用
+    host: str = ""
+    port: int = 6379
+    username: str = ""
+    password: SecretStr = SecretStr("")
+    connect_timeout: int = 2000
+
+    class CacheTimeout(BaseModel):
+        default: int = 3600
+        file_parse: int = 3600
+        code_ability: int = 3600
+
+    cache_timeout: CacheTimeout = Field(default_factory=CacheTimeout)
+
+    @model_validator(mode="after")
+    def validate_availability(self):
+        if self.host in ("<HOST>", "<host>", "", None) or self.port <= 0:
+            self.is_can_use = False
+            print("⚠️警告：请在.env文件中配置redis相关配置，否则导致无法使用redis缓存。")
+        return self
+
+
+class Other(BaseModel):
+    ssl_verify: bool | str = True
+
+    @model_validator(mode="after")
+    def set_default_value(self):
+        if self.ssl_verify:
+            self.ssl_verify = certifi.where()
+        return self
 
 
 class Settings(BaseSettings):
@@ -287,6 +341,8 @@ class Settings(BaseSettings):
     milvus: Milvus = Field(default_factory=Milvus)
     chroma_config: ChromaConfig = Field(default_factory=ChromaConfig)
     code_ability: CodeAbility = Field(default_factory=CodeAbility)
+    redis: RedisConfig = Field(default_factory=RedisConfig)
+    other: Other = Field(default_factory=Other)
 
     @model_validator(mode="after")
     def set_default_values(self) -> "Settings":

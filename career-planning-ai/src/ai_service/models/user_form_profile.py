@@ -60,7 +60,8 @@ class InternshipExperience(BaseModel):
         result = []
         for item in v:
             if isinstance(item, str):
-                # 处理 ISO 格式 (如 2026-04-04T16:00:00.000Z)
+                if item in ["至今", "现在", "目前", "present", "now"]:
+                    item = datetime.date.today().strftime("%Y-%m-%d")
                 if "T" in item:
                     item = item.split("T")[0]
                 result.append(datetime.datetime.strptime(item, "%Y-%m-%d").date())

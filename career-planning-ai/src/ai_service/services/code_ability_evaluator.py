@@ -11,6 +11,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_openai import ChatOpenAI
 
+from ai_service.services import log
 from ai_service.services.prompt_loader import prompt_loader
 from config import settings
 from ai_service.scripts.py.platform_url_parser import platform_url_parser
@@ -359,6 +360,7 @@ class AIAnalyzer:
             ("system", prompt_loader.small_prompts.get("code_ability")),
             ("human", prompt_loader.code_ability)
         ])
+        log.info("正在使用AI分析代码能力")
 
         basic = features.get("basic", {})
         repo = features.get("repo", {})
@@ -459,11 +461,9 @@ class CodeAbilityEvaluator:
         if not repos:
             raise ValueError(f"用户 {username} 没有任何公开仓库，无法评估")
 
-        # Step 3: 特征提取
         extractor = FeatureExtractor(profile, repos, platform)
         features = extractor.extract_all()
 
-        # Step 4: AI分析
         ai_analysis = None
         if use_ai:
             try:
@@ -480,6 +480,4 @@ class CodeAbilityEvaluator:
             "ai_analysis": ai_analysis
         }
 
-
-# 单例
 code_ability_evaluator = CodeAbilityEvaluator()
