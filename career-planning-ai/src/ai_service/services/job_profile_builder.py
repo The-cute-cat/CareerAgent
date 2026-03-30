@@ -1,6 +1,8 @@
 #通过岗位元信息构建岗位画像
 import os
 import json
+import re
+import asyncio
 from typing import List, Optional
 
 from dotenv import load_dotenv
@@ -81,6 +83,7 @@ USER_PROMPT = """
 {jd_text}
 """
 
+
 # ==========================================
 # 3. 封装调用函数
 # ==========================================
@@ -110,19 +113,8 @@ def fix_llm_json_keys(data: dict) -> dict:
     return data
 
 
-def analyze_job_description(jobs: List[JobInfo], api_key: Optional[str] = None, model_name: str = settings.vector.llm_model_name) -> dict:
-    """
-    使用 LangChain 调用大模型分析多个岗位信息并返回结构化 JSON 数据
-
-    Args:
-        jobs (List[JobInfo]): 岗位信息列表
-        api_key (str, optional): API Key，若不传则读取环境变量 LLM__API_KEY
-        model_name (str, optional): 模型名称
-
-    Returns:
-        dict: 解析后的字典数据
-    """
-    # 1. 构建 JD 文本
+def _build_jd_text(jobs: List[JobInfo]) -> str:
+    """构建发送给 LLM 的 JD 文本。"""
     jd_text_parts = []
     for job in jobs:
         job_info = f"""ID: {job.id}
@@ -133,85 +125,86 @@ def analyze_job_description(jobs: List[JobInfo], api_key: Optional[str] = None, 
         """
         jd_text_parts.append(job_info)
 
-    jd_text = "\n" + "=" * 80 + "\n".join(jd_text_parts)
+    return "\n" + "=" * 80 + "\n".join(jd_text_parts)
 
-    # 2. 初始化 LLM
+
+def _create_llm(api_key: str, model_name: str) -> ChatTongyi:
+    """创建 LLM 实例。"""
+    return ChatTongyi(
+        api_key=api_key,
+        model=model_name,
+        temperature=0.1,
+        streaming=True,
+    )
+
+
+async def analyze_job_description(
+    jobs: List[JobInfo],
+    api_key: Optional[str] = None,
+    model_name: str = settings.vector.llm_model_name,
+) -> dict:
+    """
+    异步分析多个岗位信息并返回结构化 JSON 数据。
+
+    优先使用 LangChain 的 ainvoke；如果底层模型不支持真正异步，
+    则自动回退到 asyncio.to_thread 包装同步 invoke，避免阻塞事件循环。
+    """
+    jd_text = _build_jd_text(jobs)
+
     if not api_key:
         api_key = settings.llm.api_key.get_secret_value()
 
     if not api_key:
         raise ValueError("请提供 API Key 或设置环境变量 LLM__API_KEY")
 
-    llm = ChatTongyi(
-        api_key=api_key,
-        model=model_name,
-        temperature=0.1,  # 低温度以保证输出稳定性
-        streaming=True  # 启用流式模式（该模型必需）
-    )
-
-    # 3. 初始化输出解析器 (绑定 Pydantic Schema)
+    llm = _create_llm(api_key=api_key, model_name=model_name)
     parser = PydanticOutputParser(pydantic_object=JDAnalysisResult)
 
-
-    # 3. 构建 Prompt
     prompt = ChatPromptTemplate.from_messages([
         ("system", SYSTEM_PROMPT + "\n\n# 输出格式说明\n{format_instructions}"),
-        ("user", USER_PROMPT)
+        ("user", USER_PROMPT),
     ])
-    # 5. 注入格式指令
     prompt = prompt.partial(format_instructions=parser.get_format_instructions())
-
-    # 6. 构建链 (Chain)
     chain = prompt | llm | parser
 
     try:
-        # 7. 执行调用
-        result = chain.invoke({"jd_text": jd_text})
+        try:
+            result = await chain.ainvoke({"jd_text": jd_text})
+        except Exception as async_error:
+            log.warning(f"ainvoke 调用失败，回退到线程池 invoke: {async_error}")
+            result = await asyncio.to_thread(chain.invoke, {"jd_text": jd_text})
 
-        # 8. 转换为普通字典 (方便后续处理)
         return result.model_dump(by_alias=True)
 
     except Exception as e:
         log.error(f"解析错误:{e}", exc_info=True)
 
-        # 尝试修复 LLM 返回的 JSON 键名问题
         error_msg = str(e)
         if "行业_Domain_知识" in error_msg or "行业 Domain 知识" in error_msg:
             log.warning("检测到键名不匹配问题，尝试修复...")
 
-            # 尝试直接解析 LLM 返回的 JSON 文本
             try:
-                # 获取 LLM 的原始输出
-                import json
-                from langchain_core.output_parsers import OutputParserException
-
-                # 重新执行 chain，但这次不使用 parser
-
                 simple_prompt = ChatPromptTemplate.from_messages([
                     ("system", SYSTEM_PROMPT),
-                    ("user", USER_PROMPT)
+                    ("user", USER_PROMPT),
                 ])
                 simple_chain = simple_prompt | llm
 
-                # 获取 LLM 原始输出
-                raw_output = simple_chain.invoke({"jd_text": jd_text})
+                try:
+                    raw_output = await simple_chain.ainvoke({"jd_text": jd_text})
+                except Exception as async_error:
+                    log.warning(f"ainvoke 修复流程失败，回退到线程池 invoke: {async_error}")
+                    raw_output = await asyncio.to_thread(simple_chain.invoke, {"jd_text": jd_text})
 
-                # 尝试提取 JSON
-                import re
                 json_match = re.search(r'\{.*\}', raw_output.content, re.DOTALL)
                 if json_match:
                     json_str = json_match.group(0)
                     parsed_data = json.loads(json_str)
-
-                    # 修复键名
                     fixed_data = fix_llm_json_keys(parsed_data)
-
-                    # 使用 Pydantic 验证修复后的数据
                     result = JDAnalysisResult.model_validate(fixed_data)
                     return result.model_dump(by_alias=True)
 
             except Exception as fix_error:
                 log.error(f"修复失败: {fix_error}", exc_info=True)
 
-        # 如果所有修复都失败，返回错误
         return {"error": str(e), "raw_text": jd_text}
