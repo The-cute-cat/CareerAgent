@@ -2,7 +2,7 @@ package com.backend.careerplanningbackend.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
-import com.backend.careerplanningbackend.domain.dto.PointsChangeDTO;
+import com.backend.careerplanningbackend.domain.dto.PointsMembershipChangeDTO;
 import com.backend.careerplanningbackend.domain.dto.ReferralDTO;
 import com.backend.careerplanningbackend.domain.po.*;
 import com.backend.careerplanningbackend.domain.vo.UserPointsVO;
@@ -32,7 +32,6 @@ import static com.backend.careerplanningbackend.util.PointsConstant.POINTS_FOR_R
 import static com.backend.careerplanningbackend.util.PointsConstant.POINTS_FOR_REGISTRATION;
 import static com.backend.careerplanningbackend.util.RedisConstant.*;
 import static com.backend.careerplanningbackend.util.SystemActivityConstant.Activity_End_Time;
-import static com.backend.careerplanningbackend.util.SystemActivityConstant.Activity_Start_Time;
 
 @Service
 @RequiredArgsConstructor
@@ -45,6 +44,7 @@ public class PointsReferServiceImpl implements PointsReferService {
     private final UserMapper userMapper;
     private final RedisIdWorker redisIdWorker;
     private final RabbitTemplate rabbitTemplate;
+    
     
     /**
      * getAccountPoints 
@@ -427,7 +427,7 @@ public class PointsReferServiceImpl implements PointsReferService {
     
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public Result<UserPoints> recharge(@RequestBody @Valid PointsChangeDTO dto) {
+    public Result<UserPoints> recharge(@RequestBody @Valid PointsMembershipChangeDTO dto) {
         
         UserPoints account = userpointsMapper.selectOne(
                 new LambdaQueryWrapper<UserPoints>()
@@ -470,7 +470,7 @@ public class PointsReferServiceImpl implements PointsReferService {
     
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public Result consumePoints(PointsChangeDTO dto) {
+    public Result consumePoints(PointsMembershipChangeDTO dto) {
 
         UserPoints account = userpointsMapper.selectOne(
                 new LambdaQueryWrapper<UserPoints>()
@@ -513,7 +513,7 @@ public class PointsReferServiceImpl implements PointsReferService {
     
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public Result deletePoints(PointsChangeDTO dto) {
+    public Result deletePoints(PointsMembershipChangeDTO dto) {
 
         UserPoints account = userpointsMapper.selectOne(
                 new LambdaQueryWrapper<UserPoints>()
@@ -541,5 +541,16 @@ public class PointsReferServiceImpl implements PointsReferService {
 
         
         return null;
+    }
+
+    @Override
+    public Result<String> giveInviteVIPGiftPoints(ReferralDTO dto) {
+        pointsTransactionMapper.update(null, new LambdaUpdateWrapper<PointsTransaction>()
+                .eq(PointsTransaction::getUserId, dto.getUserId())
+                .eq(PointsTransaction::getType, 4)
+                .set(PointsTransaction::getAmount, POINTS_FOR_REFERRAL)
+                .set(PointsTransaction::getDescription, "邀请好友注册赠送积分")
+        );
+        return Result.ok("giveInviteVIPGiftPoints  邀请好友注册赠送积分已到账");
     }
 }

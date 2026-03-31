@@ -1,6 +1,6 @@
 package com.backend.careerplanningbackend.service;
 
-import com.backend.careerplanningbackend.domain.dto.PointsChangeDTO;
+import com.backend.careerplanningbackend.domain.dto.PointsMembershipChangeDTO;
 import com.backend.careerplanningbackend.domain.dto.ReferralDTO;
 import com.backend.careerplanningbackend.domain.po.Result;
 import jakarta.validation.Valid;
@@ -16,11 +16,14 @@ public interface PointsReferService {
     
     Result registerStudent(ReferralDTO referralDTO);
 
-    Result recharge(@Valid PointsChangeDTO dto);
+    Result recharge(@Valid PointsMembershipChangeDTO dto);
 
     Result receiverPoints(ReferralDTO referralDTO);
 
-    Result consumePoints(@Valid PointsChangeDTO dto);
+    Result consumePoints(@Valid PointsMembershipChangeDTO dto);
 
-    Result deletePoints(@Valid PointsChangeDTO dto);
+    Result deletePoints(@Valid PointsMembershipChangeDTO dto);
+
+    Result<String> giveInviteVIPGiftPoints(ReferralDTO dto);
+    
 }

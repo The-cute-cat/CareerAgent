@@ -1,6 +1,6 @@
 package com.backend.careerplanningbackend.controller;
 
-import com.backend.careerplanningbackend.domain.dto.PointsChangeDTO;
+import com.backend.careerplanningbackend.domain.dto.PointsMembershipChangeDTO;
 import com.backend.careerplanningbackend.domain.dto.ReferralDTO;
 import com.backend.careerplanningbackend.domain.po.Result;
 import com.backend.careerplanningbackend.service.PointsReferService;
@@ -66,7 +66,7 @@ public class PointsReferController {
      * @param dto
      */
     @PostMapping("/recharge")
-    public Result recharge(@RequestBody @Valid PointsChangeDTO dto) {
+    public Result recharge(@RequestBody @Valid PointsMembershipChangeDTO dto) {
         log.info("dto: {}", dto);
         return referralService.recharge(dto);
     }
@@ -77,14 +77,14 @@ public class PointsReferController {
      * 
      */
     @PostMapping("/consume")
-    public Result consumePoints(@RequestBody @Valid PointsChangeDTO dto) {
+    public Result consumePoints(@RequestBody @Valid PointsMembershipChangeDTO dto) {
         log.info("dto: {}", dto);
         return referralService.consumePoints(dto);
     }
     
     
     @PostMapping("/delete")
-    public Result deletePoints(@RequestBody @Valid PointsChangeDTO dto) {
+    public Result deletePoints(@RequestBody @Valid PointsMembershipChangeDTO dto) {
         log.info("dto: {}", dto);
         return referralService.deletePoints(dto); // 负数表示扣除积分
     }

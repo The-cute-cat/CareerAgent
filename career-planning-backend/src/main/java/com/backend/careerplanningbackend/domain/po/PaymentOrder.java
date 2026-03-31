@@ -12,7 +12,8 @@ import java.time.LocalDateTime;
 @TableName("payment_order")
 public class PaymentOrder {
 
-    @TableId(type = IdType.AUTO)
+    @TableId(type = IdType.ASSIGN_ID)
+    /** 订单ID，使用雪花算法生成，保证全局唯一且有序 */
     private Long id;
 
     private String orderNo;
