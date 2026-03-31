@@ -1,5 +1,6 @@
 package com.backend.careerplanningbackend.service.impl;
 
+import com.alipay.api.AlipayApiException;
 import com.backend.careerplanningbackend.domain.dto.PointsMembershipChangeDTO;
 import com.backend.careerplanningbackend.domain.dto.ReferralDTO;
 import com.backend.careerplanningbackend.domain.po.*;
@@ -8,8 +9,11 @@ import com.backend.careerplanningbackend.mapper.PointsTransactionMapper;
 import com.backend.careerplanningbackend.mapper.UserMapper;
 import com.backend.careerplanningbackend.mapper.UserReferralMapper;
 import com.backend.careerplanningbackend.service.MemberService;
+import com.backend.careerplanningbackend.service.PayService;
+import com.backend.careerplanningbackend.util.ThreadLocalUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.AmqpException;
@@ -17,7 +21,9 @@ import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessagePostProcessor;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 
@@ -31,9 +37,18 @@ public class MemberServiceImpl implements MemberService {
     private final PointsTransactionMapper pointsTransactionMapper;
     private final RabbitTemplate rabbitTemplate;
     private final UserReferralMapper userReferralMapper;
+    private final PayService payService;
 
     @Override
-    public Result<String> insertMember(PointsMembershipChangeDTO pointsMembershipChangeDTO) {
+    public Result<String> insertMember(PointsMembershipChangeDTO pointsMembershipChangeDTO, HttpServletResponse response) {
+        Long selectCount = memberMapper.selectCount(new LambdaQueryWrapper<UserMembership>()
+                .eq(UserMembership::getUserId, pointsMembershipChangeDTO.getUserId())
+        );
+        if(selectCount > 0) {
+            log.info("用户 {} 已经存在会员信息，跳过插入会员信息", pointsMembershipChangeDTO.getUserId());
+            return Result.fail("error,用户已经存在会员信息");
+        }
+        //没有用户会员 则插入会员信息
         UserMembership userMembership = new UserMembership();
         userMembership.setUserId(pointsMembershipChangeDTO.getUserId());
         userMembership.setLevel(pointsMembershipChangeDTO.getVip());
@@ -42,6 +57,16 @@ public class MemberServiceImpl implements MemberService {
         int inserted = memberMapper.insert(userMembership);
         if (inserted > 0) {
             log.info("成功插入会员信息: {}", userMembership);
+            try {
+                payService.pagePay(pointsMembershipChangeDTO.getUserId(),response);
+            } catch (AlipayApiException e) {
+                log.info("支付宝支付失败{}", e.getMessage());
+                throw new RuntimeException(e);
+            } catch (IOException e) {
+                log.info("支付宝支付失败{}", e.getMessage());
+                throw new RuntimeException(e);
+            }
+
             return Result.ok();
         } else {
             log.error("插入会员信息失败: {}", userMembership);
@@ -50,7 +75,8 @@ public class MemberServiceImpl implements MemberService {
     }
 
     @Override
-    public Result<String> insertNewMember(PointsMembershipChangeDTO pointsMembershipChangeDTO) {
+    @Transactional
+    public Result<String> insertCodeMember(PointsMembershipChangeDTO pointsMembershipChangeDTO) {
 //        // 30天前时间 -创建账号时间-now    useful
 //        LocalDateTime beforeNowDays = LocalDateTime.now().minusDays(30);
 //        LocalDateTime now = LocalDateTime.now();
@@ -65,7 +91,6 @@ public class MemberServiceImpl implements MemberService {
 //        Long selectCount = pointsTransactionMapper.selectCount(new LambdaQueryWrapper<PointsTransaction>()
 //                        .eq(PointsTransaction::getUserId, pointsMembershipChangeDTO.getUserId())
 //                        .in(PointsTransaction::getType, Arrays.asList(1, 0))
-////                .ge(PointsTransaction::getCreateTime, LocalDateTime.now().minusMonths(1))
 //                        .between(PointsTransaction::getCreateTime, beforeNowDays, now)
 //        );
 //        if(selectCount > 0 || selected > 0) {
@@ -84,6 +109,11 @@ public class MemberServiceImpl implements MemberService {
 //                return Result.fail("插入会员信息失败");
 //            }
 //        }
+        if(pointsMembershipChangeDTO.getUserId() == ThreadLocalUtil.getCurrentUserId()){
+            log.info("用户 {} 不可以邀请自己作为新用户，跳过插入会员信息", pointsMembershipChangeDTO.getUserId());
+            return Result.fail("error,不能邀请自己作为新用户");
+        }
+        
         UserMembership userMembership = new UserMembership();
         userMembership.setUserId(pointsMembershipChangeDTO.getUserId());
         userMembership.setLevel(pointsMembershipChangeDTO.getVip());
@@ -94,6 +124,7 @@ public class MemberServiceImpl implements MemberService {
             log.info("成功插入会员信息: {}", userMembership);
         } else {
             log.error("插入会员信息失败: {}", userMembership);
+            return Result.fail("插入会员信息失败");
         }
 
         UserReferral userReferral = userReferralMapper.selectOne(new LambdaQueryWrapper<UserReferral>()
@@ -102,9 +133,9 @@ public class MemberServiceImpl implements MemberService {
 
         if(userReferral == null) {
             log.info("用户 {} 没有被邀请过，跳过转发积分消息", pointsMembershipChangeDTO.getUserId());
-            return Result.ok();
+            return Result.fail("error,用户没有被邀请过"); // 没有邀请码就直接返回
         }
-        
+        // 有邀请码才发MQ
         // 4. 发送rabbitmq,积分表创建
         String exchange = "career.direct";
         String routingKey = "user.new.insert.membership";
@@ -118,8 +149,8 @@ public class MemberServiceImpl implements MemberService {
             }
         });
 
-        log.info("MemberServiceImpl insertNewMember 消息发送成功！");
-        return Result.ok("Result MemberServiceImpl insertNewMember 消息发送成功！");
+        log.info("MemberServiceImpl insertCodeMember 消息发送成功！");
+        return Result.ok("Result MemberServiceImpl insertCodeMember 消息发送成功！");
     }
 
     @Override

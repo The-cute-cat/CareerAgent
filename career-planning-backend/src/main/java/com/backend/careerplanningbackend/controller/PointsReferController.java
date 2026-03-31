@@ -7,6 +7,7 @@ import com.backend.careerplanningbackend.domain.po.Result;
 import com.backend.careerplanningbackend.domain.po.UserPoints;
 import com.backend.careerplanningbackend.domain.vo.UserPointsVO;
 import com.backend.careerplanningbackend.service.PointsReferService;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -79,9 +80,9 @@ public class PointsReferController {
      * @param dto
      */
     @PostMapping("/recharge")
-    public Result<UserPoints> recharge(@RequestBody @Valid PointsMembershipChangeDTO dto) {
+    public Result<UserPoints> recharge(@RequestBody @Valid PointsMembershipChangeDTO dto, HttpServletResponse response) {
         log.info("dto: {}", dto);
-        return referralService.recharge(dto);
+        return referralService.recharge(dto,response);
     }
 
     /**

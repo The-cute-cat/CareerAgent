@@ -6,6 +6,7 @@ import com.backend.careerplanningbackend.domain.dto.StudentTrueDTO;
 import com.backend.careerplanningbackend.domain.po.Result;
 import com.backend.careerplanningbackend.domain.po.UserPoints;
 import com.backend.careerplanningbackend.domain.vo.UserPointsVO;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 
 public interface PointsReferService {
@@ -19,7 +20,7 @@ public interface PointsReferService {
     
     Result<Object> registerStudent(StudentTrueDTO studentTrueDTO);
 
-    Result<UserPoints> recharge(@Valid PointsMembershipChangeDTO dto);
+    Result<UserPoints> recharge(@Valid PointsMembershipChangeDTO dto, HttpServletResponse response);
 
     Result receiverPoints(ReferralDTO referralDTO);
 

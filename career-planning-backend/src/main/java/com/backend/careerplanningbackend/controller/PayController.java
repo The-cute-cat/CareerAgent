@@ -1,6 +1,7 @@
 package com.backend.careerplanningbackend.controller;
 
 import com.alipay.api.AlipayApiException;
+import com.backend.careerplanningbackend.domain.po.PaymentOrder;
 import com.backend.careerplanningbackend.service.PayService;
 import com.backend.careerplanningbackend.util.ThreadLocalUtil;
 import jakarta.servlet.http.HttpServletRequest;
@@ -36,12 +37,16 @@ public class PayController {
      * 电脑网站支付：前端直接访问 /alipay/pagePay/{orderNumber}
      * 浏览器会 302 到支付宝沙箱收银台
      */
-    @GetMapping("/pagePay/{orderNumber}")
-    public void pagePay(@PathVariable String orderNumber,
-                        HttpServletResponse response) throws Exception {
-//        OrderListDTO order = new OrderListDTO();
-//        order.setOrderNumber(orderNumber);
-//        payService.pagePay(order,response);
+    @GetMapping("/pay/order")
+    public void orderNoPay(PaymentOrder paymentOrder, HttpServletResponse response) throws Exception {
+        log.info("paymentOrder: {}", paymentOrder);
+        payService.orderNoPay(paymentOrder,response);
+    }
+    
+    @GetMapping("/pay/{orderNumber}")
+    public void pagePay(@PathVariable Long orderNumber, HttpServletResponse response) throws Exception {
+        log.info("orderNumber: {}", orderNumber);
+        payService.pagePay(orderNumber,response);
     }
 
     /**

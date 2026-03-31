@@ -4,6 +4,7 @@ import com.backend.careerplanningbackend.domain.dto.PointsMembershipChangeDTO;
 import com.backend.careerplanningbackend.domain.po.Result;
 import com.backend.careerplanningbackend.domain.po.UserMembership;
 import com.backend.careerplanningbackend.service.MemberService;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
@@ -24,13 +25,13 @@ public class MemberController {
      * @return
      */
     @PostMapping("/insert")
-    public Result<String> insertMember(@RequestBody PointsMembershipChangeDTO pointsMembershipChangeDTO) {
+    public Result<String> insertMember(@RequestBody PointsMembershipChangeDTO pointsMembershipChangeDTO, HttpServletResponse response) {
         log.info("pointsMembershipChangeDTO: {}", pointsMembershipChangeDTO);
-        return memberService.insertMember(pointsMembershipChangeDTO);
+        return memberService.insertMember(pointsMembershipChangeDTO,response);
     }
 
     /**
-     * insertNewMember 新用户会员注册接口 首次会员支付,赠送30%的积分 -没有被邀请过的-填过邀请码的
+     * insertCodeMember 新用户会员注册接口 首次会员支付,赠送30%的积分 -没有被邀请过的-填过邀请码的
      * 用户注册成功后，系统会自动调用此接口为用户创建会员记录，并赠送相应的积分奖励
      * @param pointsMembershipChangeDTO
      * @return
@@ -38,7 +39,7 @@ public class MemberController {
     @PostMapping("/insert/new")
     public Result<String> insertNewMember(@RequestBody PointsMembershipChangeDTO pointsMembershipChangeDTO) {
         log.info("pointsMembershipChangeDTO: {}", pointsMembershipChangeDTO);
-        return memberService.insertNewMember(pointsMembershipChangeDTO);
+        return memberService.insertCodeMember(pointsMembershipChangeDTO);
     }
 
     /**'

@@ -2,6 +2,8 @@ package com.backend.careerplanningbackend.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
+import com.alipay.api.AlipayApiException;
+import com.backend.careerplanningbackend.domain.dto.AiChatResponse;
 import com.backend.careerplanningbackend.domain.dto.PointsMembershipChangeDTO;
 import com.backend.careerplanningbackend.domain.dto.ReferralDTO;
 import com.backend.careerplanningbackend.domain.dto.StudentTrueDTO;
@@ -11,12 +13,14 @@ import com.backend.careerplanningbackend.mapper.PointsTransactionMapper;
 import com.backend.careerplanningbackend.mapper.UserMapper;
 import com.backend.careerplanningbackend.mapper.UserPointsMapper;
 import com.backend.careerplanningbackend.mapper.UserReferralMapper;
+import com.backend.careerplanningbackend.service.PayService;
 import com.backend.careerplanningbackend.service.PointsReferService;
 import com.backend.careerplanningbackend.util.AiServiceClient;
 import com.backend.careerplanningbackend.util.RedisIdWorker;
 import com.backend.careerplanningbackend.util.ThreadLocalUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +32,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.RequestBody;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
@@ -49,6 +54,7 @@ public class PointsReferServiceImpl implements PointsReferService {
     private final RedisIdWorker redisIdWorker;
     private final RabbitTemplate rabbitTemplate;
     private final AiServiceClient aiServiceClient;
+    private final PayService payService;
     
     /**
      * getAccountPoints 
@@ -140,7 +146,7 @@ public class PointsReferServiceImpl implements PointsReferService {
         /** PointsTransaction insert */
         PointsTransaction pointsTransaction = new PointsTransaction();
         pointsTransaction.setUserId(userId);
-        /* POINTS_FOR_REGISTRATION-充值 */
+        /* POINTS_FOR_REGISTRATION-新用户注册获得的积分-赠送积分 */
         pointsTransaction.setAmount(POINTS_FOR_REGISTRATION);
         /* 5-系统赠送 */
         pointsTransaction.setType(5);
@@ -202,10 +208,10 @@ public class PointsReferServiceImpl implements PointsReferService {
         String exchange = "career.direct";
         String routingKey = "user.invited.points";
         ReferralDTO newReferralDTO = new ReferralDTO();
-        referralDTO.setInviteCode(inviteCode);
-        referralDTO.setUserId(userId); // 注册没有推荐人，设置为0或null
+        newReferralDTO.setInviteCode(inviteCode);
+        newReferralDTO.setUserId(userId); // 这里是对的,审核对了
 
-        rabbitTemplate.convertAndSend(exchange, routingKey, referralDTO, new MessagePostProcessor() {
+        rabbitTemplate.convertAndSend(exchange, routingKey, newReferralDTO, new MessagePostProcessor() {
             @Override
             public Message postProcessMessage(Message message) throws AmqpException {
                 message.getMessageProperties()
@@ -233,7 +239,7 @@ public class PointsReferServiceImpl implements PointsReferService {
 //            /** PointsTransaction insert */
 //            PointsTransaction pointsTransaction = new PointsTransaction();
 //            pointsTransaction.setUserId(userId);
-//            /* POINTS_FOR_REGISTRATION-充值 */
+//            /* POINTS_FOR_REGISTRATION-新用户注册获得的积分-赠送积分 */
 //            pointsTransaction.setAmount(POINTS_FOR_REGISTRATION);
 //            /* 5-系统赠送 */
 //            pointsTransaction.setType(5);
@@ -346,7 +352,7 @@ public class PointsReferServiceImpl implements PointsReferService {
 //            /** PointsTransaction insert */
 //            PointsTransaction pointsTransaction = new PointsTransaction();
 //            pointsTransaction.setUserId(userId);
-//            /* POINTS_FOR_REGISTRATION-充值 */
+//            /* POINTS_FOR_REGISTRATION-新用户注册获得的积分-赠送积分 */
 //            pointsTransaction.setAmount(POINTS_FOR_REGISTRATION);
 //            /* 5-系统赠送 */
 //            pointsTransaction.setType(5);
@@ -421,8 +427,8 @@ public class PointsReferServiceImpl implements PointsReferService {
         params.put("grade",studentTrueDTO.getGrade());
         params.put("entranceTime", studentTrueDTO.getEntranceTime());
         params.put("graduatedTime", studentTrueDTO.getGraduatedTime());
-        aiServiceClient.chatWithOtherJson("/points/student/register",params);
-        return null;
+        AiChatResponse aiChatResponse = aiServiceClient.chatWithOtherJson("/points/student/register", params);
+        return Result.ok(aiChatResponse);
     }
 
     /**
@@ -437,7 +443,7 @@ public class PointsReferServiceImpl implements PointsReferService {
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public Result<UserPoints> recharge(@RequestBody @Valid PointsMembershipChangeDTO pointsMembershipChangeDTO) {
+    public Result<UserPoints> recharge(@RequestBody @Valid PointsMembershipChangeDTO pointsMembershipChangeDTO, HttpServletResponse response) {
         
         UserPoints account = userpointsMapper.selectOne(
                 new LambdaQueryWrapper<UserPoints>()
@@ -460,17 +466,29 @@ public class PointsReferServiceImpl implements PointsReferService {
             return Result.fail("更新用户积分信息失败");
         }
 
-        PointsTransaction entity = BeanUtil.copyProperties(pointsMembershipChangeDTO, PointsTransaction.class);
-        entity.setAmount(newAmount);
-        entity.setType(1);
+        PointsTransaction paymentOrder = BeanUtil.copyProperties(pointsMembershipChangeDTO, PointsTransaction.class);
+        paymentOrder.setAmount(newAmount);
+        paymentOrder.setType(1);
         
-        redisIdWorker.nextId(POINTS_RECHARGE_KEY_PREFIX);
-        entity.setDescription("充值积分");
+//        redisIdWorker.nextId(POINTS_RECHARGE_KEY_PREFIX);
+        paymentOrder.setDescription("充值积分");
         
-        int insert = pointsTransactionMapper.insert(entity);
+        int insert = pointsTransactionMapper.insert(paymentOrder);
         if (insert == 0) {
             return Result.fail("记录积分变动失败");
         }
+
+        try {
+            payService.pagePay(paymentOrder.getId(), response);
+        } catch (AlipayApiException e) {
+            log.info("支付宝支付失败{}", e.getMessage());
+            throw new RuntimeException(e);
+        } catch (IOException e) {
+            log.info("支付宝支付失败{}", e.getMessage());
+            throw new RuntimeException(e);
+        }
+
+        // todo 支付宝
         return Result.ok(account);
     }
 
@@ -580,8 +598,6 @@ public class PointsReferServiceImpl implements PointsReferService {
             return Result.fail("删除用户积分信息失败");
         }
 
-        
         return null;
     }
-
 }
