@@ -158,6 +158,4 @@ public class MemberServiceImpl implements MemberService {
         }
         return Result.ok("成功更新会员信息和积分交易记录描述");
     }
-
-
 }

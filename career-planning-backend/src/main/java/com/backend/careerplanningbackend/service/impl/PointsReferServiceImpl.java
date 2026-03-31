@@ -4,6 +4,7 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
 import com.backend.careerplanningbackend.domain.dto.PointsMembershipChangeDTO;
 import com.backend.careerplanningbackend.domain.dto.ReferralDTO;
+import com.backend.careerplanningbackend.domain.dto.StudentTrueDTO;
 import com.backend.careerplanningbackend.domain.po.*;
 import com.backend.careerplanningbackend.domain.vo.UserPointsVO;
 import com.backend.careerplanningbackend.mapper.PointsTransactionMapper;
@@ -11,6 +12,7 @@ import com.backend.careerplanningbackend.mapper.UserMapper;
 import com.backend.careerplanningbackend.mapper.UserPointsMapper;
 import com.backend.careerplanningbackend.mapper.UserReferralMapper;
 import com.backend.careerplanningbackend.service.PointsReferService;
+import com.backend.careerplanningbackend.util.AiServiceClient;
 import com.backend.careerplanningbackend.util.RedisIdWorker;
 import com.backend.careerplanningbackend.util.ThreadLocalUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -27,6 +29,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.RequestBody;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
 
 import static com.backend.careerplanningbackend.util.PointsConstant.POINTS_FOR_REFERRAL;
 import static com.backend.careerplanningbackend.util.PointsConstant.POINTS_FOR_REGISTRATION;
@@ -44,7 +48,7 @@ public class PointsReferServiceImpl implements PointsReferService {
     private final UserMapper userMapper;
     private final RedisIdWorker redisIdWorker;
     private final RabbitTemplate rabbitTemplate;
-    
+    private final AiServiceClient aiServiceClient;
     
     /**
      * getAccountPoints 
@@ -381,7 +385,9 @@ public class PointsReferServiceImpl implements PointsReferService {
 
         ReferralDTO data = new ReferralDTO();
         data.setInviteCode(String.valueOf(nextId));
-        data.setUserId(currentUserId);
+        
+        // referral 表示邀请大使
+        data.setReferrerId(currentUserId);
         return Result.ok(data);
     }
 
@@ -407,15 +413,20 @@ public class PointsReferServiceImpl implements PointsReferService {
 
     /** todo 这里是给学生用户留着的 */
     @Override
-    public Result registerStudent(@RequestBody ReferralDTO referralDTO) {
-        
-        
+    public Result<Object> registerStudent(@RequestBody StudentTrueDTO studentTrueDTO) {
+        Map<String, Object> params =new HashMap<>();
+        params.put("name", studentTrueDTO.getName());
+        params.put("schoolName", studentTrueDTO.getSchoolName());
+        params.put("major", studentTrueDTO.getMajor());
+        params.put("grade",studentTrueDTO.getGrade());
+        params.put("entranceTime", studentTrueDTO.getEntranceTime());
+        params.put("graduatedTime", studentTrueDTO.getGraduatedTime());
+        aiServiceClient.chatWithOtherJson("/points/student/register",params);
         return null;
     }
 
     /**
      * 充值积分接口
-     * @param dto
      * @return
      * 1. 获取当前用户ID
      * 2. 根据用户ID查询UserPoints表，获取当前积分账户信息
@@ -424,10 +435,9 @@ public class PointsReferServiceImpl implements PointsReferService {
      * 5. 在PointsTransaction表中记录这笔积分变动，类型为充值，描述为充值积分
      * 6. 返回充值成功的积分信息
      */
-    
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public Result<UserPoints> recharge(@RequestBody @Valid PointsMembershipChangeDTO dto) {
+    public Result<UserPoints> recharge(@RequestBody @Valid PointsMembershipChangeDTO pointsMembershipChangeDTO) {
         
         UserPoints account = userpointsMapper.selectOne(
                 new LambdaQueryWrapper<UserPoints>()
@@ -438,27 +448,34 @@ public class PointsReferServiceImpl implements PointsReferService {
             return Result.fail("用户积分信息不存在,可能是有人发起攻击来了,或者系统故障");
         }
 
-        Integer amount = dto.getAmount();
+        Integer amount = pointsMembershipChangeDTO.getAmount();
         int newAmount = account.getPointsBalance() + amount;
         account.setPointsBalance(newAmount);
-        
-        userpointsMapper.insert(account);
 
-        PointsTransaction entity = new PointsTransaction();
-        entity.setUserId(ThreadLocalUtil.getCurrentUserId());
-        entity.setAmount(amount);
+        int updated = userpointsMapper.update(null, new LambdaUpdateWrapper<UserPoints>()
+                .eq(UserPoints::getUserId, ThreadLocalUtil.getCurrentUserId())
+                .set(UserPoints::getPointsBalance, newAmount)
+        );
+        if(updated == 0) {
+            return Result.fail("更新用户积分信息失败");
+        }
+
+        PointsTransaction entity = BeanUtil.copyProperties(pointsMembershipChangeDTO, PointsTransaction.class);
+        entity.setAmount(newAmount);
         entity.setType(1);
         
         redisIdWorker.nextId(POINTS_RECHARGE_KEY_PREFIX);
         entity.setDescription("充值积分");
-        pointsTransactionMapper.insert(entity);
-
+        
+        int insert = pointsTransactionMapper.insert(entity);
+        if (insert == 0) {
+            return Result.fail("记录积分变动失败");
+        }
         return Result.ok(account);
     }
 
     /**
      * consumePoints 消耗积分接口
-     * @param dto
      * @return
      * 1. 获取当前用户ID
      * 2. 根据用户ID查询UserPoints表，获取当前积分账户信息
@@ -470,7 +487,7 @@ public class PointsReferServiceImpl implements PointsReferService {
     
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public Result consumePoints(PointsMembershipChangeDTO dto) {
+    public Result consumePoints(PointsMembershipChangeDTO pointsMembershipChangeDTO) {
 
         UserPoints account = userpointsMapper.selectOne(
                 new LambdaQueryWrapper<UserPoints>()
@@ -481,22 +498,46 @@ public class PointsReferServiceImpl implements PointsReferService {
             return Result.fail("用户积分信息不存在,可能是有人发起攻击来了,或者系统故障");
         }
 
-        Integer amount = dto.getAmount();
+        Integer amount = pointsMembershipChangeDTO.getAmount();
         int newAmount = account.getPointsBalance() - amount;
         account.setPointsBalance(newAmount);
 
-        userpointsMapper.insert(account);
+        int updated = userpointsMapper.update(null, new LambdaUpdateWrapper<UserPoints>()
+                .eq(UserPoints::getUserId, ThreadLocalUtil.getCurrentUserId())
+                .set(UserPoints::getPointsBalance, newAmount)
+        );
+        if(updated == 0) {
+            return Result.fail("更新用户积分信息失败");
+        }
 
-        PointsTransaction entity = new PointsTransaction();
-        entity.setUserId(ThreadLocalUtil.getCurrentUserId());
-        entity.setAmount(amount);
+        PointsTransaction entity = BeanUtil.copyProperties(pointsMembershipChangeDTO, PointsTransaction.class);
+        entity.setAmount(newAmount);
         entity.setType(1);
         
         redisIdWorker.nextId(POINTS_CONSUME_KEY_PREFIX);
         entity.setDescription("消费积分积分");
-        pointsTransactionMapper.insert(entity);
+        int insert = pointsTransactionMapper.insert(entity);
+        
+        if (insert == 0) {
+            return Result.fail("记录积分变动失败");
+        }
 
         return Result.ok(account);
+    }
+
+    @Override
+    public Result<String> giveInviteVIPGiftPoints(ReferralDTO dto) {
+        int updated = pointsTransactionMapper.update(null, new LambdaUpdateWrapper<PointsTransaction>()
+                .eq(PointsTransaction::getUserId, dto.getUserId())
+                .eq(PointsTransaction::getType, 4)
+                .set(PointsTransaction::getAmount, POINTS_FOR_REFERRAL)
+                .set(PointsTransaction::getDescription, "邀请好友注册赠送积分")
+        );
+        if(updated == 0) {
+            log.error("更新用户推荐信息失败");
+            return Result.fail("更新用户推荐信息失败");
+        }
+        return Result.ok("giveInviteVIPGiftPoints  邀请好友注册赠送积分已到账");
     }
 
     /**
@@ -513,7 +554,7 @@ public class PointsReferServiceImpl implements PointsReferService {
     
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public Result deletePoints(PointsMembershipChangeDTO dto) {
+    public Result<Object> deletePoints(PointsMembershipChangeDTO dto) {
 
         UserPoints account = userpointsMapper.selectOne(
                 new LambdaQueryWrapper<UserPoints>()
@@ -543,14 +584,4 @@ public class PointsReferServiceImpl implements PointsReferService {
         return null;
     }
 
-    @Override
-    public Result<String> giveInviteVIPGiftPoints(ReferralDTO dto) {
-        pointsTransactionMapper.update(null, new LambdaUpdateWrapper<PointsTransaction>()
-                .eq(PointsTransaction::getUserId, dto.getUserId())
-                .eq(PointsTransaction::getType, 4)
-                .set(PointsTransaction::getAmount, POINTS_FOR_REFERRAL)
-                .set(PointsTransaction::getDescription, "邀请好友注册赠送积分")
-        );
-        return Result.ok("giveInviteVIPGiftPoints  邀请好友注册赠送积分已到账");
-    }
 }

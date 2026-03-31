@@ -10,6 +10,7 @@ import lombok.NoArgsConstructor;
  * PointsChangeDTO.java
  * 积分和会员变动DTO，用于记录用户积分和会员等级的变动信息
  */
+// 和 PointsTransaction 类似，可以使用 BeanUtils.copyProperties 来简化代码
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
