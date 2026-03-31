@@ -4,7 +4,7 @@ import shutil
 import tempfile
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Self
+from typing import Any
 
 import certifi
 import yaml
@@ -252,6 +252,12 @@ class ChromaConfig(LLM):
     extra: dict[str, Any] = {}
     save_path: str = ""
     k: int = 5
+
+    class Collection(BaseModel):
+        default: str = "default_collection"
+        project_collection: str = "open_source_projects"
+
+    collection_name: Collection = Field(default_factory=Collection)
 
     def set_default_path(self, path: str):
         if self.save_path == "<SAVE_PATH>" or not self.save_path or not Path(self.save_path).exists():
