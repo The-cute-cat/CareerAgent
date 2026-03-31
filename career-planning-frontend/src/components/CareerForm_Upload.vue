@@ -2,7 +2,7 @@
 //简历上传，作为能力画像的功能3\组件
 
 import { ref, computed } from 'vue'
-import { UploadFilled, Document, MagicStick, Timer, Operation, Check, Close, CircleCloseFilled, Picture, Folder } from '@element-plus/icons-vue'
+import { UploadFilled, Document, MagicStick, Timer, Operation, Check, Close, CircleCloseFilled, Picture, Folder, Warning } from '@element-plus/icons-vue'
 import { uploadResumeApi } from '@/api/career-form/resume'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/modules/user'
@@ -206,9 +206,16 @@ const cancelUpload = () => {
 }
 
 
+const showFileRequiredTip = ref(false)
+
 const submitUpload = async () => {
   if (!selectedFile.value) {
-    ElMessage.warning('请先选择文件')
+    showFileRequiredTip.value = true
+    ElMessage.warning('请先上传简历文件，再点击开始智能解析')
+    // 3秒后隐藏提示
+    setTimeout(() => {
+      showFileRequiredTip.value = false
+    }, 3000)
     return
   }
   
@@ -364,6 +371,11 @@ const handleDrop = () => {
       </div>
       
       <div class="upload-area">
+        <!-- 未选择文件提示 -->
+        <div v-if="showFileRequiredTip" class="file-required-tip">
+          <el-icon><Warning /></el-icon>
+          <span>请先选择或拖拽简历文件到上方区域</span>
+        </div>
         <el-upload
           ref="uploadRef"
           drag
@@ -372,7 +384,7 @@ const handleDrop = () => {
           :limit="1"
           accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif"
           class="upload-component"
-          :class="{ 'is-dragging': isDragging }"
+          :class="{ 'is-dragging': isDragging, 'file-required': showFileRequiredTip }"
           @dragenter="handleDragEnter"
           @dragleave="handleDragLeave"
           @drop="handleDrop"
@@ -431,8 +443,9 @@ const handleDrop = () => {
             type="primary" 
             :loading="uploading || parsing" 
             @click="submitUpload"
-            :disabled="!selectedFile || uploading || parsing"
+            :disabled="uploading || parsing"
             class="upload-btn"
+            :class="{ 'no-file': !selectedFile }"
             size="large"
           >
             <el-icon class="btn-icon" v-if="!uploading && !parsing"><MagicStick /></el-icon>
@@ -565,7 +578,54 @@ const handleDrop = () => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 20px;
+  gap: 16px;
+}
+
+/* 未选择文件提示 */
+.file-required-tip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background: linear-gradient(135deg, #fdf6ec 0%, #fef9f0 100%);
+  border: 1px solid #f5dab1;
+  border-radius: 10px;
+  color: #e6a23c;
+  font-size: 14px;
+  font-weight: 500;
+  animation: slideDown 0.3s ease;
+}
+
+.file-required-tip .el-icon {
+  font-size: 18px;
+  color: #e6a23c;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 上传区域需要文件的样式 */
+.upload-component.file-required :deep(.el-upload-dragger) {
+  border-color: #e6a23c;
+  border-style: dashed;
+  background-color: #fdf6ec;
+  animation: shake 0.5s ease;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-5px); }
+  40% { transform: translateX(5px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(3px); }
 }
 
 .upload-component {
@@ -742,6 +802,18 @@ const handleDrop = () => {
   background-color: #f5f7fa;
   border-color: #dcdfe6;
   color: #c0c4cc;
+}
+
+.upload-btn.no-file {
+  background-color: #f5f7fa;
+  border-color: #dcdfe6;
+  color: #c0c4cc;
+}
+
+.upload-btn.no-file:hover {
+  background-color: #e6f2ff;
+  border-color: #a0cfff;
+  color: #409eff;
 }
 
 .cancel-btn {
