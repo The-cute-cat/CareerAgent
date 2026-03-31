@@ -113,13 +113,14 @@ class RedisService:
         """获取底层 Redis 客户端实例"""
         return self._client
 
-    def get(self, key: str, default: Any = None) -> Any:
+    def get(self, key: str, default: Any = None, ttl: int | None = 0) -> Any:
         """
         获取缓存值
 
         Args:
             key: 缓存键
             default: 默认值（键不存在时返回）
+            ttl: 过期时间（秒），None 表示永不过期，0 表示不更新过期时间
 
         Returns:
             缓存值，如果不存在则返回默认值
@@ -130,6 +131,10 @@ class RedisService:
         try:
             full_key = self._build_key(key)
             value = self._client.get(full_key)
+            if ttl is None:
+                self._client.persist(full_key)
+            elif ttl > 0:
+                self._client.expire(full_key, ttl)
             if value is None:
                 return default
             # 尝试 JSON 反序列化

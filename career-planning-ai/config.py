@@ -253,6 +253,12 @@ class ChromaConfig(LLM):
     save_path: str = ""
     k: int = 5
 
+    class Collection(BaseModel):
+        default: str = "default_collection"
+        project_collection: str = "open_source_projects"
+
+    collection_name: Collection = Field(default_factory=Collection)
+
     def set_default_path(self, path: str):
         if self.save_path == "<SAVE_PATH>" or not self.save_path or not Path(self.save_path).exists():
             if path and path != "" and Path(path).exists():
