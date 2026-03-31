@@ -69,7 +69,7 @@ export const getQuestionsApi = (params: GetQuestionsParams) => {
       ? params.title
       : undefined
   }
-  return request.get<QuizResponse>('/test_question/generate', { params: requestData })
+  return request.get<QuizResponse>('/question/generate', { params: requestData })
 }
 
 
@@ -82,12 +82,12 @@ export const getQuestionsApi = (params: GetQuestionsParams) => {
 export const getPersonQuizApi = (type: string) => {
   // Mock 模式：使用本地模拟数据
   // if (true) {
-    return new Promise<{ data: Result<BackendPersonData[]> }>((resolve) => {
-      setTimeout(() => {
-        const mockData = getPersonMockQuestions(type as 'communication' | 'stress' | 'learning')
-        resolve({ data: { code: 200, msg: '获取题目成功', data: mockData } })
-      }, 500)
-    })
+  return new Promise<{ data: Result<BackendPersonData[]> }>((resolve) => {
+    setTimeout(() => {
+      const mockData = getPersonMockQuestions(type as 'communication' | 'stress' | 'learning')
+      resolve({ data: { code: 200, msg: '获取题目成功', data: mockData } })
+    }, 500)
+  })
   //}
 
   // return request.get<BackendPersonData[]>('/person_question/generate', { params: { type } })
@@ -108,7 +108,7 @@ export const submitOpenEndedApi = (data: SubmitOpenEndedParams) => {
     })
   }
   console.log('submitOpenEndedApi', data)
-  return request.post<OpenEndedScoreResult>('/test_question/check_student_answer', data)
+  return request.post<OpenEndedScoreResult>('/question/check_student_answer', data)
 }
 
 // ==================== 计分配置 ====================
@@ -296,8 +296,8 @@ export async function submitQuiz(
     }
   }
 
- 
-   // 3. 汇总总分
+
+  // 3. 汇总总分
   const totalScore = objective.choiceScore + objective.fillInScore + openEndedResult.score
   const totalMaxScore =
     objective.choiceMaxScore +
