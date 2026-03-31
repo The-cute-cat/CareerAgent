@@ -146,7 +146,6 @@ export interface CareerFormSubmitDTO {
 
 
 
-
 //简历上传接口返回的数据类型定义
 // 简化版：直接返回表单数据，用于自动填充
 export interface UploadResponse extends Partial<CareerFormData> {

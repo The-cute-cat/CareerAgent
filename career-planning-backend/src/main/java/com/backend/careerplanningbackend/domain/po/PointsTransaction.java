@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @TableName("points_transaction")
 public class PointsTransaction {
+    @TableId(type = IdType.ASSIGN_ID)
     private Long id;
     private Long userId;
     private Integer amount; // 积分变动值(正值为加，负值为减)
@@ -22,4 +23,7 @@ public class PointsTransaction {
     private String description;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
+    private Integer vip;
+    private Integer status;
+    
 }

@@ -1,6 +1,7 @@
 package com.backend.careerplanningbackend.service;
 
 import com.alipay.api.AlipayApiException;
+import com.backend.careerplanningbackend.domain.po.PaymentOrder;
 import com.backend.careerplanningbackend.domain.po.PointsTransaction;
 import com.backend.careerplanningbackend.domain.po.Result;
 import jakarta.servlet.http.HttpServletRequest;
@@ -16,8 +17,11 @@ public interface PayService {
     /**
      * 电脑支付宝网站支付：
      */
-    void pagePay(PointsTransaction pointsTransaction, HttpServletResponse response) throws AlipayApiException, IOException;
+    void orderNoPay(PaymentOrder paymentOrder, HttpServletResponse response) throws AlipayApiException, IOException;
+    
+    void pagePay(Long orderNumber, HttpServletResponse response) throws AlipayApiException, IOException;
 
+    void pagePayByUserId(Long orderNumber, HttpServletResponse response) throws AlipayApiException, IOException;
     /**
      * 支付成功异步通知
      */

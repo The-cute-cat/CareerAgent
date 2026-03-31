@@ -1,26 +1,33 @@
 package com.backend.careerplanningbackend.service;
 
-import com.backend.careerplanningbackend.domain.dto.PointsChangeDTO;
+import com.backend.careerplanningbackend.domain.dto.PointsMembershipChangeDTO;
 import com.backend.careerplanningbackend.domain.dto.ReferralDTO;
+import com.backend.careerplanningbackend.domain.dto.StudentTrueDTO;
 import com.backend.careerplanningbackend.domain.po.Result;
+import com.backend.careerplanningbackend.domain.po.UserPoints;
+import com.backend.careerplanningbackend.domain.vo.UserPointsVO;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 
 public interface PointsReferService {
 
 
-    Result getAccountPoints(Long userId);
+    Result<UserPointsVO> getAccountPoints(Long userId);
 
-    Result register(ReferralDTO referralDTO);
+    Result<Object> register(ReferralDTO referralDTO);
 
-    Result generateInvite(ReferralDTO referralDTO);
+    Result<ReferralDTO> generateInvite(ReferralDTO referralDTO);
     
-    Result registerStudent(ReferralDTO referralDTO);
+    Result<Object> registerStudent(StudentTrueDTO studentTrueDTO);
 
-    Result recharge(@Valid PointsChangeDTO dto);
+    Result<UserPoints> recharge(@Valid PointsMembershipChangeDTO dto, HttpServletResponse response);
 
     Result receiverPoints(ReferralDTO referralDTO);
 
-    Result consumePoints(@Valid PointsChangeDTO dto);
+    Result<UserPoints> consumePoints(@Valid PointsMembershipChangeDTO dto);
 
-    Result deletePoints(@Valid PointsChangeDTO dto);
+    Result<String> giveInviteVIPGiftPoints(ReferralDTO dto);
+
+    Result<Object> deletePoints(@Valid PointsMembershipChangeDTO dto);
+    
 }
