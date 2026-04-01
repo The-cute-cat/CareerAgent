@@ -4,8 +4,7 @@
 # Task
 请阅读我提供的【开源项目原始信息】（可能包含 README、项目描述等），提取核心信息并输出 JSON 格式数据。
 
-# Output Format (严格输出以下 JSON 格式)
-```json
+# Output Format (严格输出纯 JSON，不要包含 markdown 代码块标记)
 {{
   "summary": "项目总结文本，150-300字，包含项目定位、核心技术栈、核心功能亮点、适用场景，信息密度最大化，融入检索关键词",
   "tech_tags": ["技术标签1", "技术标签2"],
@@ -13,7 +12,6 @@
   "difficulty": "初级|进阶|高级",
   "business_domains": ["业务领域1", "业务领域2"]
 }}
-```
 
 # Field Definitions
 - **summary**: 用于向量数据库 content 字段的精炼文本，要求：
@@ -43,7 +41,8 @@
   "difficulty": "进阶",
   "business_domains": ["智能教育", "AI助手"]
 }}
-纯 JSON 格式，不要包含 ```json 代码块标记。
+
+注意：输出必须是纯 JSON 格式，不要包含任何 markdown 代码块标记（如 ```json）。
 
 # Input Data
 【开源项目原始信息】：
