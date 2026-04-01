@@ -50,6 +50,11 @@ const router = createRouter({
           component: () => import('../views/DevelopmentMap.vue'),
         },
         {
+          path: 'knowledge-base',
+          name: 'knowledge-base',
+          component: () => import('../views/JobKnowledge.vue'),
+        },
+        {
           path: 'profile',
           name: 'profile',
           component: () => import('../views/CProfile.vue'),
@@ -124,4 +129,3 @@ router.beforeEach(async (to, _from, next) => {
 })
 
 export default router
-
