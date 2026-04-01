@@ -1,13 +1,11 @@
 import asyncio
-import os
-import time
 from typing import List
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 
 # 导入你提供的模块
 from ai_service.models.job_info import JobInfo
-from ai_service.services.job_table_cleaning import read_excel_to_jobinfo
+from ai_service.scripts.py.job_table_cleaning import read_excel_to_jobinfo
 from ai_service.utils.logger_handler import log
 from config import settings
 
