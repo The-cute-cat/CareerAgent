@@ -75,7 +75,8 @@ const aboutSettings = [
     <div class="settings-section">
       <div class="section-header">
         <span class="section-icon">ℹ️</span>
-        <span class="section-title">关于职引未来</span>
+        <!-- <span class="section-title">关于职引未来</span> -->
+        <span class="section-title">关于职悟 Agent</span>
       </div>
       <div class="settings-group">
         <div

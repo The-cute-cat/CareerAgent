@@ -55,7 +55,8 @@ defineExpose({ collapsed })
         <img src="../assets/1234.png" alt="logo" />
       </div>
       <transition name="text-fade">
-        <span v-if="!collapsed" class="logo-text">职引未来</span>
+        <!-- <span v-if="!collapsed" class="logo-text">职引未来</span> -->
+        <span v-if="!collapsed" class="logo-text">职悟 Agent</span>
       </transition>
       <el-button
         class="collapse-toggle"
@@ -137,8 +138,8 @@ defineExpose({ collapsed })
 }
 
 .logo-icon-box {
-  width: 48px;
-  height: 48px;
+  width: 38px;
+  height: 38px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -152,19 +153,21 @@ defineExpose({ collapsed })
 }
 
 .sidebar-container.collapsed .logo-icon-box {
-  width: 44px;
-  height: 44px;
+  width: 38px;
+  height: 38px;
 }
 
 .logo-text {
-  font-size: 22px;
+  font-size: 19px;
   font-weight: 800;
-  background: linear-gradient(135deg, #1e293b 0%, #3b82f6 100%);
+  background: linear-gradient(135deg, #2c3e50 20%, #409EFF 100%);
+  background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   letter-spacing: 0.5px;
   white-space: nowrap;
-  overflow: hidden;
+  line-height: 1.2;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 .text-fade-enter-active,

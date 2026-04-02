@@ -121,7 +121,6 @@ public class AiServiceClient {
                 long startTime = System.currentTimeMillis();
                 log.info("调用 {}，URL: {}, 尝试次数：{}", serviceName, url, tryCount);
                 AiChatResponse response = requestExecutor.execute(bodySupplier != null ? bodySupplier.get() : null);
-                validateResponse(response, serviceName);
                 long time = System.currentTimeMillis() - startTime;
                 log.info("调用{}结束，耗时：{}ms", serviceName, time);
                 return response;
@@ -131,19 +130,6 @@ public class AiServiceClient {
             }
         }
         throw new RuntimeException(serviceName + "调用失败，URL: " + url + ", 已达到最大重试次数");
-    }
-
-    /**
-     * 验证响应状态
-     *
-     * @param response     AI 响应
-     * @param serviceName 服务名称
-     */
-    private void validateResponse(AiChatResponse response, String serviceName) {
-        if (response == null || !response.isState()) {
-            String errorMsg = response != null ? response.getMsg() : "响应为空";
-            throw new RuntimeException(serviceName + "业务失败: " + errorMsg);
-        }
     }
 
     /**

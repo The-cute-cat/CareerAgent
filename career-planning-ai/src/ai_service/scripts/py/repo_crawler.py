@@ -107,15 +107,12 @@ async def crawl_github(url):
             data = resp.json()
             print(f"  ✓ 成功获取 GitHub: {data.get('full_name')}")
 
-            # 获取 README AI 分析结果
             ai_result = await fetch_readme_content(api_url, owner, repo)
 
-            # 统一 license 字段处理
             license_info = None
             if data.get('license') and isinstance(data.get('license'), dict):
                 license_info = data['license'].get('spdx_id')
 
-            # 组装用于向量数据库的数据结构
             vector_db_record = {
                 "id": f"github_{owner}_{repo}",
                 "url": url,
@@ -167,10 +164,8 @@ async def crawl_gitee(url):
             data = resp.json()
             print(f"  ✓ 成功获取 Gitee: {data.get('full_name')}")
 
-            # 获取 README AI 分析结果
             ai_result = await fetch_readme_content(api_url, owner, repo)
 
-            # Gitee license 处理
             license_info = None
             if data.get('license'):
                 if isinstance(data.get('license'), dict):
@@ -178,7 +173,6 @@ async def crawl_gitee(url):
                 else:
                     license_info = data.get('license')
 
-            # 组装用于向量数据库的数据结构
             vector_db_record = {
                 "id": f"gitee_{owner}_{repo}",
                 "url": url,
@@ -217,15 +211,18 @@ async def crawl_gitee(url):
 async def main():
     # 待爬取的 URL 列表
     url_list = [
-        "https://github.com/Snailclimb/interview-guide",
+        # "https://github.com/Snailclimb/interview-guide",
         # "https://github.com/itwanger/PaiAgent",
-        "https://gitee.com/xiaonuobase/snowy",
+        # "https://gitee.com/xiaonuobase/snowy",
         # "https://gitee.com/y_project/RuoYi",
         # "https://github.com/elunez/eladmin",
         # "https://github.com/macrozheng/mall",
         # "https://gitee.com/kekingcn/file-online-preview"
     ]
-
+    file = "../temp/abandoned/project_url.txt"
+    if os.path.exists(file):
+        with open(file, 'r', encoding='utf-8') as f:
+            url_list = f.readlines()
     results = []
 
     print(f"开始爬取，共 {len(url_list)} 个仓库...\n")
@@ -245,7 +242,8 @@ async def main():
         time.sleep(1.5)
 
         # 保存为 JSON 文件，后续可直接读取插入向量库
-    output_file = "./../temp/repo_data_for_vector_db.json"
+    output_file = "../temp/abandoned/repo_data_for_vector_db.json"
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
     with open(output_file, 'w', encoding='utf-8') as f:
         json.dump(results, f, ensure_ascii=False, indent=2)
 

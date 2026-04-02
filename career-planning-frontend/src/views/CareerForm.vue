@@ -1411,7 +1411,6 @@ const showMissingFieldsReminder = (missingFields: typeof requiredFields) => {
     ElMessage.success('简历信息已完整填充，可以直接提交！')
     return
   }
-
   pendingMissingFields.value = chatFields
   activeMenu.value = pendingMissingFields.value[0]?.step || '1'
   showMissingFieldsChat.value = true
@@ -7005,4 +7004,3 @@ const resetForm = () => {
   }
 }
 </style>
-

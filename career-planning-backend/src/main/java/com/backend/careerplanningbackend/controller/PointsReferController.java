@@ -1,14 +1,30 @@
 package com.backend.careerplanningbackend.controller;
 
-import com.backend.careerplanningbackend.domain.dto.PointsChangeDTO;
+import com.backend.careerplanningbackend.domain.dto.PointsMembershipChangeDTO;
 import com.backend.careerplanningbackend.domain.dto.ReferralDTO;
+import com.backend.careerplanningbackend.domain.dto.StudentTrueDTO;
 import com.backend.careerplanningbackend.domain.po.Result;
+import com.backend.careerplanningbackend.domain.po.UserPoints;
+import com.backend.careerplanningbackend.domain.vo.UserPointsVO;
 import com.backend.careerplanningbackend.service.PointsReferService;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * PointsReferController
+ * 负责处理积分相关的请求，如获取账户积分、注册赠送积分、邀请好友等
+ * 1. 获取账户积分接口：用户可以查询自己的当前积分余额
+ * 2. 注册赠送积分接口：新用户注册成功后，系统会自动赠送一定数量的积分
+ * 3. 邀请好友接口：用户可以通过邀请好友注册来获得额外的积分奖励
+ * 4. 学生注册接口：学生用户注册成功后，系统会自动赠送一定数量的积分
+ * 5. 充值接口：用户可以通过充值来增加自己的积分余额
+ * 6. 消耗积分接口：用户在购买课程或服务时可以使用积分抵扣部分金额，消耗相应的积分
+ * @module PointsReferController
+ */
+// 积分接口都在这
 @Slf4j
 @RestController
 @RequestMapping("/points")
@@ -22,7 +38,7 @@ public class PointsReferController {
      * @param id 用户ID
      */
     @PostMapping("/account/{id}")
-    public Result getAccountPoints(Long id) {
+    public Result<UserPointsVO> getAccountPoints(Long id) {
         log.info("userId: {}", id);
         return referralService.getAccountPoints(id);
     }
@@ -33,7 +49,7 @@ public class PointsReferController {
      * @param referralDTO
      */
     @PostMapping("/register")
-    public Result register(ReferralDTO referralDTO) {
+    public Result<Object> register(ReferralDTO referralDTO) {
         log.info("referralDTO: {}", referralDTO);
         return referralService.register(referralDTO);
     }
@@ -44,20 +60,18 @@ public class PointsReferController {
      * @param referralDTO
      */
     @PostMapping("/invite")
-    public Result invite(ReferralDTO referralDTO) {
+    public Result<ReferralDTO> invite(ReferralDTO referralDTO) {
         log.info("referralDTO: {}", referralDTO);
         return referralService.generateInvite(referralDTO);
     }
 
     /**
-     * registerStudent 学生注册接口
-     * 新用户赠送积分接口
-     * @param referralDTO
+     * registerStudent 大学生认证接口
      */
     @PostMapping("/register/student")
-    public Result registerStudent(ReferralDTO referralDTO) {
-        log.info("referralDTO: {}", referralDTO);
-        return referralService.registerStudent(referralDTO);
+    public Result<Object> registerStudent(StudentTrueDTO studentTrueDTO) {
+        log.info("studentTrueDTO: {}", studentTrueDTO);
+        return referralService.registerStudent(studentTrueDTO);
     }
 
     /**
@@ -66,9 +80,9 @@ public class PointsReferController {
      * @param dto
      */
     @PostMapping("/recharge")
-    public Result recharge(@RequestBody @Valid PointsChangeDTO dto) {
+    public Result<UserPoints> recharge(@RequestBody @Valid PointsMembershipChangeDTO dto, HttpServletResponse response) {
         log.info("dto: {}", dto);
-        return referralService.recharge(dto);
+        return referralService.recharge(dto,response);
     }
 
     /**
@@ -77,14 +91,14 @@ public class PointsReferController {
      * 
      */
     @PostMapping("/consume")
-    public Result consumePoints(@RequestBody @Valid PointsChangeDTO dto) {
+    public Result<UserPoints> consumePoints(@RequestBody @Valid PointsMembershipChangeDTO dto) {
         log.info("dto: {}", dto);
         return referralService.consumePoints(dto);
     }
     
     
     @PostMapping("/delete")
-    public Result deletePoints(@RequestBody @Valid PointsChangeDTO dto) {
+    public Result<Object> deletePoints(@RequestBody @Valid PointsMembershipChangeDTO dto) {
         log.info("dto: {}", dto);
         return referralService.deletePoints(dto); // 负数表示扣除积分
     }

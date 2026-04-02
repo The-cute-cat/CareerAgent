@@ -1,8 +1,12 @@
 package com.backend.careerplanningbackend.controller;
 
 import com.backend.careerplanningbackend.domain.dto.AiChatResponse;
+import com.backend.careerplanningbackend.domain.po.FileUpload;
 import com.backend.careerplanningbackend.domain.po.Result;
+import com.backend.careerplanningbackend.mapper.FileUploadMapper;
 import com.backend.careerplanningbackend.util.AiServiceClient;
+import com.backend.careerplanningbackend.util.AliOSSUtils;
+import com.backend.careerplanningbackend.util.ThreadLocalUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -11,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -32,7 +37,8 @@ import java.util.List;
 public class ParseFileController {
 
     private final AiServiceClient aiServiceClient;
-
+    private final AliOSSUtils aliOSSUtils;
+    private final FileUploadMapper  fileUploadMapper;
     /**
      * parseFile
      * 解析单个文件
@@ -42,12 +48,19 @@ public class ParseFileController {
     @PostMapping("/file")
     public Result<Object> parseFile(
             @RequestParam("file") MultipartFile file,// 文件数据
-            @RequestParam(value = "user_id", required = false) String userId,//用户id
             @RequestParam(value = "overwrite", defaultValue = "false") boolean overwrite //是否覆盖
-    ) {
+    ) throws IOException {
         log.info("name: {}, size: {} bytes, leixing: {}",
                 file.getOriginalFilename(), file.getSize(), file.getContentType());
-
+        
+        Long userId= ThreadLocalUtil.getCurrentUserId();
+        
+        String upload = aliOSSUtils.upload(file);
+        FileUpload fileUpload = new FileUpload();
+        fileUpload.setUserId(userId);
+        fileUpload.setFilename(file.getOriginalFilename());
+        fileUpload.setFileUrl(upload);
+        fileUploadMapper.insert(fileUpload);
 
         List<MultipartFile>files = new ArrayList<>();
         files.add(file);

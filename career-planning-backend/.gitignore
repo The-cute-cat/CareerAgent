@@ -1,5 +1,6 @@
 HELP.md
 application-dev.yaml
+application-prod.yaml
 target/
 temp/
 test/
@@ -7,7 +8,6 @@ test/
 !**/src/main/**/target/
 !**/src/test/**/target/
 src/main/java/com/backend/careerplanningbackend/http/
-   
 ### STS ###
 .apt_generated
 .classpath

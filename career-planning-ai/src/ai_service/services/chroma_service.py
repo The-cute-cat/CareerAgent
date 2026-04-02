@@ -21,7 +21,7 @@ def get_default_embedding() -> Embeddings:
     """获取默认的 Embedding 模型"""
     return DashScopeEmbeddings(
         model=settings.chroma_config.model_name,
-        dashscope_api_key=settings.llm.api_key.get_secret_value(),
+        dashscope_api_key=settings.chroma_config.api_key.get_secret_value(),
     )
 
 
@@ -83,7 +83,7 @@ class ChromaService:
     @classmethod
     def get_instance(
             cls,
-            collection_name: str = "default",
+            collection_name: str = "default_collection",
             embedding_function: Embeddings | None = None,
             persist_directory: str | None = None,
     ) -> "ChromaService":
@@ -263,7 +263,7 @@ class ChromaService:
 
         Args:
             query: 查询文本
-            k: 返回文档数量
+            k: 返回文档数量，默认使用配置中的值
             filter_dict: 元数据过滤条件
 
         Returns:
@@ -386,3 +386,6 @@ class ChromaService:
 
     def __repr__(self) -> str:
         return f"ChromaService(collection={self._collection_name}, docs_count={self.count()})"
+
+
+chroma_service = ChromaService.get_instance(collection_name=settings.chroma_config.collection_name.default)

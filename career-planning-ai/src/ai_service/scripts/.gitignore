@@ -1,0 +1,10 @@
+.gitee_cookies.json
+.crawl_progress.json
+recommend_project_url.txt
+
+
+temp/
+temp*.*
+test*.*
+test/
+tests/

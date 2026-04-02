@@ -1,0 +1,9 @@
+package com.backend.careerplanningbackend.mapper;
+
+import com.backend.careerplanningbackend.domain.po.PaymentOrder;
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import org.apache.ibatis.annotations.Mapper;
+
+@Mapper
+public interface PaymentOrderMapper extends BaseMapper<PaymentOrder> {
+}

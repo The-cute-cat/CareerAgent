@@ -136,7 +136,8 @@ const reportItems = [
 
 const faqs = [
   {
-    q: '职引未来适合哪些人使用？',
+    // q: '职引未来适合哪些人使用？',
+    q: '职悟 Agent适合哪些人使用？',
     a: '面向在校大学生、应届毕业生以及处于职业探索期的青年群体，尤其适合对自我定位、岗位选择和成长路径还不够清晰的用户。'
   },
   {
@@ -158,7 +159,8 @@ const faqs = [
           <div class="logo-icon">
             <img src="@/assets/1234.png" alt="Logo" class="logo-img" />
           </div>
-          <span class="logo-text">职引未来</span>
+          <!-- <span class="logo-text">职引未来</span> -->
+          <span class="logo-text">职悟 Agent</span>
         </div>
         <div class="nav-links">
           <a v-for="item in navItems" :key="item.label" :href="item.path" class="nav-link">
@@ -374,7 +376,8 @@ const faqs = [
       <div class="container cta-card">
         <div>
           <h2>现在开始，让职业规划从“迷茫”走向“清晰”</h2>
-          <p>职引未来，用 AI 帮大学生看见方向、看清差距、看懂路径。</p>
+          <!-- <p>职引未来，用 AI 帮大学生看见方向、看清差距、看懂路径。</p> -->
+          <p>职悟 Agent，用 AI 帮大学生看见方向、看清差距、看懂路径。</p>
         </div>
         <button class="hero-btn-primary" @click="goToLogin">
           <el-icon><ArrowRight /></el-icon>

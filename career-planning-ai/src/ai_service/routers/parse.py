@@ -105,7 +105,7 @@ async def get_cache(file_info=None, file_infos=None) -> tuple[list[dict[str, Any
     for info in file_infos:
         fingerprint = file_fingerprint(info["save_path"], HashAlgorithm.SHA256)
         if redis.exists(fingerprint):
-            result.append(redis.get(fingerprint))
+            result.append(redis.get(fingerprint,ttl=settings.redis.cache_timeout.file_parse))
         else:
             info_list.append(info)
     return result, info_list

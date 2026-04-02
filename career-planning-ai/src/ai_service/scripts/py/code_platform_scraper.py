@@ -81,6 +81,12 @@ class CodePlatformScraper:
         print(f"已获取获取GitHub用户 {username} 的仓库列表")
         repos = []
         for repo in resp.json():
+            # 兼容 license 可能是字符串或字典
+            license_info = repo.get("license")
+            if license_info:
+                if isinstance(license_info, dict):
+                    license_info = license_info.get("spdx_id") or license_info.get("name")
+
             repos.append({
                 "repo_name": repo.get("name"),
                 "full_name": repo.get("full_name"),
@@ -100,7 +106,7 @@ class CodePlatformScraper:
                 "has_wiki": repo.get("has_wiki", False),
                 "has_pages": repo.get("has_pages", False),
                 "topics": repo.get("topics", []),
-                "license": repo.get("license", {}).get("spdx_id") if repo.get("license") else None
+                "license": license_info
             })
         return repos
 
@@ -157,6 +163,11 @@ class CodePlatformScraper:
         print(f"已获取获取Gitee用户 {username} 的仓库列表")
         repos = []
         for repo in resp.json():
+            license_info = repo.get("license")
+            if license_info:
+                if isinstance(license_info, dict):
+                    license_info = license_info.get("spdx_id") or license_info.get("name")
+
             repos.append({
                 "repo_name": repo.get("name"),
                 "full_name": repo.get("full_name"),
@@ -171,7 +182,7 @@ class CodePlatformScraper:
                 "pushed_at": repo.get("pushed_at"),
                 "fork": repo.get("fork", False),
                 "homepage": repo.get("homepage"),
-                "license": repo.get("license", {}).get("spdx_id") if repo.get("license") else None
+                "license": license_info
             })
         return repos
 

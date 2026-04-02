@@ -69,10 +69,10 @@ async def evaluate(
         background_tasks.add_task(save_cache, temp, request)
         return success(temp)
     except ValueError as e:
-        log.error(f"评估过程出现错误: {str(e)}")
+        log.error(f"评估过程出现错误: {str(e)}", exc_info=True)
         return error_msg(str(e), code=400)
     except Exception as e:
-        log.error(f"评估过程出现未知错误: {str(e)}")
+        log.error(f"评估过程出现未知错误: {str(e)}", exc_info=True)
         return error_msg(f"评估过程出现未知错误: {str(e)}", code=500)
 
 
@@ -81,7 +81,7 @@ def get_cache(request: EvaluateRequest):
         return None
     str_request = json.dumps(request.model_dump(), sort_keys=True)
     fingerprint = text_fingerprint(str_request)
-    return redis.get(fingerprint, None)
+    return redis.get(fingerprint, None, ttl=settings.redis.cache_timeout.code_ability)
 
 
 def save_cache(result: dict, request: EvaluateRequest):
