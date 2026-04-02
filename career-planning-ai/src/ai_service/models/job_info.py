@@ -1,6 +1,6 @@
 from typing import Optional, List, Dict, Any
 from datetime import datetime
-from sqlalchemy import String, DateTime, Text
+from sqlalchemy import String, DateTime, Text, Integer, SmallInteger
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 import json
@@ -10,54 +10,113 @@ from ai_service.models.base import Base
 
 class JobInfo(Base):
     """
-        字段类型：
-        id: 使用 int 类型，设置 autoincrement=True 自动递增
-        短文本字段：使用 String(长度)
-        长文本字段（描述）：使用 Text 类型
-        时间字段：使用 DateTime 类型
-        时间戳自动管理：
-        created_at: 创建时自动设置为当前时间
-        updated_at: 创建和更新时自动设置为当前时间
-        可空性：所有字段都设置为 nullable=True，根据实际需求可以调整
-        注释：使用 comment 参数添加字段说明
+    岗位信息模型 - 与数据库 job_original 表结构完全对齐
     """
-    __tablename__ = "job_info"
+    __tablename__ = "job_original"
 
-    # 主键ID
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True, comment="主键ID")
+    # ==================== 主键 ====================
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+        autoincrement=True,
+        comment="主键ID"
+    )
 
-    # 岗位信息
-    job_code: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, comment="岗位编码")
-    job_title: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, comment="岗位名称")
-    location: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, comment="工作地址")
-    salary_range: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, comment="薪资范围")
+    # ==================== 扩展字段 ====================
+    job_profile_id: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        nullable=True,
+        default=None,
+        comment="指向合并后的岗位id，默认为空"
+    )
 
-    # 公司信息
-    company_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, comment="公司名称")
-    company_size: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, comment="公司规模")
-    company_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, comment="公司类型")
-    industry: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, comment="所属行业")
+    is_deleted: Mapped[Optional[int]] = mapped_column(
+        SmallInteger,
+        nullable=True,
+        default=0,
+        comment="逻辑删除-1表示逻辑删除"
+    )
 
-    # 描述信息（使用 Text 类型以支持更长文本）
-    company_desc: Mapped[Optional[str]] = mapped_column(Text, nullable=True, comment="公司描述")
-    job_desc: Mapped[Optional[str]] = mapped_column(Text, nullable=True, comment="岗位描述")
+    # ==================== 岗位信息 ====================
+    job_code: Mapped[Optional[str]] = mapped_column(
+        String(50),
+        nullable=True,
+        comment="岗位编码"
+    )
+    job_title: Mapped[Optional[str]] = mapped_column(
+        String(100),
+        nullable=True,
+        comment="岗位名称"
+    )
+    location: Mapped[Optional[str]] = mapped_column(
+        String(100),
+        nullable=True,
+        comment="工作地址"
+    )
+    salary_range: Mapped[Optional[str]] = mapped_column(
+        String(50),
+        nullable=True,
+        comment="薪资范围"
+    )
 
-    # 来源信息
-    job_source_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True, comment="岗位来源URL")
+    # ==================== 公司信息 ====================
+    company_name: Mapped[Optional[str]] = mapped_column(
+        String(100),
+        nullable=True,
+        comment="公司名称"
+    )
+    company_size: Mapped[Optional[str]] = mapped_column(
+        String(50),
+        nullable=True,
+        comment="公司规模"
+    )
+    company_type: Mapped[Optional[str]] = mapped_column(
+        String(50),
+        nullable=True,
+        comment="公司类型"
+    )
+    industry: Mapped[Optional[str]] = mapped_column(
+        String(50),
+        nullable=True,
+        comment="所属行业"
+    )
 
-    # 时间戳
-    created_at: Mapped[Optional[datetime]] = mapped_column(
+    # ==================== 描述信息 ====================
+    company_desc: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        comment="公司描述"
+    )
+    job_desc: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        comment="岗位描述"
+    )
+
+    # ==================== 来源信息 ====================
+    job_source_url: Mapped[Optional[str]] = mapped_column(
+        String(500),
+        nullable=True,
+        comment="岗位来源地址"
+    )
+
+    # ==================== 时间戳 ⚠️ 关键字段修正 ====================
+    created_time: Mapped[Optional[datetime]] = mapped_column(
         DateTime,
         server_default=func.now(),
+        nullable=False,  # 数据库中标记为"不是null"
         comment="创建时间"
     )
-    updated_at: Mapped[Optional[datetime]] = mapped_column(
+
+    updated_time: Mapped[Optional[datetime]] = mapped_column(
         DateTime,
-        # server_default=func.now(),
-        # onupdate=func.now(),
-        comment="更新时间"
+        server_default=func.now(),
+        onupdate=func.now(),  # 更新时自动刷新
+        nullable=True,
+        comment="更新日期"
     )
 
+    # ==================== 辅助方法 ====================
     def __repr__(self) -> str:
         return (f"<JobInfo("
                 f"id={self.id}, "
@@ -72,9 +131,10 @@ class JobInfo(Base):
                 f"company_desc={self.company_desc}, "
                 f"job_desc={self.job_desc}, "
                 f"job_source_url={self.job_source_url}, "
-                f"created_at={self.created_at}, "
-                f"updated_at={self.updated_at}"
+                f"created_time={self.created_time}, "
+                f"updated_time={self.updated_time}"
                 f")>")
+
 
     def to_dict(self, exclude_fields: Optional[List[str]] = None) -> Dict[str, Any]:
         """

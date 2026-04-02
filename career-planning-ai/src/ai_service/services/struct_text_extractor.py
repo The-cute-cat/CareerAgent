@@ -6,7 +6,7 @@ from ai_service.models.struct_txt import StudentProfile
 from ai_service.models.user_form import UserForm
 from ai_service.models.user_form_profile import StudentFormProfile
 from ai_service.services import log
-from ai_service.services.major_aliger import major_aligner
+from ai_service.scripts.py.major_aliger import major_aligner
 from ai_service.services.prompt_loader import prompt_loader
 from config import settings
 
