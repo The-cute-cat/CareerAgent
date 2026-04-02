@@ -54,6 +54,7 @@ const toggleCollapse = () => {
 }
 
 const menuItems = [
+  { title: '核心功能', isGroup: true },
   { index: '/', icon: House, text: '首页' },
   {
     index: '/career-form-group',
@@ -101,6 +102,11 @@ defineExpose({ collapsed })
         <template v-for="(item, i) in menuItems" :key="i">
           <!-- 分隔符 -->
           <div v-if="item.isSpacer" class="menu-spacer"></div>
+
+          <!-- 分组标题 -->
+          <div v-else-if="item.isGroup" class="menu-group-title">
+            <span>{{ item.title }}</span>
+          </div>
 
           <!-- 带有子菜单的项 -->
           <el-sub-menu v-else-if="item.children" :index="item.index" class="custom-sub-menu">
@@ -255,6 +261,22 @@ defineExpose({ collapsed })
   height: 1px;
   background: rgba(0, 0, 0, 0.05);
   margin: 16px 12px;
+}
+
+.menu-group-title {
+  padding: 20px 16px 8px;
+  font-size: 15px;
+  font-weight: 500;
+  color: #94a3b8;
+  line-height: 1.5;
+}
+
+.menu-group-title:first-child {
+  padding-top: 8px;
+}
+
+.sidebar-container.collapsed .menu-group-title {
+  display: none;
 }
 
 .custom-menu-item,
