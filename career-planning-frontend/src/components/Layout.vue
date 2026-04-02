@@ -1,10 +1,43 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, provide, onMounted, onUnmounted } from 'vue'
 import Sidebar from '@/components/Sidebar.vue'
 import CHeader from '@/components/CHeader.vue'
+import MobileTabBar from '@/components/MobileTabBar.vue'
 import ChatBot from '@/components/ChatBot.vue'
 
 const sidebarRef = ref<InstanceType<typeof Sidebar>>()
+
+const isMobile = ref(false)
+const mobileDrawerVisible = ref(false)
+
+const handleResize = () => {
+  if (typeof window !== 'undefined') {
+    isMobile.value = window.innerWidth <= 768
+    if (!isMobile.value) {
+      mobileDrawerVisible.value = false
+    }
+  }
+}
+
+onMounted(() => {
+  if (typeof window !== 'undefined') {
+    handleResize()
+    window.addEventListener('resize', handleResize)
+  }
+})
+
+onUnmounted(() => {
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('resize', handleResize)
+  }
+})
+
+const toggleMobileDrawer = () => {
+  mobileDrawerVisible.value = !mobileDrawerVisible.value
+}
+
+provide('toggleMobileDrawer', toggleMobileDrawer)
+provide('isMobileLayout', isMobile)
 </script>
 
 <template>
@@ -14,8 +47,20 @@ const sidebarRef = ref<InstanceType<typeof Sidebar>>()
     <div class="blob blob-3"></div>
   </div>
   <el-container class="layout-container">
-    <!-- 左侧侧边栏 -->
-    <el-aside :width="sidebarRef?.collapsed ? '80px' : '260px'" class="sidebar-wrapper">
+    <!-- 移动端侧边栏抽屉 -->
+    <el-drawer
+      v-if="isMobile"
+      v-model="mobileDrawerVisible"
+      direction="ltr"
+      size="260px"
+      :with-header="false"
+      class="mobile-sidebar-drawer"
+    >
+      <Sidebar ref="sidebarRef" @close-drawer="mobileDrawerVisible = false" />
+    </el-drawer>
+
+    <!-- 桌面端侧边栏 -->
+    <el-aside v-else :width="sidebarRef?.collapsed ? '80px' : '260px'" class="sidebar-wrapper">
       <Sidebar ref="sidebarRef" />
     </el-aside>
 
@@ -36,6 +81,9 @@ const sidebarRef = ref<InstanceType<typeof Sidebar>>()
 
     <!-- AI 助手悬浮窗 -->
     <!-- <ChatBot /> -->
+
+    <!-- 移动端底部导航 -->
+    <MobileTabBar v-if="isMobile" />
   </el-container>
 </template>
 
@@ -64,7 +112,7 @@ const sidebarRef = ref<InstanceType<typeof Sidebar>>()
 .blob-1 {
   width: 400px;
   height: 400px;
-  background: #e0c3fc;
+  background: #f1f5f9;
   top: -100px;
   left: -100px;
 }
@@ -72,7 +120,7 @@ const sidebarRef = ref<InstanceType<typeof Sidebar>>()
 .blob-2 {
   width: 500px;
   height: 500px;
-  background: #8ec5fc;
+  background: #e2e8f0;
   bottom: -150px;
   right: -100px;
   animation-delay: -5s;
@@ -81,7 +129,7 @@ const sidebarRef = ref<InstanceType<typeof Sidebar>>()
 .blob-3 {
   width: 300px;
   height: 300px;
-  background: #b5c6e0;
+  background: #cbd5e1;
   top: 40%;
   left: 30%;
   animation-delay: -10s;
@@ -127,6 +175,13 @@ const sidebarRef = ref<InstanceType<typeof Sidebar>>()
   overflow-y: auto;
   overflow-x: hidden;
   scroll-behavior: smooth;
+  transition: all 0.3s ease;
+}
+
+@media (max-width: 768px) {
+  .main-content {
+    padding: 16px 16px 80px; /* 底部预留 TabBar 空间 */
+  }
 }
 
 /* 页面切换动画 */
@@ -161,5 +216,14 @@ const sidebarRef = ref<InstanceType<typeof Sidebar>>()
 
 .main-content::-webkit-scrollbar-thumb:hover {
   background: rgba(144, 147, 153, 0.5);
+}
+
+:deep(.el-drawer.mobile-sidebar-drawer) {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+:deep(.el-drawer.mobile-sidebar-drawer .el-drawer__body) {
+  padding: 0;
 }
 </style>

@@ -1,12 +1,14 @@
 <script setup>
-import { computed, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/modules/user'
 import { logout as userLogoutService } from '@/api/user'
+import { ArrowLeft } from '@element-plus/icons-vue'
 
 import ProfileInfoPanel from '../components/CProfile_Component/ProfileInfoPanel.vue'
 import ProfileSidebar from '../components/CProfile_Component/ProfileSidebar.vue'
+import ProfileDashboard from '../components/CProfile_Component/ProfileDashboard.vue'
 import MemberPlanPanel from '../components/CProfile_Component/MemberPlanPanel.vue'
 import InviteFriendsPanel from '../components/CProfile_Component/InviteFriendsPanel.vue'
 import FeedbackPanel from '../components/CProfile_Component/FeedbackPanel.vue'
@@ -14,11 +16,60 @@ import MoreSettingsPanel from '../components/CProfile_Component/MoreSettingsPane
 
 const userStore = useUserStore()
 const router = useRouter()
+const route = useRoute()
 const sidebarCollapsed = ref(false)
 
-const activeMenu = ref('profile')
-const defaultAvatar = 'https://picsum.photos/200/200'
+const activeMenu = ref('dashboard')
+const isMobileLayout = ref(false)
+const isMobileMenuOpen = ref(true)
+
+const isSettingsCenter = computed(() => route.path.includes('/settings'))
+
+const handleResize = () => {
+  if (typeof window !== 'undefined') {
+    isMobileLayout.value = window.innerWidth <= 768
+    if (!isMobileLayout.value) {
+      isMobileMenuOpen.value = true // Ensure menu always shows on desktop
+    }
+  }
+}
+
+watch(activeMenu, () => {
+  if (isMobileLayout.value) {
+    isMobileMenuOpen.value = false
+  }
+})
+
+onMounted(() => {
+  if (typeof window !== 'undefined') {
+    handleResize()
+    window.addEventListener('resize', handleResize)
+  }
+  
+  // 初始化菜单状态
+  if (isSettingsCenter.value) {
+    activeMenu.value = 'setting'
+  } else {
+    activeMenu.value = 'dashboard'
+  }
+})
+
+watch(() => route.path, () => {
+  if (isSettingsCenter.value) {
+    activeMenu.value = 'setting'
+  } else {
+    activeMenu.value = 'dashboard'
+  }
+})
+
+onUnmounted(() => {
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('resize', handleResize)
+  }
+})
+
 const storedUser = userStore.userInfo || {}
+const defaultAvatar = 'https://cube.elemecdn.com/3/7c/3ea6beec64369c2642b92c6726f1epng.png'
 
 const userInfo = ref({
   name: storedUser?.name || storedUser?.nickname || storedUser?.username || `用户${userStore.userInfo?.id || 5442}`,
@@ -33,13 +84,24 @@ const userInfo = ref({
 
 const displayPoints = computed(() => userStore.userInfo?.points || 300)
 
-const menus = [
-  { key: 'profile', label: '个人资料' },
-  { key: 'member', label: '会员计划' },
-  { key: 'invite', label: '邀请好友' },
-  { key: 'feedback', label: '反馈建议' },
-  { key: 'setting', label: '更多设置' }
+const allMenus = [
+  { key: 'dashboard', label: '我的主页', onlyProfile: true },
+  { key: 'profile', label: '个人资料', onlyProfile: true },
+  { key: 'member', label: '会员计划', onlyProfile: true },
+  { key: 'invite', label: '邀请好友', onlyProfile: true },
+  { key: 'feedback', label: '反馈建议' }, // 反馈建议两边都留着或者按需放
+  { key: 'setting', label: '更多设置', onlySettings: true }
 ]
+
+const visibleMenus = computed(() => {
+  if (isSettingsCenter.value) {
+    // 设置中心：只显示设置和反馈
+    return allMenus.filter(m => m.onlySettings || m.key === 'feedback')
+  } else {
+    // 个人中心：排除掉仅设置项
+    return allMenus.filter(m => m.onlyProfile || m.key === 'feedback')
+  }
+})
 
 const pointRecords = ref([
   {
@@ -61,6 +123,7 @@ const pointRecords = ref([
 const inviteCode = ref('ZHILU2026')
 
 const panelTitleMap = {
+  dashboard: '我的主页',
   profile: '个人资料',
   member: '会员计划',
   invite: '邀请好友',
@@ -69,6 +132,7 @@ const panelTitleMap = {
 }
 
 const panelDescriptionMap = {
+  dashboard: '欢迎回来，在这里查看你的职业成长进度与最新动态。',
   profile: '在这里完善你的资料、兴趣方向和职业偏好，让个人中心更像你的专属名片。',
   member: '查看积分权益与会员状态，了解当前账户可使用的成长资源。',
   invite: '把职业规划工具分享给朋友，一起解锁更多使用权益。',
@@ -165,16 +229,23 @@ const handleSettingAction = (key) => {
     <div class="page-glow page-glow-right"></div>
 
     <ProfileSidebar
+      v-show="!isMobileLayout || isMobileMenuOpen"
       v-model:activeMenu="activeMenu"
       v-model:collapsed="sidebarCollapsed"
-      :menus="menus"
+      :menus="visibleMenus"
       :user-info="userInfo"
       :points="displayPoints"
+      class="responsive-sidebar"
     />
 
-    <div class="right-panel">
+    <div class="right-panel" v-show="!isMobileLayout || !isMobileMenuOpen">
       <div class="panel-shell">
-        <div class="content-intro">
+        <div class="mobile-nav-header" v-if="isMobileLayout">
+          <el-icon class="back-btn" @click="isMobileMenuOpen = true"><ArrowLeft /></el-icon>
+          <span class="mobile-nav-title">{{ panelTitleMap[activeMenu] }}</span>
+        </div>
+
+        <div class="content-intro" v-else>
           <div class="intro-badge">个人中心</div>
           <h1>{{ panelTitleMap[activeMenu] }}</h1>
           <p>{{ panelDescriptionMap[activeMenu] }}</p>
@@ -182,8 +253,10 @@ const handleSettingAction = (key) => {
 
         <transition name="fade-slide" mode="out-in">
           <div :key="activeMenu" class="panel-content">
+            <ProfileDashboard v-if="activeMenu === 'dashboard'" :user-info="userInfo" />
+
             <ProfileInfoPanel
-              v-if="activeMenu === 'profile'"
+              v-else-if="activeMenu === 'profile'"
               :user-info="userInfo"
               @update-user="updateUserInfo"
             />
@@ -206,38 +279,52 @@ const handleSettingAction = (key) => {
 .profile-page {
   position: relative;
   display: flex;
-  gap: 20px;
-  padding: 20px;
+  gap: 24px;
+  padding: 24px;
   min-height: calc(100vh - 80px);
   box-sizing: border-box;
   background:
-    radial-gradient(circle at top left, rgba(97, 154, 255, 0.2), transparent 28%),
-    radial-gradient(circle at right 20%, rgba(40, 199, 111, 0.14), transparent 24%),
-    linear-gradient(180deg, #f4f8ff 0%, #eef4fb 52%, #f8fbff 100%);
+    radial-gradient(ellipse at top left, rgba(255, 255, 255, 0.8), transparent 45%),
+    radial-gradient(ellipse at bottom right, rgba(226, 232, 240, 0.4), transparent 50%),
+    linear-gradient(180deg, #f4f6f8 0%, #e8eef3 100%);
   overflow: hidden;
+  font-family: 'Inter', -apple-system, sans-serif;
 }
 
 .page-glow {
   position: absolute;
   border-radius: 50%;
-  filter: blur(12px);
+  filter: blur(50px);
   pointer-events: none;
+  z-index: 0;
 }
 
 .page-glow-left {
-  top: 72px;
-  left: -40px;
-  width: 180px;
-  height: 180px;
-  background: rgba(22, 119, 255, 0.12);
+  top: -50px;
+  left: -100px;
+  width: 400px;
+  height: 400px;
+  background: rgba(255, 255, 255, 0.4);
+  animation: floatLeft 15s ease-in-out infinite alternate;
 }
 
 .page-glow-right {
-  right: 40px;
-  bottom: 32px;
-  width: 220px;
-  height: 220px;
-  background: rgba(14, 203, 102, 0.08);
+  right: -50px;
+  bottom: -50px;
+  width: 500px;
+  height: 500px;
+  background: rgba(226, 232, 240, 0.3);
+  animation: floatRight 18s ease-in-out infinite alternate;
+}
+
+@keyframes floatLeft {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(40px, 30px) scale(1.1); }
+}
+
+@keyframes floatRight {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(-50px, -40px) scale(1.05); }
 }
 
 .right-panel {
@@ -249,51 +336,93 @@ const handleSettingAction = (key) => {
 
 .panel-shell {
   min-height: 100%;
-  border: 1px solid rgba(219, 230, 244, 0.75);
-  border-radius: 24px;
-  padding: 32px;
-  background: rgba(255, 255, 255, 0.78);
-  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  border-radius: 32px;
+  padding: 36px 40px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.75) 100%);
+  backdrop-filter: blur(24px) saturate(120%);
   box-shadow:
-    0 1px 3px rgba(27, 63, 104, 0.04),
-    0 20px 50px rgba(27, 63, 104, 0.07);
+    0 10px 40px rgba(15, 23, 42, 0.03),
+    inset 0 2px 4px rgba(255, 255, 255, 1);
+  transition: all 0.3s ease;
 }
 
 .content-intro {
-  margin-bottom: 28px;
-  padding-bottom: 24px;
-  border-bottom: 1px solid rgba(219, 230, 244, 0.6);
+  margin-bottom: 32px;
+  padding-bottom: 28px;
+  border-bottom: 1px solid rgba(226, 236, 248, 0.7);
+  position: relative;
+}
+
+.content-intro::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  width: 60px;
+  height: 2px;
+  background: linear-gradient(90deg, #94a3b8, transparent);
+  border-radius: 2px;
 }
 
 .content-intro h1 {
-  margin: 10px 0 6px;
-  font-size: 28px;
+  margin: 14px 0 8px;
+  font-size: 30px;
   font-weight: 800;
-  line-height: 1.2;
-  color: #163253;
+  line-height: 1.25;
+  color: #0f243d;
   letter-spacing: -0.02em;
 }
 
 .content-intro p {
   margin: 0;
-  max-width: 600px;
-  font-size: 13px;
-  line-height: 1.75;
-  color: #7a8da3;
+  max-width: 640px;
+  font-size: 14px;
+  line-height: 1.8;
+  color: #6a7d94;
 }
 
 .intro-badge {
   display: inline-flex;
   align-items: center;
-  height: 28px;
-  padding: 0 12px;
+  height: 30px;
+  padding: 0 14px;
   border-radius: 999px;
-  background: linear-gradient(135deg, rgba(22, 119, 255, 0.1), rgba(103, 184, 255, 0.08));
-  color: #1668dc;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.mobile-nav-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.back-btn {
+  font-size: 20px;
+  color: #334155;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 8px;
+  transition: background 0.2s;
+}
+
+.back-btn:hover {
+  background: #f1f5f9;
+}
+
+.mobile-nav-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: #0f172a;
 }
 
 .panel-content {
@@ -327,25 +456,27 @@ const handleSettingAction = (key) => {
   transform: translateY(-8px);
 }
 
-@media (max-width: 1400px) {
+@media (max-width: 992px) {
   .profile-page {
     flex-direction: column;
+    gap: 16px;
+    padding: 16px;
   }
 }
 
 @media (max-width: 768px) {
   .profile-page {
-    padding: 14px;
-    gap: 14px;
+    padding: 12px;
+    gap: 12px;
   }
 
   .panel-shell {
-    padding: 20px 16px;
-    border-radius: 22px;
+    padding: 24px 20px;
+    border-radius: 24px;
   }
 
   .content-intro h1 {
-    font-size: 26px;
+    font-size: 24px;
   }
 }
 </style>

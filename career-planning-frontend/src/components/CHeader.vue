@@ -1,9 +1,12 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, inject, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/modules/user'
-import { ArrowDown, User, SwitchButton } from '@element-plus/icons-vue'
+import { ArrowDown, User, SwitchButton, Menu as MenuIcon } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+
+const isMobileLayout = inject('isMobileLayout', ref(false))
+const toggleMobileDrawer = inject('toggleMobileDrawer', () => {})
 
 const route = useRoute()
 const router = useRouter()
@@ -85,9 +88,11 @@ const confirmLogout = () => {
 <template>
   <header class="header glass-header">
     <div class="header-left">
+      <el-icon v-if="isMobileLayout" class="mobile-menu-btn" @click="toggleMobileDrawer">
+        <MenuIcon />
+      </el-icon>
       <div class="breadcrumb">
-        <!-- <span class="app-name">职引未来</span> -->
-        <span class="app-name">职悟 Agent</span>
+        <span class="app-name">职路 Agent</span>
         <span class="divider">/</span>
         <span class="page-title">{{ currentTitle }}</span>
       </div>
@@ -361,6 +366,19 @@ const confirmLogout = () => {
     min-height: 72px;
     padding: 12px 16px;
     gap: 12px;
+  }
+
+  .header-left {
+    gap: 12px;
+  }
+
+  .mobile-menu-btn {
+    font-size: 20px;
+    color: #409eff;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 6px;
+    background: rgba(64, 158, 255, 0.1);
   }
 
   .breadcrumb {

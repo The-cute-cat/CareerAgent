@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { ref, reactive, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -1803,142 +1803,127 @@ const resetForm = () => {
 <template>
   <div class="career-form-layout">
     <el-container>
-      <!-- 侧边栏 -->
-      <el-aside width="220px" class="sidebar">
+      <!-- 高端自定义侧边栏 -->
+      <el-aside width="260px" class="premium-sidebar">
         <div class="sidebar-brand">
-          <div class="brand-icon">
-            <el-icon :size="26">
-              <DocumentAdd />
-            </el-icon>
+          <div class="brand-icon-wrapper">
+            <el-icon :size="24"><DocumentAdd /></el-icon>
+            <div class="brand-glow"></div>
           </div>
           <div class="brand-info">
             <div class="brand-text">能力画像</div>
-            <div class="brand-subtitle">就业规划系统</div>
+            <div class="brand-subtitle">AI 智能规划</div>
           </div>
         </div>
 
-        <!-- 进度概览 -->
-        <div class="progress-overview">
-          <div class="progress-text">
-            <span>完成度</span>
-            <span class="progress-percent">{{ formProgress }}%</span>
-          </div>
-          <el-progress :percentage="formProgress" :show-text="false" :stroke-width="6" class="sidebar-progress" />
-        </div>
-
-        <el-menu :default-active="activeMenu" class="sidebar-menu" @select="handleMenuSelect">
-          <el-menu-item index="1" :class="{ 'is-completed': isStepCompleted(1) }">
-            <div class="menu-step">
-              <el-icon v-if="isStepCompleted(1)">
-                <Check />
-              </el-icon>
-              <span v-else>1</span>
-            </div>
-            <span class="menu-text">基本信息</span>
-            <el-icon class="menu-check" v-if="isStepCompleted(1)"><Circle-Check /></el-icon>
-          </el-menu-item>
-
-          <el-menu-item index="2" :class="{ 'is-completed': isStepCompleted(2) }">
-            <div class="menu-step">
-              <el-icon v-if="isStepCompleted(2)">
-                <Check />
-              </el-icon>
-              <span v-else>2</span>
-            </div>
-            <span class="menu-text">技能证书</span>
-            <el-icon class="menu-check" v-if="isStepCompleted(2)"><Circle-Check /></el-icon>
-          </el-menu-item>
-
-          <el-menu-item index="3" :class="{ 'is-completed': isStepCompleted(3) }">
-            <div class="menu-step">
-              <el-icon v-if="isStepCompleted(3)">
-                <Check />
-              </el-icon>
-              <span v-else>3</span>
-            </div>
-            <span class="menu-text">经历项目</span>
-            <el-icon class="menu-check" v-if="isStepCompleted(3)"><Circle-Check /></el-icon>
-          </el-menu-item>
-
-          <el-menu-item index="4" :class="{ 'is-completed': isStepCompleted(4) }">
-            <div class="menu-step">
-              <el-icon v-if="isStepCompleted(4)">
-                <Check />
-              </el-icon>
-              <span v-else>4</span>
-            </div>
-            <span class="menu-text">素质测评</span>
-            <el-icon class="menu-check" v-if="isStepCompleted(4)"><Circle-Check /></el-icon>
-          </el-menu-item>
-
-          <el-menu-item index="5" :class="{ 'is-completed': isStepCompleted(5) }">
-            <div class="menu-step">
-              <el-icon v-if="isStepCompleted(5)">
-                <Check />
-              </el-icon>
-              <span v-else>5</span>
-            </div>
-            <span class="menu-text">职业意向</span>
-            <el-icon class="menu-check" v-if="isStepCompleted(5)"><Circle-Check /></el-icon>
-          </el-menu-item>
-        </el-menu>
-
-        <!-- 简历上传入口 -->
-        <div class="resume-upload-section">
-          <div class="upload-label">
-          </div>
-          <el-button class="upload-btn" :type="hasUploadedResume ? 'info' : 'primary'" @click="showUploadDialog = true"
-            :icon="Upload">
-            {{ hasUploadedResume ? '重新上传简历' : '上传简历' }}
-          </el-button>
-          <el-button
-            v-if="showResumeContinueButton"
-            class="resume-continue-btn"
-            plain
-            :icon="Warning"
-            @click="reopenMissingFieldsChat"
+        <!-- 圆形主进度 -->
+        <div class="main-progress-container">
+          <el-progress 
+            type="dashboard" 
+            :percentage="formProgress" 
+            :stroke-width="10"
+            :width="150"
+            color="rgba(64, 158, 255, 0.9)"
           >
-            继续补全信息
-          </el-button>
-          <div v-if="showResumeContinueButton" class="resume-continue-tip">
-            识别后还有 {{ missingFieldCount }} 项必填信息待补充，稍后也可以从这里继续。
+            <template #default="{ percentage }">
+              <div class="progress-inner">
+                <span class="pct">{{ percentage }}%</span>
+                <span class="lbl">画像完整</span>
+              </div>
+            </template>
+          </el-progress>
+        </div>
+
+        <!-- 垂直轨道进度导航 -->
+        <div class="timeline-nav">
+          <div class="track-line"></div>
+          <div 
+            v-for="step in [1, 2, 3, 4, 5]" 
+            :key="step" 
+            class="nav-item"
+            :class="{ 
+              'is-active': activeMenu === String(step), 
+              'is-completed': isStepCompleted(step) 
+            }"
+            @click="handleMenuSelect(String(step))"
+          >
+            <div class="dot-box">
+              <div class="step-dot">
+                <el-icon v-if="isStepCompleted(step)"><Check /></el-icon>
+                <span v-else>{{ step }}</span>
+              </div>
+              <div class="active-glow" v-if="activeMenu === String(step)"></div>
+            </div>
+            <span class="nav-text">
+              {{ ['基本信息', '技能证书', '经历项目', '素质测评', '职业意向'][step-1] }}
+            </span>
+          </div>
+        </div>
+
+        <!-- 简历上传操作区 -->
+        <div class="sidebar-footer">
+          <div class="upload-island" @click="showUploadDialog = true">
+            <el-icon :size="22" :class="{ 'is-uploaded': hasUploadedResume }">
+              <Upload />
+            </el-icon>
+            <div class="upload-text">
+              <span>{{ hasUploadedResume ? '重新解析简历' : '智能解析简历' }}</span>
+              <small>AI 自动填充表单</small>
+            </div>
+          </div>
+          
+          <div v-if="showResumeContinueButton" class="resume-resume-tip">
+             还有 {{ missingFieldCount }} 处待补全
           </div>
         </div>
       </el-aside>
 
       <!-- 主内容区 -->
       <el-main class="main-content">
-        <el-card class="form-card">
+        <el-card class="form-card-dashboard">
           <template #header>
-            <div class="card-header">
-              <div class="title-section">
+            <div class="dashboard-header-modern">
+              <div class="header-left">
+                <div class="current-step-badge">Phase {{ activeMenu }}</div>
                 <h2>{{ currentSectionTitle }}</h2>
-                <p class="subtitle">第 {{ activeMenu }} 步，共 5 步</p>
-                <div class="header-badges">
-                  <span class="header-badge">画像完整度 {{ profileCompleteness }}%</span>
-                  <span class="header-badge header-badge--soft">逐步完善后可生成更准确评估</span>
+                <div class="step-indicator">
+                   {{ ['Profile', 'Expertise', 'Journey', 'Assessment', 'Objective'][parseInt(activeMenu)-1] }}
                 </div>
               </div>
-              <div class="progress-section">
-                <span class="progress-label">完成度 {{ formProgress }}%</span>
-                <el-progress :percentage="formProgress" :stroke-width="8" :show-text="false" class="progress-bar" />
-              </div>
-            </div>
-            <div class="header-stats">
-              <div class="header-stat-card">
-                <span class="stat-label">当前阶段</span>
-                <strong>{{ currentSectionTitle }}</strong>
-                <small>聚焦本步核心信息完善</small>
-              </div>
-              <div class="header-stat-card">
-                <span class="stat-label">已完成步骤</span>
-                <strong>{{ completedStepCount }}/5</strong>
-                <small>每完成一步都会提升画像可用性</small>
-              </div>
-              <div class="header-stat-card">
-                <span class="stat-label">评估准备度</span>
-                <strong>{{ profileCompleteness >= 80 ? '良好' : profileCompleteness >= 60 ? '提升中' : '待完善' }}</strong>
-                <small>完善越充分，后续建议越准确</small>
+              
+              <div class="dashboard-stat-row">
+                <div class="dash-stat-item">
+                  <div class="stat-icon purple">
+                    <el-icon><Medal /></el-icon>
+                  </div>
+                  <div class="stat-info">
+                    <span class="stat-label">画像精准度</span>
+                    <span class="stat-value">{{ profileCompleteness }}%</span>
+                  </div>
+                  <div class="stat-glass-glow"></div>
+                </div>
+                
+                <div class="dash-stat-item">
+                  <div class="stat-icon blue">
+                    <el-icon><Finished /></el-icon>
+                  </div>
+                  <div class="stat-info">
+                    <span class="stat-label">已完成步骤</span>
+                    <span class="stat-value">{{ completedStepCount }}/5</span>
+                  </div>
+                  <div class="stat-glass-glow"></div>
+                </div>
+
+                <div class="dash-stat-item">
+                  <div class="stat-icon orange">
+                    <el-icon><DataAnalysis /></el-icon>
+                  </div>
+                  <div class="stat-info">
+                    <span class="stat-label">评估准备度</span>
+                    <span class="stat-value">{{ profileCompleteness >= 80 ? '高' : '中' }}</span>
+                  </div>
+                  <div class="stat-glass-glow"></div>
+                </div>
               </div>
             </div>
           </template>
@@ -2157,31 +2142,26 @@ const resetForm = () => {
             <div v-show="activeMenu === '3'" class="section-content">
               <div class="form-section-title">项目经历</div>
               <el-form-item label="项目或竞赛">
-                <div class="experience-list">
-                  <div v-for="(proj, index) in formData.projects" :key="index" class="experience-card"
+                <div class="experience-list-modern">
+                  <div v-for="(proj, index) in formData.projects" :key="index" class="premium-exp-card"
                     :class="{ 'is-competition': proj.isCompetition }">
-                    <div class="experience-card-header">
-                      <div class="experience-type-badge">
-                        <el-icon v-if="proj.isCompetition">
-                          <Trophy />
-                        </el-icon>
-                        <el-icon v-else>
-                          <Folder />
-                        </el-icon>
-                        <span>{{ proj.isCompetition ? '竞赛' : '项目' }}</span>
+                    <div class="card-indicator"></div>
+                    <div class="card-content">
+                      <div class="card-top">
+                        <div class="exp-badge">
+                          <el-icon v-if="proj.isCompetition"><Trophy /></el-icon>
+                          <el-icon v-else><Folder /></el-icon>
+                          <span>{{ proj.isCompetition ? '竞赛精华' : '核心项目' }}</span>
+                        </div>
+                        <div class="card-actions-minimal">
+                          <el-button link type="primary" :icon="Edit" @click="openEditProjectDialog(index)" />
+                          <el-button link type="danger" :icon="Delete" @click="removeProject(index)" />
+                        </div>
                       </div>
-                      <div class="card-actions">
-                        <el-button text type="primary" :icon="Edit" @click="openEditProjectDialog(index)">
-                          编辑
-                        </el-button>
-                        <el-button text type="danger" :icon="Delete" @click="removeProject(index)">
-                          删除
-                        </el-button>
+                      <h4 class="exp-title">{{ proj.name }}</h4>
+                      <div class="exp-desc-box" v-if="proj.desc">
+                        {{ proj.desc }}
                       </div>
-                    </div>
-                    <div class="experience-card-body preview-mode">
-                      <h4 class="preview-title">{{ proj.name }}</h4>
-                      <p class="preview-desc" v-if="proj.desc">{{ proj.desc }}</p>
                     </div>
                   </div>
                 </div>
@@ -2193,34 +2173,32 @@ const resetForm = () => {
 
               <div class="form-section-title">实践经历</div>
               <el-form-item label="实习/工作" prop="internships">
-                <div class="experience-list">
+                <div class="experience-list-modern">
                   <div v-for="(intern, index) in formData.internships" :key="index"
-                    class="experience-card internship-card">
-                    <div class="experience-card-header">
-                      <div class="experience-type-badge work-badge">
-                        <el-icon>
-                          <Briefcase />
-                        </el-icon>
-                        <span>工作/实习</span>
+                    class="premium-exp-card internship-themed">
+                    <div class="card-indicator"></div>
+                    <div class="card-content">
+                      <div class="card-top">
+                        <div class="exp-badge">
+                          <el-icon><Briefcase /></el-icon>
+                          <span>职业实战</span>
+                        </div>
+                        <div class="card-actions-minimal">
+                          <el-button link type="primary" :icon="Edit" @click="openEditInternshipDialog(index)" />
+                          <el-button link type="danger" :icon="Delete" @click="removeInternship(index)" />
+                        </div>
                       </div>
-                      <div class="card-actions">
-                        <el-button text type="primary" :icon="Edit" @click="openEditInternshipDialog(index)">
-                          编辑
-                        </el-button>
-                        <el-button text type="danger" :icon="Delete" @click="removeInternship(index)">
-                          删除
-                        </el-button>
+                      <div class="exp-header-info">
+                        <h4 class="company-name">{{ intern.company }}</h4>
+                        <span class="role-tag">{{ intern.role }}</span>
                       </div>
-                    </div>
-                    <div class="experience-card-body preview-mode">
-                      <div class="info-row">
-                        <span class="info-company">{{ intern.company }}</span>
-                        <span class="info-role">{{ intern.role }}</span>
+                      <div class="exp-meta-info" v-if="intern.date && intern.date.length === 2">
+                        <el-icon><Calendar /></el-icon>
+                        <span>{{ formatDateRange(intern.date) }}</span>
                       </div>
-                      <div class="info-date" v-if="intern.date && intern.date.length === 2">
-                        {{ formatDateRange(intern.date) }}
+                      <div class="exp-desc-box" v-if="intern.desc">
+                        {{ intern.desc }}
                       </div>
-                      <p class="preview-desc" v-if="intern.desc">{{ intern.desc }}</p>
                     </div>
                   </div>
                 </div>
@@ -2872,325 +2850,322 @@ const resetForm = () => {
   gap: 10px;
 }
 
-.sidebar-menu :deep(.el-menu-item:hover) {
-  background: rgba(237, 245, 255, 0.96);
-  color: #2f7df6;
+/* 高端侧边栏重塑 */
+.premium-sidebar {
+  background: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(20px);
+  border-right: 1px solid rgba(255, 255, 255, 0.5);
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  height: calc(100vh - 80px);
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 
-.sidebar-menu :deep(.el-menu-item.is-active) {
-  background: linear-gradient(135deg, rgba(229, 241, 255, 0.98), rgba(242, 248, 255, 0.98));
-  color: #2f7df6;
-  box-shadow: 0 8px 18px rgba(47, 125, 246, 0.08);
+.sidebar-brand {
+  padding: 32px 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
-.sidebar-menu :deep(.el-menu-item.is-completed) {
-  color: #67c23a;
-}
-
-.sidebar-menu :deep(.el-menu-item.is-completed:not(.is-active)) {
-  background: #f0f9ff;
-}
-
-.sidebar-menu :deep(.el-menu-item.is-completed:not(.is-active)):hover {
-  background: #ecf5ff;
-}
-
-.menu-step {
-  width: 24px;
-  height: 24px;
-  border-radius: 8px;
-  background: #eef4fb;
+.brand-icon-wrapper {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  background: linear-gradient(135deg, #409eff 0%, #1677ff 100%);
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
-  font-weight: 500;
-  transition: all 0.2s ease;
-  flex-shrink: 0;
-}
-
-.sidebar-menu :deep(.el-menu-item.is-active .menu-step) {
-  background: #409eff;
   color: #fff;
+  box-shadow: 0 8px 16px rgba(64, 158, 255, 0.3);
 }
 
-.sidebar-menu :deep(.el-menu-item.is-completed .menu-step) {
-  background: #67c23a;
-  color: #fff;
+.brand-glow {
+  position: absolute;
+  inset: -4px;
+  background: inherit;
+  filter: blur(8px);
+  opacity: 0.4;
+  border-radius: inherit;
+  z-index: -1;
 }
 
-.menu-text {
-  flex: 1;
+.brand-text {
+  font-size: 18px;
+  font-weight: 800;
+  color: #1e293b;
+  letter-spacing: 0.5px;
 }
 
-.menu-check {
-  font-size: 16px;
-  color: #3fb950;
-  opacity: 0;
-  transform: scale(0);
-  transition: all 0.3s ease;
-}
-
-.sidebar-menu :deep(.el-menu-item.is-completed .menu-check) {
-  opacity: 1;
-  transform: scale(1);
-}
-
-.resume-upload-section {
-  padding: 16px;
-  margin: 12px;
-  background: linear-gradient(180deg, rgba(244, 248, 255, 0.95), rgba(238, 245, 255, 0.92));
-  border-radius: 18px;
-  border: 1px solid rgba(220, 231, 244, 0.96);
-  flex-shrink: 0;
-  box-shadow: 0 12px 30px rgba(22, 59, 102, 0.08);
-}
-
-.upload-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: #909399;
-  font-size: 12px;
-  font-weight: 500;
-  margin-bottom: 10px;
-}
-
-.upload-label .el-icon {
-  font-size: 14px;
-}
-
-.upload-btn {
-  width: 100%;
-  border-radius: 14px;
-  font-weight: 500;
-  font-size: 13px;
-  padding: 10px 0;
-  background: linear-gradient(135deg, #2f7df6 0%, #63b7ff 100%);
-  border: none;
-  color: #ffffff !important;
-  transition: all 0.2s ease;
-  box-shadow: 0 10px 22px rgba(47, 125, 246, 0.18);
-}
-
-.upload-btn:hover {
-  background: linear-gradient(135deg, #4d8ff6 0%, #73c4ff 100%);
-}
-
-/* 已上传简历状态 */
-.upload-btn.el-button--info {
-  background: #909399;
-  border: none;
-  color: #ffffff !important;
-}
-
-.upload-btn.el-button--info:hover {
-  background: #a6a9ad;
-}
-
-.resume-continue-btn {
-  width: 100%;
-  margin-top: 10px;
-  margin-left: auto;
-  padding: 10px 18px;
-  border-radius: 14px;
-  box-sizing: border-box;
-  border-color: rgba(230, 162, 60, 0.45);
-  color: #b76a00;
-  background: rgba(255, 247, 237, 0.92);
-  font-weight: 600;
-  line-height: 1.2;
-}
-
-.resume-continue-btn:hover {
-  border-color: rgba(230, 162, 60, 0.68);
-  color: #9a5a00;
-  background: rgba(255, 243, 224, 0.96);
-}
-
-.resume-continue-btn :deep(> span) {
-  width: 100%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
-
-.resume-continue-btn :deep(.el-icon) {
-  margin: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
-  vertical-align: middle;
-}
-
-.resume-continue-tip {
-  margin-top: 8px;
-  font-size: 12px;
-  line-height: 1.6;
-  color: #8a6a2f;
-}
-
-.upload-tip {
-  margin-top: 8px;
+.brand-subtitle {
   font-size: 11px;
-  color: #c0c4cc;
-  text-align: center;
-  line-height: 1.5;
+  color: #64748b;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
 }
 
-/* 主内容区样式 */
-.main-content {
-  padding: 28px;
+/* 主进度盘 */
+.main-progress-container {
+  padding: 0 24px 32px;
+  display: flex;
+  justify-content: center;
+}
+
+.progress-inner {
   display: flex;
   flex-direction: column;
-}
-
-.form-card {
-  width: 100%;
-  max-width: 1040px;
-  margin: 0 auto;
-  border-radius: 28px;
-  background: rgba(255, 255, 255, 0.88);
-  border: 1px solid rgba(220, 231, 244, 0.96);
-  height: auto;
-  min-height: fit-content;
-  box-shadow:
-    0 18px 42px rgba(22, 59, 102, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.84);
-  overflow: hidden;
-}
-
-.form-card :deep(.el-card__header) {
-  padding: 24px 28px;
-  border-bottom: 1px solid rgba(225, 234, 244, 0.94);
-  background: linear-gradient(180deg, rgba(248, 251, 255, 0.94), rgba(244, 248, 255, 0.92));
-}
-
-.form-card :deep(.el-card__body) {
-  padding: 28px;
-  height: auto;
-  min-height: auto;
-}
-
-.form-card :deep(.el-form) {
-  display: flex;
-  flex-direction: column;
-  height: auto;
-  min-height: auto;
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
   align-items: center;
+}
+
+.progress-inner .pct {
+  font-size: 24px;
+  font-weight: 800;
+  color: #1e293b;
+}
+
+.progress-inner .lbl {
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 600;
+}
+
+/* 时间轴导航 */
+.timeline-nav {
+  flex: 1;
+  padding: 0 24px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
   gap: 20px;
 }
 
-.title-section h2 {
-  margin: 0 0 4px 0;
-  font-size: 26px;
-  font-weight: 700;
-  color: #173a5d;
+.track-line {
+  position: absolute;
+  left: 42px;
+  top: 10px;
+  bottom: 10px;
+  width: 2px;
+  background: rgba(226, 232, 240, 0.8);
 }
 
-.subtitle {
-  margin: 0;
-  font-size: 13px;
-  color: #8aa0b7;
-  font-weight: 500;
-}
-
-.header-badges {
+.nav-item {
   display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 12px;
-}
-
-.header-badge {
-  display: inline-flex;
   align-items: center;
-  min-height: 32px;
-  padding: 0 12px;
-  border-radius: 999px;
-  background: rgba(47, 125, 246, 0.1);
-  color: #2f7df6;
+  gap: 16px;
+  cursor: pointer;
+  z-index: 2;
+  transition: all 0.3s ease;
+}
+
+.dot-box {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.step-dot {
+  width: 26px;
+  height: 26px;
+  background: #fff;
+  border: 2px solid #e2e8f0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 12px;
   font-weight: 700;
+  color: #94a3b8;
+  transition: all 0.3s ease;
 }
 
-.header-badge--soft {
-  background: rgba(136, 160, 186, 0.12);
-  color: #6f839a;
+.active-glow {
+  position: absolute;
+  width: 36px;
+  height: 36px;
+  background: rgba(64, 158, 255, 0.15);
+  border-radius: 50%;
+  animation: pulse 2s infinite;
 }
 
-.header-stats {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
-  margin-top: 20px;
+@keyframes pulse {
+  0% { transform: scale(0.8); opacity: 0.5; }
+  50% { transform: scale(1.2); opacity: 0.2; }
+  100% { transform: scale(0.8); opacity: 0.5; }
 }
 
-.header-stat-card {
-  padding: 16px 18px;
-  border-radius: 18px;
-  border: 1px solid rgba(221, 232, 244, 0.96);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(243, 248, 255, 0.92));
-  box-shadow: 0 10px 22px rgba(21, 60, 110, 0.05);
+.nav-item.is-active .step-dot {
+  background: #409eff;
+  border-color: #409eff;
+  color: #fff;
+  box-shadow: 0 0 12px rgba(64, 158, 255, 0.4);
 }
 
-.stat-label {
-  display: inline-block;
-  margin-bottom: 8px;
-  color: #7b91a7;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.03em;
+.nav-item.is-completed .step-dot {
+  background: #10b981;
+  border-color: #10b981;
+  color: #fff;
 }
 
-.header-stat-card strong {
-  display: block;
-  margin-bottom: 6px;
-  color: #173a5d;
-  font-size: 18px;
+.nav-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: #64748b;
+  transition: color 0.3s ease;
+}
+
+.nav-item.is-active .nav-text {
+  color: #1e293b;
   font-weight: 800;
 }
 
-.header-stat-card small {
-  display: block;
-  color: #8aa0b7;
-  font-size: 12px;
-  line-height: 1.6;
+/* 侧边栏页脚 */
+.sidebar-footer {
+  padding: 24px;
+  border-top: 1px solid rgba(226, 232, 240, 0.5);
 }
 
-.progress-section {
+.upload-island {
+  background: linear-gradient(135deg, rgba(64, 158, 255, 0.08) 0%, rgba(22, 119, 255, 0.03) 100%);
+  border: 1px solid rgba(64, 158, 255, 0.2);
+  border-radius: 16px;
+  padding: 16px;
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 6px;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
 }
 
-.progress-label {
-  font-size: 12px;
-  color: #6c8199;
+.upload-island:hover {
+  background: rgba(64, 158, 255, 0.12);
+  transform: translateY(-2px);
+}
+
+.upload-island .el-icon { color: #409eff; }
+.upload-island .el-icon.is-uploaded { color: #10b981; }
+
+.upload-text span {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.upload-text small {
+  font-size: 11px;
+  color: #64748b;
+}
+
+.resume-resume-tip {
+  margin-top: 12px;
+  font-size: 11px;
+  color: #f59e0b;
   font-weight: 600;
+  text-align: center;
 }
 
-.progress-bar {
-  width: 180px;
+/* 主看板样式重塑 */
+.form-card-dashboard {
+  border: none;
+  background: rgba(255, 255, 255, 0.8) !important;
+  backdrop-filter: blur(30px);
+  border-radius: 32px !important;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.04) !important;
+  overflow: visible !important;
 }
 
-.progress-bar :deep(.el-progress-bar__outer) {
-  background-color: #f0f0f0;
-  border-radius: 4px;
+.form-card-dashboard :deep(.el-card__header) {
+  padding: 40px 40px 20px;
+  border-bottom: none;
+  background: transparent;
 }
 
-.progress-bar :deep(.el-progress-bar__inner) {
-  background: #409eff;
-  border-radius: 2px;
-  transition: width 0.3s ease;
+.dashboard-header-modern {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.current-step-badge {
+  background: rgba(64, 158, 255, 0.1);
+  color: #409eff;
+  padding: 4px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+  display: inline-block;
+}
+
+.header-left h2 {
+  font-size: 32px;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0;
+}
+
+.step-indicator {
+  font-size: 14px;
+  color: #64748b;
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+.dashboard-stat-row {
+  display: flex;
+  gap: 16px;
+}
+
+.dash-stat-item {
+  position: relative;
+  background: #fff;
+  border-radius: 20px;
+  padding: 16px 20px;
+  min-width: 160px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.02);
+  border: 1px solid rgba(226, 232, 240, 0.5);
+  overflow: hidden;
+}
+
+.stat-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+}
+
+.stat-icon.purple { background: #f5f3ff; color: #8b5cf6; }
+.stat-icon.blue { background: #eff6ff; color: #3b82f6; }
+.stat-icon.orange { background: #fff7ed; color: #f59e0b; }
+
+.stat-info { display: flex; flex-direction: column; }
+.stat-label { font-size: 11px; color: #64748b; font-weight: 600; }
+.stat-value { font-size: 18px; font-weight: 800; color: #1e293b; }
+
+.stat-glass-glow {
+  position: absolute;
+  right: -10px;
+  top: -10px;
+  width: 40px;
+  height: 40px;
+  background: inherit;
+  filter: blur(15px);
+  opacity: 0.3;
 }
 
 /* 表单内容样式 */
@@ -3218,24 +3193,22 @@ const resetForm = () => {
 
 /* 分组标题 */
 .form-section-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: #173a5d;
-  margin: 28px 0 18px;
-  padding-left: 0;
-  border-left: none;
+  font-size: 18px;
+  font-weight: 800;
+  color: #1e293b;
+  margin: 32px 0 20px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
 }
 
 .form-section-title::before {
   content: '';
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #2f7df6 0%, #66c4ff 100%);
-  box-shadow: 0 0 0 6px rgba(47, 125, 246, 0.1);
+  width: 4px;
+  height: 20px;
+  background: linear-gradient(180deg, #409eff 0%, #1677ff 100%);
+  border-radius: 4px;
+  box-shadow: 0 2px 6px rgba(64, 158, 255, 0.3);
 }
 
 .form-section-title:first-child {
@@ -3334,119 +3307,149 @@ const resetForm = () => {
   margin-bottom: 0;
 }
 
-/* 列表样式 */
-.list-container,
-.input-list-group {
-  width: 100%;
-}
-
-.list-row,
-.skill-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 12px;
-  padding: 12px 14px;
-  background: linear-gradient(180deg, #f7fbff 0%, #f2f7fd 100%);
-  border-radius: 16px;
-  border: 1px solid rgba(220, 231, 244, 0.96);
-  transition: all 0.2s ease;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
-}
-
-.list-row:last-child,
-.skill-item:last-child {
-  margin-bottom: 0;
-}
-
-.list-row:hover,
-.skill-item:hover {
-  border-color: rgba(47, 125, 246, 0.26);
-  background: linear-gradient(180deg, #fbfdff 0%, #f4f9ff 100%);
-  box-shadow: 0 10px 22px rgba(25, 72, 122, 0.06);
-}
-
-/* 技能项特殊样式 */
-.skill-item {
-  justify-content: space-between;
-}
-
-.skill-item span {
-  font-weight: 500;
-  color: #303133;
-  flex: 1;
-}
-
-/* 项目卡片样式 */
-.project-card {
+/* 经历卡片现代版样式 */
+.experience-list-modern {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  /* 统一控制内部间距 */
-  padding: 20px;
-  background: #fafbfc;
-  border: 1px solid #e4e7ed;
-  border-radius: 4px;
-  margin-bottom: 16px;
-}
-
-.project-card:hover {
-  border-color: #c0c4cc;
-}
-
-.project-card .el-input,
-.project-card .el-textarea {
   width: 100%;
 }
 
-.project-card :deep(.el-input__wrapper),
-.project-card :deep(.el-textarea__inner) {
-  background: #fff;
-  border-radius: 10px;
+.premium-exp-card {
+  position: relative;
+  background: #ffffff;
+  border: 1px solid rgba(226, 232, 240, 0.6);
+  border-radius: 20px;
+  padding: 0;
+  display: flex;
+  overflow: hidden;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
 }
 
-/* 项目卡片头部 */
-.project-header {
+.premium-exp-card:hover {
+  transform: translateY(-4px) scale(1.005);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.06);
+  border-color: rgba(64, 158, 255, 0.3);
+}
+
+.card-indicator {
+  width: 6px;
+  background: linear-gradient(180deg, #409eff 0%, #1677ff 100%);
+  flex-shrink: 0;
+}
+
+.is-competition .card-indicator {
+  background: linear-gradient(180deg, #8b5cf6 0%, #6d28d9 100%);
+}
+
+.internship-themed .card-indicator {
+  background: linear-gradient(180deg, #10b981 0%, #059669 100%);
+}
+
+.premium-exp-card .card-content {
+  flex: 1;
+  padding: 20px 24px;
+}
+
+.card-top {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px dashed #dcdfe6;
-  padding-bottom: 16px;
-  /* 这个 padding 不影响外部间距，因为 gap 已经处理了 */
+  margin-bottom: 12px;
 }
 
-/* 项目操作区 */
-.project-actions {
+.exp-badge {
   display: flex;
-  justify-content: flex-end;
-  width: 500px;
-  /* 不需要额外样式 */
-}
-
-/* 实习经历行 */
-.internship-row {
-  display: flex;
-  gap: 16px;
   align-items: center;
-  flex-wrap: wrap;
+  gap: 6px;
+  background: #f1f5f9;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
 }
 
-/* 项目卡片内的 Switch */
-.project-card .el-switch {
-  --el-switch-core-border-radius: 10px;
+.is-competition .exp-badge { background: #f5f3ff; color: #8b5cf6; }
+.internship-themed .exp-badge { background: #ecfdf5; color: #10b981; }
+
+.card-actions-minimal {
+  display: flex;
+  gap: 8px;
+  opacity: 0;
+  transition: opacity 0.3s ease;
 }
 
-.project-card .el-switch__label {
+.premium-exp-card:hover .card-actions-minimal {
+  opacity: 1;
+}
+
+.exp-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: #1e293b;
+  margin: 0 0 8px 0;
+}
+
+.exp-header-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.company-name {
+  font-size: 18px;
+  font-weight: 800;
+  color: #1e293b;
+  margin: 0;
+}
+
+.role-tag {
+  font-size: 12px;
+  font-weight: 600;
+  background: #eff6ff;
+  color: #3b82f6;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.exp-meta-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #64748b;
   font-weight: 500;
+  margin-bottom: 12px;
 }
 
-/* 日期选择器在项目卡片内 */
-.project-card .el-date-editor {
-  width: 100% !important;
+.exp-desc-box {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #475569;
+  background: #f8fafc;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid #f1f5f9;
 }
 
-.project-card .el-date-editor .el-input__wrapper {
-  border-radius: 4px;
+/* 按钮全局优化 */
+:deep(.el-button--primary) {
+  background: linear-gradient(135deg, #409eff 0%, #1677ff 100%) !important;
+  border: none !important;
+  border-radius: 14px !important;
+  font-weight: 700;
+  padding: 12px 24px;
+  box-shadow: 0 8px 20px rgba(64, 158, 255, 0.25);
+  transition: all 0.3s ease;
+}
+
+:deep(.el-button--primary:hover) {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px rgba(64, 158, 255, 0.35);
 }
 
 /* 按钮样式 */
@@ -3479,26 +3482,25 @@ const resetForm = () => {
   color: #ffffff !important;
 }
 
+/* 统一文字按钮 */
 :deep(.el-button.is-text) {
-  border-radius: 4px;
+  border-radius: 10px;
   transition: all 0.2s ease;
   color: #409eff;
-  font-weight: 500;
+  font-weight: 700;
 }
 
 :deep(.el-button.is-text:hover) {
-  background: #ecf5ff;
-  color: #409eff;
+  background: rgba(64, 158, 255, 0.08);
+  color: #1677ff;
 }
 
-/* 危险操作文字按钮 */
-:deep(.el-button.is-text.el-button--danger) {
-  color: #f56c6c;
-}
-
-:deep(.el-button.is-text.el-button--danger:hover) {
-  background: rgba(245, 108, 108, 0.1);
-  color: #ff4d4f;
+/* 复写兼容性 lint 问题 */
+.gradient-text {
+  background: linear-gradient(135deg, #409EFF 0%, #764BA2 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .upload-inline {
