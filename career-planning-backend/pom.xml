@@ -134,14 +134,10 @@
             <artifactId>aliyun-sdk-oss</artifactId>
             <version>3.18.5</version>
         </dependency>
-        
+        <!--webflux-->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webflux</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework</groupId>
-            <artifactId>spring-webflux</artifactId>
         </dependency>
         <dependency>
             <groupId>org.apache.commons</groupId>
@@ -167,6 +163,34 @@
             <version>4.9.28.ALL</version>   <!-- 用官网最新版 -->
         </dependency>
         
+        <!--Word 导出依赖 (POI-tl)-->
+        <dependency>
+            <groupId>com.deepoove</groupId>
+            <artifactId>poi-tl</artifactId>
+            <version>1.12.2</version>
+        </dependency>
+
+        <!--模板引擎依赖 (Thymeleaf)-->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-thymeleaf</artifactId>
+        </dependency>
+        
+        <!--PDF 生成依赖 (OpenHTMLToPDF)-->
+        <dependency>
+            <groupId>com.openhtmltopdf</groupId>
+            <artifactId>openhtmltopdf-core</artifactId>
+            <version>1.0.10</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.openhtmltopdf</groupId>
+            <artifactId>openhtmltopdf-pdfbox</artifactId>
+            <version>1.0.10</version>
+        </dependency>
+        
+        
+        
     </dependencies>
 
     <build>
@@ -189,14 +213,6 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
-                <configuration>
-                    <excludes>
-                        <exclude>
-                            <groupId>org.projectlombok</groupId>
-                            <artifactId>lombok</artifactId>
-                        </exclude>
-                    </excludes>
-                </configuration>
             </plugin>
         </plugins>
     </build>

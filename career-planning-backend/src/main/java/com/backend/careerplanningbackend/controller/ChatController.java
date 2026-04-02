@@ -5,7 +5,6 @@ import com.backend.careerplanningbackend.domain.dto.MultipartFileDTO;
 import com.backend.careerplanningbackend.domain.po.Result;
 import com.backend.careerplanningbackend.util.AiServiceClient;
 import com.backend.careerplanningbackend.util.AliOSSMultipartFileUtil;
-import com.backend.careerplanningbackend.util.AliOSSUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;

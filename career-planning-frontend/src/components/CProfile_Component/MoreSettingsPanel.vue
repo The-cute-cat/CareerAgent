@@ -1,5 +1,5 @@
 <script setup>
-import { EditPen, InfoFilled, Warning, Coin, ArrowRight, SwitchButton } from '@element-plus/icons-vue'
+import { EditPen, InfoFilled, Warning, Coin, ArrowRight, SwitchButton, Promotion } from '@element-plus/icons-vue'
 
 const emit = defineEmits(['action'])
 
@@ -8,7 +8,8 @@ const clickAction = (key) => {
 }
 
 const personalSettings = [
-  { key: 'recommend', icon: EditPen, label: '个性化推荐', desc: '根据你的偏好定制内容' }
+  { key: 'recommend', icon: EditPen, label: '个性化推荐', desc: '根据你的偏好定制内容' },
+  { key: 'ads', icon: Promotion, label: '广告推荐', desc: '管理个性化广告展示' }
 ]
 
 const accountSettings = [
@@ -141,21 +142,26 @@ const aboutSettings = [
 .settings-group {
   display: flex;
   flex-direction: column;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid #e8eef6;
-  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.03);
+  border-radius: 20px;
+  background: #ffffff; /* 变回实心纯白，对齐标准设置界面 */
+  border: 1px solid #edf2f7;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
   overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.settings-group:hover {
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.04);
 }
 
 .setting-item {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 16px 18px;
+  gap: 16px;
+  padding: 20px 24px;
   cursor: pointer;
-  transition: background 0.2s;
-  border-bottom: 1px solid #f1f5f9;
+  transition: all 0.25s ease;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.6);
 
   &:last-child {
     border-bottom: none;
@@ -165,7 +171,11 @@ const aboutSettings = [
     background: #f8fafc;
 
     .setting-label {
-      color: #1677ff;
+      color: #1e62c5;
+    }
+    
+    .setting-icon-wrap {
+      transform: scale(1.05);
     }
   }
 
@@ -175,16 +185,18 @@ const aboutSettings = [
 }
 
 .setting-icon-wrap {
-  width: 38px;
-  height: 38px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, #eef5ff, #f2fbf7);
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #f1f5f9, #f8fafc);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #1677ff;
-  font-size: 17px;
+  color: #64748b;
+  font-size: 18px;
   flex-shrink: 0;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: inset 0 2px 4px rgba(255, 255, 255, 1);
 
   &.danger {
     background: linear-gradient(135deg, #fef2f2, #fff1f2);
@@ -222,19 +234,22 @@ const aboutSettings = [
 
 .logout-btn {
   width: 100%;
-  height: 44px;
-  border-radius: 14px;
-  font-size: 14px;
-  font-weight: 700;
+  height: 48px;
+  border-radius: 16px;
+  font-size: 15px;
+  font-weight: 800;
   border: 1.5px solid #fecaca;
   color: #ef4444;
-  background: #fff5f5;
-  transition: all 0.25s;
+  background: rgba(255, 245, 245, 0.8);
+  backdrop-filter: blur(8px);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 
   &:hover {
     background: #fef2f2;
     border-color: #f87171;
     color: #dc2626;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(239, 68, 68, 0.1);
   }
 }
 </style>

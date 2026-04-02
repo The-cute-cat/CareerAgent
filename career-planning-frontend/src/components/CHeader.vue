@@ -1,9 +1,12 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, inject, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/modules/user'
-import { ArrowDown, User, SwitchButton } from '@element-plus/icons-vue'
+import { ArrowDown, User, SwitchButton, Menu as MenuIcon } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+
+const isMobileLayout = inject('isMobileLayout', ref(false))
+const toggleMobileDrawer = inject('toggleMobileDrawer', () => {})
 
 const route = useRoute()
 const router = useRouter()
@@ -85,8 +88,11 @@ const confirmLogout = () => {
 <template>
   <header class="header glass-header">
     <div class="header-left">
+      <el-icon v-if="isMobileLayout" class="mobile-menu-btn" @click="toggleMobileDrawer">
+        <MenuIcon />
+      </el-icon>
       <div class="breadcrumb">
-        <span class="app-name">职引未来</span>
+        <span class="app-name">职路 Agent</span>
         <span class="divider">/</span>
         <span class="page-title">{{ currentTitle }}</span>
       </div>
@@ -97,7 +103,7 @@ const confirmLogout = () => {
         <el-button class="custom-btn-default" round @click="router.push('/register')">注册</el-button>
       </div>
 
-      <el-dropdown v-else @command="handleCommand" trigger="click">
+      <el-dropdown v-else @command="handleCommand">
         <div class="user-info">
           <div class="user-avatar">
             <img v-if="userAvatar" :src="userAvatar" alt="avatar" class="user-avatar-image" />
@@ -123,10 +129,6 @@ const confirmLogout = () => {
             <el-dropdown-item command="profile">
               <el-icon><User /></el-icon>
               个人中心
-            </el-dropdown-item>
-            <el-dropdown-item command="membership">
-              <el-icon><User /></el-icon>
-              会员权益
             </el-dropdown-item>
             <el-dropdown-item divided command="logout" class="logout-item">
               <el-icon><SwitchButton /></el-icon>
@@ -170,6 +172,7 @@ const confirmLogout = () => {
   font-weight: 700;
   background: linear-gradient(135deg, #409eff 0%, #764ba2 100%);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
   font-size: 16px;
   letter-spacing: 0.5px;
@@ -233,9 +236,8 @@ const confirmLogout = () => {
 }
 
 .user-info:hover {
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
-  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.82);
+  border-color: rgba(64, 158, 255, 0.3);
 }
 
 .user-avatar {
@@ -360,6 +362,19 @@ const confirmLogout = () => {
     min-height: 72px;
     padding: 12px 16px;
     gap: 12px;
+  }
+
+  .header-left {
+    gap: 12px;
+  }
+
+  .mobile-menu-btn {
+    font-size: 20px;
+    color: #409eff;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 6px;
+    background: rgba(64, 158, 255, 0.1);
   }
 
   .breadcrumb {
