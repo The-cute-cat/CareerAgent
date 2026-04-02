@@ -1,5 +1,5 @@
 ﻿<script setup lang="ts">
-import { ref, reactive, computed, nextTick } from 'vue'
+import { ref, reactive, computed, nextTick, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
@@ -51,6 +51,7 @@ import type { JsonResumeGenerationResult, ResumeProfileExtras } from '@/types/js
 import { useJsonResumeStore } from '@/stores'
 import { createDefaultResumeProfileExtras, generateJsonResume } from '@/utils/json-resume'
 import { exportJsonResumeToWord, exportResumePreviewToPdf } from '@/utils/resume-export'
+import { clearCareerFormData, loadCareerFormData, saveCareerFormData } from '@/utils/career-runtime'
 import {
   majorOptions
 } from '@/mock/mockdata/CareerForm_mockdata'
@@ -1695,6 +1696,24 @@ const handleResumeParsed = (parsedData: unknown) => {
   }
 }
 
+const hydrateCareerFormFromStorage = () => {
+  const cachedFormData = loadCareerFormData()
+  if (!cachedFormData) return
+  fillFormWithParsedData(cachedFormData)
+}
+
+onMounted(() => {
+  hydrateCareerFormFromStorage()
+})
+
+watch(
+  formData,
+  () => {
+    saveCareerFormData(formData)
+  },
+  { deep: true }
+)
+
 // --- 岗位联想搜索 ---
 
 /**
@@ -2153,6 +2172,7 @@ const resetForm = () => {
 
   // 重置当前步骤到第一步
   activeMenu.value = '1'
+  clearCareerFormData()
 
   ElMessage.success('表单已重置')
 }

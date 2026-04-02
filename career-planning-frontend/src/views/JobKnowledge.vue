@@ -538,7 +538,7 @@ const activeStatusLabel = computed(() => {
 
 watch(
   filteredRoles,
-  (list) => {
+  (list: JobKnowledgeRole[]) => {
     if (!list.length) {
       selectedRoleId.value = ''
       activeKnowledge.value = null
@@ -546,7 +546,7 @@ watch(
     }
 
     if (!list.some((role) => role.id === selectedRoleId.value)) {
-      selectedRoleId.value = list[0].id
+      selectedRoleId.value = list[0]!.id
     }
   },
   { immediate: true },
