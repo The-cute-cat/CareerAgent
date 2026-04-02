@@ -324,24 +324,29 @@ const handleAvatarUpload = (event) => {
 .hero-card {
   position: relative;
   overflow: hidden;
-  border-radius: 24px;
-  padding: 24px;
+  border-radius: 28px;
+  padding: 32px;
   background:
-    radial-gradient(circle at top right, rgba(255, 255, 255, 0.45), transparent 24%),
-    linear-gradient(135deg, #1f77ff 0%, #45b6ff 55%, #78d0c5 100%);
-  color: #fff;
-  box-shadow: 0 20px 48px rgba(26, 91, 176, 0.2);
+    radial-gradient(ellipse at top right, rgba(255, 255, 255, 0.9), transparent 50%),
+    radial-gradient(ellipse at bottom left, rgba(255, 255, 255, 0.6), transparent 50%),
+    linear-gradient(135deg, #eef2f6 0%, #f8fafc 100%);
+  color: #0f172a;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow:
+    0 12px 32px rgba(15, 23, 42, 0.04),
+    inset 0 1px 2px rgba(255, 255, 255, 1);
 }
 
 .hero-card::after {
   content: '';
   position: absolute;
-  top: -60px;
-  right: -20px;
-  width: 220px;
-  height: 220px;
+  top: -100px;
+  right: -50px;
+  width: 300px;
+  height: 300px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.12);
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.6) 0%, transparent 70%);
+  pointer-events: none;
 }
 
 .hero-main {
@@ -368,10 +373,14 @@ const handleAvatarUpload = (event) => {
 .big-avatar {
   width: 100%;
   height: 100%;
-  border-radius: 28px;
+  border-radius: 30px;
   object-fit: cover;
-  border: 3px solid rgba(255, 255, 255, 0.4);
-  box-shadow: 0 12px 32px rgba(9, 37, 92, 0.24);
+  border: 4px solid rgba(255, 255, 255, 1);
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+  transition: all 0.3s ease;
+}
+.avatar-box:hover .big-avatar {
+  border-color: rgba(248, 250, 252, 1);
 }
 
 .camera-badge {
@@ -418,16 +427,18 @@ const handleAvatarUpload = (event) => {
   height: 30px;
   padding: 0 12px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(226, 232, 240, 0.8);
   font-size: 12px;
   font-weight: 700;
+  color: #475569;
 }
 
 .hero-copy p {
   margin: 12px 0 0;
   max-width: 640px;
   line-height: 1.8;
-  color: rgba(255, 255, 255, 0.92);
+  color: #64748b;
 }
 
 .hero-tags {
@@ -443,8 +454,9 @@ const handleAvatarUpload = (event) => {
   min-height: 34px;
   padding: 0 14px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.14);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  color: #334155;
   font-size: 13px;
   font-weight: 600;
 }
@@ -461,14 +473,14 @@ const handleAvatarUpload = (event) => {
 .stat-card {
   padding: 16px 18px;
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.14);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(10px);
 }
 
 .stat-label {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.75);
+  color: #64748b;
 }
 
 .stat-value {
@@ -479,10 +491,22 @@ const handleAvatarUpload = (event) => {
 }
 
 .section-title {
-  margin-top: 8px;
-  font-size: 18px;
+  margin-top: 16px;
+  margin-bottom: 4px;
+  font-size: 20px;
   font-weight: 800;
-  color: #163253;
+  color: #0f243d;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.section-title::before {
+  content: '';
+  display: block;
+  width: 4px;
+  height: 18px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #1677ff, #67b8ff);
 }
 
 .base-grid {
@@ -494,10 +518,22 @@ const handleAvatarUpload = (event) => {
 .field-card,
 .interest-card {
   border-radius: 20px;
-  padding: 18px;
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid #e8eef6;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow:
+    0 8px 24px rgba(22, 119, 255, 0.04),
+    inset 0 1px 2px rgba(255, 255, 255, 0.9);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.field-card:hover,
+.interest-card:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 12px 32px rgba(22, 119, 255, 0.08),
+    inset 0 1px 2px rgba(255, 255, 255, 1);
 }
 
 .field-label {
@@ -599,8 +635,19 @@ const handleAvatarUpload = (event) => {
 :deep(.el-input__wrapper),
 :deep(.el-textarea__inner),
 :deep(.el-select__wrapper) {
-  border-radius: 14px;
-  box-shadow: none;
+  border-radius: 16px;
+  background: rgba(248, 250, 252, 0.8);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  box-shadow: inset 0 2px 4px rgba(15, 23, 42, 0.02);
+  transition: all 0.2s ease;
+}
+
+:deep(.el-input__wrapper.is-focus),
+:deep(.el-textarea__inner:focus),
+:deep(.el-select__wrapper.is-focus) {
+  background: #ffffff;
+  border-color: #1677ff;
+  box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.1);
 }
 
 @media (max-width: 992px) {

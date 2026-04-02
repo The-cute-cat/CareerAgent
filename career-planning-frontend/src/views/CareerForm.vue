@@ -1,6 +1,6 @@
 ﻿<script setup lang="ts">
 import { ref, reactive, computed, nextTick, watch, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { cloneDeep } from 'lodash'
@@ -60,6 +60,7 @@ import {
 // --- 状态定义 ---
 
 /** 路由实例 */
+const route = useRoute()
 const router = useRouter()
 const jsonResumeStore = useJsonResumeStore()
 
@@ -68,6 +69,7 @@ const formRef = ref<FormInstance>()
 
 /** 当前激活的菜单项索引，控制显示哪个表单步骤 (1-5) */
 const activeMenu = ref('1')
+const activeProfileTab = ref<'resume' | 'template'>('resume')
 
 /** 表单提交状态，控制提交按钮的加载状态 */
 const submitting = ref(false)
@@ -135,6 +137,12 @@ if (!resumeProfileExtras.value.educationHistory?.length) {
     }
   ]
 }
+
+const syncCareerSectionFromRoute = () => {
+  activeProfileTab.value = route.path.includes('/career-form/template') ? 'template' : 'resume'
+}
+
+watch(() => route.path, syncCareerSectionFromRoute, { immediate: true })
 
 
 
@@ -362,6 +370,15 @@ const isStepCompleted = (step: number) => {
  */
 const handleMenuSelect = (index: string) => {
   activeMenu.value = index
+}
+
+const switchCareerSection = (section: 'resume' | 'template') => {
+  activeProfileTab.value = section
+  router.push(section === 'resume' ? '/career-form/resume' : '/career-form/template')
+}
+
+const goToResumeEditor = () => {
+  router.push('/resume-editor')
 }
 
 
@@ -1413,6 +1430,7 @@ const showMissingFieldsReminder = (missingFields: typeof requiredFields) => {
     return
   }
   pendingMissingFields.value = chatFields
+  switchCareerSection('resume')
   activeMenu.value = pendingMissingFields.value[0]?.step || '1'
   showMissingFieldsChat.value = true
 }
@@ -1425,6 +1443,7 @@ const reopenMissingFieldsChat = () => {
     return
   }
 
+  switchCareerSection('resume')
   activeMenu.value = pendingMissingFields.value[0]?.step || activeMenu.value
   showMissingFieldsChat.value = true
 }
@@ -1787,9 +1806,80 @@ const currentResumeTemplateLabel = computed(() => {
   return mapping[selectedResumeTemplate.value]
 })
 
-/** 当前简历缺失的必填项。 */
+/** 当前简历缺失的必填项 - 直接从表单数据计算，实时反映填写情况。 */
 const resumeMissingRequiredFields = computed(() => {
-  return jsonResumeResult.value?.completeness.missingRequiredFields ?? []
+  const missing: { field: string; label: string }[] = []
+
+  // 从 resumeProfileExtras.basics 检查基本信息
+  const basics = resumeProfileExtras.value.basics
+  if (!basics.name?.trim()) missing.push({ field: 'basics.name', label: '姓名' })
+  if (!basics.phone?.trim()) missing.push({ field: 'basics.phone', label: '手机' })
+  if (!basics.email?.trim()) missing.push({ field: 'basics.email', label: '邮箱' })
+
+  // 从 resumeProfileExtras.educationHistory 检查教育信息
+  const education = resumeProfileExtras.value.educationHistory?.[0]
+  if (!education?.institution?.trim()) missing.push({ field: 'education.institution', label: '学校' })
+  if (!education?.studyType?.trim()) missing.push({ field: 'education.studyType', label: '学历' })
+
+  // 从 formData 检查技能和求职意向
+  if (formData.skills.length === 0) missing.push({ field: 'skills', label: '专业技能' })
+  if (!formData.targetJob?.trim()) missing.push({ field: 'targetJob', label: '目标岗位' })
+
+  // 检查项目/经历（建议至少有一个）
+  if (formData.projects.length === 0 && formData.internships.length === 0) {
+    missing.push({ field: 'experience', label: '项目或实习经历' })
+  }
+
+  return missing
+})
+
+/** 简历内容完整度评分 - 直接从表单数据计算（0-100）。 */
+const resumeCompletenessScore = computed(() => {
+  let score = 0
+  const basics = resumeProfileExtras.value.basics
+  const education = resumeProfileExtras.value.educationHistory?.[0]
+
+  // 基本信息（35分）：姓名、手机、邮箱、求职意向
+  if (basics.name?.trim()) score += 10
+  if (basics.phone?.trim()) score += 8
+  if (basics.email?.trim()) score += 7
+  if (basics.label?.trim() || formData.targetJob?.trim()) score += 10
+
+  // 教育信息（20分）：学校、学历、专业
+  if (education?.institution?.trim()) score += 8
+  if (education?.studyType?.trim()) score += 7
+  if (education?.area?.trim()) score += 5
+
+  // 技能（15分）
+  if (formData.skills.length > 0) {
+    score += Math.min(15, formData.skills.length * 5)
+  }
+
+  // 经历/项目（20分）
+  const expCount = formData.projects.length + formData.internships.length
+  if (expCount > 0) {
+    score += Math.min(20, expCount * 10)
+  }
+
+  // 其他信息（10分）：证书、语言、工具
+  if (formData.certificates.length > 0) score += 4
+  if (formData.languages.some(l => l.type && l.level)) score += 3
+  if (formData.tools.length > 0) score += 3
+
+  return Math.min(100, score)
+})
+
+/** 简历结构是否有效 - 检查必填项是否满足基本要求。 */
+const resumeStructureValid = computed(() => {
+  const basics = resumeProfileExtras.value.basics
+  const education = resumeProfileExtras.value.educationHistory?.[0]
+
+  // 基本结构有效：姓名 + 手机/邮箱 + 学校 + 学历
+  const hasBasicInfo = !!basics.name?.trim()
+  const hasContact = !!basics.phone?.trim() || !!basics.email?.trim()
+  const hasEducation = !!education?.institution?.trim() && !!education?.studyType?.trim()
+
+  return hasBasicInfo && hasContact && hasEducation
 })
 
 const resumePrimaryEducation = computed(() => currentJsonResume.value?.education?.[0] ?? null)
@@ -1867,8 +1957,7 @@ const ensureResumeEducationHistory = () => {
   return resumeProfileExtras.value.educationHistory![0]!
 }
 
-/** 打开简历补充资料弹窗，并按当前表单默认补齐部分字段。 */
-const openResumeProfileDialog = () => {
+const syncResumeProfileExtrasFromForm = () => {
   const firstEducation = ensureResumeEducationHistory()
 
   if (!resumeProfileExtras.value.basics.label?.trim() && formData.targetJob.trim()) {
@@ -1885,8 +1974,18 @@ const openResumeProfileDialog = () => {
   if (!firstEducation.endDate?.toString().trim() && formData.graduationDate) {
     firstEducation.endDate = formData.graduationDate
   }
+}
 
+/** 打开简历补充资料弹窗，并按当前表单默认补齐部分字段。 */
+const openResumeProfileDialog = () => {
+  syncResumeProfileExtrasFromForm()
   resumeProfileDialogVisible.value = true
+}
+
+const syncResumeTemplateFromProfile = () => {
+  syncResumeProfileExtrasFromForm()
+  jsonResumeStore.setProfileExtras(cloneDeep(resumeProfileExtras.value))
+  ElMessage.success('已同步“我的简历”信息，现在可以直接选择模板并预览简历')
 }
 
 /** 打开模板选择弹窗。 */
@@ -2198,7 +2297,7 @@ const resetForm = () => {
         </div>
 
         <!-- 进度概览 -->
-        <div class="progress-overview">
+        <div v-if="activeProfileTab === 'resume'" class="progress-overview">
           <div class="progress-text">
             <span>完成度</span>
             <span class="progress-percent">{{ formProgress }}%</span>
@@ -2206,89 +2305,110 @@ const resetForm = () => {
           <el-progress :percentage="formProgress" :show-text="false" :stroke-width="6" class="sidebar-progress" />
         </div>
 
-        <el-menu :default-active="activeMenu" class="sidebar-menu" @select="handleMenuSelect">
-          <el-menu-item index="1" :class="{ 'is-completed': isStepCompleted(1) }">
-            <div class="menu-step">
-              <el-icon v-if="isStepCompleted(1)">
-                <Check />
-              </el-icon>
-              <span v-else>1</span>
-            </div>
-            <span class="menu-text">基本信息</span>
-            <el-icon class="menu-check" v-if="isStepCompleted(1)"><Circle-Check /></el-icon>
-          </el-menu-item>
-
-          <el-menu-item index="2" :class="{ 'is-completed': isStepCompleted(2) }">
-            <div class="menu-step">
-              <el-icon v-if="isStepCompleted(2)">
-                <Check />
-              </el-icon>
-              <span v-else>2</span>
-            </div>
-            <span class="menu-text">技能证书</span>
-            <el-icon class="menu-check" v-if="isStepCompleted(2)"><Circle-Check /></el-icon>
-          </el-menu-item>
-
-          <el-menu-item index="3" :class="{ 'is-completed': isStepCompleted(3) }">
-            <div class="menu-step">
-              <el-icon v-if="isStepCompleted(3)">
-                <Check />
-              </el-icon>
-              <span v-else>3</span>
-            </div>
-            <span class="menu-text">经历项目</span>
-            <el-icon class="menu-check" v-if="isStepCompleted(3)"><Circle-Check /></el-icon>
-          </el-menu-item>
-
-          <el-menu-item index="4" :class="{ 'is-completed': isStepCompleted(4) }">
-            <div class="menu-step">
-              <el-icon v-if="isStepCompleted(4)">
-                <Check />
-              </el-icon>
-              <span v-else>4</span>
-            </div>
-            <span class="menu-text">素质测评</span>
-            <el-icon class="menu-check" v-if="isStepCompleted(4)"><Circle-Check /></el-icon>
-          </el-menu-item>
-
-          <el-menu-item index="5" :class="{ 'is-completed': isStepCompleted(5) }">
-            <div class="menu-step">
-              <el-icon v-if="isStepCompleted(5)">
-                <Check />
-              </el-icon>
-              <span v-else>5</span>
-            </div>
-            <span class="menu-text">职业意向</span>
-            <el-icon class="menu-check" v-if="isStepCompleted(5)"><Circle-Check /></el-icon>
-          </el-menu-item>
-        </el-menu>
-
-        <!-- 简历上传入口 -->
-        <div class="resume-upload-section">
-          <div class="upload-label">
-          </div>
-          <el-button class="upload-btn" :type="hasUploadedResume ? 'info' : 'primary'" @click="showUploadDialog = true"
-            :icon="Upload">
-            {{ hasUploadedResume ? '重新上传简历' : '上传简历' }}
-          </el-button>
-          <el-button
-            v-if="showResumeContinueButton"
-            class="resume-continue-btn"
-            plain
-            :icon="Warning"
-            @click="reopenMissingFieldsChat"
+        <div class="career-section-switcher">
+          <button
+            type="button"
+            class="career-section-tab"
+            :class="{ 'is-active': activeProfileTab === 'resume' }"
+            @click="switchCareerSection('resume')"
           >
-            继续补全信息
-          </el-button>
-          <div v-if="showResumeContinueButton" class="resume-continue-tip">
-            识别后还有 {{ missingFieldCount }} 项必填信息待补充，稍后也可以从这里继续。
-          </div>
+            <el-icon><Document /></el-icon>
+            <span>我的简历</span>
+          </button>
+          <button
+            type="button"
+            class="career-section-tab"
+            :class="{ 'is-active': activeProfileTab === 'template' }"
+            @click="switchCareerSection('template')"
+          >
+            <el-icon><Folder /></el-icon>
+            <span>导出简历</span>
+          </button>
         </div>
+
+        <template v-if="activeProfileTab === 'resume'">
+          <el-menu :default-active="activeMenu" class="sidebar-menu" @select="handleMenuSelect">
+            <el-menu-item index="1" :class="{ 'is-completed': isStepCompleted(1) }">
+              <div class="menu-step">
+                <el-icon v-if="isStepCompleted(1)">
+                  <Check />
+                </el-icon>
+                <span v-else>1</span>
+              </div>
+              <span class="menu-text">基本信息</span>
+              <el-icon class="menu-check" v-if="isStepCompleted(1)"><Circle-Check /></el-icon>
+            </el-menu-item>
+
+            <el-menu-item index="2" :class="{ 'is-completed': isStepCompleted(2) }">
+              <div class="menu-step">
+                <el-icon v-if="isStepCompleted(2)">
+                  <Check />
+                </el-icon>
+                <span v-else>2</span>
+              </div>
+              <span class="menu-text">技能证书</span>
+              <el-icon class="menu-check" v-if="isStepCompleted(2)"><Circle-Check /></el-icon>
+            </el-menu-item>
+
+            <el-menu-item index="3" :class="{ 'is-completed': isStepCompleted(3) }">
+              <div class="menu-step">
+                <el-icon v-if="isStepCompleted(3)">
+                  <Check />
+                </el-icon>
+                <span v-else>3</span>
+              </div>
+              <span class="menu-text">经历项目</span>
+              <el-icon class="menu-check" v-if="isStepCompleted(3)"><Circle-Check /></el-icon>
+            </el-menu-item>
+
+            <el-menu-item index="4" :class="{ 'is-completed': isStepCompleted(4) }">
+              <div class="menu-step">
+                <el-icon v-if="isStepCompleted(4)">
+                  <Check />
+                </el-icon>
+                <span v-else>4</span>
+              </div>
+              <span class="menu-text">素质测评</span>
+              <el-icon class="menu-check" v-if="isStepCompleted(4)"><Circle-Check /></el-icon>
+            </el-menu-item>
+
+            <el-menu-item index="5" :class="{ 'is-completed': isStepCompleted(5) }">
+              <div class="menu-step">
+                <el-icon v-if="isStepCompleted(5)">
+                  <Check />
+                </el-icon>
+                <span v-else>5</span>
+              </div>
+              <span class="menu-text">职业意向</span>
+              <el-icon class="menu-check" v-if="isStepCompleted(5)"><Circle-Check /></el-icon>
+            </el-menu-item>
+          </el-menu>
+
+          <div class="resume-upload-section">
+            <div class="upload-label"></div>
+            <el-button class="upload-btn" :type="hasUploadedResume ? 'info' : 'primary'" @click="showUploadDialog = true"
+              :icon="Upload">
+              {{ hasUploadedResume ? '重新上传简历' : '上传简历' }}
+            </el-button>
+            <el-button
+              v-if="showResumeContinueButton"
+              class="resume-continue-btn"
+              plain
+              :icon="Warning"
+              @click="reopenMissingFieldsChat"
+            >
+              继续补全信息
+            </el-button>
+            <div v-if="showResumeContinueButton" class="resume-continue-tip">
+              识别后还有 {{ missingFieldCount }} 项必填信息待补充，稍后也可以从这里继续。
+            </div>
+          </div>
+        </template>
       </el-aside>
 
       <!-- 主内容区 -->
       <el-main class="main-content">
-        <el-card class="form-card">
+        <el-card v-if="activeProfileTab === 'resume'" class="form-card">
           <template #header>
             <div class="card-header">
               <div class="title-section">
@@ -2757,14 +2877,8 @@ const resetForm = () => {
               <el-button class="form-action-btn" @click="resetForm" :icon="RefreshRight">
                 重置表单
               </el-button>
-              <el-button class="form-action-btn" @click="openResumeProfileDialog" :icon="EditPen">
-                补充简历资料
-              </el-button>
-              <el-button class="form-action-btn form-action-btn--template" @click="openResumeTemplateDialog" :icon="Document">
-                选择模板
-              </el-button>
-              <el-button class="form-action-btn form-action-btn--preview" @click="generateResumePreview" :loading="resumeGenerating" :icon="View">
-                预览简历
+              <el-button class="form-action-btn form-action-btn--template" @click="switchCareerSection('template')" :icon="Document">
+                前往简历模板
               </el-button>
               <el-button type="primary" class="form-action-btn form-action-btn--primary" @click="submitForm" :loading="submitting" :icon="Check">
                 提交画像
@@ -2772,6 +2886,127 @@ const resetForm = () => {
             </div>
           </el-form>
 
+        </el-card>
+
+        <el-card v-else class="form-card template-workspace-card">
+          <template #header>
+            <div class="card-header template-card-header">
+              <div class="title-section">
+                <h2>简历模板生成</h2>
+                <p class="subtitle">基于你的“我的简历”信息，快速生成更适合投递的简历版本</p>
+                <div class="header-badges">
+                  <span class="header-badge">当前模板 {{ currentResumeTemplateLabel }}</span>
+                  <span class="header-badge header-badge--soft">可直接同步能力画像并生成预览</span>
+                </div>
+              </div>
+              <el-button type="primary" class="template-sync-btn" @click="syncResumeTemplateFromProfile">
+                一键同步能力画像
+              </el-button>
+            </div>
+            <div class="header-stats">
+              <div class="header-stat-card" :class="{ 'is-valid': resumeStructureValid }">
+                <span class="stat-label">结构校验</span>
+                <strong :class="{ 'valid-text': resumeStructureValid }">
+                  {{ resumeStructureValid ? '通过' : '待完善' }}
+                </strong>
+                <small>{{ resumeStructureValid ? '基本信息已满足' : '请完善姓名、联系方式和教育背景' }}</small>
+              </div>
+              <div class="header-stat-card">
+                <span class="stat-label">内容完整度</span>
+                <strong :class="{
+                  'score-high': resumeCompletenessScore >= 80,
+                  'score-medium': resumeCompletenessScore >= 50 && resumeCompletenessScore < 80,
+                  'score-low': resumeCompletenessScore < 50
+                }">{{ resumeCompletenessScore }}%</strong>
+                <small>资料越完整，模板内容越饱满</small>
+              </div>
+              <div class="header-stat-card" :class="{ 'has-missing': resumeMissingRequiredFields.length > 0 }">
+                <span class="stat-label">必填缺失</span>
+                <strong :class="{ 'missing-text': resumeMissingRequiredFields.length > 0 }">
+                  {{ resumeMissingRequiredFields.length }}
+                </strong>
+                <small>{{ resumeMissingRequiredFields.length > 0 ? '请补充以下信息：' + resumeMissingRequiredFields.slice(0, 2).map(f => f.label).join('、') : '必填项已完成' }}</small>
+              </div>
+            </div>
+          </template>
+
+          <div class="template-workspace">
+            <div class="template-toolbar">
+              <el-button class="form-action-btn" @click="goToResumeEditor" :icon="Edit">
+                编辑简历
+              </el-button>
+              <el-button class="form-action-btn" @click="switchCareerSection('resume')" :icon="RefreshRight">
+                返回我的简历
+              </el-button>
+            </div>
+
+            <div class="resume-template-grid template-page-grid">
+              <button
+                type="button"
+                class="resume-template-card template-page-card"
+                :class="{ 'is-active': selectedResumeTemplate === 'professional' }"
+                @click="selectResumeTemplate('professional')"
+              >
+                <span class="template-tag">热门</span>
+                <div class="template-preview template-preview--professional">
+                  <div class="template-preview-header"></div>
+                  <div class="template-preview-line large"></div>
+                  <div class="template-preview-line"></div>
+                  <div class="template-preview-columns">
+                    <span></span>
+                    <span></span>
+                  </div>
+                </div>
+                <strong>专业商务版</strong>
+                <p>适合校招、社招与正式投递场景，结构清晰、信息完整。</p>
+                <span class="template-use-btn">使用该模板</span>
+              </button>
+
+              <button
+                type="button"
+                class="resume-template-card template-page-card"
+                :class="{ 'is-active': selectedResumeTemplate === 'modern' }"
+                @click="selectResumeTemplate('modern')"
+              >
+                <span class="template-tag template-tag--green">经典</span>
+                <div class="template-preview template-preview--modern">
+                  <div class="template-preview-header accent"></div>
+                  <div class="template-preview-line large"></div>
+                  <div class="template-preview-columns">
+                    <span class="accent"></span>
+                    <span></span>
+                  </div>
+                  <div class="template-preview-line"></div>
+                </div>
+                <strong>现代视觉版</strong>
+                <p>更适合产品、运营、前端、设计等强调表达与亮点的岗位。</p>
+                <span class="template-use-btn">使用该模板</span>
+              </button>
+
+              <button
+                type="button"
+                class="resume-template-card template-page-card"
+                :class="{ 'is-active': selectedResumeTemplate === 'compact' }"
+                @click="selectResumeTemplate('compact')"
+              >
+                <span class="template-tag template-tag--orange">新趋势</span>
+                <div class="template-preview template-preview--compact">
+                  <div class="template-preview-line large"></div>
+                  <div class="template-preview-line small"></div>
+                  <div class="template-preview-line"></div>
+                  <div class="template-preview-line"></div>
+                </div>
+                <strong>紧凑高效版</strong>
+                <p>适合一页式简历，重点突出核心项目、技能标签与求职方向。</p>
+                <span class="template-use-btn">使用该模板</span>
+              </button>
+            </div>
+
+            <div class="template-note-card">
+              <el-icon><InfoFilled /></el-icon>
+              <span>AI 提示：简历内容会优先同步“能力画像-我的简历”中填写的最新信息，建议先完善表单与上传信息，再生成模板。</span>
+            </div>
+          </div>
         </el-card>
       </el-main>
     </el-container>
@@ -3704,6 +3939,36 @@ const resetForm = () => {
   transition: width 0.3s ease;
 }
 
+.career-section-switcher {
+  display: grid;
+  gap: 10px;
+  padding: 0 12px 10px;
+}
+
+.career-section-tab {
+  width: 100%;
+  border: 1px solid rgba(219, 230, 243, 0.96);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #60758d;
+  padding: 13px 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.24s ease;
+}
+
+.career-section-tab:hover,
+.career-section-tab.is-active {
+  border-color: rgba(47, 125, 246, 0.38);
+  color: #2f7df6;
+  background: linear-gradient(135deg, rgba(47, 125, 246, 0.1), rgba(99, 183, 255, 0.04));
+  box-shadow: 0 10px 20px rgba(47, 125, 246, 0.1);
+}
+
 .sidebar-menu {
   border-right: none;
   background: transparent;
@@ -4017,6 +4282,37 @@ const resetForm = () => {
   color: #8aa0b7;
   font-size: 12px;
   line-height: 1.6;
+}
+
+/* 统计卡片状态样式 */
+.header-stat-card.is-valid {
+  border-color: rgba(103, 194, 58, 0.5);
+  background: linear-gradient(180deg, rgba(240, 249, 235, 0.94), rgba(230, 245, 220, 0.92));
+}
+
+.header-stat-card.has-missing {
+  border-color: rgba(245, 108, 108, 0.5);
+  background: linear-gradient(180deg, rgba(254, 240, 240, 0.94), rgba(253, 230, 230, 0.92));
+}
+
+.valid-text {
+  color: #67c23a !important;
+}
+
+.missing-text {
+  color: #f56c6c !important;
+}
+
+.score-high {
+  color: #67c23a !important;
+}
+
+.score-medium {
+  color: #e6a23c !important;
+}
+
+.score-low {
+  color: #f56c6c !important;
 }
 
 .progress-section {
@@ -4706,6 +5002,100 @@ const resetForm = () => {
 .form-action-btn--primary:active {
   background: linear-gradient(135deg, #256ee0 0%, #55a8ff 100%) !important;
   color: #ffffff !important;
+}
+
+.template-workspace-card {
+  min-height: 760px;
+}
+
+.template-card-header {
+  align-items: flex-start;
+}
+
+.template-sync-btn {
+  min-width: 168px;
+  height: 44px;
+  border-radius: 999px;
+  padding: 0 22px;
+  border: none;
+  box-shadow: 0 12px 26px rgba(47, 125, 246, 0.2);
+}
+
+.template-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.template-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.template-page-grid {
+  align-items: stretch;
+}
+
+.template-page-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.template-tag {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  z-index: 1;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #2f7df6 0%, #63b7ff 100%);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.template-tag--green {
+  background: linear-gradient(135deg, #37b26c 0%, #72d383 100%);
+}
+
+.template-tag--orange {
+  background: linear-gradient(135deg, #ffb347 0%, #ff9b42 100%);
+}
+
+.template-use-btn {
+  margin-top: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-width: 116px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(106, 169, 255, 0.4);
+  background: rgba(238, 247, 255, 0.92);
+  color: #409eff;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.template-note-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 20px;
+  border-radius: 18px;
+  border: 1px solid rgba(190, 219, 255, 0.9);
+  background: linear-gradient(90deg, rgba(240, 248, 255, 0.98), rgba(255, 255, 255, 0.94));
+  color: #56718f;
+  line-height: 1.8;
+}
+
+.template-note-card .el-icon {
+  color: #409eff;
+  font-size: 18px;
+  flex-shrink: 0;
 }
 
 /* 重置按钮 - 浅色背景深色文字 */
@@ -6976,6 +7366,8 @@ const resetForm = () => {
   }
 
   .resume-preview-toolbar,
+  .template-card-header,
+  .template-toolbar,
   .form-actions,
   .professional-title-line,
   .compact-header {
@@ -7020,6 +7412,11 @@ const resetForm = () => {
   }
 
   .form-actions .el-button {
+    width: 100%;
+  }
+
+  .template-sync-btn,
+  .template-use-btn {
     width: 100%;
   }
 }

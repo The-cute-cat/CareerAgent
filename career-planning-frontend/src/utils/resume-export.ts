@@ -12,6 +12,33 @@ import {
 
 import type { JsonResume } from '@/types/json-resume'
 
+export interface ManualResumeEditorData {
+  name: string
+  title: string
+  phone: string
+  email: string
+  location: string
+  education: string
+  school: string
+  summary: string
+  skills: string
+  awards: string
+  languages: string
+  portfolio: string
+  work: Array<{
+    company: string
+    position: string
+    date: string
+    desc: string
+  }>
+  projects: Array<{
+    name: string
+    tech: string
+    date: string
+    desc: string
+  }>
+}
+
 /** 导出 PDF 的配置。 */
 export interface ResumePdfExportOptions {
   /** 导出文件名。 */
@@ -254,6 +281,169 @@ export async function exportJsonResumeToWord(
         text: `${item.name}: ${item.keywords.join(', ')}`
       }))
     }
+  }
+
+  const doc = new Document({
+    sections: [
+      {
+        children
+      }
+    ]
+  })
+
+  const blob = await Packer.toBlob(doc)
+  saveAs(blob, options?.fileName ?? 'resume.docx')
+}
+
+export async function exportManualResumeToWord(
+  resume: ManualResumeEditorData,
+  options?: ResumeWordExportOptions
+): Promise<void> {
+  const children: Paragraph[] = []
+
+  children.push(
+    new Paragraph({
+      text: asText(resume.name) || '简历',
+      heading: HeadingLevel.TITLE,
+      alignment: AlignmentType.CENTER,
+      spacing: {
+        after: 160
+      }
+    })
+  )
+
+  const metaLine = [
+    asText(resume.title),
+    asText(resume.phone),
+    asText(resume.email),
+    asText(resume.location)
+  ].filter(Boolean).join(' | ')
+
+  if (metaLine) {
+    children.push(new Paragraph({
+      text: metaLine,
+      alignment: AlignmentType.CENTER,
+      spacing: {
+        after: 240
+      }
+    }))
+  }
+
+  if (asText(resume.summary)) {
+    children.push(
+      new Paragraph({ text: '个人简介', heading: HeadingLevel.HEADING_1 }),
+      new Paragraph({ text: resume.summary })
+    )
+  }
+
+  if (asText(resume.education) || asText(resume.school)) {
+    children.push(
+      new Paragraph({ text: '教育背景', heading: HeadingLevel.HEADING_1 }),
+      new Paragraph({
+        children: [
+          new TextRun({ text: asText(resume.school), bold: true }),
+          new TextRun({ text: asText(resume.education) ? `  ${asText(resume.education)}` : '' })
+        ]
+      })
+    )
+  }
+
+  const workItems = resume.work.filter(item =>
+    [item.company, item.position, item.date, item.desc].some(value => asText(value))
+  )
+
+  if (workItems.length) {
+    children.push(new Paragraph({ text: '工作经历', heading: HeadingLevel.HEADING_1 }))
+
+    for (const item of workItems) {
+      children.push(
+        new Paragraph({
+          children: [
+            new TextRun({ text: asText(item.company), bold: true }),
+            new TextRun({ text: asText(item.position) ? `  ${asText(item.position)}` : '' })
+          ],
+          spacing: {
+            before: 120
+          }
+        })
+      )
+
+      if (asText(item.date)) {
+        children.push(new Paragraph({ text: item.date }))
+      }
+
+      const lines = item.desc.split('\n').map(line => line.trim()).filter(Boolean)
+      if (lines.length <= 1 && asText(item.desc)) {
+        children.push(new Paragraph({ text: item.desc }))
+      } else {
+        children.push(...toBulletParagraphs(lines))
+      }
+    }
+  }
+
+  const projectItems = resume.projects.filter(item =>
+    [item.name, item.tech, item.date, item.desc].some(value => asText(value))
+  )
+
+  if (projectItems.length) {
+    children.push(new Paragraph({ text: '项目经验', heading: HeadingLevel.HEADING_1 }))
+
+    for (const item of projectItems) {
+      children.push(
+        new Paragraph({
+          children: [
+            new TextRun({ text: asText(item.name), bold: true }),
+            new TextRun({ text: asText(item.tech) ? `  ${asText(item.tech)}` : '' })
+          ],
+          spacing: {
+            before: 120
+          }
+        })
+      )
+
+      if (asText(item.date)) {
+        children.push(new Paragraph({ text: item.date }))
+      }
+
+      const lines = item.desc.split('\n').map(line => line.trim()).filter(Boolean)
+      if (lines.length <= 1 && asText(item.desc)) {
+        children.push(new Paragraph({ text: item.desc }))
+      } else {
+        children.push(...toBulletParagraphs(lines))
+      }
+    }
+  }
+
+  const skillItems = asText(resume.skills)
+    .split(/[，,]/)
+    .map(item => item.trim())
+    .filter(Boolean)
+
+  if (skillItems.length) {
+    children.push(
+      new Paragraph({ text: '专业技能', heading: HeadingLevel.HEADING_1 }),
+      new Paragraph({ text: skillItems.join('、') })
+    )
+  }
+
+  const awardItems = resume.awards.split('\n').map(item => item.trim()).filter(Boolean)
+  if (awardItems.length) {
+    children.push(
+      new Paragraph({ text: '荣誉证书', heading: HeadingLevel.HEADING_1 }),
+      ...toBulletParagraphs(awardItems)
+    )
+  }
+
+  const otherItems = [
+    ...resume.languages.split('\n').map(item => item.trim()).filter(Boolean),
+    asText(resume.portfolio)
+  ].filter(Boolean)
+
+  if (otherItems.length) {
+    children.push(
+      new Paragraph({ text: '其他信息', heading: HeadingLevel.HEADING_1 }),
+      ...toBulletParagraphs(otherItems)
+    )
   }
 
   const doc = new Document({

@@ -128,36 +128,38 @@ const typeOptions = [
 .tip-banner {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 14px 18px;
-  border-radius: 16px;
-  background: linear-gradient(135deg, #eef5ff, #e8f4ff);
-  border: 1px solid rgba(22, 119, 255, 0.12);
-  font-size: 13px;
-  color: #4a6fa5;
+  gap: 12px;
+  padding: 16px 20px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(241, 245, 249, 0.8), rgba(248, 250, 252, 0.5));
+  backdrop-filter: blur(12px);
+  border: 1px solid #e2e8f0;
+  font-size: 14px;
+  color: #475569;
   line-height: 1.6;
 
   strong {
-    color: #1553c7;
+    color: #0f172a;
     font-weight: 800;
   }
 }
 
 .tip-icon {
-  font-size: 18px;
-  color: #1677ff;
+  font-size: 20px;
+  color: #3b82f6;
   flex-shrink: 0;
 }
 
 .form-card {
   display: flex;
   flex-direction: column;
-  gap: 22px;
-  padding: 24px;
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid #e8eef6;
-  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.03);
+  gap: 24px;
+  padding: 32px;
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 1);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.03), inset 0 1px 2px rgba(255, 255, 255, 1);
 }
 
 .form-row {
@@ -190,20 +192,21 @@ const typeOptions = [
 .upload-placeholder {
   height: 96px;
   border-radius: 16px;
-  background: #f8fafc;
-  border: 1.5px dashed #cbd5e1;
+  background: rgba(248, 250, 252, 0.6);
+  border: 1.5px dashed rgba(203, 213, 225, 0.8);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  font-size: 13px;
-  color: #94a3b8;
-  transition: all 0.2s;
+  font-size: 14px;
+  color: #64748b;
+  transition: all 0.3s ease;
 
   &:hover {
-    border-color: #94a3b8;
-    background: #f1f5f9;
+    border-color: #1677ff;
+    background: rgba(238, 245, 255, 0.8);
+    color: #1677ff;
   }
 }
 
@@ -256,25 +259,36 @@ const typeOptions = [
 }
 
 .submit-btn {
-  height: 44px;
-  border-radius: 14px;
-  font-size: 15px;
-  font-weight: 700;
-  background: linear-gradient(135deg, #1677ff, #409eff);
+  height: 48px;
+  border-radius: 16px;
+  font-size: 16px;
+  font-weight: 800;
+  background: linear-gradient(135deg, #2563eb, #3b82f6);
   border: none;
-  box-shadow: 0 4px 16px rgba(22, 119, 255, 0.3);
-  transition: all 0.25s;
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.25);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 
   &:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 8px 24px rgba(22, 119, 255, 0.35);
+    transform: translateY(-2px);
+    box-shadow: 0 12px 28px rgba(37, 99, 235, 0.35);
   }
 }
 
 :deep(.el-input__wrapper),
 :deep(.el-textarea__inner),
 :deep(.el-select__wrapper) {
-  border-radius: 14px;
-  box-shadow: none;
+  border-radius: 16px;
+  background: rgba(248, 250, 252, 0.8);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  box-shadow: inset 0 2px 4px rgba(15, 23, 42, 0.02);
+  transition: all 0.2s ease;
+}
+
+:deep(.el-input__wrapper.is-focus),
+:deep(.el-textarea__inner:focus),
+:deep(.el-select__wrapper.is-focus) {
+  background: #ffffff;
+  border-color: #1677ff;
+  box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.1);
 }
 </style>
