@@ -1,70 +1,51 @@
 <template>
-  <div class="knowledge-tree-node" :style="{ '--level': props.level }">
-    <div class="node-row">
-      <button
-        v-if="hasChildren"
-        type="button"
-        class="toggle-btn"
-        :aria-label="expanded ? '收起子节点' : '展开子节点'"
-        @click="expanded = !expanded"
-      >
-        <el-icon>
-          <ArrowDown v-if="expanded" />
-          <ArrowRight v-else />
-        </el-icon>
-      </button>
-      <span v-else class="toggle-placeholder"></span>
+  <div class="tree-node" :style="{ '--depth': String(depth) }">
+    <div class="tree-node__branch">
+      <div class="tree-node__self">
+        <button
+          type="button"
+          class="tree-node__label"
+          :class="{
+            active: activeId === node.id,
+            expandable: hasChildren,
+            opened: expanded,
+          }"
+          @click="emit('select', node)"
+        >
+          <span class="tree-node__text">{{ node.label }}</span>
+        </button>
 
-      <button
-        type="button"
-        class="node-card"
-        :class="{
-          active: props.activeId === props.node.id,
-          completed: props.node.status === 'completed',
-          current: props.node.status === 'current',
-        }"
-        @click="emit('select', props.node)"
-      >
-        <div class="node-card__header">
-          <div class="node-title-group">
-            <span class="node-title">{{ props.node.label }}</span>
-            <span class="node-summary">{{ props.node.summary }}</span>
-          </div>
-          <span class="status-badge" :class="props.node.status">
-            {{ statusLabelMap[props.node.status] }}
-          </span>
-        </div>
+        <button
+          v-if="hasChildren"
+          type="button"
+          class="tree-node__toggle"
+          :aria-label="expanded ? '收起下一级内容' : '展开下一级内容'"
+          @click.stop="expanded = !expanded"
+        >
+          <el-icon>
+            <ArrowDownBold v-if="expanded" />
+            <ArrowRightBold v-else />
+          </el-icon>
+        </button>
+      </div>
 
-        <div class="node-meta">
-          <span>{{ props.node.difficulty }}</span>
-          <span>{{ props.node.duration }}</span>
-          <span>{{ props.node.resources.length }} 个资源</span>
-        </div>
-
-        <div v-if="props.node.tags.length" class="node-tags">
-          <span v-for="tag in props.node.tags.slice(0, 4)" :key="tag" class="tag-chip">
-            {{ tag }}
-          </span>
-        </div>
-      </button>
-    </div>
-
-    <div v-if="hasChildren && expanded" class="children">
-      <TreeNode
-        v-for="child in props.node.children"
-        :key="child.id"
-        :node="child"
-        :level="props.level + 1"
-        :active-id="props.activeId"
-        @select="emit('select', $event)"
-      />
+      <div v-if="hasChildren && expanded" class="tree-node__children">
+        <TreeNode
+          v-for="child in node.children"
+          :key="child.id"
+          :node="child"
+          :depth="depth + 1"
+          :active-id="activeId"
+          @select="emit('select', $event)"
+        />
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { ArrowDown, ArrowRight } from '@element-plus/icons-vue'
+import { ArrowDownBold, ArrowRightBold } from '@element-plus/icons-vue'
 
 export interface KnowledgeTreeNode {
   id: string
@@ -83,11 +64,11 @@ export interface KnowledgeTreeNode {
 const props = withDefaults(
   defineProps<{
     node: KnowledgeTreeNode
-    level?: number
+    depth?: number
     activeId?: string
   }>(),
   {
-    level: 0,
+    depth: 0,
     activeId: '',
   },
 )
@@ -96,204 +77,154 @@ const emit = defineEmits<{
   select: [node: KnowledgeTreeNode]
 }>()
 
-const expanded = ref(props.level < 1)
+const expanded = ref(false)
 const hasChildren = computed(() => props.node.children.length > 0)
-
-const statusLabelMap: Record<KnowledgeTreeNode['status'], string> = {
-  completed: '已掌握',
-  current: '进行中',
-  planned: '待学习',
-}
 </script>
 
 <style scoped lang="scss">
-.knowledge-tree-node {
-  --line-color: rgba(148, 163, 184, 0.28);
+.tree-node {
   position: relative;
-  padding-left: calc(var(--level) * 18px);
 }
 
-.knowledge-tree-node::before {
-  content: '';
-  position: absolute;
-  left: calc(var(--level) * 18px + 10px);
-  top: 0;
-  bottom: 0;
-  width: 1px;
-  background: var(--line-color);
-}
-
-.node-row {
-  position: relative;
+.tree-node__branch {
   display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  margin-bottom: 14px;
+  align-items: center;
+  gap: 28px;
+  min-height: 86px;
 }
 
-.node-row::before {
-  content: '';
-  position: absolute;
-  left: 10px;
-  top: 18px;
-  width: 14px;
-  height: 1px;
-  background: var(--line-color);
-}
-
-.toggle-btn,
-.toggle-placeholder {
+.tree-node__self {
   position: relative;
-  z-index: 1;
-  flex: 0 0 22px;
-  width: 22px;
-  height: 22px;
-  margin-top: 8px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
 }
 
-.toggle-btn {
+.tree-node__label {
+  min-width: 190px;
+  max-width: 240px;
+  min-height: 46px;
+  padding: 0 18px;
+  border-radius: 14px;
+  border: 1.5px solid rgba(212, 220, 230, 0.95);
+  background: rgba(255, 255, 255, 0.96);
+  color: #3b4655;
+  font-size: 15px;
+  font-weight: 700;
+  text-align: left;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.05);
+  cursor: pointer;
+  transition: all 0.22s ease;
+}
+
+.tree-node__label:hover {
+  transform: translateY(-1px);
+  border-color: rgba(37, 99, 235, 0.38);
+  box-shadow: 0 12px 26px rgba(37, 99, 235, 0.12);
+}
+
+.tree-node__label.active {
+  border-color: #2563eb;
+  box-shadow: 0 14px 28px rgba(37, 99, 235, 0.18);
+  color: #1849b8;
+}
+
+.tree-node__label.opened {
+  background: rgba(244, 248, 255, 0.98);
+}
+
+.tree-node__text {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+}
+
+.tree-node__toggle {
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 10px;
+  background: rgba(241, 245, 249, 0.95);
+  color: #6b7280;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(191, 219, 254, 0.9);
-  border-radius: 999px;
-  background: #fff;
-  color: #2563eb;
   cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: all 0.2s ease;
+  box-shadow: inset 0 0 0 1px rgba(203, 213, 225, 0.85);
 }
 
-.toggle-btn:hover {
-  transform: scale(1.05);
-  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.14);
+.tree-node__toggle:hover {
+  color: #2563eb;
+  background: rgba(239, 246, 255, 1);
+  box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.5), 0 8px 20px rgba(37, 99, 235, 0.12);
 }
 
-.node-card {
+.tree-node__children {
   position: relative;
-  z-index: 1;
-  width: 100%;
-  padding: 16px 18px;
-  text-align: left;
-  border: 1px solid rgba(219, 231, 245, 0.94);
-  border-radius: 20px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(245, 249, 255, 0.96));
-  box-shadow: 0 16px 36px rgba(28, 74, 126, 0.06);
-  cursor: pointer;
-  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
-}
-
-.node-card:hover {
-  transform: translateY(-2px);
-  border-color: rgba(96, 165, 250, 0.5);
-  box-shadow: 0 20px 44px rgba(37, 99, 235, 0.1);
-}
-
-.node-card.active {
-  border-color: rgba(37, 99, 235, 0.55);
-  box-shadow: 0 22px 50px rgba(37, 99, 235, 0.16);
-  background: linear-gradient(180deg, rgba(239, 246, 255, 0.98), rgba(255, 255, 255, 0.98));
-}
-
-.node-card.completed {
-  border-left: 4px solid #22c55e;
-}
-
-.node-card.current {
-  border-left: 4px solid #f59e0b;
-}
-
-.node-card__header {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
+  flex-direction: column;
+  gap: 18px;
+  padding-left: 26px;
 }
 
-.node-title-group {
-  min-width: 0;
+.tree-node__children::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 26px;
+  height: 1.5px;
+  background: rgba(148, 163, 184, 0.9);
 }
 
-.node-title {
-  display: block;
-  color: #16324f;
-  font-size: 16px;
-  font-weight: 800;
+.tree-node__children::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 16px;
+  bottom: 16px;
+  width: 1.5px;
+  background: rgba(148, 163, 184, 0.75);
 }
 
-.node-summary {
-  display: block;
-  margin-top: 4px;
-  color: #6b7f94;
-  font-size: 13px;
-  line-height: 1.6;
+.tree-node__children > :deep(.tree-node) {
+  position: relative;
 }
 
-.status-badge {
-  flex-shrink: 0;
-  min-width: 68px;
-  padding: 5px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 700;
-  text-align: center;
+.tree-node__children > :deep(.tree-node)::before {
+  content: '';
+  position: absolute;
+  left: -26px;
+  top: 50%;
+  width: 26px;
+  height: 1.5px;
+  background: rgba(148, 163, 184, 0.85);
 }
 
-.status-badge.completed {
-  background: rgba(34, 197, 94, 0.12);
-  color: #15803d;
-}
-
-.status-badge.current {
-  background: rgba(245, 158, 11, 0.14);
-  color: #b45309;
-}
-
-.status-badge.planned {
-  background: rgba(59, 130, 246, 0.1);
-  color: #2563eb;
-}
-
-.node-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 14px;
-  margin-top: 12px;
-  color: #72879c;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.node-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.tag-chip {
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: rgba(226, 232, 240, 0.7);
-  color: #47627f;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.children {
-  margin-left: 12px;
-}
-
-@media (max-width: 768px) {
-  .knowledge-tree-node {
-    padding-left: calc(var(--level) * 10px);
-  }
-
-  .knowledge-tree-node::before {
-    left: calc(var(--level) * 10px + 10px);
-  }
-
-  .node-card__header {
+@media (max-width: 1024px) {
+  .tree-node__branch {
+    align-items: flex-start;
     flex-direction: column;
+    gap: 12px;
+    min-height: initial;
+  }
+
+  .tree-node__children {
+    padding-left: 18px;
+  }
+
+  .tree-node__children::before,
+  .tree-node__children::after,
+  .tree-node__children > :deep(.tree-node)::before {
+    display: none;
+  }
+
+  .tree-node__label {
+    min-width: 168px;
+    max-width: min(74vw, 230px);
   }
 }
 </style>

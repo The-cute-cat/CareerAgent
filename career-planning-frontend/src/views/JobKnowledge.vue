@@ -1,206 +1,143 @@
 <template>
   <div class="job-knowledge-page">
-    <section class="hero-panel">
-      <div class="hero-copy">
-        <div class="hero-kicker">
-          <el-icon><Collection /></el-icon>
-          岗位知识库
+    <template v-if="pageMode === 'list'">
+      <section class="list-shell">
+        <div class="search-bar">
+          <el-icon class="search-icon"><Search /></el-icon>
+          <input v-model="searchQuery" class="search-input" placeholder="搜索路径、技能、职位..." />
         </div>
-        <h1 class="hero-title">按岗位拆解学习路径，把知识点和行动建议串起来</h1>
-        <p class="hero-desc">
-          围绕典型岗位整理核心能力模块、阶段学习顺序与资源建议，帮助你从“知道要学什么”走到“知道下一步做什么”。
-        </p>
-        <div class="hero-actions">
-          <el-input
-            v-model="searchQuery"
-            placeholder="搜索岗位、知识点或技能标签"
-            clearable
-            size="large"
-            class="search-input"
+
+        <div class="category-tabs">
+          <button
+            v-for="item in trackOptions"
+            :key="item.value"
+            type="button"
+            class="category-chip"
+            :class="{ active: activeTrack === item.value }"
+            @click="activeTrack = item.value"
           >
-            <template #prefix>
-              <el-icon><Search /></el-icon>
-            </template>
-          </el-input>
-          <el-button size="large" @click="router.push('/development-map')">
-            查看发展图谱
-          </el-button>
-        </div>
-      </div>
-
-      <div class="hero-stats">
-        <article class="hero-stat-card">
-          <span class="stat-label">覆盖岗位</span>
-          <strong>{{ filteredRoles.length }}</strong>
-          <small>支持按关键词快速筛选</small>
-        </article>
-        <article class="hero-stat-card accent">
-          <span class="stat-label">知识节点</span>
-          <strong>{{ knowledgeStats.total }}</strong>
-          <small>含基础、框架、项目与工程化</small>
-        </article>
-        <article class="hero-stat-card">
-          <span class="stat-label">已掌握占比</span>
-          <strong>{{ knowledgeStats.progress }}%</strong>
-          <small>根据当前模拟学习进度生成</small>
-        </article>
-      </div>
-    </section>
-
-    <section class="workspace">
-      <aside class="role-panel card-shell">
-        <div class="panel-heading">
-          <div>
-            <div class="panel-eyebrow">岗位导航</div>
-            <h2>选择目标岗位</h2>
-          </div>
-          <el-tag effect="light" round>{{ filteredRoles.length }} 个结果</el-tag>
+            {{ item.label }}
+          </button>
         </div>
 
-        <div class="role-filter">
-          <el-segmented v-model="activeTrack" :options="trackOptions" block />
-        </div>
-
-        <div class="role-list">
+        <div class="role-cards">
           <button
             v-for="role in filteredRoles"
             :key="role.id"
             type="button"
-            class="role-item"
-            :class="{ active: selectedRole?.id === role.id }"
-            @click="selectRole(role.id)"
+            class="role-card"
+            @click="openRole(role.id)"
           >
-            <div class="role-item__main">
-              <span class="role-name">{{ role.title }}</span>
-              <span class="role-level">{{ role.level }}</span>
+            <div class="role-card__icon">{{ role.emoji }}</div>
+            <div class="role-card__content">
+              <div class="role-card__title">{{ role.title }}</div>
+              <div class="role-card__desc">{{ role.description }}</div>
+              <div class="role-card__meta">{{ role.stageCount }} 个阶段 · {{ getNodeCount(role.tree) }} 个核心技能</div>
             </div>
-            <div class="role-item__meta">
-              <span>{{ role.trackLabel }}</span>
-              <span>{{ getNodeCount(role.tree) }} 个节点</span>
-            </div>
-            <p class="role-item__desc">{{ role.description }}</p>
           </button>
+
+          <div v-if="!filteredRoles.length" class="empty-block">暂无匹配岗位</div>
         </div>
-      </aside>
+      </section>
+    </template>
 
-      <main class="knowledge-panel">
-        <section class="overview-card card-shell">
-          <div class="overview-header">
-            <div>
-              <div class="panel-eyebrow">当前岗位</div>
-              <h2>{{ selectedRole?.title }}</h2>
-              <p>{{ selectedRole?.description }}</p>
+    <template v-else>
+      <section class="detail-shell">
+        <header class="detail-header">
+          <button type="button" class="back-btn" @click="pageMode = 'list'">
+            <el-icon><ArrowLeft /></el-icon>
+          </button>
+          <h1>{{ selectedRole?.title }}</h1>
+          <div class="detail-actions">
+            <button type="button" class="icon-btn"><el-icon><FullScreen /></el-icon></button>
+            <button type="button" class="icon-btn"><el-icon><Share /></el-icon></button>
+          </div>
+        </header>
+
+        <div class="detail-body">
+          <div class="tree-stage">
+            <div class="tree-scroll">
+              <TreeNode
+                v-if="detailRoot"
+                :node="detailRoot"
+                :active-id="activeKnowledge?.id"
+                @select="handleNodeSelect"
+              />
             </div>
-            <div class="overview-badges">
-              <span class="overview-badge">{{ selectedRole?.level }}</span>
-              <span class="overview-badge subtle">{{ selectedRole?.trackLabel }}</span>
-            </div>
           </div>
 
-          <div class="overview-metrics">
-            <article class="metric-card">
-              <span>建议学习周期</span>
-              <strong>{{ selectedRole?.cycle }}</strong>
-            </article>
-            <article class="metric-card">
-              <span>优先突破</span>
-              <strong>{{ selectedRole?.focus }}</strong>
-            </article>
-            <article class="metric-card">
-              <span>推荐项目方向</span>
-              <strong>{{ selectedRole?.projectHint }}</strong>
-            </article>
-          </div>
-        </section>
+          <transition name="panel-slide">
+            <aside v-if="activeKnowledge" class="knowledge-panel">
+              <div class="knowledge-panel__header">
+                <div>
+                  <div class="knowledge-panel__eyebrow">{{ activeStatusLabel }}</div>
+                  <h2>{{ activeKnowledge.label }}</h2>
+                  <p>{{ activeKnowledge.summary }}</p>
+                </div>
+                <button type="button" class="panel-close" @click="activeKnowledge = null">
+                  <el-icon><Close /></el-icon>
+                </button>
+              </div>
 
-        <section class="tree-card card-shell">
-          <div class="panel-heading">
-            <div>
-              <div class="panel-eyebrow">知识树</div>
-              <h2>分阶段掌握核心模块</h2>
-            </div>
-            <el-progress
-              type="circle"
-              :percentage="knowledgeStats.progress"
-              :width="74"
-              :stroke-width="8"
-            />
-          </div>
+              <div class="knowledge-panel__actions">
+                <button type="button" class="text-action"><el-icon><Star /></el-icon> 收藏</button>
+                <button type="button" class="text-action"><el-icon><Share /></el-icon> 分享</button>
+              </div>
 
-          <div class="tree-wrapper">
-            <TreeNode
-              v-for="node in selectedRole?.tree ?? []"
-              :key="node.id"
-              :node="node"
-              :active-id="activeKnowledge?.id"
-              @select="activeKnowledge = $event"
-            />
-          </div>
-        </section>
-      </main>
+              <section class="knowledge-section">
+                <h3>知识说明</h3>
+                <p>{{ activeKnowledge.description }}</p>
+              </section>
 
-      <aside class="detail-panel card-shell">
-        <div class="panel-heading">
-          <div>
-            <div class="panel-eyebrow">知识详情</div>
-            <h2>{{ activeKnowledge?.label }}</h2>
-          </div>
-          <span class="detail-status" :class="activeKnowledge?.status">
-            {{ activeStatusLabel }}
-          </span>
+              <section class="meta-grid">
+                <article class="meta-card">
+                  <span>难度</span>
+                  <strong>{{ activeKnowledge.difficulty }}</strong>
+                </article>
+                <article class="meta-card">
+                  <span>预计耗时</span>
+                  <strong>{{ activeKnowledge.duration }}</strong>
+                </article>
+              </section>
+
+              <section class="knowledge-section">
+                <h3>关键标签</h3>
+                <div class="tag-list">
+                  <span v-for="tag in activeKnowledge.tags" :key="tag" class="tag-chip">{{ tag }}</span>
+                </div>
+              </section>
+
+              <section class="knowledge-section">
+                <h3>推荐资源</h3>
+                <ul>
+                  <li v-for="item in activeKnowledge.resources" :key="item">{{ item }}</li>
+                </ul>
+              </section>
+
+              <section class="knowledge-section">
+                <h3>学习里程碑</h3>
+                <ul>
+                  <li v-for="item in activeKnowledge.milestones" :key="item">{{ item }}</li>
+                </ul>
+              </section>
+            </aside>
+          </transition>
         </div>
-
-        <p class="detail-description">
-          {{ activeKnowledge?.description }}
-        </p>
-
-        <div class="detail-meta-grid">
-          <article class="detail-meta-card">
-            <span>难度</span>
-            <strong>{{ activeKnowledge?.difficulty }}</strong>
-          </article>
-          <article class="detail-meta-card">
-            <span>预计耗时</span>
-            <strong>{{ activeKnowledge?.duration }}</strong>
-          </article>
-        </div>
-
-        <section class="detail-section">
-          <div class="section-title">关键标签</div>
-          <div class="tag-list">
-            <span v-for="tag in activeKnowledge?.tags ?? []" :key="tag" class="tag-chip">
-              {{ tag }}
-            </span>
-          </div>
-        </section>
-
-        <section class="detail-section">
-          <div class="section-title">推荐资源</div>
-          <ul class="plain-list">
-            <li v-for="item in activeKnowledge?.resources ?? []" :key="item">{{ item }}</li>
-          </ul>
-        </section>
-
-        <section class="detail-section">
-          <div class="section-title">阶段里程碑</div>
-          <ul class="plain-list">
-            <li v-for="item in activeKnowledge?.milestones ?? []" :key="item">{{ item }}</li>
-          </ul>
-        </section>
-      </aside>
-    </section>
+      </section>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
-import { Collection, Search } from '@element-plus/icons-vue'
+import { ArrowLeft, Close, FullScreen, Search, Share, Star } from '@element-plus/icons-vue'
 import TreeNode, { type KnowledgeTreeNode } from '@/components/JobKnowledge/TreeNode.vue'
 
 interface JobKnowledgeRole {
   id: string
   title: string
+  emoji: string
+  stageCount: number
   level: string
   track: 'frontend' | 'backend' | 'data' | 'ai'
   trackLabel: string
@@ -211,280 +148,277 @@ interface JobKnowledgeRole {
   tree: KnowledgeTreeNode[]
 }
 
-const router = useRouter()
+const pageMode = ref<'list' | 'detail'>('list')
 const searchQuery = ref('')
 const activeTrack = ref<'all' | JobKnowledgeRole['track']>('all')
+const selectedRoleId = ref('')
+const activeKnowledge = ref<KnowledgeTreeNode | null>(null)
 
 const trackOptions = [
-  { label: '全部', value: 'all' },
-  { label: '前端', value: 'frontend' },
-  { label: '后端', value: 'backend' },
-  { label: '数据', value: 'data' },
-  { label: 'AI', value: 'ai' },
-]
+  { label: '推荐', value: 'all' },
+  { label: '热门职业', value: 'backend' },
+  { label: '热门技能', value: 'data' },
+  { label: '计算机软件', value: 'frontend' },
+  { label: 'Java', value: 'ai' },
+] as const
 
 const roles = ref<JobKnowledgeRole[]>([
   {
-    id: 'frontend-engineer',
-    title: '前端开发工程师',
-    level: '初中级',
-    track: 'frontend',
-    trackLabel: '前端方向',
-    description: '围绕页面开发、组件工程化、性能优化与交互体验构建完整前端能力。',
-    cycle: '12-16 周',
-    focus: 'JavaScript / Vue3 / 工程化',
-    projectHint: '中后台系统 + 落地页双项目组合',
+    id: 'java-learning-path',
+    title: 'Java研发工程师学习路径',
+    emoji: '🚀',
+    stageCount: 5,
+    level: '中级',
+    track: 'backend',
+    trackLabel: '后端方向',
+    description: '面向中级 Java 工程师的进阶学习路径，涵盖技术深度、行业趋势、职业发展及 AI 时代技能。',
+    cycle: '14-18 周',
+    focus: 'Java / Spring Boot / 微服务',
+    projectHint: '企业级业务系统 + AI 融合项目',
     tree: [
       {
-        id: 'fe-basic',
-        label: '前端基础',
-        summary: '打牢语言和浏览器认知',
-        description: '先把 HTML、CSS、JavaScript 与浏览器运行机制学扎实，这是后续框架和工程化的底层支撑。',
+        id: 'java-core-domain',
+        label: '核心知识领域',
+        summary: '夯实 Java 工程师的基础知识与系统能力',
+        description: '围绕语言基础、框架能力、数据库设计与工程实践，建立稳定且可扩展的 Java 开发知识体系。',
         difficulty: '基础',
         duration: '3-4 周',
         status: 'completed',
-        tags: ['HTML', 'CSS', 'JavaScript', '浏览器'],
-        resources: ['MDN 核心文档', 'JavaScript 高级程序设计', '浏览器渲染流程专题'],
-        milestones: ['独立完成响应式页面', '理解作用域、原型链与事件循环'],
+        tags: ['Java', 'Spring Boot', 'MySQL', '工程化'],
+        resources: ['Java 核心技术', 'Spring Boot 官方文档', '高性能 MySQL'],
+        milestones: ['完成一个基础业务服务', '掌握接口分层与异常处理'],
         children: [
           {
-            id: 'fe-html-css',
-            label: 'HTML / CSS',
-            summary: '结构化页面与响应式布局',
-            description: '掌握语义化标签、Flex/Grid、BFC、动画和常见布局方案，做到可还原设计稿。',
+            id: 'java-language',
+            label: 'Java 语言基础',
+            summary: '语法、集合、并发与面向对象设计',
+            description: '打牢 Java 语法、集合框架、异常处理、IO 与并发编程基础，是进入企业级后端开发的第一步。',
             difficulty: '基础',
             duration: '1-2 周',
             status: 'completed',
-            tags: ['语义化', 'Flex', 'Grid', '动画'],
-            resources: ['CSS Tricks 布局指南', 'MDN HTML/CSS'],
-            milestones: ['完成 2 个静态页面还原', '掌握常用布局与适配'],
+            tags: ['集合', '并发', 'IO'],
+            resources: ['Java 基础题库', '并发编程实战'],
+            milestones: ['能解释线程池', '掌握常见集合选择'],
             children: [],
           },
           {
-            id: 'fe-js',
-            label: 'JavaScript 核心',
-            summary: '语言能力与异步模型',
-            description: '重点掌握闭包、this、原型链、Promise、模块化和常见数组对象处理能力。',
-            difficulty: '基础',
-            duration: '1-2 周',
-            status: 'completed',
-            tags: ['闭包', 'Promise', '模块化'],
-            resources: ['现代 JavaScript 教程', '手写 Promise 练习'],
-            milestones: ['能独立解释事件循环', '完成常见 JS 手写题'],
+            id: 'java-framework',
+            label: 'Spring 体系',
+            summary: '掌握主流企业级 Java 框架',
+            description: '深入理解 Spring、Spring Boot、MVC、事务、校验与鉴权等常见企业级开发能力。',
+            difficulty: '进阶',
+            duration: '2 周',
+            status: 'current',
+            tags: ['Spring', '事务', '鉴权'],
+            resources: ['Spring 官方文档', '实战项目教程'],
+            milestones: ['完成 RESTful 服务', '输出接口设计规范'],
             children: [],
           },
         ],
       },
       {
-        id: 'fe-framework',
-        label: 'Vue3 与组件开发',
-        summary: '掌握主流前端框架开发方式',
-        description: '学习 Composition API、状态管理、组件设计和页面协同，具备独立开发业务模块的能力。',
+        id: 'industry-trend',
+        label: '行业趋势与技术前沿',
+        summary: '理解云原生、AI 融合与新兴方向',
+        description: '不仅要会写代码，还要理解行业变化趋势，提升技术判断力和职业持续成长能力。',
         difficulty: '进阶',
-        duration: '4-5 周',
+        duration: '3 周',
         status: 'current',
-        tags: ['Vue3', 'Pinia', '组件设计'],
-        resources: ['Vue 官方文档', 'Element Plus 组件库', '组合式函数实战'],
-        milestones: ['封装 3 个可复用业务组件', '完成一个完整 CRUD 模块'],
+        tags: ['云原生', 'AI', '新技术'],
+        resources: ['云原生白皮书', 'AI 工程落地案例'],
+        milestones: ['能解释云原生架构价值', '形成个人技术雷达'],
         children: [
           {
-            id: 'fe-vue-core',
-            label: 'Composition API',
-            summary: '响应式和组合式设计',
-            description: '理解 ref/reactive、computed、watch、组件通信和组合式函数拆分方式。',
-            difficulty: '进阶',
-            duration: '1-2 周',
-            status: 'current',
-            tags: ['ref', 'computed', 'watch'],
-            resources: ['Vue 深入响应式章节', '组合式函数最佳实践'],
-            milestones: ['拆分 2 个 composable', '能清晰处理父子与跨组件状态'],
-            children: [],
-          },
-          {
-            id: 'fe-engineering',
-            label: '工程化与质量',
-            summary: '让代码更稳定可维护',
-            description: '掌握 Vite、ESLint、Prettier、Git 协作、接口分层与基础测试思路。',
+            id: 'cloud-stack',
+            label: '云原生技术栈',
+            summary: '容器化、部署与服务治理',
+            description: '掌握 Docker、Kubernetes、CI/CD、日志监控与服务治理，提升系统交付能力。',
             difficulty: '进阶',
             duration: '1-2 周',
             status: 'planned',
-            tags: ['Vite', 'ESLint', 'Git', '测试'],
-            resources: ['Vite 官方文档', '团队规范模板', 'Vitest 入门'],
-            milestones: ['建立项目目录规范', '补齐至少 3 个关键测试'],
+            tags: ['Docker', 'K8s', 'CI/CD'],
+            resources: ['Docker 官方文档', 'K8s 实战'],
+            milestones: ['完成服务容器化', '搭建部署流水线'],
+            children: [],
+          },
+          {
+            id: 'java-ai',
+            label: 'AI 与 Java 融合',
+            summary: 'Java 工程师的 AI 能力升级方向',
+            description: '理解如何在 Java 业务系统中接入 LLM、RAG、Agent 能力，让传统后端能力与 AI 应用融合。',
+            difficulty: '进阶',
+            duration: '1-2 周',
+            status: 'current',
+            tags: ['LLM', 'RAG', 'Agent'],
+            resources: ['RAG 设计资料', '模型接入示例'],
+            milestones: ['完成一个知识问答 Demo', '输出 AI 接入设计方案'],
+            children: [],
+          },
+          {
+            id: 'new-tech',
+            label: '新兴技术方向',
+            summary: '跟踪具备长期价值的技术主题',
+            description: '关注低代码、边缘计算、可观测性平台、智能运维等方向，拓宽技术视野。',
+            difficulty: '进阶',
+            duration: '1 周',
+            status: 'planned',
+            tags: ['低代码', '可观测性', '智能运维'],
+            resources: ['行业趋势报告', '技术峰会分享'],
+            milestones: ['形成 1 份技术趋势笔记'],
             children: [],
           },
         ],
       },
       {
-        id: 'fe-project',
-        label: '项目与性能优化',
-        summary: '从会写页面走向能交付产品',
-        description: '通过项目实战、性能优化和体验细节打磨，把知识点转成可展示成果。',
+        id: 'career-development',
+        label: '职业发展路径',
+        summary: '从岗位能力走向职业竞争力',
+        description: '围绕技术进阶、认证体系与职业竞争力提升，规划后续成长路线。',
         difficulty: '进阶',
-        duration: '4-6 周',
+        duration: '2-3 周',
         status: 'planned',
-        tags: ['项目实战', '性能优化', '部署'],
-        resources: ['Lighthouse 指标说明', '性能优化案例库', '前端项目复盘模板'],
-        milestones: ['上线 1 个完整项目', '完成首屏与交互优化复盘'],
+        tags: ['职业规划', '技术进阶', '认证'],
+        resources: ['成长路线图模板', '职业复盘模板'],
+        milestones: ['明确半年成长目标', '形成阶段学习清单'],
+        children: [
+          {
+            id: 'advance-route',
+            label: '技术进阶路线',
+            summary: '从开发者走向骨干工程师',
+            description: '逐步提升架构设计、性能优化、复杂系统排障和团队协作能力。',
+            difficulty: '进阶',
+            duration: '1-2 周',
+            status: 'planned',
+            tags: ['架构', '性能优化', '排障'],
+            resources: ['系统设计资料', '性能优化案例'],
+            milestones: ['完成一次系统优化复盘'],
+            children: [],
+          },
+          {
+            id: 'certification',
+            label: '行业认证',
+            summary: '利用证书提升履历竞争力',
+            description: '结合岗位方向选择云计算、数据库、架构或 AI 类认证，提高求职与晋升竞争力。',
+            difficulty: '基础',
+            duration: '1 周',
+            status: 'planned',
+            tags: ['认证', '履历', '晋升'],
+            resources: ['认证考试官网', '备考路线'],
+            milestones: ['确定 1 个目标认证'],
+            children: [],
+          },
+        ],
+      },
+      {
+        id: 'project-case',
+        label: '实践项目与案例',
+        summary: '用项目沉淀真实交付经验',
+        description: '通过企业项目、系统设计和 AI 融合项目，形成可展示的作品与成果。',
+        difficulty: '进阶',
+        duration: '4-5 周',
+        status: 'current',
+        tags: ['项目', '案例', '作品'],
+        resources: ['项目复盘模板', '系统设计案例集'],
+        milestones: ['完成 2 个可展示项目'],
+        children: [
+          {
+            id: 'enterprise-project',
+            label: '企业级项目实战',
+            summary: '围绕真实业务场景构建系统',
+            description: '完成用户中心、订单系统、报表系统等企业级项目，强化业务理解和工程能力。',
+            difficulty: '进阶',
+            duration: '2-3 周',
+            status: 'current',
+            tags: ['订单系统', '用户中心', '报表系统'],
+            resources: ['业务系统案例', '接口设计规范'],
+            milestones: ['交付一个完整后台服务'],
+            children: [],
+          },
+          {
+            id: 'ai-project',
+            label: 'AI 融合项目',
+            summary: '面向 Java 工程师的 AI 系统梳理',
+            description: '将 AI 概念与时代理解落到项目中，例如知识库问答、智能代码助手、自动化流程等，构建“传统后端 + AI”复合能力。',
+            difficulty: '进阶',
+            duration: '2 周',
+            status: 'current',
+            tags: ['知识库', '智能助手', '自动化'],
+            resources: ['RAG 案例集', 'AI 应用架构示例'],
+            milestones: ['完成 1 个 AI 融合项目 Demo', '形成系统设计说明'],
+            children: [],
+          },
+        ],
+      },
+      {
+        id: 'ai-evolution',
+        label: 'AI时代技能演进',
+        summary: '理解技术角色在 AI 时代的升级方式',
+        description: '理解为什么传统工程师需要升级为具备产品理解、流程设计与模型集成能力的复合型人才。',
+        difficulty: '进阶',
+        duration: '1-2 周',
+        status: 'planned',
+        tags: ['AI 时代', '复合能力', '岗位升级'],
+        resources: ['岗位趋势分析', 'AI 工程实践文章'],
+        milestones: ['形成个人岗位升级方案'],
         children: [],
       },
     ],
   },
   {
-    id: 'backend-engineer',
-    title: '后端开发工程师',
-    level: '初中级',
+    id: 'java-advanced',
+    title: 'Java进阶学习路径',
+    emoji: '☕',
+    stageCount: 7,
+    level: '中高级',
     track: 'backend',
     trackLabel: '后端方向',
-    description: '从语言基础、框架、数据库到服务治理，建立稳定的后端交付能力。',
-    cycle: '14-18 周',
-    focus: 'Java / Spring Boot / 数据库',
-    projectHint: '订单系统或用户中心服务',
-    tree: [
-      {
-        id: 'be-java',
-        label: 'Java 基础',
-        summary: '语言、集合、并发与 IO',
-        description: '理解 Java 语言特性、集合框架、异常处理和基础并发，是后端开发的必修课。',
-        difficulty: '基础',
-        duration: '3-4 周',
-        status: 'completed',
-        tags: ['Java', '集合', '并发'],
-        resources: ['Java 核心技术', '并发编程入门'],
-        milestones: ['能写出清晰的面向对象代码', '掌握线程池和常见集合'],
-        children: [],
-      },
-      {
-        id: 'be-framework',
-        label: 'Spring Boot 实战',
-        summary: '快速搭建可用服务',
-        description: '围绕接口设计、分层架构、参数校验、异常处理和权限认证构建业务服务。',
-        difficulty: '进阶',
-        duration: '4-5 周',
-        status: 'current',
-        tags: ['Spring Boot', 'RESTful', '认证授权'],
-        resources: ['Spring 官方文档', '接口设计规范'],
-        milestones: ['完成一个带登录鉴权的服务', '输出 API 文档'],
-        children: [],
-      },
-      {
-        id: 'be-data',
-        label: '数据库与缓存',
-        summary: '提升数据层设计能力',
-        description: '掌握 MySQL 建模、索引优化、事务和 Redis 使用场景，具备常见性能优化思路。',
-        difficulty: '进阶',
-        duration: '3-4 周',
-        status: 'planned',
-        tags: ['MySQL', 'Redis', '事务'],
-        resources: ['高性能 MySQL', 'Redis 实战'],
-        milestones: ['完成表结构设计', '定位并优化慢查询'],
-        children: [],
-      },
-    ],
+    description: '面向中级开发者的 Java 全栈学习路径，涵盖语言特性、云原生、AI 融合及职业发展。',
+    cycle: '16-20 周',
+    focus: '微服务 / 中间件 / 架构设计',
+    projectHint: '分布式系统项目',
+    tree: [],
   },
   {
-    id: 'data-engineer',
-    title: '数据开发工程师',
-    level: '中级',
-    track: 'data',
-    trackLabel: '数据方向',
-    description: '围绕数据链路、建模与服务化能力，建立面向分析和决策的数据工程能力。',
+    id: 'java-basic',
+    title: 'Java',
+    emoji: '🧑‍💻',
+    stageCount: 11,
+    level: '初中级',
+    track: 'frontend',
+    trackLabel: '软件开发',
+    description: '从基础到进阶的 Java 开发全流程学习路径。',
+    cycle: '10-12 周',
+    focus: '语言基础 / 面向对象',
+    projectHint: '控制台项目 + Web 项目',
+    tree: [],
+  },
+  {
+    id: 'javascript',
+    title: 'JavaScript编程',
+    emoji: '💛',
+    stageCount: 19,
+    level: '初中级',
+    track: 'frontend',
+    trackLabel: '前端方向',
+    description: '2025 年学习 JavaScript 的逐步指南。',
     cycle: '12-16 周',
-    focus: 'SQL / ETL / 数仓建模',
-    projectHint: '用户行为分析链路',
-    tree: [
-      {
-        id: 'data-sql',
-        label: 'SQL 与数据处理',
-        summary: '查询、聚合和数据清洗',
-        description: '重点掌握复杂查询、窗口函数、数据清洗与质量校验。',
-        difficulty: '基础',
-        duration: '2-3 周',
-        status: 'completed',
-        tags: ['SQL', '清洗', '窗口函数'],
-        resources: ['SQL 必知必会', 'LeetCode SQL 题单'],
-        milestones: ['独立完成复杂报表 SQL', '具备基础数据排错能力'],
-        children: [],
-      },
-      {
-        id: 'data-warehouse',
-        label: '数仓与 ETL',
-        summary: '构建稳定的数据链路',
-        description: '学习分层建模、指标口径、离线同步和调度编排，搭建完整 ETL 流程。',
-        difficulty: '进阶',
-        duration: '4-5 周',
-        status: 'current',
-        tags: ['ETL', '数仓', '调度'],
-        resources: ['数据仓库工具箱', 'Airflow 入门'],
-        milestones: ['完成一条离线 ETL 链路', '建立指标口径文档'],
-        children: [],
-      },
-      {
-        id: 'data-service',
-        label: '数据服务化',
-        summary: '让数据真正服务业务',
-        description: '把指标和数据能力服务化输出，支撑看板、策略和业务系统调用。',
-        difficulty: '进阶',
-        duration: '3-4 周',
-        status: 'planned',
-        tags: ['数据 API', '指标服务', '可视化'],
-        resources: ['BI 看板案例', '数据接口设计实践'],
-        milestones: ['输出一个指标服务接口', '联动业务看板展示'],
-        children: [],
-      },
-    ],
+    focus: 'JS / 浏览器 / 框架',
+    projectHint: '交互站点项目',
+    tree: [],
   },
   {
-    id: 'ai-engineer',
-    title: 'AI 应用工程师',
-    level: '中级',
-    track: 'ai',
-    trackLabel: 'AI 方向',
-    description: '面向大模型应用落地，构建 Prompt、RAG、Agent 与业务集成的工程能力。',
-    cycle: '10-14 周',
-    focus: 'LLM 接入 / Prompt / RAG',
-    projectHint: '知识问答或智能助手应用',
-    tree: [
-      {
-        id: 'ai-foundation',
-        label: '大模型应用基础',
-        summary: '理解模型能力边界与接入方式',
-        description: '建立对模型输入输出、上下文限制、提示词设计和评估方式的基础理解。',
-        difficulty: '基础',
-        duration: '2-3 周',
-        status: 'completed',
-        tags: ['LLM', 'Prompt', '评测'],
-        resources: ['模型接入文档', 'Prompt 案例集'],
-        milestones: ['能设计稳定提示词', '理解幻觉与评测基本方法'],
-        children: [],
-      },
-      {
-        id: 'ai-rag',
-        label: 'RAG 与知识库',
-        summary: '把业务知识接进模型',
-        description: '学习切片、向量检索、召回重排与答案生成，搭建一个可用的知识问答流程。',
-        difficulty: '进阶',
-        duration: '3-4 周',
-        status: 'current',
-        tags: ['RAG', '向量检索', 'Embedding'],
-        resources: ['RAG 架构文章', '向量数据库文档'],
-        milestones: ['完成一个问答 Demo', '优化召回与答案质量'],
-        children: [],
-      },
-      {
-        id: 'ai-agent',
-        label: 'Agent 工作流',
-        summary: '组织多步骤任务执行',
-        description: '围绕工具调用、流程编排、状态管理和安全边界设计业务 Agent。',
-        difficulty: '进阶',
-        duration: '3-4 周',
-        status: 'planned',
-        tags: ['Agent', '工具调用', '工作流'],
-        resources: ['Agent 设计模式', '多步骤任务案例'],
-        milestones: ['设计 1 个可落地业务 Agent', '补齐观测与回退机制'],
-        children: [],
-      },
-    ],
+    id: 'computer-software',
+    title: '计算机软件',
+    emoji: '🧑‍💻',
+    stageCount: 15,
+    level: '综合',
+    track: 'data',
+    trackLabel: '综合方向',
+    description: '覆盖软件开发全栈知识体系，包含技术、工具、行业趋势及职业发展路径。',
+    cycle: '长期',
+    focus: '软件工程 / 全栈基础',
+    projectHint: '综合项目集',
+    tree: [],
   },
 ])
 
@@ -492,16 +426,11 @@ const filteredRoles = computed(() => {
   const keyword = searchQuery.value.trim().toLowerCase()
 
   return roles.value.filter((role) => {
-    const matchTrack = activeTrack.value === 'all' || role.track === activeTrack.value
-    if (!matchTrack) return false
+    const trackMatched = activeTrack.value === 'all' || role.track === activeTrack.value
+    if (!trackMatched) return false
     if (!keyword) return true
 
-    const content = [
-      role.title,
-      role.description,
-      role.focus,
-      ...flattenNodes(role.tree).flatMap((node) => [node.label, node.summary, ...node.tags]),
-    ]
+    const content = [role.title, role.description, role.focus, ...flattenNodes(role.tree).map((item) => item.label)]
       .join(' ')
       .toLowerCase()
 
@@ -509,48 +438,35 @@ const filteredRoles = computed(() => {
   })
 })
 
-const selectedRoleId = ref(roles.value[0]?.id ?? '')
-const selectedRole = computed(
-  () => filteredRoles.value.find((role) => role.id === selectedRoleId.value) ?? filteredRoles.value[0] ?? null,
-)
+const selectedRole = computed(() => roles.value.find((item) => item.id === selectedRoleId.value) ?? null)
 
-const activeKnowledge = ref<KnowledgeTreeNode | null>(null)
+const detailRoot = computed<KnowledgeTreeNode | null>(() => {
+  if (!selectedRole.value) return null
 
-const knowledgeStats = computed(() => {
-  const nodes = selectedRole.value ? flattenNodes(selectedRole.value.tree) : []
-  const total = nodes.length
-  const completed = nodes.filter((node) => node.status === 'completed').length
-  const progress = total ? Math.round((completed / total) * 100) : 0
-
-  return { total, progress }
+  return {
+    id: `${selectedRole.value.id}-root`,
+    label: selectedRole.value.title,
+    summary: selectedRole.value.description,
+    description: `${selectedRole.value.description} 建议学习周期：${selectedRole.value.cycle}；优先突破：${selectedRole.value.focus}；推荐项目方向：${selectedRole.value.projectHint}。`,
+    difficulty: selectedRole.value.level,
+    duration: selectedRole.value.cycle,
+    status: 'current',
+    tags: [selectedRole.value.trackLabel, selectedRole.value.focus, selectedRole.value.projectHint],
+    resources: ['岗位概览', '阶段学习规划', '项目实践建议'],
+    milestones: ['选择一个目标岗位方向', '按阶段逐步展开下一级内容'],
+    children: selectedRole.value.tree,
+  }
 })
 
 const activeStatusLabel = computed(() => {
   if (!activeKnowledge.value) return ''
-  const map = {
+  const statusMap: Record<KnowledgeTreeNode['status'], string> = {
     completed: '已掌握',
     current: '进行中',
     planned: '待学习',
-  } satisfies Record<KnowledgeTreeNode['status'], string>
-
-  return map[activeKnowledge.value.status]
+  }
+  return statusMap[activeKnowledge.value.status]
 })
-
-watch(
-  filteredRoles,
-  (list: JobKnowledgeRole[]) => {
-    if (!list.length) {
-      selectedRoleId.value = ''
-      activeKnowledge.value = null
-      return
-    }
-
-    if (!list.some((role) => role.id === selectedRoleId.value)) {
-      selectedRoleId.value = list[0]!.id
-    }
-  },
-  { immediate: true },
-)
 
 watch(
   selectedRole,
@@ -559,11 +475,7 @@ watch(
       activeKnowledge.value = null
       return
     }
-
-    const nodes = flattenNodes(role.tree)
-    if (!activeKnowledge.value || !nodes.some((node) => node.id === activeKnowledge.value?.id)) {
-      activeKnowledge.value = nodes[0] ?? null
-    }
+    activeKnowledge.value = detailRoot.value
   },
   { immediate: true },
 )
@@ -576,381 +488,322 @@ function getNodeCount(nodes: KnowledgeTreeNode[]): number {
   return flattenNodes(nodes).length
 }
 
-function selectRole(roleId: string): void {
+function openRole(roleId: string): void {
   selectedRoleId.value = roleId
+  pageMode.value = 'detail'
+}
+
+function handleNodeSelect(node: KnowledgeTreeNode): void {
+  activeKnowledge.value = node
 }
 </script>
 
 <style scoped lang="scss">
 .job-knowledge-page {
-  min-height: calc(100vh - 60px);
-  padding: 28px 20px 40px;
-  background:
-    radial-gradient(circle at top left, rgba(59, 130, 246, 0.16), transparent 24%),
-    radial-gradient(circle at right center, rgba(56, 189, 248, 0.14), transparent 20%),
-    linear-gradient(180deg, #f4f8ff 0%, #eef5ff 52%, #f9fbff 100%);
+  min-height: 100%;
+  background: #efefef;
 }
 
-.hero-panel,
-.card-shell {
-  position: relative;
-  border: 1px solid rgba(218, 230, 244, 0.96);
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 24px 60px rgba(28, 74, 127, 0.08);
+.list-shell {
+  max-width: 1060px;
+  margin: 0 auto;
+  padding: 14px 0 32px;
 }
 
-.hero-panel {
-  max-width: 1360px;
-  margin: 0 auto 24px;
-  padding: 32px;
-  border-radius: 32px;
-  display: grid;
-  grid-template-columns: minmax(0, 1.3fr) minmax(280px, 0.7fr);
-  gap: 24px;
-  background:
-    radial-gradient(circle at top left, rgba(96, 165, 250, 0.22), transparent 28%),
-    linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(245, 249, 255, 0.94));
-}
-
-.hero-kicker,
-.panel-eyebrow,
-.section-title {
-  color: #2563eb;
-  font-weight: 700;
-}
-
-.hero-kicker,
-.panel-eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 32px;
-  padding: 0 14px;
-  border-radius: 999px;
-  background: rgba(59, 130, 246, 0.1);
-  font-size: 12px;
-}
-
-.hero-title {
-  margin: 18px 0 12px;
-  color: #173a5d;
-  font-size: clamp(30px, 4vw, 42px);
-  line-height: 1.15;
-  font-weight: 800;
-}
-
-.hero-desc {
-  max-width: 760px;
-  margin: 0;
-  color: #617890;
-  font-size: 15px;
-  line-height: 1.9;
-}
-
-.hero-actions {
-  margin-top: 22px;
+.search-bar {
   display: flex;
-  gap: 12px;
+  align-items: center;
+  gap: 14px;
+  height: 72px;
+  padding: 0 22px;
+  background: rgba(255, 255, 255, 0.68);
+  border-radius: 18px;
+}
+
+.search-icon {
+  font-size: 28px;
+  color: #6b7280;
 }
 
 .search-input {
-  max-width: 460px;
+  width: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: #374151;
+  font-size: 18px;
 }
 
-.hero-stats {
-  display: grid;
+.search-input::placeholder {
+  color: #6b7280;
+}
+
+.category-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 24px 6px 22px;
+}
+
+.category-chip {
+  min-height: 48px;
+  padding: 0 24px;
+  border-radius: 999px;
+  border: 1.5px solid #c9ced6;
+  background: #f7f7f7;
+  color: #333;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.category-chip.active {
+  color: #1658d3;
+  border-color: #1658d3;
+  background: #e9f0ff;
+  font-weight: 700;
+}
+
+.role-cards {
+  display: flex;
+  flex-direction: column;
   gap: 14px;
 }
 
-.hero-stat-card {
-  padding: 20px 22px;
-  border-radius: 24px;
-  background: linear-gradient(180deg, #f8fbff 0%, #eff6ff 100%);
-  border: 1px solid rgba(220, 232, 244, 0.96);
-}
-
-.hero-stat-card.accent {
-  background: linear-gradient(135deg, rgba(37, 99, 235, 0.12), rgba(56, 189, 248, 0.16));
-}
-
-.stat-label {
-  display: block;
-  color: #6f879e;
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.hero-stat-card strong {
-  display: block;
-  margin: 10px 0 6px;
-  color: #16324f;
-  font-size: 34px;
-  font-weight: 800;
-}
-
-.hero-stat-card small {
-  color: #688096;
-  font-size: 13px;
-}
-
-.workspace {
-  max-width: 1360px;
-  margin: 0 auto;
-  display: grid;
-  grid-template-columns: 300px minmax(0, 1fr) 340px;
-  gap: 20px;
-}
-
-.card-shell {
-  border-radius: 28px;
-  padding: 24px;
-}
-
-.panel-heading {
+.role-card {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 18px;
-}
-
-.panel-heading h2 {
-  margin: 10px 0 0;
-  color: #173a5d;
-  font-size: 24px;
-  font-weight: 800;
-  line-height: 1.2;
-}
-
-.role-filter {
-  margin-bottom: 16px;
-}
-
-.role-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  max-height: 760px;
-  overflow: auto;
-}
-
-.role-item {
-  padding: 16px 18px;
-  border: 1px solid rgba(220, 232, 244, 0.96);
-  border-radius: 20px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 251, 255, 0.96));
+  align-items: center;
+  gap: 18px;
+  width: 100%;
+  padding: 20px 24px;
+  border: none;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.7);
   text-align: left;
   cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-.role-item:hover,
-.role-item.active {
+.role-card:hover {
   transform: translateY(-2px);
-  border-color: rgba(96, 165, 250, 0.54);
-  box-shadow: 0 18px 40px rgba(37, 99, 235, 0.1);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.08);
 }
 
-.role-item__main,
-.role-item__meta {
+.role-card__icon {
+  flex: 0 0 54px;
+  width: 54px;
+  height: 54px;
+  border-radius: 14px;
+  background: rgba(244, 244, 245, 1);
   display: flex;
-  justify-content: space-between;
-  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
 }
 
-.role-name {
-  color: #173a5d;
-  font-size: 16px;
+.role-card__title {
+  color: #20242c;
+  font-size: 18px;
   font-weight: 800;
 }
 
-.role-level,
-.role-item__meta {
-  color: #6f8499;
-  font-size: 12px;
-  font-weight: 700;
+.role-card__desc {
+  margin-top: 8px;
+  color: #5f6877;
+  font-size: 14px;
+  line-height: 1.6;
 }
 
-.role-item__meta {
+.role-card__meta {
   margin-top: 10px;
+  color: #5b6471;
+  font-size: 14px;
 }
 
-.role-item__desc {
-  margin: 10px 0 0;
-  color: #5f768e;
-  font-size: 13px;
-  line-height: 1.7;
+.empty-block {
+  padding: 48px 20px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.7);
+  text-align: center;
+  color: #6b7280;
+}
+
+.detail-shell {
+  min-height: 100vh;
+  padding: 10px 18px 18px;
+}
+
+.detail-header {
+  position: sticky;
+  top: 0;
+  z-index: 12;
+  display: grid;
+  grid-template-columns: 48px 1fr auto;
+  align-items: center;
+  gap: 16px;
+  height: 54px;
+}
+
+.detail-header h1 {
+  margin: 0;
+  text-align: center;
+  color: #1658d3;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.back-btn,
+.icon-btn,
+.panel-close {
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: #1658d3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.back-btn {
+  font-size: 20px;
+}
+
+.detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.detail-body {
+  position: relative;
+  display: flex;
+  gap: 24px;
+  min-height: calc(100vh - 80px);
+}
+
+.tree-stage {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.tree-scroll {
+  min-height: calc(100vh - 90px);
+  padding: 180px 90px 80px 280px;
+  overflow: auto;
 }
 
 .knowledge-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
+  position: sticky;
+  top: 84px;
+  align-self: flex-start;
+  width: 420px;
+  max-height: calc(100vh - 110px);
+  padding: 26px 24px 24px;
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.15);
+  overflow: auto;
 }
 
-.overview-card {
-  background:
-    radial-gradient(circle at top right, rgba(59, 130, 246, 0.14), transparent 22%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(246, 250, 255, 0.98));
-}
-
-.overview-header {
+.knowledge-panel__header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 18px;
+  gap: 16px;
 }
 
-.overview-header h2 {
-  margin: 10px 0 8px;
-  color: #173a5d;
-  font-size: 28px;
-  font-weight: 800;
-}
-
-.overview-header p {
-  margin: 0;
-  color: #617890;
-  font-size: 14px;
-  line-height: 1.8;
-}
-
-.overview-badges {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.overview-badge {
-  min-height: 36px;
-  padding: 0 14px;
-  display: inline-flex;
-  align-items: center;
-  border-radius: 999px;
-  background: rgba(37, 99, 235, 0.12);
-  color: #2563eb;
+.knowledge-panel__eyebrow {
+  color: #1658d3;
   font-size: 13px;
   font-weight: 700;
 }
 
-.overview-badge.subtle {
-  background: rgba(226, 232, 240, 0.72);
-  color: #526a83;
-}
-
-.overview-metrics {
-  margin-top: 20px;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
-}
-
-.metric-card {
-  padding: 18px;
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.86);
-  border: 1px solid rgba(223, 233, 244, 0.96);
-}
-
-.metric-card span {
-  display: block;
-  color: #7890a7;
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.metric-card strong {
-  display: block;
-  margin-top: 10px;
-  color: #16324f;
+.knowledge-panel__header h2 {
+  margin: 6px 0 8px;
+  color: #1f2937;
   font-size: 18px;
   font-weight: 800;
-  line-height: 1.5;
 }
 
-.tree-wrapper {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  max-height: 760px;
-  overflow: auto;
-  padding-right: 4px;
-}
-
-.detail-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  background:
-    radial-gradient(circle at top left, rgba(56, 189, 248, 0.12), transparent 26%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 251, 255, 0.98));
-}
-
-.detail-status {
-  padding: 6px 12px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.detail-status.completed {
-  background: rgba(34, 197, 94, 0.12);
-  color: #15803d;
-}
-
-.detail-status.current {
-  background: rgba(245, 158, 11, 0.14);
-  color: #b45309;
-}
-
-.detail-status.planned {
-  background: rgba(59, 130, 246, 0.1);
-  color: #2563eb;
-}
-
-.detail-description {
+.knowledge-panel__header p {
   margin: 0;
-  color: #5d748b;
+  color: #667085;
   font-size: 14px;
-  line-height: 1.85;
+  line-height: 1.7;
 }
 
-.detail-meta-grid {
+.knowledge-panel__actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 18px 0 20px;
+  padding: 14px 0;
+  border-top: 1px solid #e5e7eb;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.text-action {
+  border: none;
+  background: transparent;
+  color: #1658d3;
+  font-size: 15px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.knowledge-section + .knowledge-section,
+.meta-grid + .knowledge-section,
+.knowledge-section + .meta-grid {
+  margin-top: 18px;
+}
+
+.knowledge-section h3 {
+  margin: 0 0 10px;
+  color: #1f2937;
+  font-size: 16px;
+}
+
+.knowledge-section p,
+.knowledge-section ul {
+  margin: 0;
+  color: #4b5563;
+  line-height: 1.9;
+}
+
+.knowledge-section ul {
+  padding-left: 18px;
+}
+
+.meta-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
 
-.detail-meta-card {
+.meta-card {
   padding: 16px;
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(221, 232, 244, 0.96);
+  background: #f8fafc;
 }
 
-.detail-meta-card span {
+.meta-card span {
   display: block;
-  color: #758ba1;
+  color: #64748b;
   font-size: 12px;
-  font-weight: 700;
 }
 
-.detail-meta-card strong {
+.meta-card strong {
   display: block;
   margin-top: 8px;
-  color: #173a5d;
+  color: #1f2937;
   font-size: 18px;
-  font-weight: 800;
-}
-
-.detail-section {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.section-title {
-  font-size: 13px;
 }
 
 .tag-list {
@@ -960,68 +813,78 @@ function selectRole(roleId: string): void {
 }
 
 .tag-chip {
-  padding: 5px 10px;
+  padding: 6px 12px;
   border-radius: 999px;
-  background: rgba(37, 99, 235, 0.08);
-  color: #285d9a;
-  font-size: 12px;
+  background: #eff6ff;
+  color: #1658d3;
+  font-size: 13px;
   font-weight: 700;
 }
 
-.plain-list {
-  margin: 0;
-  padding-left: 18px;
-  color: #5d748b;
-  font-size: 14px;
-  line-height: 1.8;
+.panel-slide-enter-active,
+.panel-slide-leave-active {
+  transition: all 0.25s ease;
 }
 
-@media (max-width: 1240px) {
-  .workspace {
-    grid-template-columns: 280px minmax(0, 1fr);
-  }
-
-  .detail-panel {
-    grid-column: 1 / -1;
-  }
+.panel-slide-enter-from,
+.panel-slide-leave-to {
+  opacity: 0;
+  transform: translateX(16px);
 }
 
-@media (max-width: 980px) {
-  .hero-panel,
-  .workspace {
-    grid-template-columns: 1fr;
+@media (max-width: 1200px) {
+  .detail-body {
+    flex-direction: column;
   }
 
-  .overview-metrics {
-    grid-template-columns: 1fr;
+  .tree-scroll {
+    padding: 90px 24px 40px 24px;
+    min-height: auto;
+  }
+
+  .knowledge-panel {
+    position: static;
+    width: 100%;
+    max-height: none;
   }
 }
 
 @media (max-width: 768px) {
-  .job-knowledge-page {
-    padding: 18px 14px 30px;
+  .list-shell {
+    padding: 12px;
   }
 
-  .hero-panel,
-  .card-shell {
-    padding: 20px 18px;
-    border-radius: 24px;
+  .search-bar {
+    height: 62px;
   }
 
-  .hero-actions,
-  .overview-header,
-  .panel-heading {
-    flex-direction: column;
+  .category-tabs {
+    gap: 10px;
+    margin-inline: 0;
+  }
+
+  .category-chip {
+    min-height: 42px;
+    padding-inline: 16px;
+    font-size: 14px;
+  }
+
+  .role-card {
+    padding: 16px;
     align-items: flex-start;
   }
 
-  .search-input {
-    max-width: none;
-    width: 100%;
+  .detail-shell {
+    padding: 8px 10px 16px;
   }
 
-  .detail-meta-grid {
-    grid-template-columns: 1fr;
+  .detail-header {
+    grid-template-columns: 40px 1fr auto;
+    gap: 8px;
+  }
+
+  .detail-header h1 {
+    font-size: 16px;
   }
 }
 </style>
