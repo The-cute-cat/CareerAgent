@@ -168,7 +168,7 @@ print(person)
 
 ```python
 from ai_service.engine import AIEngine
-from config import settings, LLM
+from config import settings, _LLM
 
 engine = AIEngine()
 
@@ -180,7 +180,7 @@ pipeline = engine.pick_brain(
     model=settings.llm.qwen,
     model_fallbacks=[
         settings.llm.deepseek,  # 主模型失败时降级到 DeepSeek
-        settings.llm.gpt4o      # DeepSeek 也失败时降级到 GPT-4o
+        settings.llm.gpt4o  # DeepSeek 也失败时降级到 GPT-4o
     ]
 )
 ```

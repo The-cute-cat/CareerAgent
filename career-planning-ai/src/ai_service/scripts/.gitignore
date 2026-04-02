@@ -1,7 +1,25 @@
 .gitee_cookies.json
-.crawl_progress.json
+.get_recommend_crawl_progress.json
 recommend_project_url.txt
-
+.get_book_crawl_progress.json
+books_data/
+.douban_cookies.json
+all_books.json
+internships_url.txt
+.internships_crawl_progress.json
+internships_search_urls.json
+books_detail.json
+.book_detail_progress.json
+blocked.html
+internships_detail.json
+.internships_detail_progress.json
+analyze_missing.js
+get_bilibili_course.js
+video_data/
+.video_crawl_progress.json
+bilibili_courses.json
+.*.*
+failed_records/
 
 temp/
 temp*.*
