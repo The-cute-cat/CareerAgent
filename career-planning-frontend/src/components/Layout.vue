@@ -48,14 +48,8 @@ provide('isMobileLayout', isMobile)
   </div>
   <el-container class="layout-container">
     <!-- 移动端侧边栏抽屉 -->
-    <el-drawer
-      v-if="isMobile"
-      v-model="mobileDrawerVisible"
-      direction="ltr"
-      size="260px"
-      :with-header="false"
-      class="mobile-sidebar-drawer"
-    >
+    <el-drawer v-if="isMobile" v-model="mobileDrawerVisible" direction="ltr" size="260px" :with-header="false"
+      class="mobile-sidebar-drawer">
       <Sidebar ref="sidebarRef" @close-drawer="mobileDrawerVisible = false" />
     </el-drawer>
 
@@ -136,9 +130,17 @@ provide('isMobileLayout', isMobile)
 }
 
 @keyframes float {
-  0% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(50px, 30px) scale(1.1); }
-  100% { transform: translate(-30px, 60px) scale(0.9); }
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+
+  50% {
+    transform: translate(50px, 30px) scale(1.1);
+  }
+
+  100% {
+    transform: translate(-30px, 60px) scale(0.9);
+  }
 }
 
 .layout-container {
@@ -180,7 +182,8 @@ provide('isMobileLayout', isMobile)
 
 @media (max-width: 768px) {
   .main-content {
-    padding: 16px 16px 80px; /* 底部预留 TabBar 空间 */
+    padding: 16px 16px 80px;
+    /* 底部预留 TabBar 空间 */
   }
 }
 
@@ -223,6 +226,7 @@ provide('isMobileLayout', isMobile)
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
 }
+
 :deep(.el-drawer.mobile-sidebar-drawer .el-drawer__body) {
   padding: 0;
 }

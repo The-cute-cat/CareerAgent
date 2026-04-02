@@ -1,6 +1,7 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { ChatDotRound, UserFilled } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import type { CareerFormData } from '@/types/careerform_report'
 import type { Option } from '@/mock/mockdata/CareerForm_mockdata'
 
@@ -8,6 +9,7 @@ interface MissingFieldItem {
   field: string
   label: string
   step: string
+  optional?: boolean
 }
 
 interface SavePayload {
@@ -37,6 +39,7 @@ const emit = defineEmits<{
   complete: []
   'step-change': [step: string]
   'open-quiz': [type: 'communication' | 'stress' | 'learning']
+  'evaluate-code-ability': [payload: { links: string; useAi: boolean }]
 }>()
 
 const currentIndex = ref(0)
@@ -51,6 +54,8 @@ const skillsValue = ref<string[]>([])
 const industryInput = ref('')
 const industryValues = ref<string[]>([])
 const targetJobValue = ref('')
+const codeAbilityLinksValue = ref('')
+const codeAbilityUseAiValue = ref(false)
 const completedAnswers = ref<Record<string, string>>({})
 
 const educationOptions = ['高中', '大专', '本科', '硕士', '博士', '其他']
@@ -68,7 +73,8 @@ const assistantPromptMap: Record<string, string> = {
   skills: '还差专业技能。可以输入多个技能，我会帮你逐个记录。',
   targetJob: '你的目标岗位是什么？先写一个最想投递的岗位即可。',
   targetIndustries: '最后补一下期望行业，可以填多个。',
-  qualityAssessment: '素质测评暂时还没完成。下面 3 个测试可以帮助系统更准确理解你的沟通、抗压和学习能力。'
+  qualityAssessment: '素质测评暂时还没完成。下面 3 个测试可以帮助系统更准确理解你的沟通、抗压和学习能力。',
+  codeAbility: '如果你愿意，我们还可以补充代码仓库并做一次代码能力评估。这一项是可选的，填写后我会帮你直接发起测试。'
 }
 
 const quizGuideCards = computed(() => [
@@ -108,6 +114,11 @@ const closeDialog = () => {
 }
 
 const normalizeTagValue = (value: string) => value.trim()
+const getCodeAbilityUrls = (rawLinks: string) => rawLinks
+  .split(/[\n,，]/)
+  .map(item => item.trim())
+  .filter(Boolean)
+const isValidCodeRepoUrl = (url: string) => /^https?:\/\/(www\.)?(github\.com|gitee\.com)\/[^/]+\/[^/]+\/?$/i.test(url)
 
 const syncDraftFromForm = () => {
   const field = currentField.value?.field
@@ -139,6 +150,10 @@ const syncDraftFromForm = () => {
     case 'targetIndustries':
       industryValues.value = [...props.formData.targetIndustries]
       industryInput.value = ''
+      break
+    case 'codeAbility':
+      codeAbilityLinksValue.value = props.formData.codeAbility?.links || ''
+      codeAbilityUseAiValue.value = false
       break
     case 'qualityAssessment':
       break
@@ -205,6 +220,10 @@ const getFieldAnswer = (field: MissingFieldItem) => {
       return targetJobValue.value || '待填写'
     case 'targetIndustries':
       return industryValues.value.join('、') || '待填写'
+    case 'codeAbility':
+      return codeAbilityLinksValue.value.trim()
+        ? `${codeAbilityUseAiValue.value ? '已开启深度分析' : '基础评估'}：${codeAbilityLinksValue.value.trim()}`
+        : '已跳过'
     case 'qualityAssessment': {
       const finished: string[] = []
       if (props.quizStatus.communication) finished.push('沟通能力')
@@ -272,6 +291,15 @@ const validateCurrentField = () => {
         message: '请至少添加一个期望行业',
         value: industryValues.value
       }
+    case 'codeAbility':
+      return {
+        valid: !!codeAbilityLinksValue.value.trim(),
+        message: '请输入至少一个 GitHub 或 Gitee 仓库链接',
+        value: {
+          links: codeAbilityLinksValue.value.trim(),
+          useAi: codeAbilityUseAiValue.value
+        }
+      }
     case 'qualityAssessment':
       return {
         valid: props.quizStatus.communication && props.quizStatus.stress && props.quizStatus.learning,
@@ -287,6 +315,15 @@ const submitCurrentField = () => {
   const result = validateCurrentField()
   if (!currentField.value || !result.valid) return
 
+  if (currentField.value.field === 'codeAbility') {
+    const payload = result.value as { links: string; useAi: boolean }
+    const invalidUrl = getCodeAbilityUrls(payload.links).find(url => !isValidCodeRepoUrl(url))
+    if (invalidUrl) {
+      ElMessage.warning(`存在无效仓库链接：${invalidUrl}`)
+      return
+    }
+  }
+
   if (currentField.value.field !== 'qualityAssessment') {
     emit('save', {
       field: currentField.value.field,
@@ -294,7 +331,27 @@ const submitCurrentField = () => {
     })
   }
 
+  if (currentField.value.field === 'codeAbility' && result.value) {
+    const payload = result.value as { links: string; useAi: boolean }
+    emit('evaluate-code-ability', payload)
+  }
+
   completedAnswers.value[currentField.value.field] = getFieldAnswer(currentField.value)
+
+  const isLast = currentIndex.value >= props.fields.length - 1
+  if (isLast) {
+    emit('complete')
+    closeDialog()
+    return
+  }
+
+  currentIndex.value += 1
+}
+
+const skipCurrentField = () => {
+  if (!currentField.value?.optional) return
+
+  completedAnswers.value[currentField.value.field] = '已跳过'
 
   const isLast = currentIndex.value >= props.fields.length - 1
   if (isLast) {
@@ -364,7 +421,10 @@ const submitCurrentField = () => {
 
       <div class="composer-card">
         <div class="panel-label">当前填写</div>
-        <div class="composer-title">{{ currentField?.label }}</div>
+        <div class="composer-title-row">
+          <div class="composer-title">{{ currentField?.label }}</div>
+          <el-tag v-if="currentField?.optional" type="info" effect="light" round>可选</el-tag>
+        </div>
 
         <div v-if="currentField?.field === 'education'" class="composer-body">
           <el-select v-model="educationValue" placeholder="请选择学历" size="large">
@@ -479,6 +539,28 @@ const submitCurrentField = () => {
           </div>
         </div>
 
+        <div v-else-if="currentField?.field === 'codeAbility'" class="composer-body">
+          <div class="code-ability-guide">
+            <p class="code-ability-guide-text">
+              支持填写一个或多个 GitHub / Gitee 仓库链接，多个链接可用换行、英文逗号或中文逗号分隔。提交后会直接打开评估结果。
+            </p>
+            <el-input
+              v-model="codeAbilityLinksValue"
+              type="textarea"
+              :rows="5"
+              resize="none"
+              placeholder="例如：https://github.com/user/repo"
+            />
+            <div class="code-ability-toggle">
+              <div>
+                <div class="code-ability-toggle-title">AI 深度分析</div>
+                <div class="code-ability-toggle-desc">开启后会额外返回 summary、strengths、weaknesses 等内容</div>
+              </div>
+              <el-switch v-model="codeAbilityUseAiValue" />
+            </div>
+          </div>
+        </div>
+
         <div v-else-if="currentField?.field === 'qualityAssessment'" class="composer-body">
           <div class="quiz-guide">
             <p class="quiz-guide-text">
@@ -516,8 +598,9 @@ const submitCurrentField = () => {
           </div>
           <div class="composer-actions">
             <el-button @click="closeDialog">稍后填写</el-button>
+            <el-button v-if="currentField?.optional" @click="skipCurrentField">跳过此项</el-button>
             <el-button type="primary" @click="submitCurrentField" :disabled="currentField?.field === 'qualityAssessment' && !(quizStatus.communication && quizStatus.stress && quizStatus.learning)">
-              {{ currentIndex === fields.length - 1 ? '完成补充' : '下一项' }}
+              {{ currentField?.field === 'codeAbility' ? '填写并测试' : (currentIndex === fields.length - 1 ? '完成补充' : '下一项') }}
             </el-button>
           </div>
         </div>
@@ -699,6 +782,17 @@ const submitCurrentField = () => {
   line-height: 1.2;
 }
 
+.composer-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.composer-title-row .composer-title {
+  margin-bottom: 0;
+}
+
 .composer-body {
   flex: 1;
   display: flex;
@@ -728,6 +822,49 @@ const submitCurrentField = () => {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+}
+
+.code-ability-guide {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 22px;
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at top right, rgba(191, 219, 254, 0.28), transparent 32%),
+    linear-gradient(180deg, #f8fbff 0%, #f3f8ff 100%);
+  border: 1px solid #d8e7fb;
+}
+
+.code-ability-guide-text {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.9;
+  color: #475569;
+}
+
+.code-ability-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid #e5edf8;
+}
+
+.code-ability-toggle-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.code-ability-toggle-desc {
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: #64748b;
 }
 
 .composer-footer {
@@ -913,6 +1050,11 @@ const submitCurrentField = () => {
   .composer-body.two-col,
   .tag-input-row {
     grid-template-columns: 1fr;
+    flex-direction: column;
+  }
+
+  .code-ability-toggle {
+    align-items: flex-start;
     flex-direction: column;
   }
 

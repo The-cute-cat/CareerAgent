@@ -3,12 +3,12 @@
 import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
-  House,Document,DataAnalysis,
-  User,TrendCharts,Setting,
-  Star,Collection,Position,
-  Fold,Expand,Guide,Connection,Calendar,
-  Memo,Timer,Finished,Reading,
-  Promotion,MagicStick
+  House, Document, DataAnalysis,
+  User, TrendCharts, Setting,
+  Star, Collection, Position,
+  Fold, Expand, Guide, Connection, Calendar,
+  Memo, Timer, Finished, Reading,
+  Promotion, MagicStick
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
@@ -57,32 +57,16 @@ const toggleCollapse = () => {
 // 菜单配置项
 const menuItems = [
   { index: '/', icon: House, text: '首页' },
-  {
-    index: '/career-form-parent',
-    icon: Document,
-    text: '能力画像',
-    children: [
-      { index: '/career-form', icon: Document, text: '我的简历' },
-      { index: '/resume-template', icon: MagicStick, text: '简历模板' }
-    ]
-  },
-  { index: '/job-matching', icon: DataAnalysis, text: '人岗匹配' },
-  { index: '/development-map', icon: Promotion, text: '发展图谱' },
-  { index: '/report', icon: TrendCharts, text: '生涯报告' },
-  {
-    index: '/interviews',
-    icon: Calendar,
-    text: '我的面试',
-    children: [
-      { index: '/interviews/calendar', icon: Memo, text: '面试日历' },
-      { index: '/interviews/ongoing', icon: Timer, text: '进行中' },
-      { index: '/interviews/finished', icon: Finished, text: '已结束' },
-      { index: '/interviews/review', icon: Reading, text: '面试复盘' }
-    ]
-  },
-  { index: 'spacer', isSpacer: true },
-  { index: '/settings', icon: Setting, text: '设置中心' },
-  { index: '/profile', icon: User, text: '我的' }
+  { index: '/career-form', icon: Document, text: '能力画像' },
+  { index: '/job-matching', icon: TrendCharts, text: '人岗匹配' },
+  { index: '/development-map', icon: Position, text: '发展图谱' },
+  { index: '/report', icon: DataAnalysis, text: '生涯报告' },
+  { title: '知识与探索', isGroup: true },
+  { index: '/knowledge-base', icon: Collection, text: '岗位知识库' },
+  { index: '/favorites', icon: Star, text: '我的收藏' },
+  { title: '系统与管理', isGroup: true },
+  { index: '/profile', icon: User, text: '个人中心' },
+  { index: '/admin', icon: Setting, text: '系统管理' }
 ]
 
 defineExpose({ collapsed })
@@ -98,27 +82,17 @@ defineExpose({ collapsed })
       <transition name="text-fade">
         <span v-if="!collapsed" class="logo-text">职路 Agent</span>
       </transition>
-      <el-button
-        class="collapse-toggle"
-        circle
-        size="small"
-        @click="toggleCollapse"
-      >
+      <el-button class="collapse-toggle" circle size="small" @click="toggleCollapse">
         <el-icon :size="14">
           <component :is="collapsed ? Expand : Fold" />
         </el-icon>
       </el-button>
     </div>
-    
+
     <!-- 菜单区域 -->
     <div class="menu-wrapper">
-      <el-menu
-        :default-active="activeIndex"
-        class="side-menu"
-        :unique-opened="true"
-        :collapse="collapsed"
-        @select="handleSelect"
-      >
+      <el-menu :default-active="activeIndex" class="side-menu" :unique-opened="true" :collapse="collapsed"
+        @select="handleSelect">
         <template v-for="(item, i) in menuItems" :key="i">
           <!-- 分隔符 -->
           <div v-if="item.isSpacer" class="menu-spacer"></div>
@@ -126,16 +100,16 @@ defineExpose({ collapsed })
           <!-- 带有子菜单的项 -->
           <el-sub-menu v-else-if="item.children" :index="item.index" class="custom-sub-menu">
             <template #title>
-              <el-icon class="menu-icon"><component :is="item.icon" /></el-icon>
+              <el-icon class="menu-icon">
+                <component :is="item.icon" />
+              </el-icon>
               <span class="menu-text">{{ item.text }}</span>
             </template>
-            <el-menu-item
-              v-for="child in item.children"
-              :key="child.index"
-              :index="child.index"
-              class="custom-menu-item sub-item"
-            >
-              <el-icon class="menu-icon"><component :is="child.icon" /></el-icon>
+            <el-menu-item v-for="child in item.children" :key="child.index" :index="child.index"
+              class="custom-menu-item sub-item">
+              <el-icon class="menu-icon">
+                <component :is="child.icon" />
+              </el-icon>
               <template #title>
                 <span class="menu-text">{{ child.text }}</span>
               </template>
@@ -144,22 +118,20 @@ defineExpose({ collapsed })
 
           <!-- 普通菜单项目 -->
           <template v-else>
-            <el-tooltip
-              v-if="collapsed"
-              :content="item.text"
-              placement="right"
-              :offset="8"
-              :show-after="400"
-            >
+            <el-tooltip v-if="collapsed" :content="item.text" placement="right" :offset="8" :show-after="400">
               <el-menu-item :index="item.index" class="custom-menu-item">
-                <el-icon class="menu-icon"><component :is="item.icon" /></el-icon>
+                <el-icon class="menu-icon">
+                  <component :is="item.icon" />
+                </el-icon>
                 <template #title>
                   <span class="menu-text">{{ item.text }}</span>
                 </template>
               </el-menu-item>
             </el-tooltip>
             <el-menu-item v-else :index="item.index" class="custom-menu-item">
-              <el-icon class="menu-icon"><component :is="item.icon" /></el-icon>
+              <el-icon class="menu-icon">
+                <component :is="item.icon" />
+              </el-icon>
               <template #title>
                 <span class="menu-text">{{ item.text }}</span>
               </template>
@@ -185,7 +157,8 @@ defineExpose({ collapsed })
 .logo-section {
   display: flex;
   align-items: center;
-  padding: 24px 16px 36px 20px; /* 增加底部 padding 以拉开与菜单的距离 */
+  padding: 24px 16px 36px 20px;
+  /* 增加底部 padding 以拉开与菜单的距离 */
   gap: 12px;
   flex-shrink: 0;
 }
@@ -292,7 +265,8 @@ defineExpose({ collapsed })
   height: 48px;
   line-height: 48px;
   border-radius: 12px;
-  margin-bottom: 10px; /* 增加间距以提升档次感 */
+  margin-bottom: 10px;
+  /* 增加间距以提升档次感 */
   color: #475569;
   font-weight: 500;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -309,7 +283,8 @@ defineExpose({ collapsed })
   padding-left: 48px !important;
   height: 40px;
   line-height: 40px;
-  margin-top: 6px; /* 增加二级菜单的上方间距 */
+  margin-top: 6px;
+  /* 增加二级菜单的上方间距 */
 }
 
 .custom-menu-item.sub-item:hover::before {

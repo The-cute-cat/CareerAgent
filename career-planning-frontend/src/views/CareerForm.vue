@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, nextTick, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
+import { cloneDeep } from 'lodash'
 
 
 
@@ -32,7 +33,9 @@ import {
   Edit,
   EditPen,
   Switch,
-  Medal
+  Medal,
+  Download,
+  View
 } from '@element-plus/icons-vue'
 import CareerFormUpload from '@/components/CareerForm_Upload.vue'
 import ResumeMissingFieldsChat from '@/components/ResumeMissingFieldsChat.vue'
@@ -44,6 +47,11 @@ import type { CareerFormData, QuizDetailItem } from '@/types/careerform_report'
 import type { Question, BackendPersonData } from '@/types/careerform_question'
 import type { CodeAbilityEvaluateData } from '@/types/code-ability'
 import type { JobMatchItem } from '@/types/job-match'
+import type { JsonResumeGenerationResult, ResumeProfileExtras } from '@/types/json-resume'
+import { useJsonResumeStore } from '@/stores'
+import { createDefaultResumeProfileExtras, generateJsonResume } from '@/utils/json-resume'
+import { exportJsonResumeToWord, exportResumePreviewToPdf } from '@/utils/resume-export'
+import { clearCareerFormData, loadCareerFormData, saveCareerFormData } from '@/utils/career-runtime'
 import {
   majorOptions
 } from '@/mock/mockdata/CareerForm_mockdata'
@@ -53,6 +61,7 @@ import {
 
 /** 路由实例 */
 const router = useRouter()
+const jsonResumeStore = useJsonResumeStore()
 
 /** 表单引用，用于表单验证和重置 */
 const formRef = ref<FormInstance>()
@@ -100,7 +109,32 @@ const codeAbilityResultVisible = ref(false)
 const codeAbilityResult = ref<CodeAbilityEvaluateData | null>(null)
 const lastEvaluatedCodeRepoUrls = ref<string[]>([])
 type MissingFieldKey = keyof CareerFormData | 'qualityAssessment'
-const pendingMissingFields = ref<Array<{ field: MissingFieldKey; label: string; step: string }>>([])
+type ResumeChatField = { field: MissingFieldKey; label: string; step: string; optional?: boolean }
+const pendingMissingFields = ref<ResumeChatField[]>([])
+const resumeProfileDialogVisible = ref(false)
+const resumePreviewDialogVisible = ref(false)
+const resumeTemplateDialogVisible = ref(false)
+const resumeGenerating = ref(false)
+const resumeExportingPdf = ref(false)
+const resumeExportingWord = ref(false)
+const resumePreviewRef = ref<HTMLElement | null>(null)
+const jsonResumeResult = ref<JsonResumeGenerationResult | null>(null)
+const resumeProfileExtras = ref<ResumeProfileExtras>(
+  cloneDeep(jsonResumeStore.profileExtras || createDefaultResumeProfileExtras())
+)
+const selectedResumeTemplate = ref<'professional' | 'modern' | 'compact'>('professional')
+
+if (!resumeProfileExtras.value.educationHistory?.length) {
+  resumeProfileExtras.value.educationHistory = [
+    {
+      institution: '',
+      area: '',
+      studyType: '',
+      startDate: '',
+      endDate: ''
+    }
+  ]
+}
 
 
 
@@ -1194,16 +1228,16 @@ const getCodeRepoMeta = (url: string) => {
     }
   }
 
- const matchResult = match as RegExpMatchArray
-const [, host, owner, repo] = matchResult
+  const matchResult = match as RegExpMatchArray
+  const [, host, owner, repo] = matchResult
 
-return {
-  hostLabel: host?.toLowerCase() === 'gitee.com' ? 'Gitee' : 'GitHub',
-  owner: owner || '',
-  repo: repo || '',
-  fullName: `${owner || ''}/${repo || ''}`,
-  normalized
-}
+  return {
+    hostLabel: host?.toLowerCase() === 'gitee.com' ? 'Gitee' : 'GitHub',
+    owner: owner || '',
+    repo: repo || '',
+    fullName: `${owner || ''}/${repo || ''}`,
+    normalized
+  }
 }
 
 const getRepoDisplayNames = (urls: string[]) => {
@@ -1235,8 +1269,14 @@ const showCodeAbilityResultDialog = () => {
   codeAbilityResultVisible.value = true
 }
 
-const handleCodeAbilityEvaluate = async () => {
-  const rawLinks = formData.codeAbility.links.trim()
+const handleCodeAbilityEvaluate = async (options?: {
+  rawLinks?: string
+  useAi?: boolean
+  openResultDialog?: boolean
+}) => {
+  const rawLinks = (options?.rawLinks ?? formData.codeAbility.links).trim()
+  const useAi = options?.useAi ?? codeAbilityUseAi.value
+  const openResultDialog = options?.openResultDialog ?? true
   const repoUrls = getCodeAbilityUrls(rawLinks)
 
   if (!repoUrls.length) {
@@ -1256,7 +1296,7 @@ const handleCodeAbilityEvaluate = async () => {
   try {
     const res = await evaluateCodeAbilityApi({
       urls: repoUrls,
-      use_ai: codeAbilityUseAi.value
+      use_ai: useAi
     })
     const result = res.data as any
 
@@ -1265,7 +1305,10 @@ const handleCodeAbilityEvaluate = async () => {
     }
 
     codeAbilityResult.value = result.data
-    codeAbilityResultVisible.value = true
+    codeAbilityUseAi.value = useAi
+    if (openResultDialog) {
+      codeAbilityResultVisible.value = true
+    }
 
     ElMessage.success(result.data?.ai_analysis ? '代码能力深度分析完成' : '代码能力评估完成')
   } catch (error: any) {
@@ -1323,7 +1366,7 @@ const checkRequiredFields = () => {
   })
 }
 
-const mapPendingMissingFields = (missingFields: typeof requiredFields) => {
+const mapPendingMissingFields = (missingFields: typeof requiredFields): ResumeChatField[] => {
   return missingFields.map((field) => ({
     field: field.field,
     label: field.label,
@@ -1331,8 +1374,24 @@ const mapPendingMissingFields = (missingFields: typeof requiredFields) => {
   }))
 }
 
+const getOptionalResumeChatFields = (): ResumeChatField[] => {
+  if (formData.codeAbility.links.trim()) {
+    return []
+  }
+
+  return [{
+    field: 'codeAbility',
+    label: '代码能力',
+    step: '2',
+    optional: true
+  }]
+}
+
 const syncPendingMissingFields = () => {
-  pendingMissingFields.value = mapPendingMissingFields(checkRequiredFields())
+  pendingMissingFields.value = [
+    ...mapPendingMissingFields(checkRequiredFields()),
+    ...getOptionalResumeChatFields()
+  ]
 }
 
 const missingFieldCount = computed(() => checkRequiredFields().length)
@@ -1343,12 +1402,17 @@ const showResumeContinueButton = computed(() => hasUploadedResume.value && missi
  * @param missingFields 缺失的字段列表
  */
 const showMissingFieldsReminder = (missingFields: typeof requiredFields) => {
-  if (missingFields.length === 0) {
+  const chatFields = [
+    ...mapPendingMissingFields(missingFields),
+    ...getOptionalResumeChatFields()
+  ]
+
+  if (chatFields.length === 0) {
     pendingMissingFields.value = []
     ElMessage.success('简历信息已完整填充，可以直接提交！')
     return
   }
-  pendingMissingFields.value = mapPendingMissingFields(missingFields)
+  pendingMissingFields.value = chatFields
   activeMenu.value = pendingMissingFields.value[0]?.step || '1'
   showMissingFieldsChat.value = true
 }
@@ -1400,7 +1464,23 @@ const handleMissingFieldSave = (payload: { field: string; value: unknown }) => {
         ? payload.value.map((item) => String(item))
         : []
       break
+    case 'codeAbility': {
+      const value = payload.value as { links?: string; useAi?: boolean } | null
+      formData.codeAbility.links = String(value?.links || '')
+      codeAbilityUseAi.value = !!value?.useAi
+      break
+    }
   }
+}
+
+const handleMissingFieldCodeAbilityEvaluate = async (payload: { links: string; useAi: boolean }) => {
+  formData.codeAbility.links = payload.links
+  codeAbilityUseAi.value = payload.useAi
+  await handleCodeAbilityEvaluate({
+    rawLinks: payload.links,
+    useAi: payload.useAi,
+    openResultDialog: true
+  })
 }
 
 const handleMissingFieldComplete = () => {
@@ -1525,7 +1605,10 @@ const fillFormWithParsedData = (parsedFormData: any) => {
 
   // 填充代码能力
   if (parsedFormData.codeAbility?.links || parsedFormData.codeLinks) {
-    formData.codeAbility.links = parsedFormData.codeAbility?.links || parsedFormData.codeLinks || ''
+    const parsedCodeLinks = parsedFormData.codeAbility?.links || parsedFormData.codeLinks || ''
+    formData.codeAbility.links = Array.isArray(parsedCodeLinks)
+      ? parsedCodeLinks.join('\n')
+      : String(parsedCodeLinks)
   }
 
   // 填充项目经历
@@ -1602,11 +1685,34 @@ const handleResumeParsed = (parsedData: unknown) => {
 
   // 检查并提示缺失的必填字段
   const missingFields = checkRequiredFields()
-  if (missingFields.length > 0) {
-    ElMessage.warning(`识别完成，但还有 ${missingFields.length} 项必填信息待补充`)
+  const optionalFields = getOptionalResumeChatFields()
+  if (missingFields.length > 0 || optionalFields.length > 0) {
+    if (missingFields.length > 0) {
+      ElMessage.warning(`识别完成，但还有 ${missingFields.length} 项必填信息待补充`)
+    } else {
+      ElMessage.info('识别完成，你还可以继续补充可选的代码能力信息')
+    }
     setTimeout(() => showMissingFieldsReminder(missingFields), 300)
   }
 }
+
+const hydrateCareerFormFromStorage = () => {
+  const cachedFormData = loadCareerFormData()
+  if (!cachedFormData) return
+  fillFormWithParsedData(cachedFormData)
+}
+
+onMounted(() => {
+  hydrateCareerFormFromStorage()
+})
+
+watch(
+  formData,
+  () => {
+    saveCareerFormData(formData)
+  },
+  { deep: true }
+)
 
 // --- 岗位联想搜索 ---
 
@@ -1669,6 +1775,276 @@ const fetchMockJobMatchResult = async (): Promise<JobMatchItem[]> => {
   return mockJobMatchItems
 }
 
+/** 当前生成的 JSON Resume。 */
+const currentJsonResume = computed(() => jsonResumeResult.value?.resume ?? null)
+const currentResumeTemplateLabel = computed(() => {
+  const mapping = {
+    professional: '专业模板',
+    modern: '现代模板',
+    compact: '紧凑模板'
+  } satisfies Record<typeof selectedResumeTemplate.value, string>
+
+  return mapping[selectedResumeTemplate.value]
+})
+
+/** 当前简历缺失的必填项。 */
+const resumeMissingRequiredFields = computed(() => {
+  return jsonResumeResult.value?.completeness.missingRequiredFields ?? []
+})
+
+const resumePrimaryEducation = computed(() => currentJsonResume.value?.education?.[0] ?? null)
+
+const resumeProfessionalFacts = computed(() => {
+  if (!currentJsonResume.value) {
+    return []
+  }
+
+  const basics = currentJsonResume.value.basics
+  const education = resumePrimaryEducation.value
+
+  return [
+    { label: '姓名', value: basics.name },
+    { label: '手机', value: basics.phone },
+    { label: '邮箱', value: basics.email },
+    { label: '学历', value: education?.studyType },
+    { label: '求职意向', value: formData.targetJob.trim() || basics.label },
+    {
+      label: '地址',
+      value: [basics.location?.city, basics.location?.region].filter(Boolean).join(' / ')
+    }
+  ].filter(item => item.value)
+})
+
+const formatResumeDisplayDate = (value?: string) => {
+  if (!value) return ''
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return value.slice(0, 7).replace('-', '.')
+  }
+
+  if (/^\d{4}-\d{2}$/.test(value)) {
+    return value.replace('-', '.')
+  }
+
+  return value
+}
+
+const formatResumeDisplayRange = (startDate?: string, endDate?: string, withPresent = false) => {
+  const start = formatResumeDisplayDate(startDate)
+  const end = formatResumeDisplayDate(endDate)
+
+  if (start && end) {
+    return `${start}-${end}`
+  }
+
+  if (start && withPresent) {
+    return `${start}-至今`
+  }
+
+  return start || end || ''
+}
+
+/** 当前编辑中的教育补充记录。 */
+const primaryResumeEducation = computed(() => {
+  ensureResumeEducationHistory()
+  return resumeProfileExtras.value.educationHistory![0]!
+})
+
+/** 确保扩展资料中的教育经历至少存在一项。 */
+const ensureResumeEducationHistory = () => {
+  if (!resumeProfileExtras.value.educationHistory?.length) {
+    resumeProfileExtras.value.educationHistory = [
+      {
+        institution: '',
+        area: '',
+        studyType: '',
+        startDate: '',
+        endDate: ''
+      }
+    ]
+  }
+
+  return resumeProfileExtras.value.educationHistory![0]!
+}
+
+/** 打开简历补充资料弹窗，并按当前表单默认补齐部分字段。 */
+const openResumeProfileDialog = () => {
+  const firstEducation = ensureResumeEducationHistory()
+
+  if (!resumeProfileExtras.value.basics.label?.trim() && formData.targetJob.trim()) {
+    resumeProfileExtras.value.basics.label = formData.targetJob.trim()
+  }
+  if (!firstEducation.area?.toString().trim() && formData.major.length) {
+    firstEducation.area = formData.major.join(' / ')
+  }
+  if (!firstEducation.studyType?.toString().trim() && formData.education) {
+    firstEducation.studyType = formData.education === '其他'
+      ? formData.educationOther
+      : formData.education
+  }
+  if (!firstEducation.endDate?.toString().trim() && formData.graduationDate) {
+    firstEducation.endDate = formData.graduationDate
+  }
+
+  resumeProfileDialogVisible.value = true
+}
+
+/** 打开模板选择弹窗。 */
+const openResumeTemplateDialog = () => {
+  resumeTemplateDialogVisible.value = true
+}
+
+/** 选择简历模板。 */
+const selectResumeTemplate = (template: 'professional' | 'modern' | 'compact') => {
+  selectedResumeTemplate.value = template
+}
+
+/** 校验生成 JSON Resume 前的关键附加资料。 */
+const validateResumeEducationDates = () => {
+  const education = ensureResumeEducationHistory()
+  const startDate = education.startDate?.toString().trim()
+  const endDate = education.endDate?.toString().trim()
+
+  if (startDate && endDate && startDate > endDate) {
+    ElMessage.warning('教育经历的入学时间不能晚于毕业时间')
+    resumeProfileDialogVisible.value = true
+    return false
+  }
+
+  return true
+}
+
+/** 保存简历补充资料弹窗。 */
+const saveResumeProfileDialog = () => {
+  if (!validateResumeEducationDates()) {
+    return
+  }
+
+  resumeProfileDialogVisible.value = false
+  ElMessage.success('简历补充资料已保存')
+}
+
+/** 校验生成 JSON Resume 前的关键附加资料。 */
+const validateResumeProfileExtras = () => {
+  const basics = resumeProfileExtras.value.basics
+  const education = ensureResumeEducationHistory()
+
+  if (!basics.name.trim()) {
+    ElMessage.warning('请先补充简历姓名')
+    resumeProfileDialogVisible.value = true
+    return false
+  }
+
+  if (!education.institution?.toString().trim()) {
+    ElMessage.warning('请先补充学校名称')
+    resumeProfileDialogVisible.value = true
+    return false
+  }
+
+  if (!validateResumeEducationDates()) {
+    return false
+  }
+
+  return true
+}
+
+/** 基于当前表单构建 JSON Resume。 */
+const buildJsonResumeFromForm = async () => {
+  if (!formRef.value) return null
+
+  const valid = await formRef.value.validate().catch(() => false)
+  if (!valid) {
+    ElMessage.error('请先完善职业画像表单中的必填信息')
+    return null
+  }
+
+  if (!validateResumeProfileExtras()) {
+    return null
+  }
+
+  resumeGenerating.value = true
+
+  try {
+    jsonResumeStore.setProfileExtras(cloneDeep(resumeProfileExtras.value))
+    const result = generateJsonResume({
+      careerFormData: cloneDeep(formData),
+      profileExtras: cloneDeep(resumeProfileExtras.value)
+    })
+
+    jsonResumeResult.value = result
+    return result
+  } finally {
+    resumeGenerating.value = false
+  }
+}
+
+/** 生成并打开简历预览。 */
+const generateResumePreview = async () => {
+  const result = await buildJsonResumeFromForm()
+  if (!result) {
+    return
+  }
+
+  resumePreviewDialogVisible.value = true
+
+  if (!result.valid) {
+    ElMessage.warning('JSON Resume 已生成，但存在结构校验提醒，请检查后再导出')
+    return
+  }
+
+  if (result.completeness.missingRequiredFields.length) {
+    ElMessage.warning('JSON Resume 已生成，但仍有必填信息缺失')
+    return
+  }
+
+  ElMessage.success('JSON Resume 已生成，可直接预览和导出')
+}
+
+/** 导出 PDF。 */
+const exportResumePdf = async () => {
+  if (!currentJsonResume.value || !resumePreviewRef.value) {
+    ElMessage.warning('请先生成并打开简历预览')
+    return
+  }
+
+  resumeExportingPdf.value = true
+
+  try {
+    await nextTick()
+    await exportResumePreviewToPdf(resumePreviewRef.value, {
+      fileName: 'resume.pdf'
+    })
+    ElMessage.success('PDF 已导出')
+  } catch (error) {
+    console.error('导出 PDF 失败:', error)
+    ElMessage.error('导出 PDF 失败，请稍后重试')
+  } finally {
+    resumeExportingPdf.value = false
+  }
+}
+
+/** 导出 Word。 */
+const exportResumeWord = async () => {
+  if (!currentJsonResume.value) {
+    ElMessage.warning('请先生成简历')
+    return
+  }
+
+  resumeExportingWord.value = true
+
+  try {
+    await exportJsonResumeToWord(currentJsonResume.value, {
+      fileName: 'resume.docx'
+    })
+    ElMessage.success('Word 已导出')
+  } catch (error) {
+    console.error('导出 Word 失败:', error)
+    ElMessage.error('导出 Word 失败，请稍后重试')
+  } finally {
+    resumeExportingWord.value = false
+  }
+}
+
 /**
  * 提交表单
  * 验证表单数据，提交到后端并等待返回能力评估报告
@@ -1684,13 +2060,16 @@ const submitForm = async () => {
 
   submitting.value = true
   try {
-    const submitData = convertToSubmitDTO(formData)
+    const submitData = convertToSubmitDTO(formData, {
+      codeAbilityResult: codeAbilityResult.value,
+      codeAbilityUseAi: codeAbilityUseAi.value
+    })
     console.log('submitData', submitData)
     const res = await submitCareerFormApi(submitData)
 
     console.log("表单提交返回结果:", res)
-    console.log("res.data:",res.data)
-    console.log("res.data.data:",res.data.data)
+    console.log("res.data:", res.data)
+    console.log("res.data.data:", res.data.data)
 
     // 处理两种响应格式：1) res.data 是数组 2) res.data 是 {code, data} 对象
     let matchResult: JobMatchItem[]
@@ -1793,6 +2172,7 @@ const resetForm = () => {
 
   // 重置当前步骤到第一步
   activeMenu.value = '1'
+  clearCareerFormData()
 
   ElMessage.success('表单已重置')
 }
@@ -1807,7 +2187,9 @@ const resetForm = () => {
       <el-aside width="260px" class="premium-sidebar">
         <div class="sidebar-brand">
           <div class="brand-icon-wrapper">
-            <el-icon :size="24"><DocumentAdd /></el-icon>
+            <el-icon :size="24">
+              <DocumentAdd />
+            </el-icon>
             <div class="brand-glow"></div>
           </div>
           <div class="brand-info">
@@ -1818,13 +2200,8 @@ const resetForm = () => {
 
         <!-- 圆形主进度 -->
         <div class="main-progress-container">
-          <el-progress 
-            type="dashboard" 
-            :percentage="formProgress" 
-            :stroke-width="10"
-            :width="150"
-            color="rgba(64, 158, 255, 0.9)"
-          >
+          <el-progress type="dashboard" :percentage="formProgress" :stroke-width="10" :width="150"
+            color="rgba(64, 158, 255, 0.9)">
             <template #default="{ percentage }">
               <div class="progress-inner">
                 <span class="pct">{{ percentage }}%</span>
@@ -1837,25 +2214,21 @@ const resetForm = () => {
         <!-- 垂直轨道进度导航 -->
         <div class="timeline-nav">
           <div class="track-line"></div>
-          <div 
-            v-for="step in [1, 2, 3, 4, 5]" 
-            :key="step" 
-            class="nav-item"
-            :class="{ 
-              'is-active': activeMenu === String(step), 
-              'is-completed': isStepCompleted(step) 
-            }"
-            @click="handleMenuSelect(String(step))"
-          >
+          <div v-for="step in [1, 2, 3, 4, 5]" :key="step" class="nav-item" :class="{
+            'is-active': activeMenu === String(step),
+            'is-completed': isStepCompleted(step)
+          }" @click="handleMenuSelect(String(step))">
             <div class="dot-box">
               <div class="step-dot">
-                <el-icon v-if="isStepCompleted(step)"><Check /></el-icon>
+                <el-icon v-if="isStepCompleted(step)">
+                  <Check />
+                </el-icon>
                 <span v-else>{{ step }}</span>
               </div>
               <div class="active-glow" v-if="activeMenu === String(step)"></div>
             </div>
             <span class="nav-text">
-              {{ ['基本信息', '技能证书', '经历项目', '素质测评', '职业意向'][step-1] }}
+              {{ ['基本信息', '技能证书', '经历项目', '素质测评', '职业意向'][step - 1] }}
             </span>
           </div>
         </div>
@@ -1871,9 +2244,9 @@ const resetForm = () => {
               <small>AI 自动填充表单</small>
             </div>
           </div>
-          
+
           <div v-if="showResumeContinueButton" class="resume-resume-tip">
-             还有 {{ missingFieldCount }} 处待补全
+            还有 {{ missingFieldCount }} 处待补全
           </div>
         </div>
       </el-aside>
@@ -1887,14 +2260,16 @@ const resetForm = () => {
                 <div class="current-step-badge">Phase {{ activeMenu }}</div>
                 <h2>{{ currentSectionTitle }}</h2>
                 <div class="step-indicator">
-                   {{ ['Profile', 'Expertise', 'Journey', 'Assessment', 'Objective'][parseInt(activeMenu)-1] }}
+                  {{ ['Profile', 'Expertise', 'Journey', 'Assessment', 'Objective'][parseInt(activeMenu) - 1] }}
                 </div>
               </div>
-              
+
               <div class="dashboard-stat-row">
                 <div class="dash-stat-item">
                   <div class="stat-icon purple">
-                    <el-icon><Medal /></el-icon>
+                    <el-icon>
+                      <Medal />
+                    </el-icon>
                   </div>
                   <div class="stat-info">
                     <span class="stat-label">画像精准度</span>
@@ -1902,10 +2277,12 @@ const resetForm = () => {
                   </div>
                   <div class="stat-glass-glow"></div>
                 </div>
-                
+
                 <div class="dash-stat-item">
                   <div class="stat-icon blue">
-                    <el-icon><Finished /></el-icon>
+                    <el-icon>
+                      <Finished />
+                    </el-icon>
                   </div>
                   <div class="stat-info">
                     <span class="stat-label">已完成步骤</span>
@@ -1916,7 +2293,9 @@ const resetForm = () => {
 
                 <div class="dash-stat-item">
                   <div class="stat-icon orange">
-                    <el-icon><DataAnalysis /></el-icon>
+                    <el-icon>
+                      <DataAnalysis />
+                    </el-icon>
                   </div>
                   <div class="stat-info">
                     <span class="stat-label">评估准备度</span>
@@ -2069,31 +2448,16 @@ const resetForm = () => {
               </el-form-item>
 
               <!-- 代码能力 -->
-              <el-form-item 
-                label="代码能力" 
-                prop="codeAbility"
-              >
+              <el-form-item label="代码能力" prop="codeAbility">
                 <div class="code-ability-panel">
                   <div class="code-ability-row">
-                    <el-input
-                      v-model="formData.codeAbility.links"
-                      placeholder="请输入 GitHub / Gitee 仓库链接，如 https://github.com/user/repo"
-                      style="flex: 1"
-                    />
-                    <el-button
-                      type="warning"
-                      :icon="DataAnalysis"
-                      :loading="codeAbilityEvaluating"
-                      @click="handleCodeAbilityEvaluate"
-                    >
+                    <el-input v-model="formData.codeAbility.links"
+                      placeholder="请输入 GitHub / Gitee 仓库链接，如 https://github.com/user/repo" style="flex: 1" />
+                    <el-button type="warning" :icon="DataAnalysis" :loading="codeAbilityEvaluating"
+                      @click="handleCodeAbilityEvaluate">
                       {{ codeAbilityEvaluating ? '评估中...' : '开始评估' }}
                     </el-button>
-                    <el-button
-                      v-if="codeAbilityResult"
-                      plain
-                      :icon="Rank"
-                      @click="showCodeAbilityResultDialog"
-                    >
+                    <el-button v-if="codeAbilityResult" plain :icon="Rank" @click="showCodeAbilityResultDialog">
                       查看结果
                     </el-button>
                   </div>
@@ -2101,12 +2465,7 @@ const resetForm = () => {
                   <div class="code-ability-toolbar">
                     <div class="code-ability-ai-toggle">
                       <span class="toggle-label">深度分析</span>
-                      <el-switch
-                        v-model="codeAbilityUseAi"
-                        inline-prompt
-                        active-text="开"
-                        inactive-text="关"
-                      />
+                      <el-switch v-model="codeAbilityUseAi" inline-prompt active-text="开" inactive-text="关" />
                       <span class="toggle-hint">开启后会返回 AI 深度分析的内容</span>
                     </div>
                     <div class="code-ability-input-hint">
@@ -2119,14 +2478,16 @@ const resetForm = () => {
                       <div class="summary-score">{{ codeAbilityResult.composite_score }}</div>
                       <div class="summary-meta">
                         <div class="summary-title">
-                          {{ lastEvaluatedCodeRepoUrls.length > 1 ? `已评估 ${lastEvaluatedCodeRepoUrls.length} 个仓库` : (getCodeRepoMeta(lastEvaluatedCodeRepoUrls[0] || '').repo || '未命名仓库') }}
+                          {{ lastEvaluatedCodeRepoUrls.length > 1 ? `已评估 ${lastEvaluatedCodeRepoUrls.length} 个仓库` :
+                            (getCodeRepoMeta(lastEvaluatedCodeRepoUrls[0] || '').repo || '未命名仓库') }}
                           <el-tag size="small" :type="getCodeAbilityTagType(codeAbilityResult.composite_score)">
                             {{ codeAbilityResult.level || '未评级' }}
                           </el-tag>
                         </div>
                         <div class="summary-subtitle">
                           {{ getRepoDisplayNames(lastEvaluatedCodeRepoUrls).slice(0, 3).join(' · ') }}
-                          <span v-if="lastEvaluatedCodeRepoUrls.length > 3"> 等 {{ lastEvaluatedCodeRepoUrls.length }} 个仓库</span>
+                          <span v-if="lastEvaluatedCodeRepoUrls.length > 3"> 等 {{ lastEvaluatedCodeRepoUrls.length }}
+                            个仓库</span>
                         </div>
                       </div>
                     </div>
@@ -2149,8 +2510,12 @@ const resetForm = () => {
                     <div class="card-content">
                       <div class="card-top">
                         <div class="exp-badge">
-                          <el-icon v-if="proj.isCompetition"><Trophy /></el-icon>
-                          <el-icon v-else><Folder /></el-icon>
+                          <el-icon v-if="proj.isCompetition">
+                            <Trophy />
+                          </el-icon>
+                          <el-icon v-else>
+                            <Folder />
+                          </el-icon>
                           <span>{{ proj.isCompetition ? '竞赛精华' : '核心项目' }}</span>
                         </div>
                         <div class="card-actions-minimal">
@@ -2180,7 +2545,9 @@ const resetForm = () => {
                     <div class="card-content">
                       <div class="card-top">
                         <div class="exp-badge">
-                          <el-icon><Briefcase /></el-icon>
+                          <el-icon>
+                            <Briefcase />
+                          </el-icon>
                           <span>职业实战</span>
                         </div>
                         <div class="card-actions-minimal">
@@ -2193,7 +2560,9 @@ const resetForm = () => {
                         <span class="role-tag">{{ intern.role }}</span>
                       </div>
                       <div class="exp-meta-info" v-if="intern.date && intern.date.length === 2">
-                        <el-icon><Calendar /></el-icon>
+                        <el-icon>
+                          <Calendar />
+                        </el-icon>
                         <span>{{ formatDateRange(intern.date) }}</span>
                       </div>
                       <div class="exp-desc-box" v-if="intern.desc">
@@ -2352,10 +2721,22 @@ const resetForm = () => {
 
             <!-- 底部操作按钮 -->
             <div class="form-actions">
-              <el-button @click="resetForm" :icon="RefreshRight">
+              <el-button class="form-action-btn" @click="resetForm" :icon="RefreshRight">
                 重置表单
               </el-button>
-              <el-button type="primary" @click="submitForm" :loading="submitting" :icon="Check">
+              <el-button class="form-action-btn" @click="openResumeProfileDialog" :icon="EditPen">
+                补充简历资料
+              </el-button>
+              <el-button class="form-action-btn form-action-btn--template" @click="openResumeTemplateDialog"
+                :icon="Document">
+                选择模板
+              </el-button>
+              <el-button class="form-action-btn form-action-btn--preview" @click="generateResumePreview"
+                :loading="resumeGenerating" :icon="View">
+                预览简历
+              </el-button>
+              <el-button type="primary" class="form-action-btn form-action-btn--primary" @click="submitForm"
+                :loading="submitting" :icon="Check">
                 提交画像
               </el-button>
             </div>
@@ -2420,17 +2801,449 @@ const resetForm = () => {
       <CareerFormUpload :show-close="true" @close="showUploadDialog = false" @parsed="handleResumeParsed" />
     </el-dialog>
 
-    <ResumeMissingFieldsChat
-      v-model="showMissingFieldsChat"
-      :fields="pendingMissingFields"
-      :form-data="formData"
-      :major-options="majorOptions"
-      :quiz-status="quizCompleted"
-      @save="handleMissingFieldSave"
-      @complete="handleMissingFieldComplete"
-      @step-change="activeMenu = $event"
-      @open-quiz="openQuizModal"
-    />
+    <el-dialog v-model="resumeProfileDialogVisible" title="补充简历资料" width="760px" destroy-on-close
+      class="resume-profile-dialog">
+      <div class="resume-profile-grid">
+        <div class="resume-profile-block">
+          <h4>基础信息</h4>
+          <div class="resume-profile-form two-col">
+            <el-input v-model="resumeProfileExtras.basics.name" placeholder="姓名，必填">
+              <template #prepend>姓名</template>
+            </el-input>
+            <el-input v-model="resumeProfileExtras.basics.label" placeholder="职位标签，如前端工程师">
+              <template #prepend>标签</template>
+            </el-input>
+            <el-input v-model="resumeProfileExtras.basics.email" placeholder="邮箱">
+              <template #prepend>邮箱</template>
+            </el-input>
+            <el-input v-model="resumeProfileExtras.basics.phone" placeholder="电话">
+              <template #prepend>电话</template>
+            </el-input>
+            <el-input v-model="resumeProfileExtras.basics.city" placeholder="城市">
+              <template #prepend>城市</template>
+            </el-input>
+            <el-input v-model="resumeProfileExtras.basics.region" placeholder="省 / 州">
+              <template #prepend>地区</template>
+            </el-input>
+          </div>
+          <el-input v-model="resumeProfileExtras.basics.summary" type="textarea" :rows="5"
+            placeholder="个人简介，建议补充核心技能、项目亮点和求职方向" />
+        </div>
+
+        <div class="resume-profile-block">
+          <h4>教育补充</h4>
+          <div class="resume-profile-form two-col">
+            <el-input v-model="primaryResumeEducation.institution" placeholder="学校名称，必填">
+              <template #prepend>学校</template>
+            </el-input>
+            <el-input v-model="primaryResumeEducation.studyType" placeholder="本科 / 硕士 / 博士">
+              <template #prepend>学历</template>
+            </el-input>
+            <el-input v-model="primaryResumeEducation.area" placeholder="专业">
+              <template #prepend>专业</template>
+            </el-input>
+            <el-date-picker v-model="primaryResumeEducation.startDate" type="month" format="YYYY-MM"
+              value-format="YYYY-MM" placeholder="入学时间" style="width: 100%" />
+            <el-date-picker v-model="primaryResumeEducation.endDate" type="month" format="YYYY-MM"
+              value-format="YYYY-MM" placeholder="毕业时间" style="width: 100%" />
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <el-button @click="resumeProfileDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="saveResumeProfileDialog">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="resumeTemplateDialogVisible" title="选择简历模板" width="820px" destroy-on-close
+      class="resume-template-dialog">
+      <div class="resume-template-grid">
+        <button type="button" class="resume-template-card"
+          :class="{ 'is-active': selectedResumeTemplate === 'professional' }"
+          @click="selectResumeTemplate('professional')">
+          <div class="template-preview template-preview--professional">
+            <div class="template-preview-header"></div>
+            <div class="template-preview-line large"></div>
+            <div class="template-preview-line"></div>
+            <div class="template-preview-columns">
+              <span></span>
+              <span></span>
+            </div>
+          </div>
+          <strong>专业模板</strong>
+          <p>适合校招、社招和正式投递场景，信息结构更完整。</p>
+        </button>
+
+        <button type="button" class="resume-template-card" :class="{ 'is-active': selectedResumeTemplate === 'modern' }"
+          @click="selectResumeTemplate('modern')">
+          <div class="template-preview template-preview--modern">
+            <div class="template-preview-header accent"></div>
+            <div class="template-preview-line large"></div>
+            <div class="template-preview-columns">
+              <span class="accent"></span>
+              <span></span>
+            </div>
+            <div class="template-preview-line"></div>
+          </div>
+          <strong>现代模板</strong>
+          <p>视觉更突出，适合产品、设计、前端等需要展示感的岗位。</p>
+        </button>
+
+        <button type="button" class="resume-template-card"
+          :class="{ 'is-active': selectedResumeTemplate === 'compact' }" @click="selectResumeTemplate('compact')">
+          <div class="template-preview template-preview--compact">
+            <div class="template-preview-line large"></div>
+            <div class="template-preview-line small"></div>
+            <div class="template-preview-line"></div>
+            <div class="template-preview-line"></div>
+          </div>
+          <strong>紧凑模板</strong>
+          <p>适合一页式简历，重点突出核心经历与技能摘要。</p>
+        </button>
+      </div>
+
+      <template #footer>
+        <el-button @click="resumeTemplateDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="resumeTemplateDialogVisible = false">使用当前模板</el-button>
+      </template>
+    </el-dialog>
+
+    <ResumeMissingFieldsChat v-model="showMissingFieldsChat" :fields="pendingMissingFields" :form-data="formData"
+      :major-options="majorOptions" :quiz-status="quizCompleted" @save="handleMissingFieldSave"
+      @complete="handleMissingFieldComplete" @step-change="activeMenu = $event" @open-quiz="openQuizModal"
+      @evaluate-code-ability="handleMissingFieldCodeAbilityEvaluate" />
+
+    <el-dialog v-model="resumePreviewDialogVisible" title="JSON Resume 简历预览" width="1000px" destroy-on-close
+      class="resume-preview-dialog">
+      <template v-if="jsonResumeResult && currentJsonResume">
+        <div class="resume-preview-toolbar">
+          <div class="resume-preview-meta">
+            <el-tag type="info" effect="light">当前模板: {{ currentResumeTemplateLabel }}</el-tag>
+            <el-tag type="primary" effect="light">结构校验: {{ jsonResumeResult.valid ? '通过' : '未通过' }}</el-tag>
+            <el-tag :type="jsonResumeResult.completeness.score >= 80 ? 'success' : 'warning'" effect="light">
+              完整度: {{ jsonResumeResult.completeness.score }}%
+            </el-tag>
+            <el-tag v-if="resumeMissingRequiredFields.length" type="danger" effect="light">
+              缺失必填: {{ resumeMissingRequiredFields.length }}
+            </el-tag>
+          </div>
+          <div class="resume-preview-actions">
+            <el-button plain :icon="Download" @click="exportResumePdf" :loading="resumeExportingPdf">PDF</el-button>
+            <el-button type="primary" :icon="Download" @click="exportResumeWord"
+              :loading="resumeExportingWord">Word</el-button>
+          </div>
+        </div>
+
+        <div v-if="resumeMissingRequiredFields.length" class="resume-preview-warning">
+          <div class="warning-title">仍有必填信息待补充</div>
+          <div class="warning-list">
+            <span v-for="item in resumeMissingRequiredFields" :key="item.field">{{ item.label }}</span>
+          </div>
+        </div>
+
+        <div ref="resumePreviewRef" class="resume-preview-sheet" :class="`template-${selectedResumeTemplate}`">
+          <template v-if="selectedResumeTemplate === 'professional'">
+            <header class="resume-sheet-header professional-header">
+              <div class="professional-header-banner">
+                <div class="professional-header-copy">
+                  <div class="professional-title-line">
+                    <h1>{{ currentJsonResume.basics.name || '求职简历' }}</h1>
+                    <span>PERSONAL RESUME</span>
+                  </div>
+                  <p>{{ currentJsonResume.basics.label || '我一直在努力' }}</p>
+                </div>
+                <div class="professional-header-mark">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>
+              </div>
+            </header>
+
+            <section class="resume-section professional-section">
+              <div class="professional-section-head">基本信息</div>
+              <div class="professional-basic-grid">
+                <div class="professional-basic-list">
+                  <div v-for="item in resumeProfessionalFacts" :key="item.label" class="professional-basic-item">
+                    <span class="professional-basic-label">{{ item.label }}</span>
+                    <span class="professional-basic-value">{{ item.value }}</span>
+                  </div>
+                </div>
+                <div class="professional-avatar-card">
+                  <img v-if="currentJsonResume.basics.image" :src="currentJsonResume.basics.image" alt="简历头像"
+                    class="professional-avatar-image">
+                  <div v-else class="professional-avatar-placeholder">
+                    {{ currentJsonResume.basics.name?.slice(0, 1) || '简' }}
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section v-if="currentJsonResume.basics.summary" class="resume-section professional-section">
+              <div class="professional-section-head">自我评价</div>
+              <p class="professional-summary">{{ currentJsonResume.basics.summary }}</p>
+            </section>
+
+            <section v-if="currentJsonResume.education?.length" class="resume-section professional-section">
+              <div class="professional-section-head">教育背景</div>
+              <article v-for="item in currentJsonResume.education" :key="`${item.institution}-${item.endDate || ''}`"
+                class="professional-entry">
+                <div class="professional-entry-head">
+                  <strong>{{ item.area || item.studyType || item.institution }}</strong>
+                  <span>{{ item.institution }}<template v-if="item.studyType">（{{ item.studyType }}）</template></span>
+                  <em>{{ formatResumeDisplayRange(item.startDate, item.endDate) }}</em>
+                </div>
+                <p v-if="item.courses?.length" class="professional-entry-text">
+                  主修课程：{{ item.courses.join('、') }}
+                </p>
+              </article>
+            </section>
+
+            <section v-if="currentJsonResume.work?.length" class="resume-section professional-section">
+              <div class="professional-section-head">工作经验</div>
+              <article v-for="item in currentJsonResume.work" :key="`${item.name}-${item.startDate || ''}`"
+                class="professional-entry">
+                <div class="professional-entry-head">
+                  <strong>{{ item.position || item.name }}</strong>
+                  <span>{{ item.name }}</span>
+                  <em>{{ formatResumeDisplayRange(item.startDate, item.endDate, true) }}</em>
+                </div>
+                <ul v-if="item.highlights?.length" class="professional-bullet-list">
+                  <li v-for="highlight in item.highlights" :key="highlight">{{ highlight }}</li>
+                </ul>
+                <p v-else-if="item.summary" class="professional-entry-text">{{ item.summary }}</p>
+              </article>
+            </section>
+
+            <section v-if="currentJsonResume.projects?.length" class="resume-section professional-section">
+              <div class="professional-section-head">项目经历</div>
+              <article v-for="item in currentJsonResume.projects" :key="`${item.name}-${item.startDate || ''}`"
+                class="professional-entry">
+                <div class="professional-entry-head">
+                  <strong>{{ item.name }}</strong>
+                  <span>{{ item.entity || '项目实践' }}</span>
+                  <em>{{ formatResumeDisplayRange(item.startDate, item.endDate) }}</em>
+                </div>
+                <p v-if="item.description" class="professional-entry-text">{{ item.description }}</p>
+                <ul v-if="item.highlights?.length" class="professional-bullet-list">
+                  <li v-for="highlight in item.highlights" :key="highlight">{{ highlight }}</li>
+                </ul>
+              </article>
+            </section>
+
+            <section
+              v-if="currentJsonResume.skills?.length || currentJsonResume.languages?.length || currentJsonResume.certificates?.length"
+              class="resume-section professional-section">
+              <div class="professional-section-head">职业技能</div>
+              <div class="professional-skill-block">
+                <div v-for="item in currentJsonResume.skills" :key="item.name" class="professional-skill-item">
+                  <strong>{{ item.name }}：</strong>{{ item.keywords.join('、') }}
+                </div>
+                <div v-for="item in currentJsonResume.languages" :key="item.language" class="professional-skill-item">
+                  <strong>语言能力：</strong>{{ item.language }}<template v-if="item.fluency">（{{ item.fluency }}）</template>
+                </div>
+                <div v-for="item in currentJsonResume.certificates" :key="item.name" class="professional-skill-item">
+                  <strong>证书：</strong>{{ item.name }}
+                </div>
+              </div>
+            </section>
+          </template>
+
+          <template v-else-if="selectedResumeTemplate === 'modern'">
+            <div class="modern-layout">
+              <aside class="modern-sidebar">
+                <div class="modern-identity">
+                  <div class="modern-avatar">
+                    <img v-if="currentJsonResume.basics.image" :src="currentJsonResume.basics.image" alt="简历头像">
+                    <span v-else>{{ currentJsonResume.basics.name?.slice(0, 1) || '简' }}</span>
+                  </div>
+                  <h1>{{ currentJsonResume.basics.name }}</h1>
+                  <p>{{ currentJsonResume.basics.label }}</p>
+                </div>
+
+                <section class="modern-side-section">
+                  <h3>联系方式</h3>
+                  <div class="modern-side-list">
+                    <span v-if="currentJsonResume.basics.phone">{{ currentJsonResume.basics.phone }}</span>
+                    <span v-if="currentJsonResume.basics.email">{{ currentJsonResume.basics.email }}</span>
+                    <span v-if="currentJsonResume.basics.location?.city || currentJsonResume.basics.location?.region">
+                      {{ [currentJsonResume.basics.location?.city,
+                      currentJsonResume.basics.location?.region].filter(Boolean).join(' / ') }}
+                    </span>
+                  </div>
+                </section>
+
+                <section v-if="currentJsonResume.skills?.length" class="modern-side-section">
+                  <h3>技能矩阵</h3>
+                  <div class="modern-chip-list">
+                    <span v-for="item in currentJsonResume.skills" :key="item.name">{{ item.name }}</span>
+                  </div>
+                </section>
+
+                <section v-if="currentJsonResume.languages?.length || currentJsonResume.certificates?.length"
+                  class="modern-side-section">
+                  <h3>补充信息</h3>
+                  <div class="modern-side-list">
+                    <span v-for="item in currentJsonResume.languages" :key="item.language">
+                      {{ item.language }}<template v-if="item.fluency"> / {{ item.fluency }}</template>
+                    </span>
+                    <span v-for="item in currentJsonResume.certificates" :key="item.name">{{ item.name }}</span>
+                  </div>
+                </section>
+              </aside>
+
+              <main class="modern-main">
+                <section v-if="currentJsonResume.basics.summary" class="modern-card modern-card--hero">
+                  <h3>职业概述</h3>
+                  <p>{{ currentJsonResume.basics.summary }}</p>
+                </section>
+
+                <section v-if="currentJsonResume.work?.length" class="modern-card">
+                  <h3>工作经历</h3>
+                  <article v-for="item in currentJsonResume.work" :key="`${item.name}-${item.startDate || ''}`"
+                    class="modern-entry">
+                    <div class="modern-entry-head">
+                      <div>
+                        <strong>{{ item.position || item.name }}</strong>
+                        <span>{{ item.name }}</span>
+                      </div>
+                      <em>{{ formatResumeDisplayRange(item.startDate, item.endDate, true) }}</em>
+                    </div>
+                    <p v-if="item.summary">{{ item.summary }}</p>
+                    <ul v-if="item.highlights?.length">
+                      <li v-for="highlight in item.highlights" :key="highlight">{{ highlight }}</li>
+                    </ul>
+                  </article>
+                </section>
+
+                <section v-if="currentJsonResume.projects?.length" class="modern-card">
+                  <h3>项目经历</h3>
+                  <article v-for="item in currentJsonResume.projects" :key="`${item.name}-${item.startDate || ''}`"
+                    class="modern-entry">
+                    <div class="modern-entry-head">
+                      <div>
+                        <strong>{{ item.name }}</strong>
+                        <span>{{ item.entity || '项目实践' }}</span>
+                      </div>
+                      <em>{{ formatResumeDisplayRange(item.startDate, item.endDate) }}</em>
+                    </div>
+                    <p v-if="item.description">{{ item.description }}</p>
+                    <ul v-if="item.highlights?.length">
+                      <li v-for="highlight in item.highlights" :key="highlight">{{ highlight }}</li>
+                    </ul>
+                  </article>
+                </section>
+
+                <section v-if="currentJsonResume.education?.length" class="modern-card">
+                  <h3>教育经历</h3>
+                  <article v-for="item in currentJsonResume.education"
+                    :key="`${item.institution}-${item.endDate || ''}`" class="modern-entry modern-entry--education">
+                    <div class="modern-entry-head">
+                      <div>
+                        <strong>{{ item.institution }}</strong>
+                        <span>{{ [item.area, item.studyType].filter(Boolean).join(' / ') }}</span>
+                      </div>
+                      <em>{{ formatResumeDisplayRange(item.startDate, item.endDate) }}</em>
+                    </div>
+                  </article>
+                </section>
+              </main>
+            </div>
+          </template>
+
+          <template v-else>
+            <header class="resume-sheet-header compact-header">
+              <div>
+                <h1>{{ currentJsonResume.basics.name }}</h1>
+                <p>{{ currentJsonResume.basics.label }}</p>
+              </div>
+              <div class="compact-contact">
+                <span v-if="currentJsonResume.basics.phone">{{ currentJsonResume.basics.phone }}</span>
+                <span v-if="currentJsonResume.basics.email">{{ currentJsonResume.basics.email }}</span>
+                <span v-if="currentJsonResume.basics.location?.city || currentJsonResume.basics.location?.region">
+                  {{ [currentJsonResume.basics.location?.city,
+                  currentJsonResume.basics.location?.region].filter(Boolean).join(' / ') }}
+                </span>
+              </div>
+            </header>
+
+            <div class="compact-layout">
+              <aside class="compact-side">
+                <section v-if="currentJsonResume.basics.summary" class="compact-block">
+                  <h3>简介</h3>
+                  <p>{{ currentJsonResume.basics.summary }}</p>
+                </section>
+
+                <section v-if="currentJsonResume.skills?.length" class="compact-block">
+                  <h3>核心技能</h3>
+                  <div class="compact-skill-list">
+                    <div v-for="item in currentJsonResume.skills" :key="item.name" class="compact-skill-item">
+                      <strong>{{ item.name }}</strong>
+                      <p>{{ item.keywords.join(' / ') }}</p>
+                    </div>
+                  </div>
+                </section>
+
+                <section v-if="currentJsonResume.languages?.length || currentJsonResume.certificates?.length"
+                  class="compact-block">
+                  <h3>语言与证书</h3>
+                  <ul class="compact-inline-list">
+                    <li v-for="item in currentJsonResume.languages" :key="item.language">
+                      {{ item.language }}<template v-if="item.fluency">（{{ item.fluency }}）</template>
+                    </li>
+                    <li v-for="item in currentJsonResume.certificates" :key="item.name">{{ item.name }}</li>
+                  </ul>
+                </section>
+              </aside>
+
+              <main class="compact-main">
+                <section v-if="currentJsonResume.work?.length" class="compact-block">
+                  <h3>工作经历</h3>
+                  <article v-for="item in currentJsonResume.work" :key="`${item.name}-${item.startDate || ''}`"
+                    class="compact-entry">
+                    <div class="compact-entry-head">
+                      <strong>{{ item.position || item.name }}</strong>
+                      <em>{{ formatResumeDisplayRange(item.startDate, item.endDate, true) }}</em>
+                    </div>
+                    <div class="compact-entry-sub">{{ item.name }}</div>
+                    <p v-if="item.summary">{{ item.summary }}</p>
+                    <ul v-if="item.highlights?.length">
+                      <li v-for="highlight in item.highlights" :key="highlight">{{ highlight }}</li>
+                    </ul>
+                  </article>
+                </section>
+
+                <section v-if="currentJsonResume.projects?.length" class="compact-block">
+                  <h3>项目经历</h3>
+                  <article v-for="item in currentJsonResume.projects" :key="`${item.name}-${item.startDate || ''}`"
+                    class="compact-entry">
+                    <div class="compact-entry-head">
+                      <strong>{{ item.name }}</strong>
+                      <em>{{ formatResumeDisplayRange(item.startDate, item.endDate) }}</em>
+                    </div>
+                    <div class="compact-entry-sub">{{ item.entity || '项目实践' }}</div>
+                    <p v-if="item.description">{{ item.description }}</p>
+                  </article>
+                </section>
+
+                <section v-if="currentJsonResume.education?.length" class="compact-block">
+                  <h3>教育经历</h3>
+                  <article v-for="item in currentJsonResume.education"
+                    :key="`${item.institution}-${item.endDate || ''}`" class="compact-entry">
+                    <div class="compact-entry-head">
+                      <strong>{{ item.institution }}</strong>
+                      <em>{{ formatResumeDisplayRange(item.startDate, item.endDate) }}</em>
+                    </div>
+                    <div class="compact-entry-sub">{{ [item.area, item.studyType].filter(Boolean).join(' / ') }}</div>
+                  </article>
+                </section>
+              </main>
+            </div>
+          </template>
+        </div>
+      </template>
+    </el-dialog>
 
     <!-- 项目经历弹窗 -->
     <el-dialog v-model="showProjectDialog" :title="projectForm.isEdit ? '编辑项目/竞赛经历' : '添加项目/竞赛经历'" width="600px"
@@ -2530,13 +3343,8 @@ const resetForm = () => {
       </template>
     </el-dialog>
 
-    <el-dialog
-      v-model="codeAbilityResultVisible"
-      title="代码能力评估结果"
-      width="920px"
-      destroy-on-close
-      class="code-ability-result-dialog"
-    >
+    <el-dialog v-model="codeAbilityResultVisible" title="代码能力评估结果" width="920px" destroy-on-close
+      class="code-ability-result-dialog">
       <template v-if="codeAbilityResult">
         <div class="code-result-hero">
           <div class="hero-topline">
@@ -2551,17 +3359,14 @@ const resetForm = () => {
               <div class="score-label">综合评分</div>
             </div>
             <div class="hero-content">
-              <h3>{{ lastEvaluatedCodeRepoUrls.length > 1 ? `${lastEvaluatedCodeRepoUrls.length} 个仓库联合评估` : (getCodeRepoMeta(lastEvaluatedCodeRepoUrls[0] || '').repo || '未命名仓库') }}</h3>
-              <p>{{ lastEvaluatedCodeRepoUrls.length > 1 ? '综合多个代码仓库的结构、活跃度与工程化表现进行评估' : (getCodeRepoMeta(lastEvaluatedCodeRepoUrls[0] || '').fullName || codeAbilityResult.username || '-') }}</p>
+              <h3>{{ lastEvaluatedCodeRepoUrls.length > 1 ? `${lastEvaluatedCodeRepoUrls.length} 个仓库联合评估` :
+                (getCodeRepoMeta(lastEvaluatedCodeRepoUrls[0] || '').repo || '未命名仓库') }}</h3>
+              <p>{{ lastEvaluatedCodeRepoUrls.length > 1 ? '综合多个代码仓库的结构、活跃度与工程化表现进行评估' :
+                (getCodeRepoMeta(lastEvaluatedCodeRepoUrls[0] || '').fullName || codeAbilityResult.username || '-') }}
+              </p>
               <div v-if="lastEvaluatedCodeRepoUrls.length" class="hero-link-list">
-                <a
-                  v-for="url in lastEvaluatedCodeRepoUrls"
-                  :key="url"
-                  :href="url"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="hero-link"
-                >
+                <a v-for="url in lastEvaluatedCodeRepoUrls" :key="url" :href="url" target="_blank"
+                  rel="noopener noreferrer" class="hero-link">
                   {{ getCodeRepoMeta(url).fullName || url }}
                 </a>
               </div>
@@ -2579,7 +3384,8 @@ const resetForm = () => {
             </div>
             <div class="meta-line">
               <span class="meta-label">仓库平台</span>
-              <span class="meta-value">{{ codeAbilityResult.platform || getCodeRepoMeta(lastEvaluatedCodeRepoUrls[0] || '').hostLabel || '-' }}</span>
+              <span class="meta-value">{{ codeAbilityResult.platform || getCodeRepoMeta(lastEvaluatedCodeRepoUrls[0] ||
+                '').hostLabel || '-' }}</span>
             </div>
             <div class="meta-line">
               <span class="meta-label">评估仓库数</span>
@@ -2622,12 +3428,14 @@ const resetForm = () => {
             <h5>整体评价</h5>
             <p>{{ codeAbilityResult.ai_analysis.overall_assessment.summary }}</p>
             <div class="analysis-tags" v-if="codeAbilityResult.ai_analysis.overall_assessment.strengths?.length">
-              <el-tag v-for="item in codeAbilityResult.ai_analysis.overall_assessment.strengths" :key="`strength-${item}`" type="success" effect="light">
+              <el-tag v-for="item in codeAbilityResult.ai_analysis.overall_assessment.strengths"
+                :key="`strength-${item}`" type="success" effect="light">
                 {{ item }}
               </el-tag>
             </div>
             <div class="analysis-tags" v-if="codeAbilityResult.ai_analysis.overall_assessment.weaknesses?.length">
-              <el-tag v-for="item in codeAbilityResult.ai_analysis.overall_assessment.weaknesses" :key="`weakness-${item}`" type="danger" effect="light">
+              <el-tag v-for="item in codeAbilityResult.ai_analysis.overall_assessment.weaknesses"
+                :key="`weakness-${item}`" type="danger" effect="light">
                 {{ item }}
               </el-tag>
             </div>
@@ -2640,20 +3448,24 @@ const resetForm = () => {
               <div>
                 <div class="list-title">主技术栈</div>
                 <ul>
-                  <li v-for="item in codeAbilityResult.ai_analysis.tech_stack_analysis.primary_stack" :key="`primary-${item}`">{{ item }}</li>
+                  <li v-for="item in codeAbilityResult.ai_analysis.tech_stack_analysis.primary_stack"
+                    :key="`primary-${item}`">{{ item }}</li>
                 </ul>
               </div>
               <div>
                 <div class="list-title">辅助技术栈</div>
                 <ul>
-                  <li v-for="item in codeAbilityResult.ai_analysis.tech_stack_analysis.secondary_stack" :key="`secondary-${item}`">{{ item }}</li>
+                  <li v-for="item in codeAbilityResult.ai_analysis.tech_stack_analysis.secondary_stack"
+                    :key="`secondary-${item}`">{{ item }}</li>
                 </ul>
               </div>
             </div>
-            <div v-if="codeAbilityResult.ai_analysis.tech_stack_analysis.stack_recommendations?.length" class="analysis-list">
+            <div v-if="codeAbilityResult.ai_analysis.tech_stack_analysis.stack_recommendations?.length"
+              class="analysis-list">
               <div class="list-title">技术栈建议</div>
               <ul>
-                <li v-for="item in codeAbilityResult.ai_analysis.tech_stack_analysis.stack_recommendations" :key="`stack-rec-${item}`">{{ item }}</li>
+                <li v-for="item in codeAbilityResult.ai_analysis.tech_stack_analysis.stack_recommendations"
+                  :key="`stack-rec-${item}`">{{ item }}</li>
               </ul>
             </div>
           </div>
@@ -2666,13 +3478,15 @@ const resetForm = () => {
               <div v-if="codeAbilityResult.ai_analysis.project_quality_analysis.best_practices?.length">
                 <div class="list-title">最佳实践</div>
                 <ul>
-                  <li v-for="item in codeAbilityResult.ai_analysis.project_quality_analysis.best_practices" :key="`best-${item}`">{{ item }}</li>
+                  <li v-for="item in codeAbilityResult.ai_analysis.project_quality_analysis.best_practices"
+                    :key="`best-${item}`">{{ item }}</li>
                 </ul>
               </div>
               <div v-if="codeAbilityResult.ai_analysis.project_quality_analysis.improvement_areas?.length">
                 <div class="list-title">待改进项</div>
                 <ul>
-                  <li v-for="item in codeAbilityResult.ai_analysis.project_quality_analysis.improvement_areas" :key="`improve-${item}`">{{ item }}</li>
+                  <li v-for="item in codeAbilityResult.ai_analysis.project_quality_analysis.improvement_areas"
+                    :key="`improve-${item}`">{{ item }}</li>
                 </ul>
               </div>
             </div>
@@ -2684,29 +3498,29 @@ const resetForm = () => {
               <div v-if="codeAbilityResult.ai_analysis.actionable_advice.short_term?.length">
                 <div class="list-title">短期</div>
                 <ul>
-                  <li v-for="item in codeAbilityResult.ai_analysis.actionable_advice.short_term" :key="`short-${item}`">{{ item }}</li>
+                  <li v-for="item in codeAbilityResult.ai_analysis.actionable_advice.short_term" :key="`short-${item}`">
+                    {{ item }}</li>
                 </ul>
               </div>
               <div v-if="codeAbilityResult.ai_analysis.actionable_advice.mid_term?.length">
                 <div class="list-title">中期</div>
                 <ul>
-                  <li v-for="item in codeAbilityResult.ai_analysis.actionable_advice.mid_term" :key="`mid-${item}`">{{ item }}</li>
+                  <li v-for="item in codeAbilityResult.ai_analysis.actionable_advice.mid_term" :key="`mid-${item}`">{{
+                    item }}</li>
                 </ul>
               </div>
               <div v-if="codeAbilityResult.ai_analysis.actionable_advice.long_term?.length">
                 <div class="list-title">长期</div>
                 <ul>
-                  <li v-for="item in codeAbilityResult.ai_analysis.actionable_advice.long_term" :key="`long-${item}`">{{ item }}</li>
+                  <li v-for="item in codeAbilityResult.ai_analysis.actionable_advice.long_term" :key="`long-${item}`">{{
+                    item }}</li>
                 </ul>
               </div>
             </div>
           </div>
         </div>
 
-        <el-empty
-          v-else
-          description="本次未开启 AI 深度分析，当前结果仅展示基础评分数据。"
-        />
+        <el-empty v-else description="本次未开启 AI 深度分析，当前结果仅展示基础评分数据。" />
       </template>
     </el-dialog>
   </div>
@@ -2996,9 +3810,20 @@ const resetForm = () => {
 }
 
 @keyframes pulse {
-  0% { transform: scale(0.8); opacity: 0.5; }
-  50% { transform: scale(1.2); opacity: 0.2; }
-  100% { transform: scale(0.8); opacity: 0.5; }
+  0% {
+    transform: scale(0.8);
+    opacity: 0.5;
+  }
+
+  50% {
+    transform: scale(1.2);
+    opacity: 0.2;
+  }
+
+  100% {
+    transform: scale(0.8);
+    opacity: 0.5;
+  }
 }
 
 .nav-item.is-active .step-dot {
@@ -3049,8 +3874,13 @@ const resetForm = () => {
   transform: translateY(-2px);
 }
 
-.upload-island .el-icon { color: #409eff; }
-.upload-island .el-icon.is-uploaded { color: #10b981; }
+.upload-island .el-icon {
+  color: #409eff;
+}
+
+.upload-island .el-icon.is-uploaded {
+  color: #10b981;
+}
 
 .upload-text span {
   display: block;
@@ -3149,13 +3979,37 @@ const resetForm = () => {
   font-size: 20px;
 }
 
-.stat-icon.purple { background: #f5f3ff; color: #8b5cf6; }
-.stat-icon.blue { background: #eff6ff; color: #3b82f6; }
-.stat-icon.orange { background: #fff7ed; color: #f59e0b; }
+.stat-icon.purple {
+  background: #f5f3ff;
+  color: #8b5cf6;
+}
 
-.stat-info { display: flex; flex-direction: column; }
-.stat-label { font-size: 11px; color: #64748b; font-weight: 600; }
-.stat-value { font-size: 18px; font-weight: 800; color: #1e293b; }
+.stat-icon.blue {
+  background: #eff6ff;
+  color: #3b82f6;
+}
+
+.stat-icon.orange {
+  background: #fff7ed;
+  color: #f59e0b;
+}
+
+.stat-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-label {
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.stat-value {
+  font-size: 18px;
+  font-weight: 800;
+  color: #1e293b;
+}
 
 .stat-glass-glow {
   position: absolute;
@@ -3372,8 +4226,15 @@ const resetForm = () => {
   text-transform: uppercase;
 }
 
-.is-competition .exp-badge { background: #f5f3ff; color: #8b5cf6; }
-.internship-themed .exp-badge { background: #ecfdf5; color: #10b981; }
+.is-competition .exp-badge {
+  background: #f5f3ff;
+  color: #8b5cf6;
+}
+
+.internship-themed .exp-badge {
+  background: #ecfdf5;
+  color: #10b981;
+}
 
 .card-actions-minimal {
   display: flex;
@@ -3801,6 +4662,7 @@ const resetForm = () => {
 .form-actions {
   display: flex;
   justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 12px;
   margin-top: 28px;
   padding-top: 22px;
@@ -3811,9 +4673,48 @@ const resetForm = () => {
   padding: 12px 28px;
   font-size: 14px;
   border-radius: 14px;
-  min-width: 112px;
+  min-width: 144px;
   font-weight: 600;
   transition: all 0.2s ease;
+}
+
+.form-action-btn {
+  border: 1px solid #d8e2ee !important;
+  background: #ffffff !important;
+  color: #46627f !important;
+  box-shadow: none !important;
+}
+
+.form-action-btn:hover {
+  border-color: #9dc3f9 !important;
+  color: #2f7df6 !important;
+  background: #f7fbff !important;
+  transform: translateY(-1px);
+}
+
+.form-action-btn--template {
+  background: linear-gradient(135deg, #fff9ef 0%, #ffffff 100%) !important;
+}
+
+.form-action-btn--preview {
+  background: linear-gradient(135deg, #eef7ff 0%, #ffffff 100%) !important;
+}
+
+.form-action-btn--primary {
+  background: linear-gradient(135deg, #2f7df6 0%, #63b7ff 100%) !important;
+  color: #ffffff !important;
+  border: none !important;
+  box-shadow: 0 12px 24px rgba(47, 125, 246, 0.24) !important;
+}
+
+.form-action-btn--primary:hover {
+  background: linear-gradient(135deg, #4d8ff6 0%, #73c4ff 100%) !important;
+  color: #ffffff !important;
+}
+
+.form-action-btn--primary:active {
+  background: linear-gradient(135deg, #256ee0 0%, #55a8ff 100%) !important;
+  color: #ffffff !important;
 }
 
 /* 重置按钮 - 浅色背景深色文字 */
@@ -4274,7 +5175,7 @@ const resetForm = () => {
   font-size: 24px;
 }
 
-.analysis-block + .analysis-block {
+.analysis-block+.analysis-block {
   margin-top: 18px;
 }
 
@@ -4298,7 +5199,7 @@ const resetForm = () => {
 }
 
 .analysis-list,
-.analysis-list-grid > div {
+.analysis-list-grid>div {
   padding: 14px 16px;
   border-radius: 14px;
   background: #fff;
@@ -4504,7 +5405,10 @@ const resetForm = () => {
 }
 
 @keyframes submitPulse {
-  0%, 80%, 100% {
+
+  0%,
+  80%,
+  100% {
     transform: scale(0.85);
     opacity: 0.45;
   }
@@ -5417,5 +6321,719 @@ const resetForm = () => {
 .resume-parsed-desc .highlight {
   color: #409eff;
   font-weight: 500;
+}
+
+.resume-profile-grid {
+  display: grid;
+  gap: 20px;
+}
+
+.resume-template-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.resume-template-card {
+  width: 100%;
+  padding: 18px;
+  text-align: left;
+  border-radius: 20px;
+  border: 1px solid #dbe6f3;
+  background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.resume-template-card:hover,
+.resume-template-card.is-active {
+  border-color: #6aa9ff;
+  transform: translateY(-2px);
+  box-shadow: 0 14px 28px rgba(47, 125, 246, 0.12);
+}
+
+.resume-template-card strong {
+  display: block;
+  margin-bottom: 6px;
+  color: #173a5d;
+  font-size: 16px;
+}
+
+.resume-template-card p {
+  margin: 0;
+  color: #60758d;
+  line-height: 1.7;
+  font-size: 13px;
+}
+
+.template-preview {
+  display: grid;
+  gap: 8px;
+  height: 150px;
+  padding: 14px;
+  margin-bottom: 16px;
+  border-radius: 16px;
+  border: 1px solid #e8eef7;
+  background: #ffffff;
+}
+
+.template-preview--professional {
+  background:
+    linear-gradient(135deg, #6c86a7 0%, #7e94b0 54%, transparent 54%),
+    linear-gradient(180deg, #ffffff 54%, #f5f7fb 100%);
+}
+
+.template-preview--modern {
+  background:
+    linear-gradient(90deg, #0f766e 0%, #0f766e 32%, #f7fbfd 32%, #ffffff 100%);
+}
+
+.template-preview--compact {
+  background:
+    linear-gradient(180deg, #ffffff 0%, #fbfcfe 34%, #f6f7f9 34%, #f6f7f9 100%);
+}
+
+.template-preview-header,
+.template-preview-line,
+.template-preview-columns span {
+  display: block;
+  border-radius: 999px;
+  background: #d6e2f0;
+}
+
+.template-preview-header {
+  width: 46%;
+  height: 12px;
+}
+
+.template-preview-header.accent,
+.template-preview-columns .accent {
+  background: linear-gradient(135deg, #2f7df6 0%, #63b7ff 100%);
+}
+
+.template-preview-line.large {
+  width: 68%;
+  height: 10px;
+}
+
+.template-preview-line.small {
+  width: 40%;
+  height: 8px;
+}
+
+.template-preview-line {
+  width: 100%;
+  height: 8px;
+}
+
+.template-preview-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.template-preview-columns span {
+  height: 56px;
+}
+
+.resume-profile-block {
+  padding: 20px;
+  border-radius: 18px;
+  border: 1px solid #e5edf7;
+  background: linear-gradient(180deg, #f9fbff 0%, #f3f7fd 100%);
+}
+
+.resume-profile-block h4 {
+  margin: 0 0 16px;
+  color: #173a5d;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.resume-profile-form {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.resume-profile-form.two-col {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.resume-preview-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.resume-preview-meta,
+.resume-preview-actions,
+.warning-list,
+.resume-sheet-contact {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.resume-preview-warning {
+  margin-bottom: 16px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  border: 1px solid #f3d19e;
+  background: #fff8eb;
+}
+
+.warning-title {
+  margin-bottom: 8px;
+  color: #8a5a00;
+  font-weight: 700;
+}
+
+.warning-list span {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(230, 162, 60, 0.14);
+  color: #a06200;
+  font-size: 12px;
+}
+
+.resume-preview-sheet {
+  padding: 32px;
+  border-radius: 24px;
+  background: #ffffff;
+  border: 1px solid #dbe5f1;
+  box-shadow: 0 18px 48px rgba(17, 40, 74, 0.1);
+}
+
+.resume-preview-sheet.template-professional {
+  background: linear-gradient(180deg, #f7f9fd 0%, #ffffff 100%);
+  border-top: 8px solid #6e87a7;
+}
+
+.resume-preview-sheet.template-modern {
+  padding: 0;
+  overflow: hidden;
+  background: #eef4fb;
+  border-top: 8px solid #0f766e;
+}
+
+.resume-preview-sheet.template-compact {
+  padding: 28px;
+  background: #fffefb;
+  border-top: 8px solid #334155;
+}
+
+.professional-header {
+  margin-bottom: 28px;
+}
+
+.professional-header-banner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 28px 34px;
+  border-radius: 0 44px 44px 0;
+  background: linear-gradient(135deg, #617c9f 0%, #7189ab 100%);
+  color: #ffffff;
+}
+
+.professional-header-copy h1 {
+  margin: 0;
+  font-size: 50px;
+  line-height: 1;
+  letter-spacing: 2px;
+  font-weight: 300;
+}
+
+.professional-title-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+}
+
+.professional-title-line span {
+  padding-top: 6px;
+  font-size: 14px;
+  letter-spacing: 1px;
+  font-weight: 700;
+}
+
+.professional-header-copy p {
+  margin: 10px 0 0;
+  font-size: 14px;
+  opacity: 0.92;
+}
+
+.professional-header-mark {
+  width: 26px;
+  display: grid;
+  gap: 6px;
+}
+
+.professional-header-mark span {
+  display: block;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.professional-section {
+  position: relative;
+  margin-left: 38px;
+  padding: 26px 0 18px 20px;
+  border-left: 2px solid #d5dce7;
+}
+
+.professional-section:last-child {
+  padding-bottom: 0;
+}
+
+.professional-section-head {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-width: 136px;
+  margin: 0 0 18px -40px;
+  padding: 7px 24px;
+  border-radius: 999px;
+  background: #6c86a7;
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.professional-basic-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.8fr) 170px;
+  gap: 28px;
+  align-items: start;
+}
+
+.professional-basic-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 28px;
+}
+
+.professional-basic-item {
+  display: flex;
+  gap: 14px;
+  line-height: 1.9;
+  color: #384b63;
+}
+
+.professional-basic-label {
+  min-width: 56px;
+  color: #60758f;
+  font-weight: 700;
+}
+
+.professional-basic-value {
+  color: #24384d;
+}
+
+.professional-avatar-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 188px;
+  border: 1px solid #d5dfeb;
+  background: #ffffff;
+}
+
+.professional-avatar-image {
+  width: 100%;
+  height: 100%;
+  max-width: 150px;
+  object-fit: cover;
+}
+
+.professional-avatar-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 118px;
+  height: 148px;
+  background: linear-gradient(180deg, #d9e4f1 0%, #edf3fa 100%);
+  color: #5c7390;
+  font-size: 42px;
+  font-weight: 700;
+}
+
+.professional-summary,
+.professional-entry-text,
+.professional-bullet-list {
+  margin: 0;
+  color: #435671;
+  line-height: 1.95;
+  font-size: 14px;
+}
+
+.professional-entry {
+  margin-bottom: 18px;
+}
+
+.professional-entry:last-child {
+  margin-bottom: 0;
+}
+
+.professional-entry-head {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(180px, 1.2fr) auto;
+  gap: 14px;
+  align-items: baseline;
+  margin-bottom: 8px;
+  color: #415b7b;
+}
+
+.professional-entry-head strong {
+  font-size: 16px;
+  color: #476586;
+}
+
+.professional-entry-head span {
+  color: #5f728d;
+}
+
+.professional-entry-head em {
+  font-style: normal;
+  color: #5f82b1;
+}
+
+.professional-bullet-list {
+  padding-left: 18px;
+}
+
+.professional-bullet-list li+li {
+  margin-top: 6px;
+}
+
+.professional-skill-block {
+  display: grid;
+  gap: 10px;
+}
+
+.professional-skill-item {
+  color: #435671;
+  line-height: 1.9;
+}
+
+.modern-layout {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  min-height: 960px;
+}
+
+.modern-sidebar {
+  padding: 34px 26px;
+  background: linear-gradient(180deg, #0f766e 0%, #0b3f5c 100%);
+  color: #e9fffb;
+}
+
+.modern-identity {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.modern-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 96px;
+  height: 96px;
+  margin: 0 auto 16px;
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.14);
+  overflow: hidden;
+  font-size: 34px;
+  font-weight: 700;
+}
+
+.modern-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.modern-identity h1 {
+  margin: 0 0 8px;
+  font-size: 30px;
+  color: #ffffff;
+}
+
+.modern-identity p {
+  margin: 0;
+  color: rgba(233, 255, 251, 0.84);
+}
+
+.modern-side-section {
+  margin-bottom: 26px;
+}
+
+.modern-side-section h3 {
+  margin: 0 0 12px;
+  font-size: 14px;
+  letter-spacing: 1px;
+  color: #9ef3df;
+}
+
+.modern-side-list {
+  display: grid;
+  gap: 10px;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.modern-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.modern-chip-list span {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  font-size: 12px;
+}
+
+.modern-main {
+  padding: 34px;
+  display: grid;
+  gap: 18px;
+  align-content: start;
+}
+
+.modern-card {
+  padding: 22px 24px;
+  border-radius: 22px;
+  background: #ffffff;
+  border: 1px solid #dbe7f2;
+  box-shadow: 0 12px 28px rgba(15, 63, 92, 0.08);
+}
+
+.modern-card--hero {
+  background: linear-gradient(135deg, #ffffff 0%, #f2fbfa 100%);
+}
+
+.modern-card h3 {
+  margin: 0 0 16px;
+  color: #0b3f5c;
+  font-size: 18px;
+}
+
+.modern-card p,
+.modern-card ul {
+  margin: 0;
+  color: #4f6377;
+  line-height: 1.8;
+}
+
+.modern-card ul {
+  padding-left: 18px;
+  margin-top: 8px;
+}
+
+.modern-entry {
+  padding: 14px 0;
+  border-top: 1px solid #edf2f7;
+}
+
+.modern-entry:first-of-type {
+  padding-top: 0;
+  border-top: none;
+}
+
+.modern-entry-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.modern-entry-head strong {
+  display: block;
+  margin-bottom: 4px;
+  color: #173a5d;
+}
+
+.modern-entry-head span,
+.modern-entry-head em {
+  color: #688096;
+  font-style: normal;
+}
+
+.compact-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding-bottom: 18px;
+  margin-bottom: 22px;
+  border-bottom: 2px solid #dfe7ef;
+}
+
+.compact-header h1 {
+  margin: 0 0 6px;
+  color: #24384d;
+  font-size: 30px;
+}
+
+.compact-header p {
+  margin: 0;
+  color: #617487;
+  font-weight: 600;
+}
+
+.compact-contact {
+  display: grid;
+  gap: 6px;
+  justify-items: end;
+  color: #5f7284;
+  font-size: 13px;
+}
+
+.compact-layout {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 24px;
+}
+
+.compact-block {
+  margin-bottom: 18px;
+  padding: 18px;
+  border-radius: 18px;
+  border: 1px solid #e6eaef;
+  background: #ffffff;
+}
+
+.compact-block h3 {
+  margin: 0 0 12px;
+  color: #24384d;
+  font-size: 16px;
+}
+
+.compact-block p,
+.compact-block ul {
+  margin: 0;
+  color: #556676;
+  line-height: 1.8;
+}
+
+.compact-block ul {
+  padding-left: 18px;
+  margin-top: 8px;
+}
+
+.compact-skill-list {
+  display: grid;
+  gap: 12px;
+}
+
+.compact-skill-item strong {
+  display: block;
+  margin-bottom: 4px;
+  color: #334155;
+}
+
+.compact-inline-list {
+  display: grid;
+  gap: 8px;
+  padding-left: 18px;
+}
+
+.compact-entry+.compact-entry {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px dashed #d8e0e8;
+}
+
+.compact-entry-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.compact-entry-head strong {
+  color: #24384d;
+}
+
+.compact-entry-head em,
+.compact-entry-sub {
+  color: #718397;
+  font-style: normal;
+}
+
+.compact-entry-sub {
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+
+@media (max-width: 768px) {
+
+  .resume-profile-form.two-col,
+  .resume-template-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .resume-preview-sheet {
+    padding: 24px 18px;
+  }
+
+  .resume-preview-toolbar,
+  .form-actions,
+  .professional-title-line,
+  .compact-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .modern-layout,
+  .compact-layout,
+  .professional-basic-grid,
+  .professional-basic-list {
+    grid-template-columns: 1fr;
+  }
+
+  .modern-entry-head,
+  .compact-entry-head,
+  .professional-entry-head {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .professional-section {
+    margin-left: 14px;
+    padding-left: 14px;
+  }
+
+  .professional-section-head {
+    margin-left: -24px;
+  }
+
+  .professional-header-banner,
+  .modern-main,
+  .modern-sidebar,
+  .compact-block {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+
+  .compact-contact {
+    justify-items: start;
+  }
+
+  .form-actions .el-button {
+    width: 100%;
+  }
 }
 </style>
