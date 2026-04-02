@@ -17,11 +17,11 @@ const __dirname = path.dirname(__filename);
 // 文件路径
 const COOKIE_FILE = path.join(__dirname, '.gitee_cookies.json');
 const RESULT_FILE = path.join(__dirname, 'recommend_project_url.txt');
-const PROGRESS_FILE = path.join(__dirname, '.crawl_progress.json');
+const PROGRESS_FILE = path.join(__dirname, '.get_recommend_crawl_progress.json');
 
 // 配置
 const CONFIG = {
-    requestDelay: [2000, 3000],      // 每次请求延迟 2-4 秒（增加避免触发反爬）
+    requestDelay: [4000, 5000],      // 每次请求延迟 4-5 秒（增加避免触发反爬）
     batchSize: 30,                    // 每批请求数量（减少）
     batchPause: 60000,                // 每批后暂停 60 秒（增加）
     retryDelay: 120000,               // 错误重试等待 120 秒
@@ -158,7 +158,7 @@ const baseHeaders = {
 };
 
 // 默认 Cookie（首次运行使用）
-const DEFAULT_COOKIE = "BEC=8ddb6c1710618f9098bae11a2ceedd43; user_locale=zh-CN; oschina_new_user=false; abymg_id=1_B92937BE9D305339066EDE91E9C1C7AE6AE6648BF82C769DC9EC260AC783EA08; tz=Asia%2FShanghai; gitee-session-n=SVRsYVRGMG1KU1dIUlUxcDBiQjhuRHlpYjJGeFN1Q2s2NjNCM2dtWWdtWEVLanlqTGgxdTExWmJQbTQ0KzhDR29jdlgrRXNuT0FCMUJjazNFTTU4TFRyQk9ibHNUM3VYMVVZdlNaMlhrMlYxZk9zenhWMHBIRG9jTnFYVlBVM3dVQWNEN2o3Ym84UGx3M0ZsRzZXUVo0dzJ0M0gzVUdQWE5WcDRMS1BscDNtdUx5dDc5eHhPL0pYZzRrTTAwZGh6LS1LaTg4eFZjWlVOVXZ4N2FnSXdqQWF3PT0%3D--a3546fff29727f5b78bd758fc0c385f1bc24abe1; nox_jst_v1=2.0_a214_znfm5PImWAUd05c1lQdceuZBmQJ2jwDtjADN3aRaWA7vDgoB3Ib5CfPdwovIsH4ZNAL5rVEGvowsguEoyUihaWa345OP89Th60k12COXaS4o7uljsrl4qYqCybyCM+qDPU57Ho4YH5/E205qzveQZu5xMIZV3Nj+rbQcf5dWWw2xZSZyG3p3oigmTuNlrWAV91FV4uAd3rc3yc8d/J59WkPZXILlwpCsrRa8zi/lsn4TOxedSIXjvxo0O0f33Fop3jEd+MZFiWYi9TdBcb/YiA=="
+const DEFAULT_COOKIE = "BEC=4431548549a19240b277aa1ec69b0837; nox_jst_v1=2.0_c355_zldVPgoBw3Ld6J/LPyO2XmJcSFAB6AxhLnHvrlOqgpJBLckNh8pSBEaU86rRoPPxVVDDuIdkZWDkrMi2t6lMT5sUJAOCwk8gdbhTQx6Pv2X+N/Zpe/5UCWfR9E4Z/LwIohYACAjT13SFsXXVjmUamm+RmJhhAYr4XIIav4SMhkwoW916Rrqdwd0Xi4hkShjgA258dzcZRq7Exxvv3SkLVZYhGB/+M2OLvV2H4w68EUyfNEUYlUk+mCeu7vxJYRS4nm6eAACX0cVYEWMRBFVgkA==; user_locale=zh-CN; oschina_new_user=false; gitee-session-n=L0xMNi9xRHFJNEh3NlpINFN2M1ZCK0FQMVV5aVphUkhMRnNYTFJUTUZXNVR3dU9USG9HLy9JVGdoWWVZTGNITGhBZE9OdXoybHVZUG9kVk92aXA4UmkzWXg1VUZkSGdQWHBzVWRPNWhOdEF0Mis2VGxaa0xIcW56TjFQL0s5bHppRE1udzJDdnJSaUYyWE5Makh1RUpXdVZhb0NDNWEvaUxQMmg3WUN3RkpLcExSd1hvOXA5NTFMT1FIdHB6dEhZLS12YWU3cWErS29iSm41VHhJcnNGVWdnPT0%3D--a84c77272cbb3bd5e3745c25472dd16bb8e17fbb; abymg_id=1_06F4C7C4792D1DA026A9027BF5A73E4350E95F05A28A969EC9EC260AC783EA08; tz=Asia%2FShanghai"
 
 // 尝试从文件加载 Cookie
 if (!loadCookiesFromFile()) {
@@ -320,7 +320,7 @@ async function fetchPageWithRetry(url, retryCount = 0) {
                 console.log(`\n[405] Anti-crawl triggered at ${url}`);
                 console.log(`[Cooldown] Waiting ${CONFIG.cooldownAfter405 / 1000}s before retry...`);
                 await delay(CONFIG.cooldownAfter405);
-                
+
                 const updated = await promptNewCookie(405);
                 if (updated) {
                     continue; // 用新 Cookie 重试
@@ -382,8 +382,15 @@ if (recommend_project_url.length > 0) {
 }
 
 // 获取分类列表
-const base_url = "https://gitee.com/explore/all?order=starred";
+const base_url = "https://gitee.com/explore/all";
 console.log(`[Fetch] Getting categories from ${base_url}...`);
+
+// 断点续爬时，获取分类前先等待
+if (savedProgress) {
+    console.log(`[Resume] Previous session found, waiting before fetching categories...`);
+    await delay(CONFIG.requestDelay[0], CONFIG.requestDelay[1]);
+}
+
 const $doc = await fetchPageWithRetry(base_url);
 
 const recommend_url = [];
@@ -399,6 +406,12 @@ console.log(`[Found] ${recommend_url.length} categories\n`);
 let requestCount = 0;
 
 try {
+    // 断点续爬时先等待，避免立即触发反爬
+    if (savedProgress && recommend_project_url.length > 0) {
+        console.log(`[Resume] Resuming from previous session, waiting ${CONFIG.batchPause / 1000}s before starting...`);
+        await delay(CONFIG.batchPause);
+    }
+
     for (let catIndex = 0; catIndex < recommend_url.length; catIndex++) {
         const url = recommend_url[catIndex];
 
@@ -407,6 +420,8 @@ try {
         if (savedProgress && savedProgress.currentCategory === url) {
             startPage = savedProgress.currentPage;
             console.log(`[Resume] Continuing from page ${startPage}`);
+            // 找到断点位置后也等待一下
+            await delay(CONFIG.requestDelay[0] * 2, CONFIG.requestDelay[1] * 2);
         }
 
         let i = startPage;
