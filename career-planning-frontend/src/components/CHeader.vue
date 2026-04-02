@@ -103,7 +103,7 @@ const confirmLogout = () => {
         <el-button class="custom-btn-default" round @click="router.push('/register')">注册</el-button>
       </div>
 
-      <el-dropdown v-else @command="handleCommand" trigger="click">
+      <el-dropdown v-else @command="handleCommand">
         <div class="user-info">
           <div class="user-avatar">
             <img v-if="userAvatar" :src="userAvatar" alt="avatar" class="user-avatar-image" />
@@ -129,10 +129,6 @@ const confirmLogout = () => {
             <el-dropdown-item command="profile">
               <el-icon><User /></el-icon>
               个人中心
-            </el-dropdown-item>
-            <el-dropdown-item command="membership">
-              <el-icon><User /></el-icon>
-              会员权益
             </el-dropdown-item>
             <el-dropdown-item divided command="logout" class="logout-item">
               <el-icon><SwitchButton /></el-icon>
@@ -176,6 +172,7 @@ const confirmLogout = () => {
   font-weight: 700;
   background: linear-gradient(135deg, #409eff 0%, #764ba2 100%);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
   font-size: 16px;
   letter-spacing: 0.5px;
@@ -239,9 +236,8 @@ const confirmLogout = () => {
 }
 
 .user-info:hover {
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
-  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.82);
+  border-color: rgba(64, 158, 255, 0.3);
 }
 
 .user-avatar {

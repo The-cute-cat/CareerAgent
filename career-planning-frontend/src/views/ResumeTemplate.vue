@@ -14,6 +14,7 @@ const templates = ref([
     id: 1,
     name: '极简极客风',
     type: '适合研发/后端',
+    // preview: 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png',
     preview: 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png',
     tag: '热门',
     color: '#409eff'
