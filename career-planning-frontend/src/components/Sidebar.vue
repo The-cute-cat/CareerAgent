@@ -1,19 +1,14 @@
 <script setup>
-import { computed, ref } from 'vue'
+// 侧边栏组件，包含应用 Logo 和导航菜单
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
-  House,
-  Document,
-  DataAnalysis,
-  User,
-  TrendCharts,
-  Setting,
-  Star,
-  Collection,
-  Position,
-  Fold,
-  Expand,
-  Files
+  House, Document, DataAnalysis,
+  User, TrendCharts, Setting,
+  Star, Collection, Position,
+  Fold, Expand, Guide, Connection, Calendar,
+  Memo, Timer, Finished, Reading,
+  Promotion, MagicStick, Files
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
@@ -21,13 +16,37 @@ const router = useRouter()
 
 const collapsed = ref(false)
 
-const activeIndex = computed(() => route.path)
-const defaultOpeneds = computed(() => (
-  route.path.startsWith('/career-form') ? ['/career-form-group'] : []
-))
+const handleResize = () => {
+  if (typeof window !== 'undefined') {
+    collapsed.value = window.innerWidth <= 992
+  }
+}
+
+onMounted(() => {
+  if (typeof window !== 'undefined') {
+    handleResize()
+    window.addEventListener('resize', handleResize)
+  }
+})
+
+onUnmounted(() => {
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('resize', handleResize)
+  }
+})
+
+// 当前激活的菜单项，根据路由路径自动计算
+const activeIndex = computed(() => {
+  const path = route.path
+  // 处理面试路由的子路径匹配，确保父级在有子项激活时也能正确映射逻辑（如果需要）
+  if (path.startsWith('/interviews/')) return path
+  return path
+})
 
 const handleSelect = (index) => {
-  router.push(index)
+  if (index && index !== 'spacer' && index.startsWith('/')) {
+    router.push(index)
+  }
 }
 
 const toggleCollapse = () => {
@@ -35,7 +54,6 @@ const toggleCollapse = () => {
 }
 
 const menuItems = [
-  { title: '核心功能', isGroup: true },
   { index: '/', icon: House, text: '首页' },
   {
     index: '/career-form-group',
@@ -67,76 +85,63 @@ defineExpose({ collapsed })
         <img src="../assets/1234.png" alt="logo" />
       </div>
       <transition name="text-fade">
-        <span v-if="!collapsed" class="logo-text">职引未来</span>
+        <span v-if="!collapsed" class="logo-text">职路 Agent</span>
       </transition>
-      <el-button
-        class="collapse-toggle"
-        circle
-        size="small"
-        @click="toggleCollapse"
-      >
+      <el-button class="collapse-toggle" circle size="small" @click="toggleCollapse">
         <el-icon :size="14">
           <component :is="collapsed ? Expand : Fold" />
         </el-icon>
       </el-button>
     </div>
 
+    <!-- 菜单区域 -->
     <div class="menu-wrapper">
-      <el-menu
-        :default-active="activeIndex"
-        :default-openeds="defaultOpeneds"
-        class="side-menu"
-        :unique-opened="true"
-        :collapse="collapsed"
-        @select="handleSelect"
-      >
+      <el-menu :default-active="activeIndex" class="side-menu" :unique-opened="true" :collapse="collapsed"
+        @select="handleSelect">
         <template v-for="(item, i) in menuItems" :key="i">
-          <div v-if="item.isGroup && !collapsed" class="menu-group-title">
-            {{ item.title }}
-          </div>
+          <!-- 分隔符 -->
+          <div v-if="item.isSpacer" class="menu-spacer"></div>
 
-          <el-sub-menu
-            v-else-if="item.children"
-            :index="item.index"
-            class="custom-submenu"
-          >
+          <!-- 带有子菜单的项 -->
+          <el-sub-menu v-else-if="item.children" :index="item.index" class="custom-sub-menu">
             <template #title>
-              <el-icon class="menu-icon"><component :is="item.icon" /></el-icon>
+              <el-icon class="menu-icon">
+                <component :is="item.icon" />
+              </el-icon>
               <span class="menu-text">{{ item.text }}</span>
             </template>
-
-            <el-menu-item
-              v-for="child in item.children"
-              :key="child.index"
-              :index="child.index"
-              class="custom-submenu-item"
-            >
-              <el-icon class="submenu-icon"><component :is="child.icon" /></el-icon>
-              <span class="menu-text">{{ child.text }}</span>
+            <el-menu-item v-for="child in item.children" :key="child.index" :index="child.index"
+              class="custom-menu-item sub-item">
+              <el-icon class="menu-icon">
+                <component :is="child.icon" />
+              </el-icon>
+              <template #title>
+                <span class="menu-text">{{ child.text }}</span>
+              </template>
             </el-menu-item>
           </el-sub-menu>
 
-          <el-tooltip
-            v-else-if="collapsed"
-            :content="item.text"
-            placement="right"
-            :offset="8"
-            :show-after="400"
-          >
-            <el-menu-item :index="item.index" class="custom-menu-item">
-              <el-icon class="menu-icon"><component :is="item.icon" /></el-icon>
+          <!-- 普通菜单项目 -->
+          <template v-else>
+            <el-tooltip v-if="collapsed" :content="item.text" placement="right" :offset="8" :show-after="400">
+              <el-menu-item :index="item.index" class="custom-menu-item">
+                <el-icon class="menu-icon">
+                  <component :is="item.icon" />
+                </el-icon>
+                <template #title>
+                  <span class="menu-text">{{ item.text }}</span>
+                </template>
+              </el-menu-item>
+            </el-tooltip>
+            <el-menu-item v-else :index="item.index" class="custom-menu-item">
+              <el-icon class="menu-icon">
+                <component :is="item.icon" />
+              </el-icon>
               <template #title>
                 <span class="menu-text">{{ item.text }}</span>
               </template>
             </el-menu-item>
-          </el-tooltip>
-
-          <el-menu-item v-else :index="item.index" class="custom-menu-item">
-            <el-icon class="menu-icon"><component :is="item.icon" /></el-icon>
-            <template #title>
-              <span class="menu-text">{{ item.text }}</span>
-            </template>
-          </el-menu-item>
+          </template>
         </template>
       </el-menu>
     </div>
@@ -156,7 +161,8 @@ defineExpose({ collapsed })
 .logo-section {
   display: flex;
   align-items: center;
-  padding: 20px 16px 16px 20px;
+  padding: 24px 16px 36px 20px;
+  /* 增加底部 padding 以拉开与菜单的距离 */
   gap: 12px;
   flex-shrink: 0;
 }
@@ -245,12 +251,10 @@ defineExpose({ collapsed })
   background: transparent;
 }
 
-.menu-group-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: #94a3b8;
-  margin: 16px 0 8px 12px;
-  letter-spacing: 0.5px;
+.menu-spacer {
+  height: 1px;
+  background: rgba(0, 0, 0, 0.05);
+  margin: 16px 12px;
 }
 
 .custom-menu-item,
@@ -258,21 +262,41 @@ defineExpose({ collapsed })
   height: 48px;
   line-height: 48px;
   border-radius: 12px;
-  margin-bottom: 4px;
+  margin-bottom: 10px;
+  /* 增加间距以提升档次感 */
   color: #475569;
   font-weight: 500;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .custom-menu-item:hover,
-:deep(.custom-submenu > .el-sub-menu__title:hover) {
-  background: rgba(59, 130, 246, 0.06);
-  color: #3b82f6;
+:deep(.el-sub-menu__title:hover) {
+  background: rgba(59, 130, 246, 0.06) !important;
+  color: #3b82f6 !important;
   transform: translateX(4px);
 }
 
+.custom-menu-item.sub-item {
+  padding-left: 48px !important;
+  height: 40px;
+  line-height: 40px;
+  margin-top: 6px;
+  /* 增加二级菜单的上方间距 */
+}
+
+.custom-menu-item.sub-item:hover::before {
+  content: '';
+  position: absolute;
+  left: 32px;
+  top: 12px;
+  bottom: 12px;
+  width: 2px;
+  background: #3b82f6;
+  border-radius: 2px;
+}
+
 .sidebar-container.collapsed .custom-menu-item:hover,
-.sidebar-container.collapsed :deep(.custom-submenu > .el-sub-menu__title:hover) {
+.sidebar-container.collapsed :deep(.el-sub-menu__title:hover) {
   transform: none;
 }
 
@@ -289,23 +313,30 @@ defineExpose({ collapsed })
   color: #3b82f6;
 }
 
-:deep(.el-menu-item.is-active),
-:deep(.custom-submenu .el-sub-menu__title.is-active) {
-  background: linear-gradient(90deg, rgba(59, 130, 246, 0.1) 0%, rgba(59, 130, 246, 0.02) 100%) !important;
+/* ========== 激活状态 ========== */
+:deep(.el-menu-item.is-active) {
+  background: linear-gradient(90deg, rgba(59, 130, 246, 0.12) 0%, rgba(59, 130, 246, 0.02) 100%) !important;
   color: #3b82f6 !important;
-  font-weight: 600;
+  font-weight: 700;
+}
+
+/* 父级菜单在子级激活时的样式 */
+:deep(.el-sub-menu.is-active > .el-sub-menu__title) {
+  color: #3b82f6 !important;
+  font-weight: 700;
 }
 
 :deep(.el-menu-item.is-active)::before {
   content: '';
   position: absolute;
-  left: 8px;
-  top: 12px;
-  bottom: 12px;
+  left: 6px;
+  top: 10px;
+  bottom: 10px;
   width: 4px;
   border-radius: 4px;
   background: #3b82f6;
-  box-shadow: 0 0 6px rgba(59, 130, 246, 0.4);
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.6);
+  z-index: 2;
 }
 
 .sidebar-container.collapsed :deep(.el-menu-item.is-active)::before {

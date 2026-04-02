@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { ref, reactive, computed, nextTick, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -1245,16 +1245,16 @@ const getCodeRepoMeta = (url: string) => {
     }
   }
 
- const matchResult = match as RegExpMatchArray
-const [, host, owner, repo] = matchResult
+  const matchResult = match as RegExpMatchArray
+  const [, host, owner, repo] = matchResult
 
-return {
-  hostLabel: host?.toLowerCase() === 'gitee.com' ? 'Gitee' : 'GitHub',
-  owner: owner || '',
-  repo: repo || '',
-  fullName: `${owner || ''}/${repo || ''}`,
-  normalized
-}
+  return {
+    hostLabel: host?.toLowerCase() === 'gitee.com' ? 'Gitee' : 'GitHub',
+    owner: owner || '',
+    repo: repo || '',
+    fullName: `${owner || ''}/${repo || ''}`,
+    normalized
+  }
 }
 
 const getRepoDisplayNames = (urls: string[]) => {
@@ -2167,8 +2167,8 @@ const submitForm = async () => {
     const res = await submitCareerFormApi(submitData)
 
     console.log("表单提交返回结果:", res)
-    console.log("res.data:",res.data)
-    console.log("res.data.data:",res.data.data)
+    console.log("res.data:", res.data)
+    console.log("res.data.data:", res.data.data)
 
     // 处理两种响应格式：1) res.data 是数组 2) res.data 是 {code, data} 对象
     let matchResult: JobMatchItem[]
@@ -2282,17 +2282,18 @@ const resetForm = () => {
 <template>
   <div class="career-form-layout">
     <el-container>
-      <!-- 侧边栏 -->
-      <el-aside width="220px" class="sidebar">
+      <!-- 高端自定义侧边栏 -->
+      <el-aside width="260px" class="premium-sidebar">
         <div class="sidebar-brand">
-          <div class="brand-icon">
-            <el-icon :size="26">
+          <div class="brand-icon-wrapper">
+            <el-icon :size="24">
               <DocumentAdd />
             </el-icon>
+            <div class="brand-glow"></div>
           </div>
           <div class="brand-info">
             <div class="brand-text">能力画像</div>
-            <div class="brand-subtitle">就业规划系统</div>
+            <div class="brand-subtitle">AI 智能规划</div>
           </div>
         </div>
 
@@ -2410,35 +2411,54 @@ const resetForm = () => {
       <el-main class="main-content">
         <el-card v-if="activeProfileTab === 'resume'" class="form-card">
           <template #header>
-            <div class="card-header">
-              <div class="title-section">
+            <div class="dashboard-header-modern">
+              <div class="header-left">
+                <div class="current-step-badge">Phase {{ activeMenu }}</div>
                 <h2>{{ currentSectionTitle }}</h2>
-                <p class="subtitle">第 {{ activeMenu }} 步，共 5 步</p>
-                <div class="header-badges">
-                  <span class="header-badge">画像完整度 {{ profileCompleteness }}%</span>
-                  <span class="header-badge header-badge--soft">逐步完善后可生成更准确评估</span>
+                <div class="step-indicator">
+                  {{ ['Profile', 'Expertise', 'Journey', 'Assessment', 'Objective'][parseInt(activeMenu) - 1] }}
                 </div>
               </div>
-              <div class="progress-section">
-                <span class="progress-label">完成度 {{ formProgress }}%</span>
-                <el-progress :percentage="formProgress" :stroke-width="8" :show-text="false" class="progress-bar" />
-              </div>
-            </div>
-            <div class="header-stats">
-              <div class="header-stat-card">
-                <span class="stat-label">当前阶段</span>
-                <strong>{{ currentSectionTitle }}</strong>
-                <small>聚焦本步核心信息完善</small>
-              </div>
-              <div class="header-stat-card">
-                <span class="stat-label">已完成步骤</span>
-                <strong>{{ completedStepCount }}/5</strong>
-                <small>每完成一步都会提升画像可用性</small>
-              </div>
-              <div class="header-stat-card">
-                <span class="stat-label">评估准备度</span>
-                <strong>{{ profileCompleteness >= 80 ? '良好' : profileCompleteness >= 60 ? '提升中' : '待完善' }}</strong>
-                <small>完善越充分，后续建议越准确</small>
+
+              <div class="dashboard-stat-row">
+                <div class="dash-stat-item">
+                  <div class="stat-icon purple">
+                    <el-icon>
+                      <Medal />
+                    </el-icon>
+                  </div>
+                  <div class="stat-info">
+                    <span class="stat-label">画像精准度</span>
+                    <span class="stat-value">{{ profileCompleteness }}%</span>
+                  </div>
+                  <div class="stat-glass-glow"></div>
+                </div>
+
+                <div class="dash-stat-item">
+                  <div class="stat-icon blue">
+                    <el-icon>
+                      <Finished />
+                    </el-icon>
+                  </div>
+                  <div class="stat-info">
+                    <span class="stat-label">已完成步骤</span>
+                    <span class="stat-value">{{ completedStepCount }}/5</span>
+                  </div>
+                  <div class="stat-glass-glow"></div>
+                </div>
+
+                <div class="dash-stat-item">
+                  <div class="stat-icon orange">
+                    <el-icon>
+                      <DataAnalysis />
+                    </el-icon>
+                  </div>
+                  <div class="stat-info">
+                    <span class="stat-label">评估准备度</span>
+                    <span class="stat-value">{{ profileCompleteness >= 80 ? '高' : '中' }}</span>
+                  </div>
+                  <div class="stat-glass-glow"></div>
+                </div>
               </div>
             </div>
           </template>
@@ -2584,31 +2604,16 @@ const resetForm = () => {
               </el-form-item>
 
               <!-- 代码能力 -->
-              <el-form-item 
-                label="代码能力" 
-                prop="codeAbility"
-              >
+              <el-form-item label="代码能力" prop="codeAbility">
                 <div class="code-ability-panel">
                   <div class="code-ability-row">
-                    <el-input
-                      v-model="formData.codeAbility.links"
-                      placeholder="请输入 GitHub / Gitee 仓库链接，如 https://github.com/user/repo"
-                      style="flex: 1"
-                    />
-                    <el-button
-                      type="warning"
-                      :icon="DataAnalysis"
-                      :loading="codeAbilityEvaluating"
-                      @click="handleCodeAbilityEvaluate"
-                    >
+                    <el-input v-model="formData.codeAbility.links"
+                      placeholder="请输入 GitHub / Gitee 仓库链接，如 https://github.com/user/repo" style="flex: 1" />
+                    <el-button type="warning" :icon="DataAnalysis" :loading="codeAbilityEvaluating"
+                      @click="handleCodeAbilityEvaluate">
                       {{ codeAbilityEvaluating ? '评估中...' : '开始评估' }}
                     </el-button>
-                    <el-button
-                      v-if="codeAbilityResult"
-                      plain
-                      :icon="Rank"
-                      @click="showCodeAbilityResultDialog"
-                    >
+                    <el-button v-if="codeAbilityResult" plain :icon="Rank" @click="showCodeAbilityResultDialog">
                       查看结果
                     </el-button>
                   </div>
@@ -2616,12 +2621,7 @@ const resetForm = () => {
                   <div class="code-ability-toolbar">
                     <div class="code-ability-ai-toggle">
                       <span class="toggle-label">深度分析</span>
-                      <el-switch
-                        v-model="codeAbilityUseAi"
-                        inline-prompt
-                        active-text="开"
-                        inactive-text="关"
-                      />
+                      <el-switch v-model="codeAbilityUseAi" inline-prompt active-text="开" inactive-text="关" />
                       <span class="toggle-hint">开启后会返回 AI 深度分析的内容</span>
                     </div>
                     <div class="code-ability-input-hint">
@@ -2634,14 +2634,16 @@ const resetForm = () => {
                       <div class="summary-score">{{ codeAbilityResult.composite_score }}</div>
                       <div class="summary-meta">
                         <div class="summary-title">
-                          {{ lastEvaluatedCodeRepoUrls.length > 1 ? `已评估 ${lastEvaluatedCodeRepoUrls.length} 个仓库` : (getCodeRepoMeta(lastEvaluatedCodeRepoUrls[0] || '').repo || '未命名仓库') }}
+                          {{ lastEvaluatedCodeRepoUrls.length > 1 ? `已评估 ${lastEvaluatedCodeRepoUrls.length} 个仓库` :
+                            (getCodeRepoMeta(lastEvaluatedCodeRepoUrls[0] || '').repo || '未命名仓库') }}
                           <el-tag size="small" :type="getCodeAbilityTagType(codeAbilityResult.composite_score)">
                             {{ codeAbilityResult.level || '未评级' }}
                           </el-tag>
                         </div>
                         <div class="summary-subtitle">
                           {{ getRepoDisplayNames(lastEvaluatedCodeRepoUrls).slice(0, 3).join(' · ') }}
-                          <span v-if="lastEvaluatedCodeRepoUrls.length > 3"> 等 {{ lastEvaluatedCodeRepoUrls.length }} 个仓库</span>
+                          <span v-if="lastEvaluatedCodeRepoUrls.length > 3"> 等 {{ lastEvaluatedCodeRepoUrls.length }}
+                            个仓库</span>
                         </div>
                       </div>
                     </div>
@@ -2657,31 +2659,30 @@ const resetForm = () => {
             <div v-show="activeMenu === '3'" class="section-content">
               <div class="form-section-title">项目经历</div>
               <el-form-item label="项目或竞赛">
-                <div class="experience-list">
-                  <div v-for="(proj, index) in formData.projects" :key="index" class="experience-card"
+                <div class="experience-list-modern">
+                  <div v-for="(proj, index) in formData.projects" :key="index" class="premium-exp-card"
                     :class="{ 'is-competition': proj.isCompetition }">
-                    <div class="experience-card-header">
-                      <div class="experience-type-badge">
-                        <el-icon v-if="proj.isCompetition">
-                          <Trophy />
-                        </el-icon>
-                        <el-icon v-else>
-                          <Folder />
-                        </el-icon>
-                        <span>{{ proj.isCompetition ? '竞赛' : '项目' }}</span>
+                    <div class="card-indicator"></div>
+                    <div class="card-content">
+                      <div class="card-top">
+                        <div class="exp-badge">
+                          <el-icon v-if="proj.isCompetition">
+                            <Trophy />
+                          </el-icon>
+                          <el-icon v-else>
+                            <Folder />
+                          </el-icon>
+                          <span>{{ proj.isCompetition ? '竞赛精华' : '核心项目' }}</span>
+                        </div>
+                        <div class="card-actions-minimal">
+                          <el-button link type="primary" :icon="Edit" @click="openEditProjectDialog(index)" />
+                          <el-button link type="danger" :icon="Delete" @click="removeProject(index)" />
+                        </div>
                       </div>
-                      <div class="card-actions">
-                        <el-button text type="primary" :icon="Edit" @click="openEditProjectDialog(index)">
-                          编辑
-                        </el-button>
-                        <el-button text type="danger" :icon="Delete" @click="removeProject(index)">
-                          删除
-                        </el-button>
+                      <h4 class="exp-title">{{ proj.name }}</h4>
+                      <div class="exp-desc-box" v-if="proj.desc">
+                        {{ proj.desc }}
                       </div>
-                    </div>
-                    <div class="experience-card-body preview-mode">
-                      <h4 class="preview-title">{{ proj.name }}</h4>
-                      <p class="preview-desc" v-if="proj.desc">{{ proj.desc }}</p>
                     </div>
                   </div>
                 </div>
@@ -2693,34 +2694,36 @@ const resetForm = () => {
 
               <div class="form-section-title">实践经历</div>
               <el-form-item label="实习/工作" prop="internships">
-                <div class="experience-list">
+                <div class="experience-list-modern">
                   <div v-for="(intern, index) in formData.internships" :key="index"
-                    class="experience-card internship-card">
-                    <div class="experience-card-header">
-                      <div class="experience-type-badge work-badge">
+                    class="premium-exp-card internship-themed">
+                    <div class="card-indicator"></div>
+                    <div class="card-content">
+                      <div class="card-top">
+                        <div class="exp-badge">
+                          <el-icon>
+                            <Briefcase />
+                          </el-icon>
+                          <span>职业实战</span>
+                        </div>
+                        <div class="card-actions-minimal">
+                          <el-button link type="primary" :icon="Edit" @click="openEditInternshipDialog(index)" />
+                          <el-button link type="danger" :icon="Delete" @click="removeInternship(index)" />
+                        </div>
+                      </div>
+                      <div class="exp-header-info">
+                        <h4 class="company-name">{{ intern.company }}</h4>
+                        <span class="role-tag">{{ intern.role }}</span>
+                      </div>
+                      <div class="exp-meta-info" v-if="intern.date && intern.date.length === 2">
                         <el-icon>
-                          <Briefcase />
+                          <Calendar />
                         </el-icon>
-                        <span>工作/实习</span>
+                        <span>{{ formatDateRange(intern.date) }}</span>
                       </div>
-                      <div class="card-actions">
-                        <el-button text type="primary" :icon="Edit" @click="openEditInternshipDialog(index)">
-                          编辑
-                        </el-button>
-                        <el-button text type="danger" :icon="Delete" @click="removeInternship(index)">
-                          删除
-                        </el-button>
+                      <div class="exp-desc-box" v-if="intern.desc">
+                        {{ intern.desc }}
                       </div>
-                    </div>
-                    <div class="experience-card-body preview-mode">
-                      <div class="info-row">
-                        <span class="info-company">{{ intern.company }}</span>
-                        <span class="info-role">{{ intern.role }}</span>
-                      </div>
-                      <div class="info-date" v-if="intern.date && intern.date.length === 2">
-                        {{ formatDateRange(intern.date) }}
-                      </div>
-                      <p class="preview-desc" v-if="intern.desc">{{ intern.desc }}</p>
                     </div>
                   </div>
                 </div>
@@ -2880,7 +2883,8 @@ const resetForm = () => {
               <el-button class="form-action-btn form-action-btn--template" @click="switchCareerSection('template')" :icon="Document">
                 前往简历模板
               </el-button>
-              <el-button type="primary" class="form-action-btn form-action-btn--primary" @click="submitForm" :loading="submitting" :icon="Check">
+              <el-button type="primary" class="form-action-btn form-action-btn--primary" @click="submitForm"
+                :loading="submitting" :icon="Check">
                 提交画像
               </el-button>
             </div>
@@ -3066,13 +3070,8 @@ const resetForm = () => {
       <CareerFormUpload :show-close="true" @close="showUploadDialog = false" @parsed="handleResumeParsed" />
     </el-dialog>
 
-    <el-dialog
-      v-model="resumeProfileDialogVisible"
-      title="补充简历资料"
-      width="760px"
-      destroy-on-close
-      class="resume-profile-dialog"
-    >
+    <el-dialog v-model="resumeProfileDialogVisible" title="补充简历资料" width="760px" destroy-on-close
+      class="resume-profile-dialog">
       <div class="resume-profile-grid">
         <div class="resume-profile-block">
           <h4>基础信息</h4>
@@ -3096,12 +3095,8 @@ const resetForm = () => {
               <template #prepend>地区</template>
             </el-input>
           </div>
-          <el-input
-            v-model="resumeProfileExtras.basics.summary"
-            type="textarea"
-            :rows="5"
-            placeholder="个人简介，建议补充核心技能、项目亮点和求职方向"
-          />
+          <el-input v-model="resumeProfileExtras.basics.summary" type="textarea" :rows="5"
+            placeholder="个人简介，建议补充核心技能、项目亮点和求职方向" />
         </div>
 
         <div class="resume-profile-block">
@@ -3116,46 +3111,26 @@ const resetForm = () => {
             <el-input v-model="primaryResumeEducation.area" placeholder="专业">
               <template #prepend>专业</template>
             </el-input>
-            <el-date-picker
-              v-model="primaryResumeEducation.startDate"
-              type="month"
-              format="YYYY-MM"
-              value-format="YYYY-MM"
-              placeholder="入学时间"
-              style="width: 100%"
-            />
-            <el-date-picker
-              v-model="primaryResumeEducation.endDate"
-              type="month"
-              format="YYYY-MM"
-              value-format="YYYY-MM"
-              placeholder="毕业时间"
-              style="width: 100%"
-            />
+            <el-date-picker v-model="primaryResumeEducation.startDate" type="month" format="YYYY-MM"
+              value-format="YYYY-MM" placeholder="入学时间" style="width: 100%" />
+            <el-date-picker v-model="primaryResumeEducation.endDate" type="month" format="YYYY-MM"
+              value-format="YYYY-MM" placeholder="毕业时间" style="width: 100%" />
           </div>
         </div>
       </div>
 
-        <template #footer>
-          <el-button @click="resumeProfileDialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="saveResumeProfileDialog">保存</el-button>
-        </template>
-      </el-dialog>
+      <template #footer>
+        <el-button @click="resumeProfileDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="saveResumeProfileDialog">保存</el-button>
+      </template>
+    </el-dialog>
 
-    <el-dialog
-      v-model="resumeTemplateDialogVisible"
-      title="选择简历模板"
-      width="820px"
-      destroy-on-close
-      class="resume-template-dialog"
-    >
+    <el-dialog v-model="resumeTemplateDialogVisible" title="选择简历模板" width="820px" destroy-on-close
+      class="resume-template-dialog">
       <div class="resume-template-grid">
-        <button
-          type="button"
-          class="resume-template-card"
+        <button type="button" class="resume-template-card"
           :class="{ 'is-active': selectedResumeTemplate === 'professional' }"
-          @click="selectResumeTemplate('professional')"
-        >
+          @click="selectResumeTemplate('professional')">
           <div class="template-preview template-preview--professional">
             <div class="template-preview-header"></div>
             <div class="template-preview-line large"></div>
@@ -3169,12 +3144,8 @@ const resetForm = () => {
           <p>适合校招、社招和正式投递场景，信息结构更完整。</p>
         </button>
 
-        <button
-          type="button"
-          class="resume-template-card"
-          :class="{ 'is-active': selectedResumeTemplate === 'modern' }"
-          @click="selectResumeTemplate('modern')"
-        >
+        <button type="button" class="resume-template-card" :class="{ 'is-active': selectedResumeTemplate === 'modern' }"
+          @click="selectResumeTemplate('modern')">
           <div class="template-preview template-preview--modern">
             <div class="template-preview-header accent"></div>
             <div class="template-preview-line large"></div>
@@ -3188,12 +3159,8 @@ const resetForm = () => {
           <p>视觉更突出，适合产品、设计、前端等需要展示感的岗位。</p>
         </button>
 
-        <button
-          type="button"
-          class="resume-template-card"
-          :class="{ 'is-active': selectedResumeTemplate === 'compact' }"
-          @click="selectResumeTemplate('compact')"
-        >
+        <button type="button" class="resume-template-card"
+          :class="{ 'is-active': selectedResumeTemplate === 'compact' }" @click="selectResumeTemplate('compact')">
           <div class="template-preview template-preview--compact">
             <div class="template-preview-line large"></div>
             <div class="template-preview-line small"></div>
@@ -3211,26 +3178,13 @@ const resetForm = () => {
       </template>
     </el-dialog>
 
-    <ResumeMissingFieldsChat
-      v-model="showMissingFieldsChat"
-      :fields="pendingMissingFields"
-      :form-data="formData"
-      :major-options="majorOptions"
-      :quiz-status="quizCompleted"
-      @save="handleMissingFieldSave"
-      @complete="handleMissingFieldComplete"
-      @step-change="activeMenu = $event"
-      @open-quiz="openQuizModal"
-      @evaluate-code-ability="handleMissingFieldCodeAbilityEvaluate"
-    />
+    <ResumeMissingFieldsChat v-model="showMissingFieldsChat" :fields="pendingMissingFields" :form-data="formData"
+      :major-options="majorOptions" :quiz-status="quizCompleted" @save="handleMissingFieldSave"
+      @complete="handleMissingFieldComplete" @step-change="activeMenu = $event" @open-quiz="openQuizModal"
+      @evaluate-code-ability="handleMissingFieldCodeAbilityEvaluate" />
 
-    <el-dialog
-      v-model="resumePreviewDialogVisible"
-      title="JSON Resume 简历预览"
-      width="1000px"
-      destroy-on-close
-      class="resume-preview-dialog"
-    >
+    <el-dialog v-model="resumePreviewDialogVisible" title="JSON Resume 简历预览" width="1000px" destroy-on-close
+      class="resume-preview-dialog">
       <template v-if="jsonResumeResult && currentJsonResume">
         <div class="resume-preview-toolbar">
           <div class="resume-preview-meta">
@@ -3245,7 +3199,8 @@ const resetForm = () => {
           </div>
           <div class="resume-preview-actions">
             <el-button plain :icon="Download" @click="exportResumePdf" :loading="resumeExportingPdf">PDF</el-button>
-            <el-button type="primary" :icon="Download" @click="exportResumeWord" :loading="resumeExportingWord">Word</el-button>
+            <el-button type="primary" :icon="Download" @click="exportResumeWord"
+              :loading="resumeExportingWord">Word</el-button>
           </div>
         </div>
 
@@ -3285,7 +3240,8 @@ const resetForm = () => {
                   </div>
                 </div>
                 <div class="professional-avatar-card">
-                  <img v-if="currentJsonResume.basics.image" :src="currentJsonResume.basics.image" alt="简历头像" class="professional-avatar-image">
+                  <img v-if="currentJsonResume.basics.image" :src="currentJsonResume.basics.image" alt="简历头像"
+                    class="professional-avatar-image">
                   <div v-else class="professional-avatar-placeholder">
                     {{ currentJsonResume.basics.name?.slice(0, 1) || '简' }}
                   </div>
@@ -3300,7 +3256,8 @@ const resetForm = () => {
 
             <section v-if="currentJsonResume.education?.length" class="resume-section professional-section">
               <div class="professional-section-head">教育背景</div>
-              <article v-for="item in currentJsonResume.education" :key="`${item.institution}-${item.endDate || ''}`" class="professional-entry">
+              <article v-for="item in currentJsonResume.education" :key="`${item.institution}-${item.endDate || ''}`"
+                class="professional-entry">
                 <div class="professional-entry-head">
                   <strong>{{ item.area || item.studyType || item.institution }}</strong>
                   <span>{{ item.institution }}<template v-if="item.studyType">（{{ item.studyType }}）</template></span>
@@ -3314,7 +3271,8 @@ const resetForm = () => {
 
             <section v-if="currentJsonResume.work?.length" class="resume-section professional-section">
               <div class="professional-section-head">工作经验</div>
-              <article v-for="item in currentJsonResume.work" :key="`${item.name}-${item.startDate || ''}`" class="professional-entry">
+              <article v-for="item in currentJsonResume.work" :key="`${item.name}-${item.startDate || ''}`"
+                class="professional-entry">
                 <div class="professional-entry-head">
                   <strong>{{ item.position || item.name }}</strong>
                   <span>{{ item.name }}</span>
@@ -3329,7 +3287,8 @@ const resetForm = () => {
 
             <section v-if="currentJsonResume.projects?.length" class="resume-section professional-section">
               <div class="professional-section-head">项目经历</div>
-              <article v-for="item in currentJsonResume.projects" :key="`${item.name}-${item.startDate || ''}`" class="professional-entry">
+              <article v-for="item in currentJsonResume.projects" :key="`${item.name}-${item.startDate || ''}`"
+                class="professional-entry">
                 <div class="professional-entry-head">
                   <strong>{{ item.name }}</strong>
                   <span>{{ item.entity || '项目实践' }}</span>
@@ -3342,7 +3301,9 @@ const resetForm = () => {
               </article>
             </section>
 
-            <section v-if="currentJsonResume.skills?.length || currentJsonResume.languages?.length || currentJsonResume.certificates?.length" class="resume-section professional-section">
+            <section
+              v-if="currentJsonResume.skills?.length || currentJsonResume.languages?.length || currentJsonResume.certificates?.length"
+              class="resume-section professional-section">
               <div class="professional-section-head">职业技能</div>
               <div class="professional-skill-block">
                 <div v-for="item in currentJsonResume.skills" :key="item.name" class="professional-skill-item">
@@ -3376,7 +3337,8 @@ const resetForm = () => {
                     <span v-if="currentJsonResume.basics.phone">{{ currentJsonResume.basics.phone }}</span>
                     <span v-if="currentJsonResume.basics.email">{{ currentJsonResume.basics.email }}</span>
                     <span v-if="currentJsonResume.basics.location?.city || currentJsonResume.basics.location?.region">
-                      {{ [currentJsonResume.basics.location?.city, currentJsonResume.basics.location?.region].filter(Boolean).join(' / ') }}
+                      {{ [currentJsonResume.basics.location?.city,
+                      currentJsonResume.basics.location?.region].filter(Boolean).join(' / ') }}
                     </span>
                   </div>
                 </section>
@@ -3388,7 +3350,8 @@ const resetForm = () => {
                   </div>
                 </section>
 
-                <section v-if="currentJsonResume.languages?.length || currentJsonResume.certificates?.length" class="modern-side-section">
+                <section v-if="currentJsonResume.languages?.length || currentJsonResume.certificates?.length"
+                  class="modern-side-section">
                   <h3>补充信息</h3>
                   <div class="modern-side-list">
                     <span v-for="item in currentJsonResume.languages" :key="item.language">
@@ -3407,7 +3370,8 @@ const resetForm = () => {
 
                 <section v-if="currentJsonResume.work?.length" class="modern-card">
                   <h3>工作经历</h3>
-                  <article v-for="item in currentJsonResume.work" :key="`${item.name}-${item.startDate || ''}`" class="modern-entry">
+                  <article v-for="item in currentJsonResume.work" :key="`${item.name}-${item.startDate || ''}`"
+                    class="modern-entry">
                     <div class="modern-entry-head">
                       <div>
                         <strong>{{ item.position || item.name }}</strong>
@@ -3424,7 +3388,8 @@ const resetForm = () => {
 
                 <section v-if="currentJsonResume.projects?.length" class="modern-card">
                   <h3>项目经历</h3>
-                  <article v-for="item in currentJsonResume.projects" :key="`${item.name}-${item.startDate || ''}`" class="modern-entry">
+                  <article v-for="item in currentJsonResume.projects" :key="`${item.name}-${item.startDate || ''}`"
+                    class="modern-entry">
                     <div class="modern-entry-head">
                       <div>
                         <strong>{{ item.name }}</strong>
@@ -3441,7 +3406,8 @@ const resetForm = () => {
 
                 <section v-if="currentJsonResume.education?.length" class="modern-card">
                   <h3>教育经历</h3>
-                  <article v-for="item in currentJsonResume.education" :key="`${item.institution}-${item.endDate || ''}`" class="modern-entry modern-entry--education">
+                  <article v-for="item in currentJsonResume.education"
+                    :key="`${item.institution}-${item.endDate || ''}`" class="modern-entry modern-entry--education">
                     <div class="modern-entry-head">
                       <div>
                         <strong>{{ item.institution }}</strong>
@@ -3465,7 +3431,8 @@ const resetForm = () => {
                 <span v-if="currentJsonResume.basics.phone">{{ currentJsonResume.basics.phone }}</span>
                 <span v-if="currentJsonResume.basics.email">{{ currentJsonResume.basics.email }}</span>
                 <span v-if="currentJsonResume.basics.location?.city || currentJsonResume.basics.location?.region">
-                  {{ [currentJsonResume.basics.location?.city, currentJsonResume.basics.location?.region].filter(Boolean).join(' / ') }}
+                  {{ [currentJsonResume.basics.location?.city,
+                  currentJsonResume.basics.location?.region].filter(Boolean).join(' / ') }}
                 </span>
               </div>
             </header>
@@ -3487,7 +3454,8 @@ const resetForm = () => {
                   </div>
                 </section>
 
-                <section v-if="currentJsonResume.languages?.length || currentJsonResume.certificates?.length" class="compact-block">
+                <section v-if="currentJsonResume.languages?.length || currentJsonResume.certificates?.length"
+                  class="compact-block">
                   <h3>语言与证书</h3>
                   <ul class="compact-inline-list">
                     <li v-for="item in currentJsonResume.languages" :key="item.language">
@@ -3501,7 +3469,8 @@ const resetForm = () => {
               <main class="compact-main">
                 <section v-if="currentJsonResume.work?.length" class="compact-block">
                   <h3>工作经历</h3>
-                  <article v-for="item in currentJsonResume.work" :key="`${item.name}-${item.startDate || ''}`" class="compact-entry">
+                  <article v-for="item in currentJsonResume.work" :key="`${item.name}-${item.startDate || ''}`"
+                    class="compact-entry">
                     <div class="compact-entry-head">
                       <strong>{{ item.position || item.name }}</strong>
                       <em>{{ formatResumeDisplayRange(item.startDate, item.endDate, true) }}</em>
@@ -3516,7 +3485,8 @@ const resetForm = () => {
 
                 <section v-if="currentJsonResume.projects?.length" class="compact-block">
                   <h3>项目经历</h3>
-                  <article v-for="item in currentJsonResume.projects" :key="`${item.name}-${item.startDate || ''}`" class="compact-entry">
+                  <article v-for="item in currentJsonResume.projects" :key="`${item.name}-${item.startDate || ''}`"
+                    class="compact-entry">
                     <div class="compact-entry-head">
                       <strong>{{ item.name }}</strong>
                       <em>{{ formatResumeDisplayRange(item.startDate, item.endDate) }}</em>
@@ -3528,7 +3498,8 @@ const resetForm = () => {
 
                 <section v-if="currentJsonResume.education?.length" class="compact-block">
                   <h3>教育经历</h3>
-                  <article v-for="item in currentJsonResume.education" :key="`${item.institution}-${item.endDate || ''}`" class="compact-entry">
+                  <article v-for="item in currentJsonResume.education"
+                    :key="`${item.institution}-${item.endDate || ''}`" class="compact-entry">
                     <div class="compact-entry-head">
                       <strong>{{ item.institution }}</strong>
                       <em>{{ formatResumeDisplayRange(item.startDate, item.endDate) }}</em>
@@ -3641,13 +3612,8 @@ const resetForm = () => {
       </template>
     </el-dialog>
 
-    <el-dialog
-      v-model="codeAbilityResultVisible"
-      title="代码能力评估结果"
-      width="920px"
-      destroy-on-close
-      class="code-ability-result-dialog"
-    >
+    <el-dialog v-model="codeAbilityResultVisible" title="代码能力评估结果" width="920px" destroy-on-close
+      class="code-ability-result-dialog">
       <template v-if="codeAbilityResult">
         <div class="code-result-hero">
           <div class="hero-topline">
@@ -3662,17 +3628,14 @@ const resetForm = () => {
               <div class="score-label">综合评分</div>
             </div>
             <div class="hero-content">
-              <h3>{{ lastEvaluatedCodeRepoUrls.length > 1 ? `${lastEvaluatedCodeRepoUrls.length} 个仓库联合评估` : (getCodeRepoMeta(lastEvaluatedCodeRepoUrls[0] || '').repo || '未命名仓库') }}</h3>
-              <p>{{ lastEvaluatedCodeRepoUrls.length > 1 ? '综合多个代码仓库的结构、活跃度与工程化表现进行评估' : (getCodeRepoMeta(lastEvaluatedCodeRepoUrls[0] || '').fullName || codeAbilityResult.username || '-') }}</p>
+              <h3>{{ lastEvaluatedCodeRepoUrls.length > 1 ? `${lastEvaluatedCodeRepoUrls.length} 个仓库联合评估` :
+                (getCodeRepoMeta(lastEvaluatedCodeRepoUrls[0] || '').repo || '未命名仓库') }}</h3>
+              <p>{{ lastEvaluatedCodeRepoUrls.length > 1 ? '综合多个代码仓库的结构、活跃度与工程化表现进行评估' :
+                (getCodeRepoMeta(lastEvaluatedCodeRepoUrls[0] || '').fullName || codeAbilityResult.username || '-') }}
+              </p>
               <div v-if="lastEvaluatedCodeRepoUrls.length" class="hero-link-list">
-                <a
-                  v-for="url in lastEvaluatedCodeRepoUrls"
-                  :key="url"
-                  :href="url"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="hero-link"
-                >
+                <a v-for="url in lastEvaluatedCodeRepoUrls" :key="url" :href="url" target="_blank"
+                  rel="noopener noreferrer" class="hero-link">
                   {{ getCodeRepoMeta(url).fullName || url }}
                 </a>
               </div>
@@ -3690,7 +3653,8 @@ const resetForm = () => {
             </div>
             <div class="meta-line">
               <span class="meta-label">仓库平台</span>
-              <span class="meta-value">{{ codeAbilityResult.platform || getCodeRepoMeta(lastEvaluatedCodeRepoUrls[0] || '').hostLabel || '-' }}</span>
+              <span class="meta-value">{{ codeAbilityResult.platform || getCodeRepoMeta(lastEvaluatedCodeRepoUrls[0] ||
+                '').hostLabel || '-' }}</span>
             </div>
             <div class="meta-line">
               <span class="meta-label">评估仓库数</span>
@@ -3733,12 +3697,14 @@ const resetForm = () => {
             <h5>整体评价</h5>
             <p>{{ codeAbilityResult.ai_analysis.overall_assessment.summary }}</p>
             <div class="analysis-tags" v-if="codeAbilityResult.ai_analysis.overall_assessment.strengths?.length">
-              <el-tag v-for="item in codeAbilityResult.ai_analysis.overall_assessment.strengths" :key="`strength-${item}`" type="success" effect="light">
+              <el-tag v-for="item in codeAbilityResult.ai_analysis.overall_assessment.strengths"
+                :key="`strength-${item}`" type="success" effect="light">
                 {{ item }}
               </el-tag>
             </div>
             <div class="analysis-tags" v-if="codeAbilityResult.ai_analysis.overall_assessment.weaknesses?.length">
-              <el-tag v-for="item in codeAbilityResult.ai_analysis.overall_assessment.weaknesses" :key="`weakness-${item}`" type="danger" effect="light">
+              <el-tag v-for="item in codeAbilityResult.ai_analysis.overall_assessment.weaknesses"
+                :key="`weakness-${item}`" type="danger" effect="light">
                 {{ item }}
               </el-tag>
             </div>
@@ -3751,20 +3717,24 @@ const resetForm = () => {
               <div>
                 <div class="list-title">主技术栈</div>
                 <ul>
-                  <li v-for="item in codeAbilityResult.ai_analysis.tech_stack_analysis.primary_stack" :key="`primary-${item}`">{{ item }}</li>
+                  <li v-for="item in codeAbilityResult.ai_analysis.tech_stack_analysis.primary_stack"
+                    :key="`primary-${item}`">{{ item }}</li>
                 </ul>
               </div>
               <div>
                 <div class="list-title">辅助技术栈</div>
                 <ul>
-                  <li v-for="item in codeAbilityResult.ai_analysis.tech_stack_analysis.secondary_stack" :key="`secondary-${item}`">{{ item }}</li>
+                  <li v-for="item in codeAbilityResult.ai_analysis.tech_stack_analysis.secondary_stack"
+                    :key="`secondary-${item}`">{{ item }}</li>
                 </ul>
               </div>
             </div>
-            <div v-if="codeAbilityResult.ai_analysis.tech_stack_analysis.stack_recommendations?.length" class="analysis-list">
+            <div v-if="codeAbilityResult.ai_analysis.tech_stack_analysis.stack_recommendations?.length"
+              class="analysis-list">
               <div class="list-title">技术栈建议</div>
               <ul>
-                <li v-for="item in codeAbilityResult.ai_analysis.tech_stack_analysis.stack_recommendations" :key="`stack-rec-${item}`">{{ item }}</li>
+                <li v-for="item in codeAbilityResult.ai_analysis.tech_stack_analysis.stack_recommendations"
+                  :key="`stack-rec-${item}`">{{ item }}</li>
               </ul>
             </div>
           </div>
@@ -3777,13 +3747,15 @@ const resetForm = () => {
               <div v-if="codeAbilityResult.ai_analysis.project_quality_analysis.best_practices?.length">
                 <div class="list-title">最佳实践</div>
                 <ul>
-                  <li v-for="item in codeAbilityResult.ai_analysis.project_quality_analysis.best_practices" :key="`best-${item}`">{{ item }}</li>
+                  <li v-for="item in codeAbilityResult.ai_analysis.project_quality_analysis.best_practices"
+                    :key="`best-${item}`">{{ item }}</li>
                 </ul>
               </div>
               <div v-if="codeAbilityResult.ai_analysis.project_quality_analysis.improvement_areas?.length">
                 <div class="list-title">待改进项</div>
                 <ul>
-                  <li v-for="item in codeAbilityResult.ai_analysis.project_quality_analysis.improvement_areas" :key="`improve-${item}`">{{ item }}</li>
+                  <li v-for="item in codeAbilityResult.ai_analysis.project_quality_analysis.improvement_areas"
+                    :key="`improve-${item}`">{{ item }}</li>
                 </ul>
               </div>
             </div>
@@ -3795,29 +3767,29 @@ const resetForm = () => {
               <div v-if="codeAbilityResult.ai_analysis.actionable_advice.short_term?.length">
                 <div class="list-title">短期</div>
                 <ul>
-                  <li v-for="item in codeAbilityResult.ai_analysis.actionable_advice.short_term" :key="`short-${item}`">{{ item }}</li>
+                  <li v-for="item in codeAbilityResult.ai_analysis.actionable_advice.short_term" :key="`short-${item}`">
+                    {{ item }}</li>
                 </ul>
               </div>
               <div v-if="codeAbilityResult.ai_analysis.actionable_advice.mid_term?.length">
                 <div class="list-title">中期</div>
                 <ul>
-                  <li v-for="item in codeAbilityResult.ai_analysis.actionable_advice.mid_term" :key="`mid-${item}`">{{ item }}</li>
+                  <li v-for="item in codeAbilityResult.ai_analysis.actionable_advice.mid_term" :key="`mid-${item}`">{{
+                    item }}</li>
                 </ul>
               </div>
               <div v-if="codeAbilityResult.ai_analysis.actionable_advice.long_term?.length">
                 <div class="list-title">长期</div>
                 <ul>
-                  <li v-for="item in codeAbilityResult.ai_analysis.actionable_advice.long_term" :key="`long-${item}`">{{ item }}</li>
+                  <li v-for="item in codeAbilityResult.ai_analysis.actionable_advice.long_term" :key="`long-${item}`">{{
+                    item }}</li>
                 </ul>
               </div>
             </div>
           </div>
         </div>
 
-        <el-empty
-          v-else
-          description="本次未开启 AI 深度分析，当前结果仅展示基础评分数据。"
-        />
+        <el-empty v-else description="本次未开启 AI 深度分析，当前结果仅展示基础评分数据。" />
       </template>
     </el-dialog>
   </div>
@@ -3991,297 +3963,197 @@ const resetForm = () => {
   gap: 10px;
 }
 
-.sidebar-menu :deep(.el-menu-item:hover) {
-  background: rgba(237, 245, 255, 0.96);
-  color: #2f7df6;
+/* 高端侧边栏重塑 */
+.premium-sidebar {
+  background: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(20px);
+  border-right: 1px solid rgba(255, 255, 255, 0.5);
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  height: calc(100vh - 80px);
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 
-.sidebar-menu :deep(.el-menu-item.is-active) {
-  background: linear-gradient(135deg, rgba(229, 241, 255, 0.98), rgba(242, 248, 255, 0.98));
-  color: #2f7df6;
-  box-shadow: 0 8px 18px rgba(47, 125, 246, 0.08);
+.sidebar-brand {
+  padding: 32px 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
-.sidebar-menu :deep(.el-menu-item.is-completed) {
-  color: #67c23a;
-}
-
-.sidebar-menu :deep(.el-menu-item.is-completed:not(.is-active)) {
-  background: #f0f9ff;
-}
-
-.sidebar-menu :deep(.el-menu-item.is-completed:not(.is-active)):hover {
-  background: #ecf5ff;
-}
-
-.menu-step {
-  width: 24px;
-  height: 24px;
-  border-radius: 8px;
-  background: #eef4fb;
+.brand-icon-wrapper {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  background: linear-gradient(135deg, #409eff 0%, #1677ff 100%);
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
-  font-weight: 500;
-  transition: all 0.2s ease;
-  flex-shrink: 0;
-}
-
-.sidebar-menu :deep(.el-menu-item.is-active .menu-step) {
-  background: #409eff;
   color: #fff;
+  box-shadow: 0 8px 16px rgba(64, 158, 255, 0.3);
 }
 
-.sidebar-menu :deep(.el-menu-item.is-completed .menu-step) {
-  background: #67c23a;
-  color: #fff;
+.brand-glow {
+  position: absolute;
+  inset: -4px;
+  background: inherit;
+  filter: blur(8px);
+  opacity: 0.4;
+  border-radius: inherit;
+  z-index: -1;
 }
 
-.menu-text {
-  flex: 1;
+.brand-text {
+  font-size: 18px;
+  font-weight: 800;
+  color: #1e293b;
+  letter-spacing: 0.5px;
 }
 
-.menu-check {
-  font-size: 16px;
-  color: #3fb950;
-  opacity: 0;
-  transform: scale(0);
-  transition: all 0.3s ease;
-}
-
-.sidebar-menu :deep(.el-menu-item.is-completed .menu-check) {
-  opacity: 1;
-  transform: scale(1);
-}
-
-.resume-upload-section {
-  padding: 16px;
-  margin: 12px;
-  background: linear-gradient(180deg, rgba(244, 248, 255, 0.95), rgba(238, 245, 255, 0.92));
-  border-radius: 18px;
-  border: 1px solid rgba(220, 231, 244, 0.96);
-  flex-shrink: 0;
-  box-shadow: 0 12px 30px rgba(22, 59, 102, 0.08);
-}
-
-.upload-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: #909399;
-  font-size: 12px;
-  font-weight: 500;
-  margin-bottom: 10px;
-}
-
-.upload-label .el-icon {
-  font-size: 14px;
-}
-
-.upload-btn {
-  width: 100%;
-  border-radius: 14px;
-  font-weight: 500;
-  font-size: 13px;
-  padding: 10px 0;
-  background: linear-gradient(135deg, #2f7df6 0%, #63b7ff 100%);
-  border: none;
-  color: #ffffff !important;
-  transition: all 0.2s ease;
-  box-shadow: 0 10px 22px rgba(47, 125, 246, 0.18);
-}
-
-.upload-btn:hover {
-  background: linear-gradient(135deg, #4d8ff6 0%, #73c4ff 100%);
-}
-
-/* 已上传简历状态 */
-.upload-btn.el-button--info {
-  background: #909399;
-  border: none;
-  color: #ffffff !important;
-}
-
-.upload-btn.el-button--info:hover {
-  background: #a6a9ad;
-}
-
-.resume-continue-btn {
-  width: 100%;
-  margin-top: 10px;
-  margin-left: auto;
-  padding: 10px 18px;
-  border-radius: 14px;
-  box-sizing: border-box;
-  border-color: rgba(230, 162, 60, 0.45);
-  color: #b76a00;
-  background: rgba(255, 247, 237, 0.92);
-  font-weight: 600;
-  line-height: 1.2;
-}
-
-.resume-continue-btn:hover {
-  border-color: rgba(230, 162, 60, 0.68);
-  color: #9a5a00;
-  background: rgba(255, 243, 224, 0.96);
-}
-
-.resume-continue-btn :deep(> span) {
-  width: 100%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
-
-.resume-continue-btn :deep(.el-icon) {
-  margin: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
-  vertical-align: middle;
-}
-
-.resume-continue-tip {
-  margin-top: 8px;
-  font-size: 12px;
-  line-height: 1.6;
-  color: #8a6a2f;
-}
-
-.upload-tip {
-  margin-top: 8px;
+.brand-subtitle {
   font-size: 11px;
-  color: #c0c4cc;
-  text-align: center;
-  line-height: 1.5;
+  color: #64748b;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
 }
 
-/* 主内容区样式 */
-.main-content {
-  padding: 28px;
+/* 主进度盘 */
+.main-progress-container {
+  padding: 0 24px 32px;
+  display: flex;
+  justify-content: center;
+}
+
+.progress-inner {
   display: flex;
   flex-direction: column;
-}
-
-.form-card {
-  width: 100%;
-  max-width: 1040px;
-  margin: 0 auto;
-  border-radius: 28px;
-  background: rgba(255, 255, 255, 0.88);
-  border: 1px solid rgba(220, 231, 244, 0.96);
-  height: auto;
-  min-height: fit-content;
-  box-shadow:
-    0 18px 42px rgba(22, 59, 102, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.84);
-  overflow: hidden;
-}
-
-.form-card :deep(.el-card__header) {
-  padding: 24px 28px;
-  border-bottom: 1px solid rgba(225, 234, 244, 0.94);
-  background: linear-gradient(180deg, rgba(248, 251, 255, 0.94), rgba(244, 248, 255, 0.92));
-}
-
-.form-card :deep(.el-card__body) {
-  padding: 28px;
-  height: auto;
-  min-height: auto;
-}
-
-.form-card :deep(.el-form) {
-  display: flex;
-  flex-direction: column;
-  height: auto;
-  min-height: auto;
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
   align-items: center;
+}
+
+.progress-inner .pct {
+  font-size: 24px;
+  font-weight: 800;
+  color: #1e293b;
+}
+
+.progress-inner .lbl {
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 600;
+}
+
+/* 时间轴导航 */
+.timeline-nav {
+  flex: 1;
+  padding: 0 24px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
   gap: 20px;
 }
 
-.title-section h2 {
-  margin: 0 0 4px 0;
-  font-size: 26px;
-  font-weight: 700;
-  color: #173a5d;
+.track-line {
+  position: absolute;
+  left: 42px;
+  top: 10px;
+  bottom: 10px;
+  width: 2px;
+  background: rgba(226, 232, 240, 0.8);
 }
 
-.subtitle {
-  margin: 0;
-  font-size: 13px;
-  color: #8aa0b7;
-  font-weight: 500;
-}
-
-.header-badges {
+.nav-item {
   display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 12px;
-}
-
-.header-badge {
-  display: inline-flex;
   align-items: center;
-  min-height: 32px;
-  padding: 0 12px;
-  border-radius: 999px;
-  background: rgba(47, 125, 246, 0.1);
-  color: #2f7df6;
+  gap: 16px;
+  cursor: pointer;
+  z-index: 2;
+  transition: all 0.3s ease;
+}
+
+.dot-box {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.step-dot {
+  width: 26px;
+  height: 26px;
+  background: #fff;
+  border: 2px solid #e2e8f0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 12px;
   font-weight: 700;
+  color: #94a3b8;
+  transition: all 0.3s ease;
 }
 
-.header-badge--soft {
-  background: rgba(136, 160, 186, 0.12);
-  color: #6f839a;
+.active-glow {
+  position: absolute;
+  width: 36px;
+  height: 36px;
+  background: rgba(64, 158, 255, 0.15);
+  border-radius: 50%;
+  animation: pulse 2s infinite;
 }
 
-.header-stats {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
-  margin-top: 20px;
+@keyframes pulse {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.5;
+  }
+
+  50% {
+    transform: scale(1.2);
+    opacity: 0.2;
+  }
+
+  100% {
+    transform: scale(0.8);
+    opacity: 0.5;
+  }
 }
 
-.header-stat-card {
-  padding: 16px 18px;
-  border-radius: 18px;
-  border: 1px solid rgba(221, 232, 244, 0.96);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(243, 248, 255, 0.92));
-  box-shadow: 0 10px 22px rgba(21, 60, 110, 0.05);
+.nav-item.is-active .step-dot {
+  background: #409eff;
+  border-color: #409eff;
+  color: #fff;
+  box-shadow: 0 0 12px rgba(64, 158, 255, 0.4);
 }
 
-.stat-label {
-  display: inline-block;
-  margin-bottom: 8px;
-  color: #7b91a7;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.03em;
+.nav-item.is-completed .step-dot {
+  background: #10b981;
+  border-color: #10b981;
+  color: #fff;
 }
 
-.header-stat-card strong {
-  display: block;
-  margin-bottom: 6px;
-  color: #173a5d;
-  font-size: 18px;
+.nav-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: #64748b;
+  transition: color 0.3s ease;
+}
+
+.nav-item.is-active .nav-text {
+  color: #1e293b;
   font-weight: 800;
 }
 
-.header-stat-card small {
-  display: block;
-  color: #8aa0b7;
-  font-size: 12px;
-  line-height: 1.6;
+/* 侧边栏页脚 */
+.sidebar-footer {
+  padding: 24px;
+  border-top: 1px solid rgba(226, 232, 240, 0.5);
 }
 
 /* 统计卡片状态样式 */
@@ -4318,29 +4190,29 @@ const resetForm = () => {
 .progress-section {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
-  gap: 6px;
 }
 
-.progress-label {
-  font-size: 12px;
-  color: #6c8199;
+.stat-label {
+  font-size: 11px;
+  color: #64748b;
   font-weight: 600;
 }
 
-.progress-bar {
-  width: 180px;
+.stat-value {
+  font-size: 18px;
+  font-weight: 800;
+  color: #1e293b;
 }
 
-.progress-bar :deep(.el-progress-bar__outer) {
-  background-color: #f0f0f0;
-  border-radius: 4px;
-}
-
-.progress-bar :deep(.el-progress-bar__inner) {
-  background: #409eff;
-  border-radius: 2px;
-  transition: width 0.3s ease;
+.stat-glass-glow {
+  position: absolute;
+  right: -10px;
+  top: -10px;
+  width: 40px;
+  height: 40px;
+  background: inherit;
+  filter: blur(15px);
+  opacity: 0.3;
 }
 
 /* 表单内容样式 */
@@ -4368,24 +4240,22 @@ const resetForm = () => {
 
 /* 分组标题 */
 .form-section-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: #173a5d;
-  margin: 28px 0 18px;
-  padding-left: 0;
-  border-left: none;
+  font-size: 18px;
+  font-weight: 800;
+  color: #1e293b;
+  margin: 32px 0 20px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
 }
 
 .form-section-title::before {
   content: '';
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #2f7df6 0%, #66c4ff 100%);
-  box-shadow: 0 0 0 6px rgba(47, 125, 246, 0.1);
+  width: 4px;
+  height: 20px;
+  background: linear-gradient(180deg, #409eff 0%, #1677ff 100%);
+  border-radius: 4px;
+  box-shadow: 0 2px 6px rgba(64, 158, 255, 0.3);
 }
 
 .form-section-title:first-child {
@@ -4484,119 +4354,156 @@ const resetForm = () => {
   margin-bottom: 0;
 }
 
-/* 列表样式 */
-.list-container,
-.input-list-group {
-  width: 100%;
-}
-
-.list-row,
-.skill-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 12px;
-  padding: 12px 14px;
-  background: linear-gradient(180deg, #f7fbff 0%, #f2f7fd 100%);
-  border-radius: 16px;
-  border: 1px solid rgba(220, 231, 244, 0.96);
-  transition: all 0.2s ease;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
-}
-
-.list-row:last-child,
-.skill-item:last-child {
-  margin-bottom: 0;
-}
-
-.list-row:hover,
-.skill-item:hover {
-  border-color: rgba(47, 125, 246, 0.26);
-  background: linear-gradient(180deg, #fbfdff 0%, #f4f9ff 100%);
-  box-shadow: 0 10px 22px rgba(25, 72, 122, 0.06);
-}
-
-/* 技能项特殊样式 */
-.skill-item {
-  justify-content: space-between;
-}
-
-.skill-item span {
-  font-weight: 500;
-  color: #303133;
-  flex: 1;
-}
-
-/* 项目卡片样式 */
-.project-card {
+/* 经历卡片现代版样式 */
+.experience-list-modern {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  /* 统一控制内部间距 */
-  padding: 20px;
-  background: #fafbfc;
-  border: 1px solid #e4e7ed;
-  border-radius: 4px;
-  margin-bottom: 16px;
-}
-
-.project-card:hover {
-  border-color: #c0c4cc;
-}
-
-.project-card .el-input,
-.project-card .el-textarea {
   width: 100%;
 }
 
-.project-card :deep(.el-input__wrapper),
-.project-card :deep(.el-textarea__inner) {
-  background: #fff;
-  border-radius: 10px;
+.premium-exp-card {
+  position: relative;
+  background: #ffffff;
+  border: 1px solid rgba(226, 232, 240, 0.6);
+  border-radius: 20px;
+  padding: 0;
+  display: flex;
+  overflow: hidden;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
 }
 
-/* 项目卡片头部 */
-.project-header {
+.premium-exp-card:hover {
+  transform: translateY(-4px) scale(1.005);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.06);
+  border-color: rgba(64, 158, 255, 0.3);
+}
+
+.card-indicator {
+  width: 6px;
+  background: linear-gradient(180deg, #409eff 0%, #1677ff 100%);
+  flex-shrink: 0;
+}
+
+.is-competition .card-indicator {
+  background: linear-gradient(180deg, #8b5cf6 0%, #6d28d9 100%);
+}
+
+.internship-themed .card-indicator {
+  background: linear-gradient(180deg, #10b981 0%, #059669 100%);
+}
+
+.premium-exp-card .card-content {
+  flex: 1;
+  padding: 20px 24px;
+}
+
+.card-top {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px dashed #dcdfe6;
-  padding-bottom: 16px;
-  /* 这个 padding 不影响外部间距，因为 gap 已经处理了 */
+  margin-bottom: 12px;
 }
 
-/* 项目操作区 */
-.project-actions {
+.exp-badge {
   display: flex;
-  justify-content: flex-end;
-  width: 500px;
-  /* 不需要额外样式 */
-}
-
-/* 实习经历行 */
-.internship-row {
-  display: flex;
-  gap: 16px;
   align-items: center;
-  flex-wrap: wrap;
+  gap: 6px;
+  background: #f1f5f9;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
 }
 
-/* 项目卡片内的 Switch */
-.project-card .el-switch {
-  --el-switch-core-border-radius: 10px;
+.is-competition .exp-badge {
+  background: #f5f3ff;
+  color: #8b5cf6;
 }
 
-.project-card .el-switch__label {
+.internship-themed .exp-badge {
+  background: #ecfdf5;
+  color: #10b981;
+}
+
+.card-actions-minimal {
+  display: flex;
+  gap: 8px;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.premium-exp-card:hover .card-actions-minimal {
+  opacity: 1;
+}
+
+.exp-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: #1e293b;
+  margin: 0 0 8px 0;
+}
+
+.exp-header-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.company-name {
+  font-size: 18px;
+  font-weight: 800;
+  color: #1e293b;
+  margin: 0;
+}
+
+.role-tag {
+  font-size: 12px;
+  font-weight: 600;
+  background: #eff6ff;
+  color: #3b82f6;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.exp-meta-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #64748b;
   font-weight: 500;
+  margin-bottom: 12px;
 }
 
-/* 日期选择器在项目卡片内 */
-.project-card .el-date-editor {
-  width: 100% !important;
+.exp-desc-box {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #475569;
+  background: #f8fafc;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid #f1f5f9;
 }
 
-.project-card .el-date-editor .el-input__wrapper {
-  border-radius: 4px;
+/* 按钮全局优化 */
+:deep(.el-button--primary) {
+  background: linear-gradient(135deg, #409eff 0%, #1677ff 100%) !important;
+  border: none !important;
+  border-radius: 14px !important;
+  font-weight: 700;
+  padding: 12px 24px;
+  box-shadow: 0 8px 20px rgba(64, 158, 255, 0.25);
+  transition: all 0.3s ease;
+}
+
+:deep(.el-button--primary:hover) {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px rgba(64, 158, 255, 0.35);
 }
 
 /* 按钮样式 */
@@ -4629,26 +4536,25 @@ const resetForm = () => {
   color: #ffffff !important;
 }
 
+/* 统一文字按钮 */
 :deep(.el-button.is-text) {
-  border-radius: 4px;
+  border-radius: 10px;
   transition: all 0.2s ease;
   color: #409eff;
-  font-weight: 500;
+  font-weight: 700;
 }
 
 :deep(.el-button.is-text:hover) {
-  background: #ecf5ff;
-  color: #409eff;
+  background: rgba(64, 158, 255, 0.08);
+  color: #1677ff;
 }
 
-/* 危险操作文字按钮 */
-:deep(.el-button.is-text.el-button--danger) {
-  color: #f56c6c;
-}
-
-:deep(.el-button.is-text.el-button--danger:hover) {
-  background: rgba(245, 108, 108, 0.1);
-  color: #ff4d4f;
+/* 复写兼容性 lint 问题 */
+.gradient-text {
+  background: linear-gradient(135deg, #409EFF 0%, #764BA2 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .upload-inline {
@@ -5556,7 +5462,7 @@ const resetForm = () => {
   font-size: 24px;
 }
 
-.analysis-block + .analysis-block {
+.analysis-block+.analysis-block {
   margin-top: 18px;
 }
 
@@ -5580,7 +5486,7 @@ const resetForm = () => {
 }
 
 .analysis-list,
-.analysis-list-grid > div {
+.analysis-list-grid>div {
   padding: 14px 16px;
   border-radius: 14px;
   background: #fff;
@@ -5786,7 +5692,10 @@ const resetForm = () => {
 }
 
 @keyframes submitPulse {
-  0%, 80%, 100% {
+
+  0%,
+  80%,
+  100% {
     transform: scale(0.85);
     opacity: 0.45;
   }
@@ -7088,7 +6997,7 @@ const resetForm = () => {
   padding-left: 18px;
 }
 
-.professional-bullet-list li + li {
+.professional-bullet-list li+li {
   margin-top: 6px;
 }
 
@@ -7326,7 +7235,7 @@ const resetForm = () => {
   padding-left: 18px;
 }
 
-.compact-entry + .compact-entry {
+.compact-entry+.compact-entry {
   margin-top: 16px;
   padding-top: 16px;
   border-top: 1px dashed #d8e0e8;
@@ -7356,6 +7265,7 @@ const resetForm = () => {
 }
 
 @media (max-width: 768px) {
+
   .resume-profile-form.two-col,
   .resume-template-grid {
     grid-template-columns: 1fr;
