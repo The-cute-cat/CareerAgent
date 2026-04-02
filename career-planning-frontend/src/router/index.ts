@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory } from 'vue-router'
+﻿import { createRouter, createWebHistory } from 'vue-router'
 import { useUserStore } from '@/stores/modules/user'
 import { userGetUserInfoService } from '@/api/user/user'
 
@@ -48,6 +48,11 @@ const router = createRouter({
           path: 'development-map',
           name: 'development-map',
           component: () => import('../views/DevelopmentMap.vue'),
+        },
+        {
+          path: 'knowledge-base',
+          name: 'knowledge-base',
+          component: () => import('../views/JobKnowledge.vue'),
         },
         {
           path: 'profile',

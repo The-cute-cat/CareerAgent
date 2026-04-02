@@ -35,7 +35,7 @@ const sidebarRef = ref<InstanceType<typeof Sidebar>>()
     </el-container>
 
     <!-- AI 助手悬浮窗 -->
-    <!-- <ChatBot /> -->
+     <ChatBot />
   </el-container>
 </template>
 
