@@ -100,14 +100,22 @@ const confirmLogout = () => {
       </div>
     </div>
     <div class="header-right">
-      <!-- 暗黑模式切换按钮 -->
+      <!-- 环境背景色与主题切换 -->
       <div class="theme-switch-wrapper">
+        <el-tooltip content="自定义背景色" placement="bottom">
+          <el-color-picker
+            v-model="appStore.customBgColor"
+            size="small"
+            show-alpha
+            class="bg-color-picker"
+          />
+        </el-tooltip>
         <el-switch
           v-model="appStore.isDarkMode"
           inline-prompt
           :active-icon="Moon"
           :inactive-icon="Sunny"
-          style="--el-switch-on-color: #2c2c2c; --el-switch-off-color: #f2f2f2"
+          class="theme-toggle-switch"
         />
       </div>
 
@@ -161,12 +169,13 @@ const confirmLogout = () => {
   align-items: center;
   height: 72px;
   padding: 0 28px;
-  background: rgba(255, 255, 255, 0.6);
+  background: var(--color-background-soft);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.4);
+  border-bottom: 1px solid var(--color-border);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.02);
   z-index: 50;
+  transition: background-color 0.5s ease, border-color 0.5s ease;
 }
 
 .header-left {
@@ -183,7 +192,7 @@ const confirmLogout = () => {
 
 .app-name {
   font-weight: 700;
-  background: linear-gradient(135deg, #409eff 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #60a5fa 0%, #a855f7 100%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -196,7 +205,7 @@ const confirmLogout = () => {
 }
 
 .page-title {
-  color: #606266;
+  color: var(--color-text);
   font-weight: 500;
 }
 
@@ -209,8 +218,31 @@ const confirmLogout = () => {
 .theme-switch-wrapper {
   display: flex;
   align-items: center;
-  padding-right: 12px;
-  border-right: 1px solid rgba(64, 158, 255, 0.2);
+  gap: 12px;
+  padding-right: 16px;
+  border-right: 1px solid var(--color-border);
+}
+
+.bg-color-picker :deep(.el-color-picker__trigger) {
+  border: 1px solid var(--color-border);
+  background: var(--color-background-soft);
+  border-radius: 6px;
+  transition: all 0.3s ease;
+}
+
+.bg-color-picker :deep(.el-color-picker__trigger):hover {
+  border-color: #409eff;
+  box-shadow: 0 0 8px rgba(64, 158, 255, 0.2);
+}
+
+.theme-toggle-switch {
+  --el-switch-on-color: #334155;
+  --el-switch-off-color: #f1f5f9;
+  --el-switch-border-color: var(--color-border);
+}
+
+.theme-toggle-switch :deep(.el-switch__core) {
+  border: 1px solid var(--color-border);
 }
 
 .auth-buttons {
@@ -250,8 +282,8 @@ const confirmLogout = () => {
   padding: 8px 14px;
   border-radius: 22px;
   cursor: pointer;
-  background: rgba(255, 255, 255, 0.58);
-  border: 1px solid rgba(255, 255, 255, 0.85);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   outline: none; /* 移除触发后的焦点轮廓 */
@@ -263,7 +295,7 @@ const confirmLogout = () => {
 }
 
 .user-info:hover {
-  background: rgba(255, 255, 255, 0.82);
+  background: var(--color-background-soft);
   border-color: rgba(64, 158, 255, 0.3);
 }
 
@@ -307,7 +339,7 @@ const confirmLogout = () => {
 
 .user-name {
   font-size: 14px;
-  color: #303133;
+  color: var(--color-heading);
   font-weight: 600;
   max-width: 96px;
   overflow: hidden;
@@ -373,10 +405,10 @@ const confirmLogout = () => {
 
 :deep(.custom-dropdown) {
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.8);
+  border: 1px solid var(--color-border);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
   backdrop-filter: blur(10px);
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--color-background-soft);
 }
 
 :deep(.logout-item) {

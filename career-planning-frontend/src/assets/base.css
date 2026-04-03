@@ -37,15 +37,30 @@
 }
 
 html.dark {
+  /* Premium Dark Palette (Deep Navy/Indigo) */
+  --vt-c-black: #0f172a;
+  --vt-c-black-soft: #1e293b;
+  --vt-c-black-mute: #334155;
+
   --color-background: var(--vt-c-black);
   --color-background-soft: var(--vt-c-black-soft);
   --color-background-mute: var(--vt-c-black-mute);
 
-  --color-border: var(--vt-c-divider-dark-2);
-  --color-border-hover: var(--vt-c-divider-dark-1);
+  --color-border: rgba(255, 255, 255, 0.1);
+  --color-border-hover: rgba(255, 255, 255, 0.2);
 
-  --color-heading: var(--vt-c-text-dark-1);
-  --color-text: var(--vt-c-text-dark-2);
+  --color-heading: #f8fafc;
+  --color-text: #cbd5e1;
+  
+  /* Glassmorphism Logic */
+  --color-glass-bg: rgba(15, 23, 42, 0.7);
+  --color-glass-border: rgba(255, 255, 255, 0.1);
+}
+
+:root {
+  /* Light mode glassmorphism */
+  --color-glass-bg: rgba(255, 255, 255, 0.7);
+  --color-glass-border: rgba(255, 255, 255, 0.3);
 }
 
 *,

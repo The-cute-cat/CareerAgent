@@ -220,7 +220,7 @@ defineExpose({ collapsed })
 .logo-text {
   font-size: 19px;
   font-weight: 800;
-  background: linear-gradient(135deg, #2c3e50 20%, #409EFF 100%);
+  background: linear-gradient(135deg, #3b82f6 20%, #8b5cf6 100%);
   background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -293,15 +293,15 @@ defineExpose({ collapsed })
   line-height: 48px;
   border-radius: 12px;
   margin-bottom: 10px; /* 增加间距以提升档次感 */
-  color: #475569;
+  color: var(--color-text);
   font-weight: 500;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .custom-menu-item:hover,
 :deep(.el-sub-menu__title:hover) {
-  background: rgba(59, 130, 246, 0.06) !important;
-  color: #3b82f6 !important;
+  background: var(--color-background-mute) !important;
+  color: var(--el-color-primary) !important;
   transform: translateX(4px);
 }
 
@@ -341,14 +341,14 @@ defineExpose({ collapsed })
 
 /* ========== 激活状态 ========== */
 :deep(.el-menu-item.is-active) {
-  background: linear-gradient(90deg, rgba(59, 130, 246, 0.12) 0%, rgba(59, 130, 246, 0.02) 100%) !important;
-  color: #3b82f6 !important;
+  background: var(--color-background-soft) !important;
+  color: var(--el-color-primary) !important;
   font-weight: 700;
 }
 
 /* 父级菜单在子级激活时的样式 */
 :deep(.el-sub-menu.is-active > .el-sub-menu__title) {
-  color: #3b82f6 !important;
+  color: var(--el-color-primary) !important;
   font-weight: 700;
 }
 

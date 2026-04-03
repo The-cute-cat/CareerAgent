@@ -4,6 +4,9 @@ import Sidebar from '@/components/Sidebar.vue'
 import CHeader from '@/components/CHeader.vue'
 import MobileTabBar from '@/components/MobileTabBar.vue'
 import ChatBot from '@/components/ChatBot.vue'
+import { useAppStore } from '@/stores/modules/app'
+
+const appStore = useAppStore()
 
 const sidebarRef = ref<InstanceType<typeof Sidebar>>()
 
@@ -41,7 +44,10 @@ provide('isMobileLayout', isMobile)
 </script>
 
 <template>
-  <div class="app-background">
+  <div 
+    class="app-background" 
+    :style="{ backgroundColor: appStore.customBgColor || 'var(--color-background-soft)' }"
+  >
     <div class="blob blob-1"></div>
     <div class="blob blob-2"></div>
     <div class="blob blob-3"></div>
@@ -96,8 +102,9 @@ provide('isMobileLayout', isMobile)
   width: 100vw;
   height: 100vh;
   z-index: -1;
-  background-color: #f3f6f9;
+  background-color: var(--color-background-soft);
   overflow: hidden;
+  transition: all 0.5s ease;
 }
 
 .blob {
@@ -107,12 +114,13 @@ provide('isMobileLayout', isMobile)
   opacity: 0.6;
   border-radius: 50%;
   animation: float 20s infinite ease-in-out alternate;
+  transition: all 0.5s ease;
 }
 
 .blob-1 {
   width: 400px;
   height: 400px;
-  background: #f1f5f9;
+  background: var(--color-border);
   top: -100px;
   left: -100px;
 }
@@ -120,7 +128,7 @@ provide('isMobileLayout', isMobile)
 .blob-2 {
   width: 500px;
   height: 500px;
-  background: #e2e8f0;
+  background: var(--color-border-hover);
   bottom: -150px;
   right: -100px;
   animation-delay: -5s;
@@ -129,7 +137,7 @@ provide('isMobileLayout', isMobile)
 .blob-3 {
   width: 300px;
   height: 300px;
-  background: #cbd5e1;
+  background: var(--color-border);
   top: 40%;
   left: 30%;
   animation-delay: -10s;
@@ -152,12 +160,12 @@ provide('isMobileLayout', isMobile)
 .sidebar-wrapper {
   flex-shrink: 0;
   z-index: 10;
-  border-right: 1px solid rgba(255, 255, 255, 0.4);
-  background: rgba(255, 255, 255, 0.6);
+  border-right: 1px solid var(--color-border);
+  background: var(--color-background-soft);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   box-shadow: 4px 0 24px rgba(0, 0, 0, 0.02);
-  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.5s ease;
   overflow: hidden;
 }
 
