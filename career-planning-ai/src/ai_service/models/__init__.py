@@ -7,5 +7,6 @@ __all__=[
     "struct_txt",
     "user_form",
     "user_form_profile",
-    "word"
+    "word",
+    "growth_plan"
 ]
