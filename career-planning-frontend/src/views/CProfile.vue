@@ -89,8 +89,8 @@ const allMenus = [
   { key: 'profile', label: '个人资料', onlyProfile: true },
   { key: 'member', label: '会员计划', onlyProfile: true },
   { key: 'invite', label: '邀请好友', onlyProfile: true },
-  { key: 'feedback', label: '反馈建议' }, // 反馈建议两边都留着或者按需放
-  { key: 'setting', label: '更多设置', onlySettings: true }
+  { key: 'feedback', label: '反馈建议', onlyProfile: true },
+  { key: 'setting', label: '更多设置', onlyProfile: true }
 ]
 
 const visibleMenus = computed(() => {

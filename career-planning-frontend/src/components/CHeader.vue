@@ -92,7 +92,8 @@ const confirmLogout = () => {
         <MenuIcon />
       </el-icon>
       <div class="breadcrumb">
-        <span class="app-name">职路 Agent</span>
+        <span class="app-name">职引未来</span>
+        <!--<span class="app-name">职悟 Agent</span>-->
         <span class="divider">/</span>
         <span class="page-title">{{ currentTitle }}</span>
       </div>

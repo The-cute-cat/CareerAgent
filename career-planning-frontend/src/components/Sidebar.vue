@@ -8,7 +8,7 @@ import {
   Star, Collection, Position,
   Fold, Expand, Guide, Connection, Calendar,
   Memo, Timer, Finished, Reading,
-  Promotion, MagicStick
+  Promotion, MagicStick, Files
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
@@ -43,7 +43,6 @@ const activeIndex = computed(() => {
   return path
 })
 
-// 菜单点击跳转
 const handleSelect = (index) => {
   if (index && index !== 'spacer' && index.startsWith('/')) {
     router.push(index)
@@ -54,10 +53,18 @@ const toggleCollapse = () => {
   collapsed.value = !collapsed.value
 }
 
-// 菜单配置项
 const menuItems = [
+  { title: '核心功能', isGroup: true },
   { index: '/', icon: House, text: '首页' },
-  { index: '/career-form', icon: Document, text: '能力画像' },
+  {
+    index: '/career-form-group',
+    icon: Document,
+    text: '能力画像',
+    children: [
+      { index: '/career-form/resume', icon: Document, text: '我的简历' },
+      { index: '/career-form/template', icon: Files, text: '导出简历' }
+    ]
+  },
   { index: '/job-matching', icon: TrendCharts, text: '人岗匹配' },
   { index: '/development-map', icon: Position, text: '发展图谱' },
   { index: '/report', icon: DataAnalysis, text: '生涯报告' },
@@ -74,7 +81,6 @@ defineExpose({ collapsed })
 
 <template>
   <div class="sidebar-container" :class="{ collapsed }">
-    <!-- Logo 区域 -->
     <div class="logo-section">
       <div class="logo-icon-box">
         <img src="../assets/1234.png" alt="logo" />
@@ -96,6 +102,11 @@ defineExpose({ collapsed })
         <template v-for="(item, i) in menuItems" :key="i">
           <!-- 分隔符 -->
           <div v-if="item.isSpacer" class="menu-spacer"></div>
+
+          <!-- 分组标题 -->
+          <div v-else-if="item.isGroup" class="menu-group-title">
+            <span>{{ item.title }}</span>
+          </div>
 
           <!-- 带有子菜单的项 -->
           <el-sub-menu v-else-if="item.children" :index="item.index" class="custom-sub-menu">
@@ -153,7 +164,6 @@ defineExpose({ collapsed })
   z-index: 100;
 }
 
-/* ========== Logo 区域 ========== */
 .logo-section {
   display: flex;
   align-items: center;
@@ -185,22 +195,17 @@ defineExpose({ collapsed })
   object-fit: contain;
 }
 
-.sidebar-container.collapsed .logo-icon-box {
-  width: 38px;
-  height: 38px;
-}
-
 .logo-text {
   font-size: 19px;
   font-weight: 800;
-  background: linear-gradient(135deg, #2c3e50 20%, #409EFF 100%);
+  background: linear-gradient(135deg, #2c3e50 20%, #409eff 100%);
   background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   letter-spacing: 0.5px;
   white-space: nowrap;
   line-height: 1.2;
-  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 .text-fade-enter-active,
@@ -213,7 +218,6 @@ defineExpose({ collapsed })
   opacity: 0;
 }
 
-/* ========== 折叠按钮 ========== */
 .collapse-toggle {
   margin-left: auto;
   border: 1px solid #e2e8f0;
@@ -237,7 +241,6 @@ defineExpose({ collapsed })
   transform: scale(1.05);
 }
 
-/* ========== 菜单区域 ========== */
 .menu-wrapper {
   flex: 1;
   padding: 0 16px 20px 16px;
@@ -260,8 +263,24 @@ defineExpose({ collapsed })
   margin: 16px 12px;
 }
 
-/* ========== 菜单项样式 ========== */
-.custom-menu-item {
+.menu-group-title {
+  padding: 20px 16px 8px;
+  font-size: 15px;
+  font-weight: 500;
+  color: #94a3b8;
+  line-height: 1.5;
+}
+
+.menu-group-title:first-child {
+  padding-top: 8px;
+}
+
+.sidebar-container.collapsed .menu-group-title {
+  display: none;
+}
+
+.custom-menu-item,
+:deep(.custom-submenu > .el-sub-menu__title) {
   height: 48px;
   line-height: 48px;
   border-radius: 12px;
@@ -303,13 +322,15 @@ defineExpose({ collapsed })
   transform: none;
 }
 
-.menu-icon {
+.menu-icon,
+.submenu-icon {
   font-size: 18px;
   margin-right: 10px;
   transition: all 0.3s ease;
 }
 
-.custom-menu-item:hover .menu-icon {
+.custom-menu-item:hover .menu-icon,
+:deep(.custom-submenu > .el-sub-menu__title:hover .menu-icon) {
   transform: scale(1.1);
   color: #3b82f6;
 }
@@ -340,9 +361,28 @@ defineExpose({ collapsed })
   z-index: 2;
 }
 
-/* 折叠状态下的激活指示条位置 */
 .sidebar-container.collapsed :deep(.el-menu-item.is-active)::before {
   left: 6px;
+}
+
+.custom-submenu-item {
+  height: 42px;
+  line-height: 42px;
+  margin: 4px 0 4px 10px;
+  border-radius: 12px;
+  color: #64748b;
+}
+
+.custom-submenu-item .submenu-icon {
+  font-size: 16px;
+}
+
+:deep(.custom-submenu .el-menu) {
+  background: transparent;
+}
+
+:deep(.custom-submenu .el-sub-menu__icon-arrow) {
+  color: #94a3b8;
 }
 
 .side-menu::-webkit-scrollbar {
@@ -354,17 +394,18 @@ defineExpose({ collapsed })
   letter-spacing: 0.3px;
 }
 
-/* ========== 折叠状态下 el-menu 的调整 ========== */
 .sidebar-container.collapsed :deep(.el-menu--collapse) {
   border-right: none;
 }
 
-.sidebar-container.collapsed :deep(.el-menu--collapse .el-menu-item) {
+.sidebar-container.collapsed :deep(.el-menu--collapse .el-menu-item),
+.sidebar-container.collapsed :deep(.el-menu--collapse .el-sub-menu__title) {
   padding: 0 !important;
   justify-content: center;
 }
 
-.sidebar-container.collapsed :deep(.el-menu--collapse .el-menu-item .menu-icon) {
+.sidebar-container.collapsed :deep(.el-menu--collapse .el-menu-item .menu-icon),
+.sidebar-container.collapsed :deep(.el-menu--collapse .el-sub-menu__title .menu-icon) {
   margin-right: 0;
   font-size: 20px;
 }
