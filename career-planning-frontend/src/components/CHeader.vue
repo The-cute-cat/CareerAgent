@@ -286,12 +286,12 @@ const confirmLogout = () => {
   border: 1px solid var(--color-border);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-  outline: none; /* 移除触发后的焦点轮廓 */
+  outline: none; /* 移除触发后的焦点轮廓，防止出现黑框 */
 }
 
 .user-info:focus,
 .user-info:focus-visible {
-  outline: none; /* 彻底消除不同浏览器下的焦点框 */
+  outline: none; /* 彻底消除不同浏览器（如 Chrome）下的默认焦点框 */
 }
 
 .user-info:hover {

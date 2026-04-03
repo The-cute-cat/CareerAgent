@@ -287,12 +287,12 @@ defineExpose({ collapsed })
   margin: 16px 12px;
 }
 
-/* ========== 菜单项样式 ========== */
+/* ========== 菜单项样式（支持深色模式语义化变量） ========== */
 .custom-menu-item {
   height: 48px;
   line-height: 48px;
   border-radius: 12px;
-  margin-bottom: 10px; /* 增加间距以提升档次感 */
+  margin-bottom: 10px; /* 增加间距以提升品质感 */
   color: var(--color-text);
   font-weight: 500;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
