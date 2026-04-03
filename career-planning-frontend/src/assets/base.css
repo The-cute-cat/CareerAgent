@@ -37,7 +37,7 @@
 }
 
 html.dark {
-  /* Premium Dark Palette (Deep Navy/Indigo) */
+  /* 高级深色色调体系 */
   --vt-c-black: #0f172a;
   --vt-c-black-soft: #1e293b;
   --vt-c-black-mute: #334155;
@@ -46,21 +46,21 @@ html.dark {
   --color-background-soft: var(--vt-c-black-soft);
   --color-background-mute: var(--vt-c-black-mute);
 
-  --color-border: rgba(255, 255, 255, 0.1);
-  --color-border-hover: rgba(255, 255, 255, 0.2);
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-border-hover: rgba(255, 255, 255, 0.15);
 
   --color-heading: #f8fafc;
   --color-text: #cbd5e1;
   
-  /* Glassmorphism Logic */
-  --color-glass-bg: rgba(15, 23, 42, 0.7);
+  /* 玻璃拟态逻辑适配 */
+  --color-glass-bg: rgba(15, 23, 42, 0.75);
   --color-glass-border: rgba(255, 255, 255, 0.1);
 }
 
 :root {
-  /* Light mode glassmorphism */
+  /* 浅色模式玻璃拟态逻辑 */
   --color-glass-bg: rgba(255, 255, 255, 0.7);
-  --color-glass-border: rgba(255, 255, 255, 0.3);
+  --color-glass-border: rgba(255, 255, 255, 0.4);
 }
 
 *,

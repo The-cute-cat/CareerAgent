@@ -233,6 +233,12 @@ const handleHeaderAction = (action) => {
   align-items: center;
   margin-bottom: 12px;
   
+  .item-left {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  
   .item-title { font-size: 14px; font-weight: 800; color: var(--color-heading); margin-bottom: 4px; }
   .item-subtitle { font-size: 12px; color: var(--color-text); margin-bottom: 8px; }
   .item-time { font-size: 12px; color: var(--el-color-primary); font-weight: 600; display: flex; align-items: center; gap: 4px; }
@@ -240,8 +246,9 @@ const handleHeaderAction = (action) => {
   .item-status-tag {
     font-size: 11px;
     padding: 4px 8px;
-    background: #fff7ed;
-    color: #f97316;
+    background: var(--color-background-soft);
+    color: var(--el-color-primary);
+    border: 1px solid var(--color-border);
     border-radius: 6px;
     font-weight: 700;
   }
