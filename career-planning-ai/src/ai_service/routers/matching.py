@@ -17,12 +17,6 @@ router = APIRouter(prefix="/matching", tags=["match"])
 # 初始化组件 (建议在全局作用域或 lifespan 中初始化以复用连接和模型加载)
 store = JobVectorStore()
 agent = CareerAnalystAgent()
-engine = create_async_engine(get_db_url(), echo=False)
-AsyncSessionLocal = async_sessionmaker(
-    engine,
-    expire_on_commit=False,
-    class_=AsyncSession
-)
 
 @router.post("/jobs", summary="基于人物画像进行人岗匹配与深度分析")
 # 如果发现运行是model限流的话，就改career_analyst_agent.py这个文件
