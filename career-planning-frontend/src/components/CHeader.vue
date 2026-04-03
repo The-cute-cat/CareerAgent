@@ -2,7 +2,8 @@
 import { computed, inject, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/modules/user'
-import { ArrowDown, User, SwitchButton, Menu as MenuIcon } from '@element-plus/icons-vue'
+import { useAppStore } from '@/stores/modules/app'
+import { ArrowDown, User, SwitchButton, Menu as MenuIcon, Sunny, Moon } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const isMobileLayout = inject('isMobileLayout', ref(false))
@@ -11,6 +12,7 @@ const toggleMobileDrawer = inject('toggleMobileDrawer', () => {})
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
+const appStore = useAppStore()
 
 const currentTitle = computed(() => route.meta.title || '欢迎使用职业规划智能体')
 const isLoggedIn = computed(() => userStore.isLoggedIn)
@@ -98,6 +100,17 @@ const confirmLogout = () => {
       </div>
     </div>
     <div class="header-right">
+      <!-- 暗黑模式切换按钮 -->
+      <div class="theme-switch-wrapper">
+        <el-switch
+          v-model="appStore.isDarkMode"
+          inline-prompt
+          :active-icon="Moon"
+          :inactive-icon="Sunny"
+          style="--el-switch-on-color: #2c2c2c; --el-switch-off-color: #f2f2f2"
+        />
+      </div>
+
       <div v-if="!isLoggedIn" class="auth-buttons">
         <el-button class="custom-btn-primary" type="primary" round @click="router.push('/login')">登录</el-button>
         <el-button class="custom-btn-default" round @click="router.push('/register')">注册</el-button>
@@ -190,6 +203,14 @@ const confirmLogout = () => {
 .header-right {
   display: flex;
   align-items: center;
+  gap: 16px;
+}
+
+.theme-switch-wrapper {
+  display: flex;
+  align-items: center;
+  padding-right: 12px;
+  border-right: 1px solid rgba(64, 158, 255, 0.2);
 }
 
 .auth-buttons {
