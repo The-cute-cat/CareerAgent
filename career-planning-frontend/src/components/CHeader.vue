@@ -103,7 +103,7 @@ const confirmLogout = () => {
         <el-button class="custom-btn-default" round @click="router.push('/register')">注册</el-button>
       </div>
 
-      <el-dropdown v-else @command="handleCommand">
+      <el-dropdown v-else @command="handleCommand" :show-timeout="0">
         <div class="user-info">
           <div class="user-avatar">
             <img v-if="userAvatar" :src="userAvatar" alt="avatar" class="user-avatar-image" />
@@ -232,7 +232,13 @@ const confirmLogout = () => {
   background: rgba(255, 255, 255, 0.58);
   border: 1px solid rgba(255, 255, 255, 0.85);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  outline: none; /* 移除触发后的焦点轮廓 */
+}
+
+.user-info:focus,
+.user-info:focus-visible {
+  outline: none; /* 彻底消除不同浏览器下的焦点框 */
 }
 
 .user-info:hover {
