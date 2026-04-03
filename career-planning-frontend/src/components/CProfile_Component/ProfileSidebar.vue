@@ -7,7 +7,8 @@ import {
   Setting,
   ArrowRight,
   Fold,
-  Expand
+  Expand,
+  House
 } from '@element-plus/icons-vue'
 
 const props = defineProps({
@@ -21,6 +22,7 @@ const props = defineProps({
 const emit = defineEmits(['update:activeMenu', 'update:collapsed'])
 
 const iconMap = {
+  dashboard: House,
   profile: User,
   member: Star,
   invite: UserFilled,
@@ -97,14 +99,16 @@ const toggleCollapse = () => {
 .left-panel {
   position: relative;
   z-index: 1;
-  width: 320px;
-  min-width: 320px;
-  transition: all 0.25s ease;
+  flex: 0 0 32%;
+  min-width: 300px;
+  max-width: 420px;
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .left-panel.collapsed {
-  width: 88px;
+  flex: 0 0 88px;
   min-width: 88px;
+  max-width: 88px;
 }
 
 .sidebar-top {
@@ -141,14 +145,25 @@ const toggleCollapse = () => {
   overflow: hidden;
   display: flex;
   align-items: center;
-  gap: 14px;
-  min-height: 122px;
-  margin-bottom: 14px;
-  padding: 18px;
+  gap: 16px;
+  min-height: 130px;
+  margin-bottom: 16px;
+  padding: 20px;
   border-radius: 24px;
-  border: 1px solid rgba(204, 223, 246, 0.8);
-  background: linear-gradient(135deg, #eef5ff 0%, #f7fbff 65%, #f0fbf6 100%);
-  box-shadow: 0 16px 36px rgba(18, 52, 92, 0.08);
+  border: 1px solid rgba(255, 255, 255, 1);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.8) 100%);
+  backdrop-filter: blur(20px);
+  box-shadow:
+    0 12px 32px rgba(15, 23, 42, 0.04),
+    inset 0 1px 2px rgba(255, 255, 255, 1);
+  transition: all 0.3s ease;
+}
+
+.user-card:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 16px 40px rgba(22, 119, 255, 0.12),
+    inset 0 1px 2px rgba(255, 255, 255, 0.9);
 }
 
 .user-card-bg {
@@ -158,17 +173,22 @@ const toggleCollapse = () => {
   width: 128px;
   height: 128px;
   border-radius: 50%;
-  background: rgba(22, 119, 255, 0.08);
+  background: rgba(241, 245, 249, 0.6);
 }
 
 .avatar {
   position: relative;
   z-index: 1;
-  width: 60px;
-  height: 60px;
-  border-radius: 18px;
+  width: 68px;
+  height: 68px;
+  border-radius: 20px;
   object-fit: cover;
-  box-shadow: 0 10px 24px rgba(21, 83, 199, 0.14);
+  border: 2px solid #ffffff;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+  transition: transform 0.3s ease;
+}
+.user-card:hover .avatar {
+  transform: scale(1.05);
 }
 
 .user-meta {
@@ -180,27 +200,34 @@ const toggleCollapse = () => {
 .user-name {
   font-size: 20px;
   font-weight: 800;
-  color: #1553c7;
+  color: #0f172a;
+  letter-spacing: -0.01em;
 }
 
 .user-signature {
   margin-top: 6px;
-  font-size: 12px;
-  line-height: 1.6;
-  color: #627389;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #5c708a;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .user-points {
   display: inline-flex;
   align-items: center;
-  margin-top: 10px;
+  margin-top: 12px;
   min-height: 28px;
-  padding: 0 12px;
+  padding: 0 14px;
   border-radius: 999px;
-  background: rgba(21, 83, 199, 0.08);
-  color: #1553c7;
+  background: #f1f5f9;
+  color: #475569;
   font-size: 12px;
   font-weight: 700;
+  border: 1px solid #e2e8f0;
 }
 
 .user-card.collapsed {
@@ -218,21 +245,29 @@ const toggleCollapse = () => {
 .data-cards {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  margin-bottom: 14px;
+  gap: 12px;
+  margin-bottom: 16px;
 }
 
 .data-item {
-  padding: 14px 8px;
+  padding: 16px 10px;
   text-align: center;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.76);
-  border: 1px solid rgba(228, 236, 245, 0.95);
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.04);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 1);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.03);
+  transition: all 0.3s ease;
+}
+
+.data-item:hover {
+  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 12px 28px rgba(22, 119, 255, 0.08);
 }
 
 .num {
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 800;
   color: #165bcf;
 }
@@ -245,12 +280,14 @@ const toggleCollapse = () => {
 }
 
 .menu-card {
-  padding: 12px;
-  border-radius: 22px;
-  border: 1px solid rgba(228, 236, 245, 0.95);
-  background: rgba(255, 255, 255, 0.84);
-  backdrop-filter: blur(14px);
-  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.05);
+  padding: 16px;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 1);
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(20px);
+  box-shadow:
+    0 16px 40px rgba(15, 23, 42, 0.03),
+    inset 0 1px 2px rgba(255, 255, 255, 1);
 }
 
 .menu-card.collapsed {
@@ -267,16 +304,17 @@ const toggleCollapse = () => {
 
 .menu-item {
   position: relative;
-  height: 50px;
-  margin-bottom: 6px;
-  padding: 0 16px;
+  height: 54px;
+  margin-bottom: 8px;
+  padding: 0 18px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-radius: 16px;
-  color: #2b3f57;
+  border-radius: 18px;
+  color: #3b5068;
   cursor: pointer;
-  transition: all 0.25s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
 }
 
 .menu-item:last-child {
@@ -286,38 +324,57 @@ const toggleCollapse = () => {
 .left {
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 14px;
+  gap: 14px;
+  font-size: 15px;
   font-weight: 700;
+  letter-spacing: 0.02em;
 }
 
 .menu-item .el-icon {
-  font-size: 18px;
+  font-size: 20px;
+  transition: transform 0.3s ease;
 }
 
 .arrow-icon {
-  color: #9db0c5;
+  color: #a4b6cf;
+  transition: transform 0.3s ease, color 0.3s;
 }
 
 .menu-item:hover {
-  background: #f4f8ff;
+  background: #f8fafc;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.02);
+  transform: translateX(4px);
+}
+
+.menu-item:hover .arrow-icon {
   transform: translateX(2px);
+  color: #1e293b;
+}
+
+.menu-item:hover .left .el-icon {
+  transform: scale(1.1);
+  color: #1e293b;
 }
 
 .menu-item.active {
-  background: linear-gradient(90deg, rgba(22, 119, 255, 0.12), rgba(69, 182, 255, 0.08));
-  color: #1553c7;
+  background: #f1f5f9;
+  color: #0f172a;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.03);
+}
+
+.menu-item.active .left .el-icon {
+  color: #0f172a;
 }
 
 .menu-item.active::before {
   content: '';
   position: absolute;
   left: 0;
-  top: 10px;
-  bottom: 10px;
+  top: 12px;
+  bottom: 12px;
   width: 4px;
-  border-radius: 999px;
-  background: linear-gradient(180deg, #1677ff, #67b8ff);
+  border-radius: 0 4px 4px 0;
+  background: #334155;
 }
 
 .menu-item.collapsed {
@@ -335,11 +392,64 @@ const toggleCollapse = () => {
   left: 5px;
 }
 
-@media (max-width: 1400px) {
+@media (max-width: 992px) {
   .left-panel,
   .left-panel.collapsed {
     width: 100%;
-    min-width: auto;
+    min-width: 100%;
+    max-width: none;
+    flex: none;
+  }
+  
+  .sidebar-top .collapse-btn {
+    display: none;
+  }
+
+  .data-cards {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .menu-card {
+    display: flex;
+    flex-direction: column; /* 改回列表模式 */
+    gap: 0px;
+    padding: 8px;
+  }
+
+  .menu-item {
+    width: 100%;
+    min-width: 0;
+    height: 56px;
+    margin-bottom: 4px;
+    justify-content: space-between;
+    padding: 0 16px;
+    border-radius: 12px;
+  }
+
+  .menu-item .left {
+    justify-content: flex-start;
+  }
+
+  .menu-item .arrow-icon {
+    display: block; /* 在列表中显示箭头 */
+    opacity: 0.5;
+  }
+}
+
+@media (max-width: 576px) {
+  .user-card {
+    flex-direction: column;
+    text-align: center;
+    gap: 12px;
+  }
+
+  .user-card-bg {
+    right: 50%;
+    transform: translateX(50%);
+  }
+
+  .menu-item {
+    min-width: calc(50% - 10px);
   }
 }
 </style>

@@ -234,7 +234,7 @@ const initRadarChart = () => {
 .quick-actions-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 24px;
+  gap: 32px; /* 增加间距以提升档次感 */
   margin-bottom: 32px;
 }
 

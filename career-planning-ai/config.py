@@ -4,7 +4,7 @@ import shutil
 import tempfile
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Self
+from typing import Any
 
 import certifi
 import yaml
@@ -12,12 +12,12 @@ from pydantic import BaseModel, field_validator, SecretStr, Field, model_validat
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic_settings.sources import InitSettingsSource
 
-__all__ = ["settings", "LLMModelBase"]
+__all__ = ["settings", "_LLMModelBase"]
 
 from ai_service.utils.path_tool import abs_path, get_project_root, get_abs_path
 
 
-class Database(BaseModel):
+class _Database(BaseModel):
     """数据库配置嵌套类"""
 
     host: str = ""
@@ -41,7 +41,7 @@ class Database(BaseModel):
         return v
 
 
-class Communication(BaseModel):
+class _Communication(BaseModel):
     """通信配置嵌套类"""
 
     class Token(BaseModel):
@@ -58,7 +58,7 @@ class Communication(BaseModel):
     token: Token = Token()
 
 
-class LLMModelBase(BaseModel):
+class _LLMModelBase(BaseModel):
     """模型配置基类"""
     _skip_verify: bool = PrivateAttr(default=False)
     name: str = ""
@@ -81,7 +81,7 @@ class LLMModelBase(BaseModel):
         return self
 
     @model_validator(mode="after")
-    def validate_default_value(self) -> "LLMModelBase":
+    def validate_default_value(self) -> "_LLMModelBase":
         if self._skip_verify:
             return self
         if not self.api_key.get_secret_value() or self.api_key.get_secret_value() == "<api_key>":
@@ -111,11 +111,11 @@ class LLMModelBase(BaseModel):
         return self
 
 
-class LLM(LLMModelBase):
+class _LLM(_LLMModelBase):
     """大模型通用配置"""
     _skip_verify: bool = PrivateAttr(default=True)
 
-    def set_default_value(self, llm: LLMModelBase):
+    def set_default_value(self, llm: _LLMModelBase):
         if self.api_key.get_secret_value() == "<api_key>":
             raise ValueError(f"{self.__class__.__name__} api_key 应该是需要配置的但现在未配置")
         if not self.api_key.get_secret_value():
@@ -134,42 +134,41 @@ class LLM(LLMModelBase):
             self.extra = llm.extra
 
 
-class LiteLLM(LLM):
-    """模型配置基类"""
+class _LiteLLM(_LLM):
     name: str = "LiteLLM"
     model_name: str = ""
 
-    class Qwen(LLM):
+    class Qwen(_LLM):
         name: str = "LLM_Qwen"
         model_name: str = ""
 
     qwen: Qwen = Field(default_factory=Qwen)
 
-    class Deepseek(LLM):
+    class Deepseek(_LLM):
         name: str = "LLM_Deepseek"
         model_name: str = ""
 
     deepseek: Deepseek = Field(default_factory=Deepseek)
 
-    class Image(LLM):
+    class Image(_LLM):
         name: str = "LLM_Image"
         model_name: str = ""
 
     image: Image = Field(default_factory=Image)
 
-    def set_default_value(self, llm: LLMModelBase):
+    def set_default_value(self, llm: _LLMModelBase):
         super().set_default_value(llm)
         for key, value in self.__dict__.items():
-            if isinstance(value, LLM):
+            if isinstance(value, _LLM):
                 value.set_default_value(llm)
 
 
-class PDF(LLM):
+class _PDF(_LLM):
     model_name: str = ""
     extra: dict[str, Any] = {}
 
 
-class Image(LLM):
+class _Image(_LLM):
     model_name: str = ""
     extra: dict[str, Any] = {}
     suffix: list[str] = []
@@ -177,13 +176,18 @@ class Image(LLM):
     max_dimension: int = 0  # 单位 px
 
 
-class TestQuestion(LLM):
+class _TestQuestion(_LLM):
     model_name: str = ""
     timeout: float = 30
     extra: dict[str, Any] = {}
 
 
-class PathConfig(BaseModel):
+class _GrowthPlanAgent(_LLM):
+    model_name: str = ""
+    extra: dict[str, Any] = {}
+
+
+class _PathConfig(BaseModel):
     temp: str = ""
     is_clean: bool = True
     log: str = ""
@@ -227,12 +231,12 @@ class PathConfig(BaseModel):
         return str(Path(path))
 
 
-class Vector(BaseModel):
+class _Vector(BaseModel):
     model_name: str = ""
     llm_model_name: str = ""
 
 
-class Milvus(BaseModel):
+class _Milvus(BaseModel):
     class Local(BaseModel):
         host: str = ""
         port: int = 19530
@@ -245,10 +249,9 @@ class Milvus(BaseModel):
     cloud: Cloud = Field(default_factory=Cloud)
 
 
-class ChromaConfig(LLM):
+class _ChromaConfig(_LLM):
     name: str = "Chroma"
     model_name: str = ""
-    base_url: str = ""
     extra: dict[str, Any] = {}
     save_path: str = ""
     k: int = 5
@@ -256,6 +259,9 @@ class ChromaConfig(LLM):
     class Collection(BaseModel):
         default: str = "default_collection"
         project_collection: str = "open_source_projects"
+        book_collection: str = "books"
+        intern_collection: str = "internships"
+        video_collection: str = "videos"
 
     collection_name: Collection = Field(default_factory=Collection)
 
@@ -269,7 +275,7 @@ class ChromaConfig(LLM):
             os.makedirs(self.save_path, exist_ok=True)
 
 
-class CodeAbility(LLM):
+class _CodeAbility(_LLM):
     name: str = "CodeAbility"
     model_name: str = ""
     extra: dict[str, Any] = {}
@@ -295,7 +301,7 @@ class CodeAbility(LLM):
         return v
 
 
-class RedisConfig(BaseModel):
+class _RedisConfig(BaseModel):
     is_can_use: bool = True  # redis缓存是否能用
     host: str = ""
     port: int = 6379
@@ -318,7 +324,7 @@ class RedisConfig(BaseModel):
         return self
 
 
-class Other(BaseModel):
+class _Other(BaseModel):
     ssl_verify: bool | str = True
 
     @model_validator(mode="after")
@@ -335,27 +341,28 @@ class Settings(BaseSettings):
         env_nested_delimiter="__",
         extra="ignore",
     )
-    database: Database = Field(default_factory=Database)
-    communication: Communication = Field(default_factory=Communication)
-    lite_llm: LiteLLM = Field(default_factory=LiteLLM)
-    llm: LLMModelBase = Field(default_factory=LLMModelBase)
-    pdf: PDF = Field(default_factory=PDF)
-    image: Image = Field(default_factory=Image)
-    test_question: TestQuestion = Field(default_factory=TestQuestion)
-    path_config: PathConfig = Field(default_factory=PathConfig)
-    vector: Vector = Field(default_factory=Vector)
-    milvus: Milvus = Field(default_factory=Milvus)
-    chroma_config: ChromaConfig = Field(default_factory=ChromaConfig)
-    code_ability: CodeAbility = Field(default_factory=CodeAbility)
-    redis: RedisConfig = Field(default_factory=RedisConfig)
-    other: Other = Field(default_factory=Other)
+    database: _Database = Field(default_factory=_Database)
+    communication: _Communication = Field(default_factory=_Communication)
+    lite_llm: _LiteLLM = Field(default_factory=_LiteLLM)
+    llm: _LLMModelBase = Field(default_factory=_LLMModelBase)
+    pdf: _PDF = Field(default_factory=_PDF)
+    image: _Image = Field(default_factory=_Image)
+    test_question: _TestQuestion = Field(default_factory=_TestQuestion)
+    growth_plan_agent: _GrowthPlanAgent = Field(default_factory=_GrowthPlanAgent)
+    path_config: _PathConfig = Field(default_factory=_PathConfig)
+    vector: _Vector = Field(default_factory=_Vector)
+    milvus: _Milvus = Field(default_factory=_Milvus)
+    chroma_config: _ChromaConfig = Field(default_factory=_ChromaConfig)
+    code_ability: _CodeAbility = Field(default_factory=_CodeAbility)
+    redis: _RedisConfig = Field(default_factory=_RedisConfig)
+    other: _Other = Field(default_factory=_Other)
 
     @model_validator(mode="after")
     def set_default_values(self) -> "Settings":
         """设置默认值"""
         self.chroma_config.set_default_path(self.path_config.data)
         for key, value in self.__dict__.items():
-            if isinstance(value, LLM):
+            if isinstance(value, _LLM):
                 value.set_default_value(self.llm)
         return self
 
@@ -389,7 +396,7 @@ def get_settings() -> Settings:
     return Settings()
 
 
-def program_exit():
+def _program_exit():
     """程序退出前执行的操作"""
     if settings.path_config.is_clean:  # 是否清理临时文件
         temp_path = os.path.join(settings.path_config.temp, "../../")
@@ -398,7 +405,7 @@ def program_exit():
 
 
 settings = get_settings()
-atexit.register(program_exit)
+atexit.register(_program_exit)
 
 if __name__ == "__main__":
     # print(f"\n数据库配置:")

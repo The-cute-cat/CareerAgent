@@ -238,7 +238,7 @@ async def main():
         if result:
             results.append(result)
 
-        # 礼貌性延时，防止触发 IP 限制 (尤其是 GitHub，没 Token 的话限制 60次/小时)
+        # 礼貌性延时，防止触发 IP 限制
         time.sleep(1.5)
 
         # 保存为 JSON 文件，后续可直接读取插入向量库

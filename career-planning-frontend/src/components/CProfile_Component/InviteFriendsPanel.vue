@@ -86,38 +86,43 @@ const steps = [
 .invite-panel {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 24px;
+  font-family: 'Inter', system-ui, sans-serif;
 }
 
 .invite-hero {
   position: relative;
   overflow: hidden;
-  border-radius: 22px;
-  padding: 36px 32px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: #fff;
-  box-shadow: 0 16px 40px rgba(102, 126, 234, 0.25);
+  border-radius: 28px;
+  padding: 40px 36px;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  color: #0f172a;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.03), inset 0 1px 2px rgba(255, 255, 255, 1);
 }
 
 .hero-decoration {
   position: absolute;
-  top: -40px;
-  right: -30px;
-  width: 180px;
-  height: 180px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.1);
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 50%;
+  background-image: linear-gradient(rgba(148, 163, 184, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.1) 1px, transparent 1px);
+  background-size: 30px 30px;
+  -webkit-mask-image: linear-gradient(to left, rgba(0,0,0,1), rgba(0,0,0,0));
+  mask-image: linear-gradient(to left, rgba(0,0,0,1), rgba(0,0,0,0));
 }
 
 .hero-decoration::after {
   content: '';
   position: absolute;
-  bottom: -60px;
-  left: -40px;
-  width: 120px;
-  height: 120px;
+  top: -50px;
+  right: -50px;
+  width: 200px;
+  height: 200px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.07);
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.08) 0%, transparent 70%);
 }
 
 .hero-content {
@@ -127,173 +132,183 @@ const steps = [
 
 .hero-badge {
   display: inline-flex;
-  height: 26px;
-  padding: 0 12px;
+  height: 28px;
+  align-items: center;
+  padding: 0 14px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(99, 102, 241, 0.1);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  color: #4f46e5;
   font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
+  font-weight: 800;
+  letter-spacing: 0.1em;
 }
 
 .hero-title {
-  margin: 14px 0 8px;
-  font-size: 26px;
-  font-weight: 800;
-  line-height: 1.2;
+  margin: 16px 0 10px;
+  font-size: 32px;
+  font-weight: 900;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
 }
 
 .hero-desc {
   margin: 0;
   max-width: 500px;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.7;
-  opacity: 0.88;
+  color: #64748b;
 }
 
 .hero-btn {
-  margin-top: 20px;
-  background: rgba(255, 255, 255, 0.95);
-  color: #667eea;
+  margin-top: 24px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff;
   border: none;
-  font-weight: 700;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  font-weight: 800;
+  padding: 12px 28px;
+  border-radius: 999px;
+  box-shadow: 0 8px 20px rgba(99, 102, 241, 0.3);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 
   &:hover {
-    background: #fff;
+    transform: translateY(-2px);
+    box-shadow: 0 12px 28px rgba(99, 102, 241, 0.4);
   }
 }
 
 .flow-title-bar {
   display: flex;
   align-items: baseline;
-  gap: 10px;
-  margin-bottom: 16px;
+  gap: 12px;
+  margin-bottom: 20px;
 }
 
 .flow-title {
-  font-size: 17px;
-  font-weight: 800;
-  color: #163253;
+  font-size: 20px;
+  font-weight: 900;
+  color: #0f172a;
 }
 
 .flow-subtitle {
-  font-size: 13px;
-  color: #8da1b8;
+  font-size: 14px;
+  color: #64748b;
 }
 
 .flow-steps {
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 12px;
 }
 
 .step-card {
   position: relative;
   display: flex;
-  align-items: flex-start;
-  gap: 16px;
-  padding: 18px 20px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid #e8eef6;
-  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.03);
-  transition: all 0.25s ease;
+  align-items: center;
+  gap: 18px;
+  padding: 24px 28px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04), inset 0 1px 2px rgba(255, 255, 255, 0.9);
+  transition: all 0.3s ease;
 
   &:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
-    border-color: #d4e2f5;
-  }
-
-  & + .step-card {
-    margin-top: 12px;
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08), inset 0 1px 2px rgba(255, 255, 255, 1);
   }
 }
 
 .step-number {
   position: absolute;
-  top: 18px;
-  right: 20px;
-  font-size: 28px;
+  top: 50%;
+  transform: translateY(-50%);
+  right: 30px;
+  font-size: 42px;
   font-weight: 900;
-  color: #e8eef6;
+  color: rgba(15, 23, 42, 0.03);
   line-height: 1;
+  pointer-events: none;
 }
 
 .step-icon {
-  width: 46px;
-  height: 46px;
-  border-radius: 14px;
-  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  width: 52px;
+  height: 52px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #eef2ff, #e0e7ff);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 20px;
+  font-size: 24px;
   flex-shrink: 0;
+  box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.8);
 }
 
 .step-content {
   flex: 1;
   min-width: 0;
+  z-index: 1;
 }
 
 .step-name {
-  font-size: 15px;
-  font-weight: 700;
-  color: #1f3550;
+  font-size: 16px;
+  font-weight: 800;
+  color: #1e293b;
 }
 
 .step-desc {
-  margin-top: 4px;
-  font-size: 13px;
+  margin-top: 6px;
+  font-size: 14px;
   line-height: 1.6;
-  color: #7a8da3;
+  color: #64748b;
 }
 
 .code-section {
-  margin-top: 4px;
+  margin-top: 8px;
 }
 
 .code-card {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
-  padding: 24px;
-  border-radius: 20px;
-  background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
-  border: 1px solid rgba(34, 197, 94, 0.2);
+  gap: 24px;
+  padding: 32px;
+  border-radius: 28px;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.03);
 }
 
 .code-label {
-  font-size: 12px;
-  font-weight: 700;
-  color: #6b8a7a;
+  font-size: 14px;
+  font-weight: 800;
+  color: #475569;
 }
 
 .code-value {
-  margin-top: 6px;
-  font-size: 28px;
+  margin-top: 8px;
+  font-size: 34px;
   font-weight: 900;
-  color: #166534;
-  letter-spacing: 0.08em;
+  color: #0f172a;
+  letter-spacing: 0.1em;
   font-family: 'SF Mono', 'Fira Code', monospace;
+  text-shadow: 0 2px 4px rgba(15, 23, 42, 0.03);
 }
 
 .code-hint {
-  margin-top: 4px;
-  font-size: 12px;
-  color: #86b89a;
+  margin-top: 8px;
+  font-size: 14px;
+  color: #64748b;
 }
 
 @media (max-width: 768px) {
   .invite-hero {
-    padding: 28px 20px;
+    padding: 32px 24px;
   }
 
   .hero-title {
-    font-size: 22px;
+    font-size: 26px;
   }
 
   .code-card {

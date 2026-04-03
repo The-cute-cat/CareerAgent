@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory } from 'vue-router'
+﻿import { createRouter, createWebHistory } from 'vue-router'
 import { useUserStore } from '@/stores/modules/user'
 import { userGetUserInfoService } from '@/api/user/user'
 
@@ -26,6 +26,11 @@ const router = createRouter({
       component: () => import('../views/LandingPage.vue'), // 未登录欢迎页（独立页面，无Layout）
     },
     {
+      path: '/resume-editor',
+      name: 'resume-editor',
+      component: () => import('../views/ResumeEditor.vue'),
+    },
+    {
       path: '/',
       component: () => import('../components/Layout.vue'), // 布局组件
       children: [
@@ -36,8 +41,23 @@ const router = createRouter({
         },
         {
           path: 'career-form',
-          name: 'career-form',
+          redirect: { name: 'career-form-resume' },
+        },
+        {
+          path: 'career-form/resume',
+          name: 'career-form-resume',
           component: () => import('../views/CareerForm.vue'),
+        },
+        {
+          path: 'career-form/template',
+          name: 'career-form-template',
+          component: () => import('../views/CareerForm.vue'),
+        },
+        {
+          path: 'resume-template',
+          name: 'resume-template',
+          component: () => import('../views/ResumeTemplate.vue'),
+          meta: { title: '简历模板生成' }
         },
         {
           path: 'report',
@@ -48,6 +68,11 @@ const router = createRouter({
           path: 'development-map',
           name: 'development-map',
           component: () => import('../views/DevelopmentMap.vue'),
+        },
+        {
+          path: 'knowledge-base',
+          name: 'knowledge-base',
+          component: () => import('../views/JobKnowledge.vue'),
         },
         {
           path: 'profile',
@@ -63,6 +88,18 @@ const router = createRouter({
           path: 'job-position',
           name: 'job-position',
           component: () => import('../components/JobMatching_Position.vue'),
+        },
+        {
+          path: 'settings',
+          name: 'settings',
+          component: () => import('../views/CProfile.vue'),
+          meta: { title: '设置中心' }
+        },
+        {
+          path: 'interviews/:type?',
+          name: 'interviews',
+          component: () => import('../views/CInterviews.vue'),
+          meta: { title: '我的面试' }
         },
       ],
     },
