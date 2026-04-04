@@ -2,6 +2,7 @@ import request from '@/utils/request'
 import type { JobMatchItem } from '@/types/job-match'
 import { mockSubmitFormApi } from '@/mock/mockdata/Resume_mockdata'
 import type { CareerFormData, CareerFormSubmitDTO } from '@/types/careerform_report'
+import type { CodeAbilityEvaluateData } from '@/types/code-ability'
 import type { Result } from '@/types/type'
 
 // ==================== Mock 开关配置 ====================
@@ -27,7 +28,60 @@ export function submitCareerFormApi(data: CareerFormSubmitDTO) {
  * @param formData 前端表单数据
  * @returns 后端所需的提交数据格式
  */
-export function convertToSubmitDTO(formData: CareerFormData): CareerFormSubmitDTO {
+const getCodeLinks = (links?: string) => {
+  if (!links) return undefined
+
+  const codeLinks = links
+    .split(/[\n,，\s]+/)
+    .map(link => link.trim())
+    .filter(Boolean)
+
+  return codeLinks.length ? codeLinks : undefined
+}
+
+const getCodeAbilityEval = (
+  codeAbilityResult?: CodeAbilityEvaluateData | null,
+  useAi?: boolean
+): CareerFormSubmitDTO['codeAbilityEval'] | undefined => {
+  if (!codeAbilityResult) return undefined
+
+  const dimensions = codeAbilityResult.features?.composite?.dimensions
+  const overallAssessment = useAi ? codeAbilityResult.ai_analysis?.overall_assessment : undefined
+  const normalizedPlatform = codeAbilityResult.platform?.toLowerCase()
+  const platform = normalizedPlatform === 'github' || normalizedPlatform === 'gitee'
+    ? normalizedPlatform
+    : undefined
+  const normalizedLevel = ['S', 'A', 'B', 'C', 'D', 'E'].includes(codeAbilityResult.level)
+    ? codeAbilityResult.level as NonNullable<CareerFormSubmitDTO['codeAbilityEval']>['level']
+    : undefined
+
+  return {
+    platform,
+    username: codeAbilityResult.username || undefined,
+    compositeScore: codeAbilityResult.composite_score,
+    level: normalizedLevel,
+    dimensions: dimensions
+      ? {
+        projectScale: dimensions.project_scale,
+        techBreadth: dimensions.tech_breadth,
+        activity: dimensions.activity,
+        engineering: dimensions.engineering,
+        influence: dimensions.influence
+      }
+      : undefined,
+    summary: overallAssessment?.summary || undefined,
+    strengths: overallAssessment?.strengths?.length ? overallAssessment.strengths : undefined,
+    weaknesses: overallAssessment?.weaknesses?.length ? overallAssessment.weaknesses : undefined
+  }
+}
+
+export function convertToSubmitDTO(
+  formData: CareerFormData,
+  options?: {
+    codeAbilityResult?: CodeAbilityEvaluateData | null
+    codeAbilityUseAi?: boolean
+  }
+): CareerFormSubmitDTO {
   // 处理专业数据：将级联选择器的数组转换为字符串
   const majorStr = formData.major?.length > 0
     ? formData.major.join(' / ')
@@ -94,7 +148,8 @@ export function convertToSubmitDTO(formData: CareerFormData): CareerFormSubmitDT
     certificates,
     skills,
     tools,
-    codeLinks: formData.codeAbility?.links || undefined,
+    codeLinks: getCodeLinks(formData.codeAbility?.links),
+    codeAbilityEval: getCodeAbilityEval(options?.codeAbilityResult, options?.codeAbilityUseAi),
     projects,
     internships,
     quizDetail: formData.quizDetail?.length ? formData.quizDetail : undefined,

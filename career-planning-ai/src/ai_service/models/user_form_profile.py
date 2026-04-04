@@ -58,7 +58,8 @@ class InternshipExperience(BaseModel):
     @field_validator("date", mode="before")
     @classmethod
     def parse_date_list(cls, v):
-        if not isinstance(v, list): return v
+        if not isinstance(v, list):
+            return v
 
         PRESENT_RE = re.compile(r"(今|目|现|present|current|now|active|today|至今)", re.IGNORECASE)
 

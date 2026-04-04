@@ -10,6 +10,7 @@ poetry.lock
 package-lock.json
 *.pyc
 __pycache__/
+*_reference.*
 
 # 环境变量文件
 .env

@@ -8,7 +8,7 @@ from ai_service.engine.exceptions import (
     InvalidActionTypeError,
     ModelConfigNotFoundError,
 )
-from config import LLMModelBase
+from config import _LLMModelBase
 
 __all__ = [
     "AIState"
@@ -26,7 +26,7 @@ class AIState(BaseModel):
     通过 evolve() 方法实现不可变的状态演化，每次操作返回新的状态实例。
 
     Attributes:
-        model (Optional[LLMModelBase]): 主模型配置
+        model (Optional[_LLMModelBase]): 主模型配置
         model_fallbacks (List[LiteLLMBase]): 备选模型列表，用于容错降级
         system_role (str): 系统角色身份定义（身份层）
         instructions (List[str]): 任务指令列表（指令层）
@@ -38,8 +38,8 @@ class AIState(BaseModel):
         metadata (Dict[str, Any]): 请求元数据
     """
 
-    model: Optional[LLMModelBase] = None
-    model_fallbacks: List[LLMModelBase] = Field(default_factory=list)
+    model: Optional[_LLMModelBase] = None
+    model_fallbacks: List[_LLMModelBase] = Field(default_factory=list)
 
     # 提示词层次架构
     system_role: str = ""  # 身份层：定义 AI 的核心身份

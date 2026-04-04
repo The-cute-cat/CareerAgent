@@ -1,527 +1,965 @@
-<script setup lang="ts">
-import { onMounted, onBeforeUnmount, ref, nextTick } from 'vue'
-import { Graph } from '@antv/x6'
-import { ElMessage } from 'element-plus'
-import {
-  User,
-  OfficeBuilding,
-  TrendCharts,
-  Star,
-  Warning,
-  Check,
-  ArrowRight,
-  Close,
-  Download
-} from '@element-plus/icons-vue'
-
-// 容器引用
-const graphContainer = ref<HTMLDivElement | null>(null)
-let graph: Graph | null = null
-
-// 当前选中节点详情
-const selectedNode = ref<any>(null)
-
-// 用户数据
-const userData = {
-  name: '李明',
-  school: 'XX 大学 (985/211)',
-  position: 'Java 后端开发工程师',
-  matchRate: 88,
-  skills: [
-    { name: 'Java 基础', value: 85 },
-    { name: '框架应用', value: 80 },
-    { name: '数据库', value: 85 },
-    { name: '算法逻辑', value: 90 },
-    { name: '沟通协作', value: 75 }
-  ],
-  advantages: '985 院校背景，GPA 前 5%，GitHub 活跃 (1000+ commits)，算法基础扎实',
-  improvements: '缺乏高并发生产环境经验，大型分布式系统实战较少'
-}
-
-// 职业发展阶段数据
-const careerStages = [
-  { stage: '入职 0-1 年', level: '初级工程师', score: 60, ability: '基础夯实期' },
-  { stage: '入职 1-3 年', level: '中级工程师', score: 75, ability: '快速成长期' },
-  { stage: '入职 3-5 年', level: '高级工程师', score: 90, ability: '核心骨干期' },
-  { stage: '入职 5 年+', level: '技术专家/总监', score: 95, ability: '专家深耕期' }
-]
-
-// 进度条颜色配置
-const progressColors = [
-  { color: '#409eff', percentage: 0 },
-  { color: '#67c23a', percentage: 100 }
-]
-
-// 初始化图谱
-const initGraph = () => {
-  if (!graphContainer.value) return
-
-  const container = graphContainer.value
-  const width = container.clientWidth || 800
-  const height = container.clientHeight || 580
-
-  graph = new Graph({
-    container: container,
-    width: width,
-    height: height,
-    background: { color: 'transparent' },
-    grid: {
-      visible: true,
-      type: 'dot',
-      args: { color: 'rgba(0,0,0,0.05)', thickness: 1 }
-    },
-    panning: true,
-    mousewheel: { enabled: true, minScale: 0.5, maxScale: 1.5 },
-    connecting: {
-      snap: true,
-      allowBlank: false,
-      allowLoop: false
-    },
-    interacting: {
-      nodeMovable: true
-    }
-  })
-
-  graph.on('node:click', ({ node }) => {
-    const data = node.getData()
-    const label = node.attr('label/text') || ''
-    selectedNode.value = { label, ...data }
-  })
-
-  loadVerticalPath()
-}
-
-// 加载垂直路径
-const loadVerticalPath = () => {
-  if (!graph) return
-  graph.clearCells()
-  selectedNode.value = null
-
-  const nodes = [
-    { id: '1', label: '初级工程师', x: 400, y: 40, data: { status: '已达成', desc: '基础夯实期', salary: '8-15K', requirements: ['Java 基础', 'Spring Boot'] }, color: '#ecf5ff', stroke: '#409eff' },
-    { id: '2', label: '中级工程师', x: 400, y: 160, data: { status: '进行中', desc: '快速成长期', salary: '15-25K', requirements: ['微服务', '性能优化'] }, color: '#f0f9eb', stroke: '#67c23a' },
-    { id: '3', label: '高级工程师', x: 400, y: 280, data: { status: '目标', desc: '核心骨干期', salary: '25-40K', requirements: ['系统架构', '技术选型'] }, color: '#fdf6ec', stroke: '#e6a23c' },
-    { id: '4', label: '技术专家', x: 250, y: 420, data: { status: '长远目标', desc: '领域深耕', salary: '40-60K', requirements: ['源码钻研', '影响力'] }, color: '#fef0f0', stroke: '#f56c6c' },
-    { id: '5', label: '技术总监', x: 550, y: 420, data: { status: '管理路线', desc: '团队领导', salary: '60-100K', requirements: ['团队管理', '战略规划'] }, color: '#f5f7fa', stroke: '#909399' }
-  ]
-
-  nodes.forEach(node => {
-    graph?.addNode({
-      id: node.id,
-      x: node.x - 80,
-      y: node.y,
-      width: 160,
-      height: 64,
-      label: node.label,
-      data: node.data,
-      attrs: {
-        body: { fill: node.color, stroke: node.stroke, strokeWidth: 2, rx: 12, ry: 12 },
-        label: { fill: '#303133', fontSize: 14, fontWeight: 'bold' }
-      }
-    })
-  })
-
-  const edges = [
-    { source: '1', target: '2', label: '提升' },
-    { source: '2', target: '3', label: '突破' },
-    { source: '3', target: '4', label: '技术型' },
-    { source: '3', target: '5', label: '管理型' }
-  ]
-
-  edges.forEach(edge => {
-    graph?.addEdge({
-      source: edge.source,
-      target: edge.target,
-      label: edge.label,
-      attrs: {
-        line: { stroke: '#bdc3c7', strokeWidth: 2, targetMarker: 'classic' },
-        label: { fill: '#909399', fontSize: 11 }
-      }
-    })
-  })
-
-  graph.centerContent()
-  ElMessage.success('已恢复职业发展路径图')
-}
-
-// 加载横向换岗路径
-const loadTransferPath = () => {
-  if (!graph) return
-  graph.clearCells()
-  selectedNode.value = null
-
-  const nodes = [
-    { id: 'java', label: 'Java 后端', x: 400, y: 100, color: '#ecf5ff', stroke: '#409eff' },
-    { id: 'fullstack', label: '全栈工程师', x: 200, y: 220, color: '#f0f9eb', stroke: '#67c23a' },
-    { id: 'bigdata', label: '大数据开发', x: 600, y: 220, color: '#fdf6ec', stroke: '#e6a23c' },
-    { id: 'architect', label: '系统架构师', x: 400, y: 340, color: '#f5f7fa', stroke: '#909399' }
-  ]
-
-  nodes.forEach(node => {
-    graph?.addNode({
-      id: node.id,
-      x: node.x - 75,
-      y: node.y,
-      width: 150,
-      height: 60,
-      label: node.label,
-      attrs: {
-        body: { fill: node.color, stroke: node.stroke, strokeWidth: 2, rx: 10, ry: 10 },
-        label: { fill: '#303133', fontSize: 13, fontWeight: 'bold' }
-      }
-    })
-  })
-
-  const edges = [
-    { source: 'java', target: 'fullstack', label: '广度' },
-    { source: 'java', target: 'bigdata', label: '转型' },
-    { source: 'java', target: 'architect', label: '深度' }
-  ]
-
-  edges.forEach(edge => {
-    graph?.addEdge({
-      source: edge.source,
-      target: edge.target,
-      label: edge.label,
-      attrs: {
-        line: { stroke: '#909399', strokeWidth: 2, strokeDasharray: '5 5' }
-      }
-    })
-  })
-
-  graph.centerContent()
-}
-
-const resetGraph = () => loadVerticalPath()
-const exportImage = () => {
-  graph?.toPNG((dataUri: string) => {
-    const link = document.createElement('a')
-    link.href = dataUri
-    link.download = '职业路径图.png'
-    link.click()
-  })
-}
-
-onMounted(() => {
-  nextTick(() => {
-    requestAnimationFrame(() => {
-      initGraph()
-    })
-  })
-})
-
-onBeforeUnmount(() => {
-  graph?.dispose()
-})
-</script>
-
 <template>
-  <div class="development-map-container">
-    <!-- 顶部标题区 -->
-    <div class="page-header premium-glass">
-      <div class="header-left">
-        <div class="icon-box">
-          <el-icon :size="24"><TrendCharts /></el-icon>
-        </div>
-        <div class="title-text">
-          <h2>发现成长路径</h2>
-          <p>基于 AI 的职业演进模拟与能力图谱</p>
+  <div class="development-map-page">
+    <section class="hero-card">
+      <div class="hero-copy">
+        <span class="eyebrow">发展图谱</span>
+        <h1>围绕当前职业画像，动态生成岗位晋升与换岗路径</h1>
+        <p>
+          当前目标岗位为 {{ runtimeMeta.targetJobName }}，目标行业为 {{ runtimeMeta.targetIndustry }}。
+          图谱会优先结合你已填写的职业画像与人岗匹配结果，展示岗位描述、垂直晋升关系和横向转岗方向。
+        </p>
+      </div>
+
+      <div class="hero-actions">
+        <div class="hero-stat-list">
+          <div class="hero-stat">
+            <strong>{{ promotionNodes.length }}</strong>
+            <span>晋升节点</span>
+          </div>
+          <div class="hero-stat">
+            <strong>{{ transferRoles.length }}</strong>
+            <span>换岗方向</span>
+          </div>
+          <div class="hero-stat">
+            <strong>{{ totalTransferPaths }}</strong>
+            <span>换岗路径</span>
+          </div>
         </div>
       </div>
-      <div class="header-actions">
-        <el-button-group>
-          <el-button type="primary" @click="loadVerticalPath">垂直晋升路线</el-button>
-          <el-button type="success" @click="loadTransferPath">横向转岗路线</el-button>
-        </el-button-group>
-        <el-button :icon="Download" @click="exportImage">导出影像</el-button>
-        <el-button type="warning" plain @click="resetGraph">重置图谱</el-button>
+    </section>
+
+    <section class="content-grid">
+      <div class="chart-card">
+        <div class="card-head">
+          <div class="chart-head-left">
+            <el-radio-group v-model="viewMode" size="large">
+              <el-radio-button label="vertical">垂直岗位图谱</el-radio-button>
+              <el-radio-button label="transfer">换岗路径图谱</el-radio-button>
+            </el-radio-group>
+            <el-select v-model="selectedJobId" class="job-selector" placeholder="选择岗位" filterable>
+              <el-option v-for="job in selectableJobs" :key="job.id" :label="job.name" :value="job.id" />
+            </el-select>
+          </div>
+          <div class="chart-head-right">
+            <div>
+              <span class="card-kicker">{{ currentViewMeta.kicker }}</span>
+              <h2>{{ currentViewMeta.title }}</h2>
+            </div>
+          </div>
+        </div>
+
+        <div class="chart-toolbar">
+          <div class="toolbar-note">
+            {{ toolbarText }}
+          </div>
+          <div class="toolbar">
+            <el-button-group>
+              <el-button @click="zoomChart(1.15)">放大</el-button>
+              <el-button @click="zoomChart(1 / 1.15)">缩小</el-button>
+              <el-button @click="resetChart">重置</el-button>
+            </el-button-group>
+          </div>
+        </div>
+
+        <div ref="chartRef" class="graph-canvas"></div>
+
+        <div class="legend-row">
+          <div class="legend-item"><span class="legend-dot current"></span><span>当前聚焦岗位</span></div>
+          <div class="legend-item"><span class="legend-dot next"></span><span>晋升目标岗位</span></div>
+          <div class="legend-item"><span class="legend-dot related"></span><span>关联岗位</span></div>
+          <div class="legend-item"><span class="legend-line solid"></span><span>晋升路径</span></div>
+          <div class="legend-item"><span class="legend-line dashed"></span><span>换岗路径</span></div>
+        </div>
       </div>
-    </div>
 
-    <div class="layout-body">
-      <!-- 左侧：战力面板 -->
-      <div class="sidebar-panel">
-        <el-card class="user-profile-card premium-glass" shadow="never">
-          <div class="user-header">
-            <el-avatar :size="56" :icon="User" class="main-avatar" />
-            <div class="name-info">
-              <h3>{{ userData.name }}</h3>
-              <p>{{ userData.school }}</p>
-            </div>
+      <aside class="detail-column">
+        <div class="summary-card">
+          <span class="card-kicker">岗位摘要</span>
+          <h3>{{ selectedJob.name }}</h3>
+          <p>{{ selectedJob.summary }}</p>
+          <div class="summary-tags">
+            <el-tag>{{ selectedJob.level }}</el-tag>
+            <el-tag type="success">{{ selectedJob.salary }}</el-tag>
+            <el-tag type="warning">{{ selectedJob.experience }}</el-tag>
           </div>
-          <div class="match-info">
-            <div class="match-label">
-              <span>当前岗位匹配度</span>
-              <strong>{{ userData.matchRate }}%</strong>
-            </div>
-            <el-progress :percentage="userData.matchRate" :stroke-width="12" stroke-linecap="round" />
-          </div>
-        </el-card>
+        </div>
 
-        <el-card class="skills-radar-card premium-glass" shadow="never">
-          <template #header>
-            <div class="card-title"><el-icon><Star /></el-icon>能力指纹</div>
-          </template>
-          <div class="skill-bars">
-            <div v-for="skill in userData.skills" :key="skill.name" class="skill-item">
-              <div class="skill-info">
-                <span>{{ skill.name }}</span>
-                <strong>{{ skill.value }}</strong>
-              </div>
-              <div class="bar-bg">
-                <div class="bar-fill" :style="{ width: skill.value + '%' }"></div>
-              </div>
-            </div>
+        <div class="detail-card">
+          <div class="section-title">
+            <h3>岗位描述</h3>
+            <span>{{ selectedJob.track }}</span>
           </div>
-        </el-card>
+          <el-descriptions :column="1" border>
+            <el-descriptions-item label="核心职责">{{ selectedJob.description }}</el-descriptions-item>
+            <el-descriptions-item label="典型产出">{{ selectedJob.deliverables.join('、') }}</el-descriptions-item>
+            <el-descriptions-item label="关键能力">{{ selectedJob.skills.join('、') }}</el-descriptions-item>
+          </el-descriptions>
+        </div>
 
-        <el-card class="timeline-stages-card premium-glass" shadow="never">
-          <template #header>
-            <div class="card-title"><el-icon><TrendCharts /></el-icon>进阶里程碑</div>
-          </template>
+        <div v-if="viewMode === 'vertical'" class="detail-card">
+          <div class="section-title">
+            <h3>晋升路径关联</h3>
+            <span>纵向成长</span>
+          </div>
           <el-timeline>
-            <el-timeline-item
-              v-for="(stage, index) in careerStages"
-              :key="index"
-              :type="index <= 1 ? 'primary' : 'info'"
-              :hollow="index > 1"
-              :timestamp="stage.stage"
-            >
-              <h4 :style="{ color: index <= 1 ? '#409eff' : '#909399' }">{{ stage.level }}</h4>
-              <p class="stage-tag">{{ stage.ability }}</p>
+            <el-timeline-item v-for="step in selectedPromotionTrail" :key="step.id"
+              :type="step.id === selectedJobId ? 'primary' : 'success'" :timestamp="step.period">
+              <div class="path-block">
+                <strong>{{ step.name }}</strong>
+                <p>{{ step.goal }}</p>
+              </div>
             </el-timeline-item>
           </el-timeline>
-        </el-card>
-      </div>
+          <el-alert :title="`下一阶段目标：${selectedJob.nextStep}`" :description="selectedJob.nextAdvice"
+            type="success" :closable="false" show-icon />
+        </div>
 
-      <!-- 右侧：图谱区 -->
-      <div class="graph-main">
-        <div class="graph-canvas-wrapper premium-glass">
-          <div ref="graphContainer" class="graph-container"></div>
-          
-          <!-- 悬浮说明 -->
-          <div class="canvas-tips">
-            <el-icon><Warning /></el-icon> 滚轮缩放，按住画布可自由平移
+        <div v-else class="detail-card">
+          <div class="section-title">
+            <h3>换岗路径方案</h3>
+            <span>每个方向至少 2 条路径</span>
+          </div>
+          <div class="transfer-role-list">
+            <div v-for="role in transferRoles" :key="role.id" class="transfer-role-item"
+              :class="{ active: role.id === selectedTransferRole.id }"
+              @click="selectTransferRole(role.id)">
+              <div>
+                <strong>{{ role.name }}</strong>
+                <p>{{ role.summary }}</p>
+              </div>
+              <span>{{ role.paths.length }} 条路径</span>
+            </div>
           </div>
         </div>
 
-        <!-- 节点详情弹窗 -->
-        <transition name="el-zoom-in-top">
-          <div v-if="selectedNode" class="node-overlay premium-glass">
-            <div class="overlay-header">
-              <h3>{{ selectedNode.label }}</h3>
-              <el-icon class="close-btn" @click="selectedNode = null"><Close /></el-icon>
-            </div>
-            <div class="overlay-body">
-              <el-descriptions :column="1" border size="small">
-                <el-descriptions-item label="发展阶段">{{ selectedNode.desc }}</el-descriptions-item>
-                <el-descriptions-item label="薪资范畴">
-                  <span class="salary-text">{{ selectedNode.salary }}</span>
-                </el-descriptions-item>
-                <el-descriptions-item label="核心要求">
-                  <div class="req-tags">
-                    <el-tag v-for="req in selectedNode.requirements" :key="req" size="small" effect="plain">{{ req }}</el-tag>
-                  </div>
-                </el-descriptions-item>
-              </el-descriptions>
-            </div>
+        <div v-if="viewMode === 'transfer'" class="detail-card">
+          <div class="section-title">
+            <h3>{{ selectedTransferRole.name }}</h3>
+            <span>转岗详情</span>
           </div>
-        </transition>
-      </div>
-    </div>
+          <div v-for="path in selectedTransferRole.paths" :key="path.id" class="transfer-path-card">
+            <div class="transfer-path-top">
+              <strong>{{ path.title }}</strong>
+              <el-tag :type="path.difficultyType">{{ path.difficulty }}</el-tag>
+            </div>
+            <p>{{ path.description }}</p>
+            <div class="mini-label">转岗步骤</div>
+            <ol class="plain-steps">
+              <li v-for="step in path.steps" :key="step">{{ step }}</li>
+            </ol>
+          </div>
+        </div>
+      </aside>
+    </section>
   </div>
 </template>
 
-<style scoped>
-.development-map-container {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-  padding: 24px;
-  min-height: calc(100vh - 100px);
-  background: transparent;
+<script setup lang="ts">
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch
+} from 'vue'
+import * as echarts from 'echarts'
+
+import type {
+  ECharts,
+  EChartsCoreOption
+} from 'echarts'
+
+import {
+  buildDynamicDevelopmentData,
+  loadCareerFormData,
+  loadJobMatchResult
+} from '@/utils/career-runtime'
+
+import type {
+  JobMatchItem
+} from '@/types/job-match'
+
+type ViewMode = 'vertical' | 'transfer'
+
+interface PromotionNode {
+  id: string
+  name: string
+  level: string
+  track: string
+  salary: string
+  experience: string
+  period: string
+  goal: string
+  summary: string
+  description: string
+  deliverables: string[]
+  skills: string[]
+  nextStep: string
+  nextAdvice: string
 }
 
-/* 玻璃拟态基础 */
-.premium-glass {
-  background: rgba(255, 255, 255, 0.85) !important;
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.5) !important;
-  border-radius: 20px !important;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.04) !important;
+interface TransferPath {
+  id: string
+  title: string
+  description: string
+  difficulty: string
+  difficultyType: 'success' | 'warning' | 'danger' | 'info'
+  steps: string[]
 }
 
-/* 页眉 */
-.page-header {
-  display: flex;
-  justify-content: space-between;
+interface TransferRole {
+  id: string
+  name: string
+  summary: string
+  description: string
+  level: string
+  salary: string
+  experience: string
+  track: string
+  deliverables: string[]
+  skills: string[]
+  nextStep: string
+  nextAdvice: string
+  paths: TransferPath[]
+}
+
+const emptyTransferRole: TransferRole = {
+  id: 'transfer-empty',
+  name: '暂无换岗方向',
+  summary: '当前暂无可展示的换岗路径，请先完成人岗匹配分析。',
+  description: '暂无数据',
+  level: '待补充',
+  salary: '待补充',
+  experience: '待补充',
+  track: '待补充',
+  deliverables: ['待补充'],
+  skills: ['待补充'],
+  nextStep: '待补充',
+  nextAdvice: '请先完成人岗匹配分析或完善职业画像表单。',
+  paths: []
+}
+
+const emptyPromotionNode: PromotionNode = {
+  id: 'promotion-empty',
+  name: '暂无目标岗位',
+  level: '待补充',
+  track: '待补充',
+  salary: '待补充',
+  experience: '待补充',
+  period: '待补充',
+  goal: '请先完善职业画像表单中的目标岗位信息。',
+  summary: '当前暂无可展示的岗位成长路径。',
+  description: '请先填写目标岗位并生成人岗匹配结果。',
+  deliverables: ['待补充'],
+  skills: ['待补充'],
+  nextStep: '待补充',
+  nextAdvice: '先完善职业画像表单，再查看动态发展图谱。'
+}
+
+const chartRef = ref<HTMLDivElement>()
+let chartInstance: ECharts | null = null
+const currentZoom = ref(1)
+const viewMode = ref<ViewMode>('vertical')
+const formData = ref(loadCareerFormData())
+const matchItems = ref<JobMatchItem[]>(loadJobMatchResult())
+
+const runtimeMeta = computed(() => buildDynamicDevelopmentData(formData.value, matchItems.value))
+
+const splitText = (value: string | undefined) =>
+  (value || '')
+    .split(/[、, ，/；; |\n]/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+
+const topMatch = computed(() => matchItems.value[0] || null)
+
+const coreSkills = computed(() =>
+  splitText(topMatch.value?.raw_data.profiles.professional_skills.core_skills)
+)
+
+const promotionPath = computed(() => {
+  const path = splitText(topMatch.value?.raw_data.profiles.job_attributes.vertical_promotion_path)
+  return path.length
+    ? path
+    : [
+        `资深${runtimeMeta.value.targetJobName}`,
+        `${runtimeMeta.value.targetJobName}负责人`,
+        `高级${runtimeMeta.value.targetJobName}管理岗`
+      ]
+})
+
+const lateralDirections = computed(() => {
+  const dirs = splitText(topMatch.value?.raw_data.profiles.job_attributes.lateral_transfer_directions)
+  return dirs.length ? dirs : ['产品经理', '运营经理', '数据分析师', '项目经理', '用户研究员']
+})
+
+const promotionNodes = computed<PromotionNode[]>(() => {
+  const targetJob = runtimeMeta.value.targetJobName
+  const industry = runtimeMeta.value.targetIndustry
+  const salary = topMatch.value?.raw_data.profiles.job_attributes.salary_competitiveness || '待补充'
+
+  const baseSkills = coreSkills.value.length
+    ? coreSkills.value
+    : ['岗位核心技能', '项目协作', '业务理解']
+  const stages = [targetJob, ...promotionPath.value.slice(0, 4)]
+  return stages.map((name, index) => ({
+    id: `promotion-${index}`,
+    name,
+    level: index === 0 ? '当前目标岗位' : `晋升阶段 ${index}`,
+    track: industry,
+    salary: index === 0 ? salary : `${salary} / 晋升后提升`,
+    experience: index === 0 ? '0-2 年' : `${index * 2}-${index * 2 + 2}年`,
+    period: index === 0 ? '入岗阶段' : `阶段 ${index}`,
+    goal:
+      index === 0
+        ? `进入 ${name} 岗位并完成岗位基础能力补齐。`
+        : `向 ${name} 发展，提升更复杂场景下的项目和业务能力。`,
+    summary:
+      index === 0
+        ? `结合职业画像与匹配结果，当前优先关注 ${name}。`
+        : `${name} 是 ${targetJob} 的后续发展方向之一。`,
+    description:
+      topMatch.value?.deep_analysis.all_analysis ||
+      `围绕 ${name} 的岗位要求，持续提升专业能力、业务理解与项目产出。`,
+    deliverables: ['项目成果', '方案沉淀', '阶段复盘'],
+    skills: baseSkills.slice(0, Math.min(baseSkills.length, 4)),
+    nextStep: stages[index + 1] || '持续成长',
+    nextAdvice:
+      index === 0
+        ? topMatch.value?.deep_analysis.actionable_advice || '优先补齐关键技能差距，进入目标岗位。'
+        : `继续向 ${stages[index + 1] || '更高层级岗位'} 提升。`
+  }))
+})
+
+const buildTransferPath = (roleName: string, index: number): TransferRole => ({
+  id: `transfer-${index}`,
+  name: roleName,
+  summary: `从 ${runtimeMeta.value.targetJobName} 转向 ${roleName} 的可行路径。`,
+  description: `结合当前岗位画像与目标岗位要求，${roleName} 是一条可延展的横向发展方向。`,
+  level: '关联岗位',
+  salary: topMatch.value?.raw_data.profiles.job_attributes.salary_competitiveness || '待补充',
+  experience: '1-3 年起步',
+  track: runtimeMeta.value.targetIndustry,
+  deliverables: ['转岗能力证明', '项目案例', '岗位认知沉淀'],
+  skills: splitText(topMatch.value?.raw_data.profiles.professional_skills.tool_capabilities)
+    .slice(0, 4)
+    .concat(roleName)
+    .slice(0, 4),
+  nextStep: `${roleName} 进阶岗位`,
+  nextAdvice: `建议围绕 ${roleName} 补齐差异能力，并用项目/实习验证转岗可行性。`,
+  paths: [
+    {
+      id: `path-a-${index}`,
+      title: `${runtimeMeta.value.targetJobName} -> ${roleName}`,
+      description: '基于现有画像直接补齐岗位关键能力后转入目标方向。',
+      difficulty: '中等',
+      difficultyType: 'warning',
+      steps: ['识别岗位差距', '补齐核心技能', '形成可展示案例']
+    },
+    {
+      id: `path-b-${index}`,
+      title: `${runtimeMeta.value.targetJobName} -> 过渡岗位 -> ${roleName}`,
+      description: '先通过关联岗位积累经验，再平滑转入目标方向。',
+      difficulty: '较稳妥',
+      difficultyType: 'success',
+      steps: ['选择过渡岗位', '积累业务经验', '完成方向切换']
+    }
+  ]
+})
+
+const transferRoles = computed<TransferRole[]>(() =>
+  lateralDirections.value.slice(0, 5).map(buildTransferPath)
+)
+
+const promotionTrail = computed(() =>
+  promotionNodes.value.map(({ id, name, period, goal }) => ({ id, name, period, goal }))
+)
+
+const totalTransferPaths = computed(() =>
+  transferRoles.value.reduce((sum, role) => sum + role.paths.length, 0)
+)
+
+const selectedJobId = ref('promotion-0')
+const selectedTransferRoleId = ref('transfer-0')
+
+const selectableJobs = computed(() =>
+  viewMode.value === 'vertical'
+    ? promotionNodes.value.map(({ id, name }) => ({ id, name }))
+    : transferRoles.value.map(({ id, name }) => ({ id, name }))
+)
+
+const selectedJob = computed(() => {
+  if (viewMode.value === 'vertical') {
+    return (
+      promotionNodes.value.find((item) => item.id === selectedJobId.value) ??
+      promotionNodes.value[0] ??
+      emptyPromotionNode
+    )
+  }
+  return (
+    transferRoles.value.find((item) => item.id === selectedJobId.value) ??
+    transferRoles.value[0] ??
+    emptyTransferRole
+  )
+})
+
+const selectedPromotionTrail = computed(() => {
+  const currentIndex = promotionNodes.value.findIndex((item) => item.id === selectedJobId.value)
+  return currentIndex < 0
+    ? promotionTrail.value
+    : promotionTrail.value.slice(0, Math.min(currentIndex + 2, promotionTrail.value.length))
+})
+
+const selectedTransferRole = computed(
+  () =>
+    transferRoles.value.find((item) => item.id === selectedTransferRoleId.value) ??
+    transferRoles.value[0] ??
+    emptyTransferRole
+)
+
+const currentViewMeta = computed(() =>
+  viewMode.value === 'vertical'
+    ? {
+        kicker: '岗位晋升关系',
+        title: `垂直岗位图谱：${runtimeMeta.value.targetJobName} 的成长路径`
+      }
+    : {
+        kicker: '岗位血缘关系',
+        title: `换岗路径图谱：${runtimeMeta.value.targetJobName} 的横向转岗方向`
+      }
+)
+
+const toolbarText = computed(() =>
+  viewMode.value === 'vertical'
+    ? `当前图谱结合目标岗位"${runtimeMeta.value.targetJobName}"与匹配结果中的垂直晋升路径动态生成。`
+    : `当前图谱结合匹配结果中的横向转岗方向动态生成，至少展示 5 个岗位方向。`
+)
+
+const syncSelectionByMode = () => {
+  selectedJobId.value =
+    viewMode.value === 'vertical' ? promotionNodes.value[0]?.id || '' : transferRoles.value[0]?.id || ''
+  selectedTransferRoleId.value = transferRoles.value[0]?.id || ''
+}
+
+const buildVerticalOption = (): EChartsCoreOption => ({
+  title: {
+    text: '职业发展垂直图谱',
+    subtext: `当前目标岗位：${runtimeMeta.value.targetJobName}`,
+    left: 'center'
+  },
+  tooltip: {
+    trigger: 'item'
+  },
+  series: [
+    {
+      type: 'graph',
+      layout: 'force',
+      roam: true,
+      zoom: currentZoom.value,
+      symbolSize: 78,
+      edgeSymbol: ['none', 'arrow'],
+      edgeSymbolSize: 8,
+      label: {
+        show: true,
+        formatter: '{b}',
+        fontSize: 12
+      },
+      lineStyle: {
+        width: 3,
+        color: '#1f8fff',
+        curveness: 0.18
+      },
+      force: {
+        repulsion: 320,
+        edgeLength: 130,
+        gravity: 0.08
+      },
+      data: promotionNodes.value.map((node) => ({
+        id: node.id,
+        name: node.name,
+        itemStyle: {
+          color: node.id === selectedJobId.value ? '#1d4ed8' : '#8bd3dd',
+          borderColor: node.id === selectedJobId.value ? '#0f172a' : '#0f766e',
+          borderWidth: 2
+        }
+      })),
+      links: promotionNodes.value.slice(0, -1).map((node, index) => {
+        const nextNode = promotionNodes.value[index + 1]
+        return {
+          source: node.id,
+          target: nextNode?.id ?? '',
+          label: {
+            show: true,
+            formatter: nextNode?.period ?? ''
+          }
+        }
+      })
+    }
+  ]
+})
+
+const buildTransferOption = (): EChartsCoreOption => ({
+  title: {
+    text: '岗位换岗路径图谱',
+    subtext: `当前目标岗位：${runtimeMeta.value.targetJobName}`,
+    left: 'center'
+  },
+  tooltip: {
+    trigger: 'item'
+  },
+  series: [
+    {
+      type: 'graph',
+      layout: 'force',
+      roam: true,
+      zoom: currentZoom.value,
+      force: {
+        repulsion: 320,
+        edgeLength: [120, 160]
+      },
+      label: {
+        show: true,
+        formatter: '{b}',
+        fontSize: 12
+      },
+      lineStyle: {
+        color: '#fb7185',
+        width: 2,
+        type: 'dashed',
+        curveness: 0.15
+      },
+      data: [
+        {
+          id: 'origin',
+          name: runtimeMeta.value.targetJobName,
+          symbolSize: 94,
+          itemStyle: {
+            color: '#f97316',
+            borderColor: '#7c2d12',
+            borderWidth: 2
+          }
+        },
+        ...transferRoles.value.map((role) => ({
+          id: role.id,
+          name: role.name,
+          value: role.paths.length,
+          symbolSize: role.id === selectedTransferRoleId.value ? 84 : 72,
+          itemStyle: {
+            color: role.id === selectedTransferRoleId.value ? '#ec4899' : '#a5b4fc',
+            borderColor: role.id === selectedTransferRoleId.value ? '#831843' : '#3730a3',
+            borderWidth: 2
+          }
+        }))
+      ],
+      links: transferRoles.value.flatMap((role) =>
+        role.paths.map((path) => ({
+          source: 'origin',
+          target: role.id,
+          value: path.title,
+          label: {
+            show: false
+          }
+        }))
+      )
+    }
+  ]
+})
+
+const renderChart = () => {
+  if (!chartRef.value) return
+  if (!chartInstance) {
+    chartInstance = echarts.init(chartRef.value)
+    chartInstance.on('click', (params: unknown) => {
+      const p = params as {
+        data?: {
+          id?: string
+        }
+      }
+
+      const nodeId = p.data?.id
+      if (!nodeId || nodeId === 'origin') return
+      if (viewMode.value === 'vertical') {
+        selectedJobId.value = nodeId
+      } else {
+        selectTransferRole(nodeId)
+      }
+    })
+  }
+
+  chartInstance.setOption(
+    viewMode.value === 'vertical' ? buildVerticalOption() : buildTransferOption(),
+    true
+  )
+}
+
+const zoomChart = (ratio: number) => {
+  currentZoom.value = Math.min(2.4, Math.max(0.6, currentZoom.value * ratio))
+  renderChart()
+}
+
+const resetChart = () => {
+  currentZoom.value = 1
+  renderChart()
+}
+
+const selectTransferRole = (roleId: string) => {
+  selectedTransferRoleId.value = roleId
+  selectedJobId.value = roleId
+}
+
+const handleResize = () => chartInstance?.resize()
+
+watch(viewMode, async () => {
+  syncSelectionByMode()
+  await nextTick()
+  renderChart()
+})
+
+watch(selectedJobId, () => {
+  if (viewMode.value === 'transfer') selectedTransferRoleId.value = selectedJobId.value
+  renderChart()
+})
+
+onMounted(async () => {
+  syncSelectionByMode()
+  await nextTick()
+  renderChart()
+  window.addEventListener('resize', handleResize)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', handleResize)
+  chartInstance?.dispose()
+})
+</script>
+
+<style scoped lang="scss">
+.development-map-page {
+  min-height: 100vh;
+  padding: 28px;
+  background:
+    radial-gradient(circle at top left, rgba(34, 197, 94, 0.14), transparent 34%),
+    radial-gradient(circle at top right, rgba(249, 115, 22, 0.12), transparent 28%),
+    linear-gradient(180deg, #f7fbff 0%, #eef4ff 100%);
+}
+
+.hero-card,
+.chart-card,
+.summary-card,
+.detail-card {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+  backdrop-filter: blur(10px);
+}
+
+.hero-card {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr;
+  gap: 28px;
+  padding: 28px;
+  border-radius: 28px;
+}
+
+.eyebrow,
+.card-kicker {
+  display: inline-flex;
   align-items: center;
-  padding: 20px 28px;
-}
-
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-}
-
-.icon-box {
-  width: 48px;
-  height: 48px;
-  background: linear-gradient(135deg, #409eff 0%, #1677ff 100%);
-  border-radius: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  box-shadow: 0 8px 16px rgba(64, 158, 255, 0.3);
-}
-
-.title-text h2 { margin: 0; font-size: 22px; font-weight: 800; color: #1e293b; }
-.title-text p { margin: 4px 0 0; color: #64748b; font-size: 14px; }
-
-.header-actions {
-  display: flex;
-  gap: 16px;
-  align-items: center;
-}
-
-/* 布局体 */
-.layout-body {
-  display: flex;
-  gap: 24px;
-  flex: 1;
-}
-
-/* 侧边栏面板 */
-.sidebar-panel {
-  width: 340px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.user-profile-card .user-header {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 20px;
-}
-
-.main-avatar {
-  background: linear-gradient(135deg, #409eff 0%, #a5d8ff 100%);
-}
-
-.name-info h3 { margin: 0; font-size: 18px; color: #1e293b; }
-.name-info p { margin: 4px 0 0; font-size: 13px; color: #94a3b8; }
-
-.match-info .match-label {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 8px;
-  font-size: 14px;
-}
-
-.card-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 700;
-  color: #1e293b;
-}
-
-.skill-bars {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.skill-item .skill-info {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 6px;
-  font-size: 13px;
-}
-
-.bar-bg {
-  height: 8px;
-  background: #f1f5f9;
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.bar-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #409eff 0%, #3b82f6 100%);
-  border-radius: 4px;
-}
-
-.stage-tag { font-size: 12px; color: #94a3b8; margin: 4px 0 0; }
-
-/* 图谱主区 */
-.graph-main {
-  flex: 1;
-  position: relative;
-}
-
-.graph-canvas-wrapper {
-  height: 100%;
-  min-height: 600px;
-  position: relative;
-  overflow: hidden;
-}
-
-.graph-container {
-  width: 100%;
-  height: 100%;
-}
-
-.canvas-tips {
-  position: absolute;
-  bottom: 20px;
-  right: 20px;
-  background: rgba(0, 0, 0, 0.6);
-  color: #fff;
-  padding: 6px 14px;
-  border-radius: 20px;
   font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #2563eb;
+}
+
+.hero-copy h1 {
+  margin: 12px 0 14px;
+  font-size: 34px;
+  line-height: 1.25;
+  color: #0f172a;
+}
+
+.hero-copy p {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.8;
+  color: #475569;
+}
+
+.hero-actions {
+  display: flex;
+  align-items: center;
+}
+
+.job-selector {
+  width: 220px;
+}
+
+.hero-stat-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.hero-stat {
+  padding: 16px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #dbeafe 0%, #fef3c7 100%);
+}
+
+.hero-stat strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 28px;
+  color: #0f172a;
+}
+
+.hero-stat span {
+  font-size: 13px;
+  color: #475569;
+}
+
+.content-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) 430px;
+  gap: 22px;
+  margin-top: 22px;
+}
+
+.chart-card {
+  padding: 24px;
+  border-radius: 26px;
+}
+
+.card-head,
+.section-title,
+.transfer-path-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.card-head {
+  align-items: flex-start;
+}
+
+.chart-head-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.chart-head-right {
+  text-align: right;
+}
+
+.chart-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 18px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(219, 234, 254, 0.78), rgba(255, 247, 237, 0.78));
+}
+
+.toolbar-note {
+  font-size: 13px;
+  color: #475569;
+}
+
+.card-head h2,
+.section-title h3,
+.summary-card h3 {
+  margin: 6px 0 0;
+  color: #0f172a;
+}
+
+.graph-canvas {
+  height: 620px;
+  margin-top: 16px;
+}
+
+.legend-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  padding-top: 8px;
+}
+
+.legend-item {
   display: flex;
   align-items: center;
   gap: 8px;
-  z-index: 10;
+  font-size: 13px;
+  color: #64748b;
 }
 
-/* 详情弹窗 */
-.node-overlay {
-  position: absolute;
-  top: 20px;
-  right: 20px;
-  width: 280px;
-  z-index: 100;
-  padding: 0;
-  overflow: hidden;
+.legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
 }
 
-.overlay-header {
-  padding: 16px 20px;
-  background: linear-gradient(135deg, #409eff 0%, #1677ff 100%);
-  color: #fff;
+.legend-dot.current {
+  background: #1d4ed8;
+}
+
+.legend-dot.next {
+  background: #f97316;
+}
+
+.legend-dot.related {
+  background: #a855f7;
+}
+
+.legend-line {
+  width: 26px;
+  height: 2px;
+  background: #475569;
+}
+
+.legend-line.dashed {
+  background: repeating-linear-gradient(to right, #475569 0, #475569 6px, transparent 6px, transparent 12px);
+}
+
+.detail-column {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  gap: 16px;
 }
 
-.overlay-header h3 { margin: 0; font-size: 16px; }
-.close-btn { cursor: pointer; transition: transform 0.2s; }
-.close-btn:hover { transform: scale(1.2); }
+.summary-card,
+.detail-card {
+  padding: 22px;
+  border-radius: 24px;
+}
 
-.overlay-body { padding: 20px; }
-.salary-text { color: #f56c6c; font-weight: 800; font-size: 18px; }
-.req-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.summary-card p,
+.detail-card p,
+.transfer-role-item p {
+  color: #475569;
+  line-height: 1.7;
+}
 
-/* 响应式 */
+.summary-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.path-block p {
+  margin: 6px 0 0;
+}
+
+.transfer-role-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.transfer-role-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: #f8fafc;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.transfer-role-item.active,
+.transfer-role-item:hover {
+  border-color: rgba(236, 72, 153, 0.4);
+  background: #fff1f7;
+  transform: translateY(-1px);
+}
+
+.transfer-role-item span {
+  color: #be185d;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.transfer-path-card {
+  padding: 16px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #fff7ed 0%, #fdf2f8 100%);
+}
+
+.transfer-path-card + .transfer-path-card {
+  margin-top: 12px;
+}
+
+.mini-label {
+  margin-top: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #7c3aed;
+}
+
+.plain-steps {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: #475569;
+  line-height: 1.8;
+}
+
 @media (max-width: 1200px) {
-  .layout-body { flex-direction: column; }
-  .sidebar-panel { width: 100%; }
+  .hero-card,
+  .content-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-column {
+    order: 2;
+  }
+}
+
+@media (max-width: 768px) {
+  .development-map-page {
+    padding: 14px;
+  }
+
+  .hero-card,
+  .chart-card,
+  .summary-card,
+  .detail-card {
+    border-radius: 20px;
+  }
+
+  .hero-copy h1 {
+    font-size: 26px;
+  }
+
+  .hero-stat-list,
+  .content-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .graph-canvas {
+    height: 480px;
+  }
+
+  .card-head,
+  .section-title,
+  .transfer-path-top,
+  .chart-toolbar,
+  .chart-head-left {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .chart-head-right {
+    text-align: left;
+  }
 }
 </style>

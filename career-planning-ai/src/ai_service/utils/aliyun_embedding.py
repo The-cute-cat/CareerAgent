@@ -4,7 +4,7 @@ import dashscope
 from typing import List, Optional
 
 from ai_service.utils.logger_handler import log
-from config import LLM, settings
+from config import _LLM, settings
 
 
 class AliyunEmbedding:

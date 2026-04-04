@@ -127,7 +127,32 @@ export interface CareerFormSubmitDTO {
   /** 工具列表 */
   tools:  SkillTool[]
   /** 代码仓库链接 */
-  codeLinks?: string
+  codeLinks?: string[]
+  /** 代码能力评估结果 */
+  codeAbilityEval?: {
+    /** 平台类型 */
+    platform?: 'github' | 'gitee'
+    /** 用户名（仓库所有者） */
+    username?: string
+    /** 综合评分 */
+    compositeScore?: number
+    /** 能力等级 */
+    level?: 'S' | 'A' | 'B' | 'C' | 'D' | 'E'
+    /** 能力维度拆解 */
+    dimensions?: {
+      projectScale?: number
+      techBreadth?: number
+      activity?: number
+      engineering?: number
+      influence?: number
+    }
+    /** AI 总体评价 */
+    summary?: string
+    /** 优势列表 */
+    strengths?: string[]
+    /** 待改进项 */
+    weaknesses?: string[]
+  }
   /** 项目经历 */
   projects: Project[]
   /** 实习经历 */
@@ -176,7 +201,7 @@ export interface ParsedResumeFormData {
   /** 代码能力 */
   codeAbility?: CodeAbility
   /** 代码仓库链接（兼容字段） */
-  codeLinks?: string
+  codeLinks?: string | string[]
   /** 项目经历 */
   projects?: Project[]
   /** 实习经历 */
@@ -197,5 +222,4 @@ export interface RequiredFieldConfig {
   label: string
   validate: (value: any) => boolean
 }
-
 

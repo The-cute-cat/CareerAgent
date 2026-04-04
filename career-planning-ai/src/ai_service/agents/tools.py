@@ -1,3 +1,11 @@
+"""
+资源检索工具集
+
+设计原则：
+1. 返回资源 ID，供后续查库获取完整信息
+2. 仅返回必要字段供 AI 理解资源内容
+3. 所有工具统一返回格式：{id, type, summary, ...}
+"""
 from langchain_core.tools import tool
 
 from ai_service.services.chroma_service import ChromaService
@@ -5,77 +13,288 @@ from config import settings
 
 __all__ = [
     "query_project",
+    "query_books",
+    "query_intern",
+    "query_videos",
+    "get_resources_by_ids",
 ]
 
+
 @tool(
-    description="""开源项目推荐工具。根据用户的技术栈、学习目标或项目需求，从向量数据库中检索最匹配的开源项目。
+    description="""开源项目推荐工具。根据技术栈、学习目标检索匹配的开源项目。
 
-适用场景：
-- 用户想要学习某个技术栈，需要推荐实战项目
-- 用户想找适合做毕设/简历亮点的项目
-- 用户想找某个业务领域（电商、博客、后台管理等）的开源项目
-- 用户想了解某个难度等级（初级/进阶/高级）的项目
-
-输入：自然语言查询描述
-输出：匹配的项目列表，包含项目名称、技术标签、适用场景、难度、星数、地址等信息"""
+返回：项目ID、名称、技术标签、难度等关键信息。
+后续可通过ID查询获取完整项目详情（包括URL、描述等）。"""
 )
 def query_project(query: str, top_k: int = settings.chroma_config.k) -> list[dict]:
-    """
-    查询开源项目推荐，根据用户需求从向量数据库中检索最匹配的项目。
-
-    Args:
-        query: 查询描述，如 "Java 后台管理系统"、"电商项目"、"微服务架构学习"
-        top_k: 返回结果数量，默认 5
-
-    Returns:
-        匹配的项目列表，每项包含:
-        - name: 项目名称
-        - score: 相似度分数 (越小越相似)
-        - description: 项目简介
-        - tech_tags: 技术标签
-        - use_cases: 适用场景
-        - difficulty: 难度等级
-        - stars: GitHub/Gitee 星数
-        - url: 项目地址
-    """
+    """查询开源项目，返回 ID 和摘要信息"""
     service = ChromaService.get_instance(settings.chroma_config.collection_name.project_collection)
-    results = service.similarity_search_with_score(query, k=top_k)
+    results = service.similarity_search_with_score(query, k=min(top_k, 10))
 
     projects = []
     for doc, score in results:
         meta = doc.metadata
         projects.append({
+            "id": doc.id,  # Chroma 文档 ID
+            "type": "project",
             "name": meta.get("name", "Unknown"),
-            "score": round(score, 4),
-            "description": meta.get("description", ""),
-            "content": doc.page_content,  # 项目详细说明
             "tech_tags": meta.get("tech_tags", ""),
-            "use_cases": meta.get("use_cases", ""),
             "difficulty": meta.get("difficulty", "进阶"),
             "stars": meta.get("stars", 0),
             "language": meta.get("language", ""),
-            "url": doc.metadata.get("source", "") == "github"
-                   and f"https://github.com/{meta.get('full_name', '')}"
-                   or f"https://gitee.com/{meta.get('full_name', '')}"
+            "score": round(score, 4),
+            "summary": doc.page_content[:200] if doc.page_content else "",
         })
-
     return projects
 
 
-def query_learning_path(skill: str, difficulty: str = "进阶") -> dict:
+@tool(
+    description="""书籍推荐工具。根据学习需求、技术方向检索匹配的书籍。
+
+返回：书籍ID、书名、作者、评分等关键信息。
+后续可通过ID查询获取完整书籍详情（包括URL、封面、简介等）。"""
+)
+def query_books(query: str, top_k: int = settings.chroma_config.k) -> list[dict]:
+    """查询书籍，返回 ID 和摘要信息"""
+    service = ChromaService.get_instance(settings.chroma_config.collection_name.book_collection)
+    results = service.similarity_search_with_score(query, k=min(top_k, 10))
+
+    books = []
+    for doc, score in results:
+        meta = doc.metadata
+        books.append({
+            "id": doc.id,
+            "type": "book",
+            "title": meta.get("title", "Unknown"),
+            "author": meta.get("author", ""),
+            "publisher": meta.get("publisher", ""),
+            "rating_score": meta.get("rating_score", ""),
+            "category": meta.get("category", ""),
+            "score": round(score, 4),
+            "summary": doc.page_content[:200] if doc.page_content else "",
+        })
+    return books
+
+
+@tool(
+    description="""实习岗位推荐工具。根据求职意向、技术栈检索匹配的实习岗位。
+
+返回：岗位ID、职位名称、公司、城市等关键信息。
+后续可通过ID查询获取完整岗位详情（包括URL、薪资、要求等）。"""
+)
+def query_intern(query: str, top_k: int = settings.chroma_config.k) -> list[dict]:
+    """查询实习岗位，返回 ID 和摘要信息"""
+    service = ChromaService.get_instance(settings.chroma_config.collection_name.intern_collection)
+    results = service.similarity_search_with_score(query, k=min(top_k, 10))
+
+    interns = []
+    for doc, score in results:
+        meta = doc.metadata
+        interns.append({
+            "id": doc.id,
+            "type": "intern",
+            "job_title": meta.get("jobTitle", "Unknown"),
+            "company_name": meta.get("company_name", ""),
+            "city": meta.get("city", ""),
+            "tech_stack": meta.get("techStack", ""),
+            "job_type": meta.get("jobType", ""),
+            "score": round(score, 4),
+            "summary": doc.page_content[:200] if doc.page_content else "",
+        })
+    return interns
+
+
+@tool(
+    description="""视频课程推荐工具。根据学习需求、技术方向检索匹配的视频课程。
+
+返回：视频ID、标题、作者、播放量等关键信息。
+后续可通过ID查询获取完整视频详情（包括URL、封面、时长等）。"""
+)
+def query_videos(query: str, top_k: int = settings.chroma_config.k) -> list[dict]:
+    """查询视频课程，返回 ID 和摘要信息"""
+    service = ChromaService.get_instance(settings.chroma_config.collection_name.video_collection)
+    results = service.similarity_search_with_score(query, k=min(top_k, 10))
+
+    videos = []
+    for doc, score in results:
+        meta = doc.metadata
+        videos.append({
+            "id": doc.id,
+            "type": "video",
+            "title": meta.get("title", "Unknown"),
+            "author": meta.get("author", ""),
+            "category_name": meta.get("category_name", ""),
+            "play_count": meta.get("play_count", "0"),
+            "duration": meta.get("duration", ""),
+            "score": round(score, 4),
+            "summary": doc.page_content[:200] if doc.page_content else "",
+        })
+    return videos
+
+
+def get_resources_by_ids(resource_refs: list[dict]) -> dict[str, list[dict]]:
     """
-    查询某技能的学习路径，推荐课程、书籍、文档等资源。
+    根据资源引用批量查询完整资源信息
 
     Args:
-        skill: 技能名称，如 "Spring Boot", "Vue3", "MySQL优化"
-        difficulty: 难度等级
+        resource_refs: 资源引用列表，每项包含 {id, type}
 
     Returns:
-        - recommended_courses: 推荐课程列表
-        - recommended_books: 推荐书籍
-        - estimated_time: 预估学习时长
+        按类型分组的完整资源信息
+        {
+            "books": [...],
+            "videos": [...],
+            "projects": [...],
+            "interns": [...]
+        }
     """
+    # 按类型分组
+    by_type = {"book": [], "video": [], "project": [], "intern": []}
+    for ref in resource_refs:
+        rtype = ref.get("type", "")
+        rid = ref.get("id", "")
+        if rtype in by_type and rid:
+            by_type[rtype].append(rid)
+
+    results = {"books": [], "videos": [], "projects": [], "interns": []}
+
+    # 批量查询各类型资源
+    if by_type["book"]:
+        service = ChromaService.get_instance(settings.chroma_config.collection_name.book_collection)
+        data = service.get(ids=by_type["book"])
+        results["books"] = _format_books(data)
+
+    if by_type["video"]:
+        service = ChromaService.get_instance(settings.chroma_config.collection_name.video_collection)
+        data = service.get(ids=by_type["video"])
+        results["videos"] = _format_videos(data)
+
+    if by_type["project"]:
+        service = ChromaService.get_instance(settings.chroma_config.collection_name.project_collection)
+        data = service.get(ids=by_type["project"])
+        results["projects"] = _format_projects(data)
+
+    if by_type["intern"]:
+        service = ChromaService.get_instance(settings.chroma_config.collection_name.intern_collection)
+        data = service.get(ids=by_type["intern"])
+        results["interns"] = _format_interns(data)
+
+    return results
+
+
+# noinspection SpellCheckingInspection
+def _format_books(data) -> list[dict]:
+    """格式化书籍数据"""
+    if not data or not data.get("ids"):
+        return []
+    books = []
+    for i, doc_id in enumerate(data["ids"]):
+        meta = data["metadatas"][i] if data.get("metadatas") else {}
+        books.append({
+            "id": doc_id,
+            "title": meta.get("title", ""),
+            "author": meta.get("author", ""),
+            "translator": meta.get("translator", ""),
+            "publisher": meta.get("publisher", ""),
+            "publish_date": meta.get("publish_date", ""),
+            "category": meta.get("category", ""),
+            "keyword": meta.get("keyword", ""),
+            "isbn": meta.get("isbn", ""),
+            "pages": meta.get("pages", ""),
+            "url": meta.get("url", ""),
+            "cover_url": meta.get("cover_url", ""),
+            "rating_score": meta.get("rating_score", ""),
+            "content": data["documents"][i] if data.get("documents") else "",
+        })
+    return books
+
+
+# noinspection SpellCheckingInspection
+def _format_videos(data) -> list[dict]:
+    """格式化视频数据"""
+    if not data or not data.get("ids"):
+        return []
+    videos = []
+    for i, doc_id in enumerate(data["ids"]):
+        meta = data["metadatas"][i] if data.get("metadatas") else {}
+        videos.append({
+            "id": doc_id,
+            "title": meta.get("title", ""),
+            "author": meta.get("author", ""),
+            "url": meta.get("url", ""),
+            "cover_image": meta.get("cover_image", ""),
+            "category": meta.get("category", ""),
+            "category_name": meta.get("category_name", ""),
+            "tags": meta.get("tags", ""),
+            "play_count": meta.get("play_count", "0"),
+            "like_count": meta.get("like_count", "0"),
+            "favorite_count": meta.get("favorite_count", "0"),
+            "duration": meta.get("duration", ""),
+            "publish_date": meta.get("publish_date", ""),
+            "content": data["documents"][i] if data.get("documents") else "",
+        })
+    return videos
+
+
+# noinspection SpellCheckingInspection
+def _format_projects(data) -> list[dict]:
+    """格式化项目数据"""
+    if not data or not data.get("ids"):
+        return []
+    projects = []
+    for i, doc_id in enumerate(data["ids"]):
+        meta = data["metadatas"][i] if data.get("metadatas") else {}
+        source = meta.get("source", "")
+        full_name = meta.get("full_name", "")
+        url = f"https://github.com/{full_name}" if source == "github" else f"https://gitee.com/{full_name}"
+        projects.append({
+            "id": doc_id,
+            "name": meta.get("name", ""),
+            "description": meta.get("description", ""),
+            "tech_tags": meta.get("tech_tags", ""),
+            "use_cases": meta.get("use_cases", ""),
+            "difficulty": meta.get("difficulty", ""),
+            "stars": meta.get("stars", 0),
+            "language": meta.get("language", ""),
+            "url": url,
+            "content": data["documents"][i] if data.get("documents") else "",
+        })
+    return projects
+
+
+def _format_interns(data) -> list[dict]:
+    """格式化实习数据"""
+    if not data or not data.get("ids"):
+        return []
+    interns = []
+    for i, doc_id in enumerate(data["ids"]):
+        # noinspection SpellCheckingInspection
+        meta = data["metadatas"][i] if data.get("metadatas") else {}
+        interns.append({
+            "id": doc_id,
+            "job_title": meta.get("jobTitle", ""),
+            "company_name": meta.get("company_name", ""),
+            "company_industry": meta.get("company_industry", ""),
+            "company_scale": meta.get("company_scale", ""),
+            "salary": meta.get("salary", ""),
+            "city": meta.get("city", ""),
+            "degree": meta.get("degree", ""),
+            "days_per_week": meta.get("daysPerWeek", ""),
+            "months": meta.get("months", ""),
+            "job_type": meta.get("jobType", ""),
+            "tech_stack": meta.get("techStack", ""),
+            "url": meta.get("url", ""),
+            "content": data["documents"][i] if data.get("documents") else "",
+        })
+    return interns
 
 
 if __name__ == "__main__":
-    ...
+    # 第一步：查询获取摘要信息
+    result = query_videos.invoke({"query": "Java入门", "top_k": 3})
+    print("摘要信息:", result)
+    # 第二步：获取完整信息
+    if result:
+        refs = [{"id": r["id"], "type": r["type"]} for r in result]
+        full_info = get_resources_by_ids(refs)
+        print("完整信息:", full_info)
