@@ -1,0 +1,678 @@
+__all__ = ['filter_computer_jobs_excel','clean_job_excel','read_excel_to_jobinfo']
+# 清洗招聘数据 Excel 文件（支持.xls 和.xlsx 格式）
+#从文件中读取数据，并转换为JobInfo/字典实体对象列表
+from pathlib import Path
+from typing import Any
+from datetime import datetime
+import re
+
+
+from ai_service.models.job_info import JobInfo  # 替换为您的实际导入路径
+from pydantic import BaseModel, Field
+import os
+import pandas as pd
+from typing import Optional, List, Dict
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_community.chat_models.tongyi import ChatTongyi
+from langchain_core.output_parsers import PydanticOutputParser
+
+from ai_service.services import log
+from config import settings
+
+
+class JobClassificationItem(BaseModel):
+    job_title: str = Field(description="岗位名称")
+    is_computer_related: bool = Field(description="是否为计算机相关岗位，true 为是，false 为否")
+
+
+class JobClassificationResult(BaseModel):
+    """大模型返回的岗位分类结果列表"""
+    classifications: List[JobClassificationItem] = Field(description="岗位分类列表")
+
+
+# --- 删除与计算机不相干的岗位 ---
+def filter_computer_jobs_excel(
+        file_path: str,
+        api_key: str|None = None,
+        model_name: str = settings.vector.llm_model_name,
+        batch_size: int = 50  # 每次发送给大模型的唯一岗位数量
+) -> str:
+    """
+    读取 Excel -> 提取岗位 -> 去重 -> 大模型批量分类 -> 过滤原表 -> 覆盖保存
+
+    Args:
+        file_path (str): Excel 文件路径
+        api_key (str, optional): API Key
+        model_name (str, optional): 模型名称
+        batch_size (int, optional): 大模型批量处理的岗位数量，防止 Token 超限
+
+    Returns:
+        str: 处理后的文件路径
+    """
+    # 1. 基础检查
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"文件不存在：{file_path}")
+
+    if not api_key:
+        api_key = settings.llm.api_key.get_secret_value()
+    if not api_key:
+        raise ValueError("请提供 API Key 或设置环境变量 LLM__API_KEY")
+
+    # 2. 读取 Excel 数据
+    log.info(f"正在读取文件：{file_path} ...")
+    try:
+        df = pd.read_excel(file_path)
+    except Exception as e:
+        raise ValueError(f"读取 Excel 失败：{e}")
+
+    if df.empty:
+        log.warning("表格为空，无需处理。")
+        return file_path
+
+    # 3. 识别岗位列
+    target_col = None
+    possible_names = ["岗位名称", "岗位", "职位名称", "职位", "Job Title", "Position"]
+    # 标准化列名（去除空格）
+    df.columns = df.columns.str.strip()
+
+    for name in possible_names:
+        if name in df.columns:
+            target_col = name
+            break
+
+    if not target_col:
+        raise ValueError(f"未找到岗位列，请确保包含以下列名之一：{possible_names}")
+
+    # 4. 【核心步骤】提取岗位并去重
+    log.info(f"正在提取唯一岗位名称（原数据行数：{len(df)}）...")
+    # 转为字符串并去除首尾空格，去除空值
+    unique_jobs = df[target_col].astype(str).str.strip().replace('', pd.NA).dropna().unique().tolist()
+    log.info(f"去重后唯一岗位数量：{len(unique_jobs)}")
+
+    if not unique_jobs:
+        log.warning("未发现有效岗位数据，直接返回。")
+        return file_path
+
+    # 5. 初始化 LLM 与解析器
+    llm = ChatTongyi(
+        api_key=api_key,
+        model=model_name,
+        streaming=True  # qwq-plus-latest 只支持流式模式
+    )
+    parser = PydanticOutputParser(pydantic_object=JobClassificationResult)
+
+    # 6. 构建 Prompt 模板
+    prompt_template = ChatPromptTemplate.from_messages([
+        ("system", """你是一名资深人力资源数据清洗专家，专门负责从岗位名称中精准识别计算机/软件相关岗位。
+
+## 🎯 核心任务
+仅根据「岗位名称」文本，判断该岗位是否属于【计算机/软件】相关领域。
+
+## 🔍 判断标准（满足任一即为"相关"）
+
+### ✅ 明确相关的关键词（正向匹配）：
+- 开发类：开发、工程师、程序、代码、架构、后端、前端、全栈、移动端、嵌入式、算法、AI、大模型
+- 技术类：技术、技术支撑、研发、R&D、DevOps、SRE、运维、测试、测试开发、质量、效能
+- 数据类：数据、大数据、数仓、ETL、数据挖掘、数据分析、BI、算法工程
+- 基础设施：云、云计算、容器、K8s、Docker、网络、安全、信息安全、渗透、漏洞
+- 产品/项目（技术向）：技术产品经理、研发项目经理、敏捷教练、Scrum Master
+- 其他技术岗：爬虫、逆向、自动化、脚本、工具链、中间件、数据库、DBA
+
+### ❌ 明确不相关的关键词（负向排除）：
+- 纯业务/职能：销售、客服、行政、人事、财务、法务、采购、物流、仓管、司机、保安、保洁
+- 纯运营/市场（无技术前缀）：运营、市场、推广、策划、文案、设计（除非带"UI/前端"等技术词）
+- 传统行业岗位：教师、医生、护士、厨师、工人、技工、服务员、导购、顾问（除非明确带"技术"前缀）
+
+### ⚠️ 模糊岗位处理策略（关键！）：
+【高召回原则】当岗位名称存在歧义时，只要包含任何技术相关词汇，或无法100%确定无关，一律判定为 "related": true
+示例：
+- "技术顾问" → related: true（含"技术"）
+- "IT支持" → related: true
+- "系统专员" → related: true（"系统"在中文语境常指计算机系统）
+- "项目助理" → related: false（无技术前缀）
+- "技术支持工程师" → related: true
+
+## 📦 输出格式（严格JSON，无额外内容）
+{format_instructions}
+
+## ⚡ 执行要求
+1. 仅分析岗位名称，不推测职责、不依赖外部信息
+2. 输出必须为合法JSON，字段：job_name(原名称), related(bool), reason(10字内简述)
+3. 保持高召回：宁可误判为相关，绝不漏判真正技术岗
+4. 不输出思考过程，只返回JSON结果"""),
+        ("user",
+         """请分析以下岗位列表，返回 JSON 格式结果。\n\n# 输出格式说明\n{format_instructions}\n\n# 待分析岗位列表\n{job_list}""")
+    ])
+    prompt = prompt_template.partial(format_instructions=parser.get_format_instructions())
+    chain = prompt | llm | parser
+
+    # 7. 【核心步骤】分批调用大模型进行分类
+    # 避免一次性发送过多岗位导致 Token 超限或超时
+    classification_map: Dict[str, bool] = {}
+    total_batches = (len(unique_jobs) + batch_size - 1) // batch_size
+
+    log.info(f"正在调用大模型进行分类（共分 {total_batches} 批）...")
+
+    for i in range(0, len(unique_jobs), batch_size):
+        batch_jobs = unique_jobs[i:i + batch_size]
+        job_list_text = "\n".join([f"- {job}" for job in batch_jobs])
+
+        max_retries = 3
+        retry_count = 0
+        success = False
+
+        while retry_count < max_retries and not success:
+            try:
+                result = chain.invoke({"job_list": job_list_text})
+                # 将结果存入映射表
+                for item in result.classifications:
+                    # 确保 key 也是.strip() 过的，方便后续匹配
+                    classification_map[item.job_title.strip()] = item.is_computer_related
+                log.info(f"  - 完成批次 {i // batch_size + 1}/{total_batches}")
+                success = True
+            except Exception as e:
+                retry_count += 1
+                import traceback
+                error_type = type(e).__name__
+                error_msg = str(e)
+                error_detail = traceback.format_exc() if retry_count == max_retries else ""
+
+                if retry_count < max_retries:
+                    log.warning(f"  - 批次 {i // batch_size + 1} 处理失败（重试 {retry_count}/{max_retries}）")
+                    log.warning(f"    错误类型: {error_type}")
+                    log.warning(f"    错误信息: {error_msg}")
+                    import time
+                    time.sleep(2)  # 等待2秒后重试
+                else:
+                    log.error(f"  - 批次 {i // batch_size + 1} 处理失败（已重试{max_retries}次）",exc_info=True)
+                    # 失败则该批次岗位默认视为非计算机岗（保守策略）
+                    continue
+
+    # 8. 【核心步骤】根据映射表过滤原 DataFrame
+    log.info("正在应用过滤规则到原表格...")
+
+    # 定义一个映射函数
+    def map_job_status(job_title):
+        if not isinstance(job_title, str):
+            return False
+        clean_title = job_title.strip()
+        # 如果大模型判断过，返回判断结果；如果没判断过（漏网之鱼），默认返回 False
+        return classification_map.get(clean_title, False)
+
+    # 创建掩码
+    mask = df[target_col].apply(map_job_status)
+    filtered_df = df[mask]
+
+    # 9. 覆盖保存原文件
+    try:
+        filtered_df.to_excel(file_path, index=False, engine='openpyxl')
+        log.info(f"处理完成！原始行数：{len(df)}, 保留行数：{len(filtered_df)}, 删除行数：{len(df) - len(filtered_df)}")
+        log.info(f"文件已覆盖保存：{file_path}")
+        return file_path
+    except Exception as e:
+        raise RuntimeError(f"保存文件失败，请检查文件是否被占用：{e}")
+
+
+# Excel表头到JobInfo字段的映射关系
+EXCEL_TO_MODEL_MAPPING = {
+    '岗位名称': 'job_title',
+    '地址': 'location',
+    '薪资范围': 'salary_range',
+    '公司名称': 'company_name',
+    '所属行业': 'industry',
+    '公司规模': 'company_size',
+    '公司类型': 'company_type',
+    '岗位编码': 'job_code',
+    '岗位详情': 'job_desc',
+    '更新日期': 'updated_time',
+    '公司详情': 'company_desc',
+    '岗位来源地址': 'job_source_url',
+}
+
+
+def read_excel_to_jobinfo(
+        file_path: str,
+        sheet_name: Optional[str] = 0,
+        skip_rows: int = 0
+) -> List[JobInfo]:
+    """
+    读取Excel表格并生成JobInfo实体列表
+
+    Args:
+        file_path: Excel文件路径
+        sheet_name: 工作表名称，默认为第一个工作表
+        skip_rows: 跳过的行数（如果表头不在第一行）
+
+    Returns:
+        List[JobInfo]: JobInfo实体对象列表
+    """
+    # 验证文件路径
+    if not Path(file_path).exists():
+        raise FileNotFoundError(f"文件不存在: {file_path}")
+
+    # 读取Excel文件
+    df = pd.read_excel(
+        file_path,
+        sheet_name=sheet_name,
+        skiprows=skip_rows,
+        dtype=str  # 默认全部读取为字符串，避免类型转换问题
+    )
+
+    # 检查必要的列是否存在
+    available_columns = set(df.columns)
+    missing_columns = set(EXCEL_TO_MODEL_MAPPING.keys()) - available_columns
+    if missing_columns:
+        log.warning(f"警告: 以下列在Excel中未找到: {missing_columns}")
+
+    job_info_list = []
+
+    for idx, row in df.iterrows():
+        try:
+            job_info_data = {}
+
+            # 遍历映射关系，将Excel数据转换为模型字段
+            for excel_col, model_field in EXCEL_TO_MODEL_MAPPING.items():
+                if excel_col in df.columns:
+                    value = row.get(excel_col)
+
+                    # 处理特殊字段类型
+                    if model_field == 'updated_at' and pd.notna(value):
+                        # 处理日期时间字段
+                        try:
+                            if isinstance(value, str):
+                                for fmt in ['%Y年%m月%d日', '%Y-%m-%d', '%Y/%m/%d', '%Y年%m月%d']:
+                                    try:
+                                        value = datetime.strptime(value, fmt)
+                                        break
+                                    except ValueError:
+                                        continue
+                            elif isinstance(value, pd.Timestamp):
+                                value = value.to_pydatetime()
+                        except (ValueError, TypeError):
+                            value = None
+                    else:
+                        # 其他字段转为字符串，处理NaN值
+                        value = str(value).strip() if pd.notna(value) else None
+
+                    job_info_data[model_field] = value
+
+            # 创建JobInfo实例（不保存到数据库）
+            job_info = JobInfo(**job_info_data)
+            job_info_list.append(job_info)
+
+        except Exception as e:
+            log.error(f"第{idx + 2}行数据解析失败: {e}", exc_info=True)
+            continue
+
+    return job_info_list
+
+
+def read_excel_to_jobinfo_dict(
+        file_path: str,
+        sheet_name: Optional[str] = 0
+) -> List[Dict[str, Any]]:
+    """
+    读取Excel表格并生成字典列表（不创建实体对象，更轻量）
+
+    Args:
+        file_path: Excel文件路径
+        sheet_name: 工作表名称
+
+    Returns:
+        List[Dict]: 字典列表，可直接用于批量插入数据库
+    """
+    df = pd.read_excel(file_path, sheet_name=sheet_name, dtype=str)
+
+    data_list = []
+    for _, row in df.iterrows():
+        record = {}
+
+        for excel_col, model_field in EXCEL_TO_MODEL_MAPPING.items():
+            if excel_col in df.columns:
+                value = row.get(excel_col)
+
+                if model_field == 'updated_at' and pd.notna(value):
+                    try:
+                        if isinstance(value, str):
+                            for fmt in ['%Y年%m月%d日', '%Y-%m-%d', '%Y/%m/%d', '%Y年%m月%d']:
+                                try:
+                                    value = datetime.strptime(value, fmt)
+                                    break
+                                except ValueError:
+                                    continue
+                        else:
+                            record[model_field] = None
+                    except:
+                        record[model_field] = None
+                else:
+                    record[model_field] = str(value).strip() if pd.notna(value) else None
+
+        data_list.append(record)
+
+    return data_list
+
+
+def parse_chinese_date(date_str):
+    """
+    将中文日期字符串转换为 datetime 对象
+    支持格式：'2025 年 4 月 11 日', '2025-04-11', '2025/04/11' 等
+    """
+    if not date_str or not isinstance(date_str, str):
+        return datetime.now()
+
+    # 尝试解析中文格式：2025 年 4 月 11 日
+    chinese_pattern = r'(\d{4}) 年 (\d{1,2}) 月 (\d{1,2}) 日'
+    match = re.match(chinese_pattern, date_str.strip())
+    if match:
+        year, month, day = map(int, match.groups())
+        return datetime(year, month, day)
+
+    # 尝试解析标准格式：2025-04-11 或 2025/04/11
+    for fmt in ['%Y-%m-%d', '%Y/%m/%d', '%Y-%m-%d %H:%M:%S']:
+        try:
+            return datetime.strptime(date_str.strip(), fmt)
+        except ValueError:
+            continue
+
+    # 如果都无法解析，返回当前时间
+    return datetime.now()
+
+def clean_job_excel(file_path, clean_title=True, clean_salary=True, clean_date=True, remove_duplicates=True,
+                    output_format=None):
+    """
+    清洗招聘数据 Excel 文件（支持.xls 和.xlsx 格式）
+
+    参数:
+        file_path: Excel 文件路径（.xls 或.xlsx）
+        clean_title: 是否清洗岗位名称中的多余括号及其内容（默认 True）
+        clean_salary: 是否统一薪资格式（默认 True，处理 1.6-3万·14薪 等复杂格式）
+        clean_date: 是否统一日期格式为"YYYY年M月D日"（默认 True）
+        remove_duplicates: 是否删除重复记录（默认 False）
+        output_format: 输出格式（'xls' 或 'xlsx'，默认 None 则保持原格式）
+    """
+
+    # 检查文件是否存在
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"文件不存在：{file_path}")
+
+    # 检查文件扩展名
+    file_ext = os.path.splitext(file_path)[1].lower()
+    if file_ext not in ['.xls', '.xlsx']:
+        raise ValueError(f"不支持的文件格式：{file_ext}，请使用.xls 或.xlsx")
+
+    # 读取 Excel 文件
+    df = pd.read_excel(file_path)
+
+    # 定义需要保持格式的列
+    target_columns = [
+        '岗位名称', '地址', '薪资范围', '公司名称', '所属行业',
+        '公司规模', '公司类型', '岗位编码', '岗位详情'
+    ]
+
+    # 检查必要列是否存在 (宽容模式：仅处理存在的列)
+    existing_cols = [col for col in target_columns if col in df.columns]
+
+    log.info(f"📊 原始数据行数：{len(df)}")
+
+    # ========== 1. 清洗岗位详情列 ==========
+    if '岗位详情' in existing_cols:
+        def clean_job_details(text):
+            if pd.isna(text):
+                return ''
+            text = str(text)
+            text = re.sub(r'<br\s*/?>', '', text, flags=re.IGNORECASE)  # 删除<br>标签
+            text = re.sub(r'[\n\r\t]', '', text)  # 删除换行符
+            text = re.sub(r'\s+', ' ', text)  # 删除多余空格
+            return text.strip()
+
+        df['岗位详情'] = df['岗位详情'].apply(clean_job_details)
+
+    # ========== 1.5 新增：清洗岗位名称 (去除括号及内部内容) ==========
+    if clean_title and '岗位名称' in existing_cols:
+        log.info("🔧 正在清洗岗位名称 (去除括号)...")
+
+        def clean_job_name(text):
+            if pd.isna(text):
+                return ''
+            text = str(text)
+            # 正则匹配中文全角括号（）和英文半角括号()及其内部所有内容
+            text = re.sub(r'\(.*?\)|\（.*?\）', '', text)
+            return text.strip()
+
+        df['岗位名称'] = df['岗位名称'].apply(clean_job_name)
+
+    # ========== 2. 统一其他列的数据类型 ==========
+    for col in existing_cols:
+        if col not in ['岗位详情', '岗位名称']:
+            df[col] = df[col].apply(lambda x: '' if pd.isna(x) else str(x).strip())
+
+    # ========== 3. 优化：统一薪资格式 ==========
+    if clean_salary and '薪资范围' in existing_cols:
+        log.info("🔧 正在统一薪资格式...")
+
+        def standardize_salary(text):
+            if pd.isna(text) or str(text).strip() == '':
+                return '面议'
+
+            text = str(text).strip()
+            if '面议' in text:
+                return '面议'
+
+            # 匹配数字（支持整数和小数），如 1.6-3 或 7000-12000
+            # group(1)为最小值，group(2)为最大值
+            num_pattern = r'(\d+(?:\.\d+)?)-?(\d+(?:\.\d+)?)?'
+
+            # 1. 处理 "万·X薪" 格式 (例如：1.6-3万·14薪)
+            if '万' in text and '薪' in text:
+                match = re.search(num_pattern, text)
+                salary_match = re.search(r'·\s*(\d+)\s*薪', text)
+                if match and salary_match:
+                    min_val = float(match.group(1))
+                    max_val = float(match.group(2)) if match.group(2) else min_val
+                    months = int(salary_match.group(1))
+
+                    # 转换逻辑：万 -> 元，再乘以薪数
+                    min_year = int(min_val * 10000 * months)
+                    max_year = int(max_val * 10000 * months)
+                    return f'{min_year}-{max_year}元/年'
+
+            # 2. 处理 "元·X薪" 格式 (例如：5000-10000元·13薪)
+            elif '元' in text and '薪' in text:
+                match = re.search(num_pattern, text)
+                salary_match = re.search(r'·\s*(\d+)\s*薪', text)
+                if match and salary_match:
+                    min_val = float(match.group(1))
+                    max_val = float(match.group(2)) if match.group(2) else min_val
+                    months = int(salary_match.group(1))
+                    min_year = int(min_val * months)
+                    max_year = int(max_val * months)
+                    return f'{min_year}-{max_year}元/年'
+
+            # 3. 处理纯 "万" 格式 (例如：1.1-1.8万)
+            elif '万' in text:
+                match = re.search(num_pattern, text)
+                if match:
+                    min_val = float(match.group(1))
+                    max_val = float(match.group(2)) if match.group(2) else min_val
+                    min_yuan = int(min_val * 10000)
+                    max_yuan = int(max_val * 10000)
+                    if min_yuan == max_yuan:
+                        return f'{min_yuan}元/月'
+                    return f'{min_yuan}-{max_yuan}元/月'
+
+            # 4. 处理 "元/天" 格式 (例如：100-150元/天)
+            elif '元/天' in text or '天' in text:
+                match = re.search(num_pattern, text)
+                if match:
+                    min_val = float(match.group(1))
+                    max_val = float(match.group(2)) if match.group(2) else min_val
+                    min_month = int(min_val * 22)  # 按22天计算
+                    max_month = int(max_val * 22)
+                    return f'{min_month}-{max_month}元/月'
+
+            # 5. 处理普通的 "元" 格式 (例如：7000-12000元)
+            elif '元' in text:
+                match = re.search(num_pattern, text)
+                if match:
+                    min_val = float(match.group(1))
+                    max_val = float(match.group(2)) if match.group(2) else min_val
+                    if min_val == max_val:
+                        return f'{int(min_val)}元/月'
+                    return f'{int(min_val)}-{int(max_val)}元/月'
+
+            return text
+
+        df['薪资范围'] = df['薪资范围'].apply(standardize_salary)
+
+    # ========== 4. 可选：统一日期格式 ==========
+    if clean_date:
+        log.info("🔧 正在统一日期格式...")
+
+        def parse_chinese_date(date_str):
+            """
+            将中文日期字符串转换为 datetime 对象
+            支持格式：'2025 年 4 月 11 日', '2025-04-11', '2025/04/11' 等
+            """
+            if not date_str or not isinstance(date_str, str):
+                return datetime.now()
+
+            # 尝试解析中文格式：2025 年 4 月 11 日
+            chinese_pattern = r'(\d{4}) 年 (\d{1,2}) 月 (\d{1,2}) 日'
+            match = re.match(chinese_pattern, date_str.strip())
+            if match:
+                year, month, day = map(int, match.groups())
+                return datetime(year, month, day)
+
+            # 尝试解析标准格式：2025-04-11 或 2025/04/11
+            for fmt in ['%Y-%m-%d', '%Y/%m/%d', '%Y-%m-%d %H:%M:%S']:
+                try:
+                    return datetime.strptime(date_str.strip(), fmt)
+                except ValueError:
+                    continue
+
+            # 如果都无法解析，返回当前时间
+            return datetime.now()
+
+        date_columns = [col for col in df.columns if '日期' in col or 'date' in col.lower() or '更新' in col]
+        for date_col in date_columns:
+            df[date_col] = df[date_col].apply(parse_chinese_date)
+
+    # ========== 5. 可选：删除重复记录 ==========
+    if remove_duplicates:
+        log.info("🔧 正在删除重复记录...")
+        original_count = len(df)
+        if '岗位编码' in existing_cols:
+            df = df.drop_duplicates(subset=['岗位编码'], keep='first')
+        elif '岗位名称' in existing_cols and '公司名称' in existing_cols:
+            df = df.drop_duplicates(subset=['岗位名称', '公司名称'], keep='first')
+
+        log.info(f"✓ 删除重复记录：{original_count - len(df)}条")
+
+    # ========== 6. 按岗位名称排序 ==========
+    if '岗位名称' in existing_cols:
+        df = df.sort_values(by='岗位名称', ascending=True, kind='stable')
+
+    df = df.reset_index(drop=True)
+
+    # ========== 7. 保存覆盖原文件 ==========
+    output_path = file_path
+    if output_format is not None:
+        output_format = '.' + output_format.lower().replace('.', '')
+        output_path = os.path.splitext(file_path)[0] + output_format
+    else:
+        output_format = file_ext
+
+    log.info(f"💾 正在保存文件...")
+    df.to_excel(output_path, index=False, engine='openpyxl')
+
+    log.info(f"✓ 数据清洗完成！处理后行数：{len(df)}")
+    log.info(f"✓ 文件已保存：{output_path}")
+
+    return df
+
+def process_excel_jobs(file_path: str, url_column_name: str='岗位来源地址'):
+    """
+    读取Excel，提取URL并抓取信息，最后写回原文件
+
+    参数:
+        file_path: Excel文件的路径
+        url_column_name: Excel中存放职位URL的列名
+    """
+    # 1. 加载数据
+    if not os.path.exists(file_path):
+        log.error(f"❌ 错误：找不到文件 {file_path}", exc_info=True)
+        return
+
+    # 根据后缀判断读取方式（pandas会自动处理）
+    df = pd.read_excel(file_path)
+
+    # 检查列名是否存在
+    if url_column_name not in df.columns:
+        log.error(f"❌ 错误：列名 '{url_column_name}' 不在表中，请检查！", exc_info=True)
+        return
+
+    log.info(f"🚀 开始处理，共 {len(df)} 行数据...")
+
+    # 2. 遍历并抓取
+    for index, row in df.iterrows():
+        url = row[url_column_name]
+
+        # 简单判断URL是否有效
+        if pd.isna(url) or str(url).strip() == "":
+            continue
+
+        log.info(f"🔍 正在抓取第 {index + 1} 行: {url}")
+
+        try:
+            # 调用你提供的抓取函数
+            from ai_service.scripts.py.recruitment_spider import fetch_job_info
+            job_info = fetch_job_info(url=url)
+
+            # 3. 判断字典是否为空（以及是否抓到了有效内容）
+            # 假设 fetch_job_info 返回 {} 或者 None 或者 字典值全为 None
+            if job_info and any(job_info.values()):
+                # 将获取到的信息填充到对应的列
+                for key, value in job_info.items():
+                    # 如果值为 None 或空字符串，则不修改也不添加
+                    if value is None or value == "":
+                        log.warning(f"⚠️ 第 {index + 1} 行抓取结果为空，跳过修改。")
+                        continue
+                    # 如果列不存在，pandas会自动创建新列
+                    df.at[index, key] = value
+                log.info(f"✅ 抓取成功")
+            else:
+                log.warning(f"⚠️ 第 {index + 1} 行抓取结果为空，跳过修改。")
+
+        except Exception as e:
+            log.error(f"❌ 处理第 {index + 1} 行时发生异常: {e}", exc_info=True)
+
+    # 4. 保存文件
+    output_path = file_path
+    _, ext = os.path.splitext(output_path)
+    output_format = ext.lower()
+
+    try:
+        if output_format == '.xls':
+            # .xls 格式使用 openpyxl 引擎（注意：openpyxl通常支持xlsx，老版xls可能需要xlwt，但依你要求写）
+            df.to_excel(output_path, index=False, engine='openpyxl')
+            log.info(f"💾 数据已保存至 {output_path}")
+            log.info("⚠️ 注意：.xls 格式最大支持 65536 行，如数据量大建议使用 .xlsx")
+        else:
+            # .xlsx 格式使用 openpyxl 引擎
+            df.to_excel(output_path, index=False, engine='openpyxl')
+            log.info(f"💾 数据已成功保存至 {output_path}")
+
+    except Exception as e:
+        log.error(f"❌ 保存文件失败: {e}", exc_info=True)
+
+# ========== 使用示例 ==========
+if __name__ == "__main__":
+    test_file_path = r"E:\软件工程相关资料\项目比赛\服创2026\岗位数据\a13基于AI的大学生职业规划智能体-JD采样数据.xls"
+    # filter_computer_jobs_excel(test_file_path)
+    clean_job_excel(test_file_path)
+    print("数据清洗完成！")
+    # read_excel_to_jobinfo(file_path)
+    # process_excel_jobs(file_path)
+
+
+
