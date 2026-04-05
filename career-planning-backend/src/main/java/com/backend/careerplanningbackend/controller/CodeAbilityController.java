@@ -20,14 +20,14 @@ import java.util.Map;
 public class CodeAbilityController {
 
     private final AiServiceClient aiServiceClient;
-    
+
     @PostMapping("/evaluate")
-    public Result getCodeAbility(CodeAbilityDTO codeAbilityDTO) {
+    public Result<Object> getCodeAbility(CodeAbilityDTO codeAbilityDTO) {
         Map<String, Object> params = new HashMap<>();
         params.put("url", codeAbilityDTO.getUrl());
         params.put("use_ai", codeAbilityDTO.getUse_ai());
-        AiChatResponse aiChatResponse = aiServiceClient.chatWithOtherJson("/codeAbility/evaluate", params);
+        AiChatResponse aiChatResponse = aiServiceClient.chatWithOtherJson("/codeAbility/evaluate", params, false);
         return Result.ok(aiChatResponse.getData());
     }
-    
+
 }
