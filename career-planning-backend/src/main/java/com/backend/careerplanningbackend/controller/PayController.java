@@ -10,6 +10,16 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * PayController
+ * 支付控制器
+ * 处理与支付相关的业务逻辑，包括创建订单、支付回调等
+ * 主要功能：
+ * 1. 创建支付订单并跳转到支付宝收银台
+ * 2. 处理支付宝异步支付结果通知
+ * 3. 订单支付接口
+ * @module PayController
+ */
 @Slf4j
 @RestController
 @RequestMapping("/member")
@@ -34,15 +44,29 @@ public class PayController {
 //    }
 
     /**
-     * 电脑网站支付：前端直接访问 /alipay/pagePay/{orderNumber}
-     * 浏览器会 302 到支付宝沙箱收银台
+     * orderNoPay
+     * 电脑网站支付订单接口
+     * 前端直接访问此接口，浏览器会 302 重定向到支付宝沙箱收银台
+     *
+     * @param paymentOrder 支付订单信息
+     * @param response HTTP 响应对象
+     * @throws Exception 支付异常
      */
     @GetMapping("/pay/order")
     public void orderNoPay(PaymentOrder paymentOrder, HttpServletResponse response) throws Exception {
         log.info("paymentOrder: {}", paymentOrder);
         payService.orderNoPay(paymentOrder,response);
     }
-    
+
+    /**
+     * pagePay
+     * 页面支付接口
+     * 根据订单号跳转到支付宝收银台
+     *
+     * @param orderNumber 订单号
+     * @param response HTTP 响应对象
+     * @throws Exception 支付异常
+     */
     @GetMapping("/pay/{orderNumber}")
     public void pagePay(@PathVariable Long orderNumber, HttpServletResponse response) throws Exception {
         log.info("orderNumber: {}", orderNumber);
@@ -50,11 +74,15 @@ public class PayController {
     }
 
     /**
-     * 支付成功异步通知
+     * returns
+     * 支付宝异步通知回调接口
+     * 当用户支付成功后，支付宝会调用此接口通知支付结果
+     *
+     * @param request HTTP 请求对象，包含支付结果通知
      */
     @PostMapping("/notify")
     public void returns(HttpServletRequest request) {
-        System.out.println("进入回调notify");
+        log.info("进入回调notify");
         payService.notifyPayment(request);
     }
 }
