@@ -14,25 +14,41 @@ from config import settings
 # 1. 定义 Agent 输出的结构化数据模型
 # ==========================================
 class GapItem(BaseModel):
-    dimension: str = Field(description="维度名称，如 '核心专业技能', '工具与平台能力' 等")
+    dimension: str = Field(
+        description="维度名称，如 '核心专业技能', '工具与平台能力' 等"
+    )
     required: str = Field(description="岗位原始要求")
     current: str = Field(description="学生当前掌握情况")
-    gap_analysis: str = Field(description="差距分析，需具体到技术点，如 '缺乏 Milvus 标量过滤经验'")
+    gap_analysis: str = Field(
+        description="差距分析，需具体到技术点，如 '缺乏 Milvus 标量过滤经验'"
+    )
+    adaptability: str = Field(description="对该技能的适应性评价，只有 '低'、'中'、'高' 三种")
 
 
 class DeepAnalysisResult(BaseModel):
-    can_apply: bool = Field(description="是否满足核心硬性要求及关键技能。若缺失核心项直接为 false")
+    can_apply: bool = Field(
+        description="是否满足核心硬性要求及关键技能。若缺失核心项直接为 false"
+    )
     score: int = Field(description="综合匹配度打分 0-100")
-    missing_key_skills: List[str] = Field(description="缺失的关键技能或硬性条件列表，若满足则为空列表")
-    gap_matrix: List[GapItem] = Field(description="详细的能力差距矩阵，仅列出有差距或需要提升的项")
+    missing_key_skills: List[str] = Field(
+        description="缺失的关键技能或硬性条件列表，若满足则为空列表"
+    )
+    gap_matrix: List[GapItem] = Field(
+        description="详细的能力差距矩阵，仅列出有差距或需要提升的项"
+    )
     actionable_advice: str = Field(description="给学生的一句话下一步行动建议")
+    all_analysis: str = Field(description="总的差距分析")
 
 
 # ==========================================
 # 2. 核心分析 Agent 类
 # ==========================================
 class CareerAnalystAgent:
-    def __init__(self, api_key: str = settings.llm.api_key.get_secret_value(), model: str = settings.llm.model_name):
+    def __init__(
+        self,
+        api_key: str = settings.llm.api_key.get_secret_value(),
+        model: str = settings.llm.model_name,
+    ):
         """
         初始化职业分析 Agent
         推荐使用 qwen-max 以保证复杂的 JSON 结构化输出和逻辑判断能力
@@ -61,9 +77,7 @@ class CareerAnalystAgent:
         try:
             # 强制要求模型输出 JSON 格式
             response = dashscope.Generation.call(
-                model=self.model,
-                prompt=prompt,
-                result_format='message'
+                model=self.model, prompt=prompt, result_format="message"
             )
 
             if response.status_code == 200:
@@ -81,7 +95,9 @@ class CareerAnalystAgent:
             log.error(f"❌ LLM 请求异常：{e}")
             return self._fallback_result()
 
-    async def _analyze_single_job_async(self, student_info: str, job: Dict[str, Any]) -> Dict[str, Any]:
+    async def _analyze_single_job_async(
+        self, student_info: str, job: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """
         异步分析单个岗位
         """
@@ -125,7 +141,7 @@ class CareerAnalystAgent:
         analysis_dict = await asyncio.to_thread(self._call_llm_sync, prompt)
 
         # 将分析结果回填到岗位字典中
-        job['deep_analysis'] = analysis_dict
+        job["deep_analysis"] = analysis_dict
         return job
 
     def _fallback_result(self) -> Dict[str, Any]:
@@ -135,14 +151,14 @@ class CareerAnalystAgent:
             "score": 0,
             "missing_key_skills": ["分析接口请求失败"],
             "gap_matrix": [],
-            "actionable_advice": "系统繁忙，请稍后重试"
+            "actionable_advice": "系统繁忙，请稍后重试",
         }
 
     async def batch_analyze_async(
-            self,
-            student_profile: StudentProfile,
-            retrieved_jobs: List[Dict[str, Any]],
-            top_k: int = 5
+        self,
+        student_profile: StudentProfile,
+        retrieved_jobs: List[Dict[str, Any]],
+        top_k: int = 5,
     ) -> List[Dict[str, Any]]:
         """
         并发执行批量分析并进行最终排序 (主入口)
@@ -154,8 +170,7 @@ class CareerAnalystAgent:
 
         # 1. 创建并发任务列表
         tasks = [
-            self._analyze_single_job_async(student_info, job)
-            for job in retrieved_jobs
+            self._analyze_single_job_async(student_info, job) for job in retrieved_jobs
         ]
 
         # 2. 等待所有任务并发完成 (这里将 10 个请求的时间压缩到 1 个请求的时间)
@@ -166,41 +181,15 @@ class CareerAnalystAgent:
         # 排序规则：can_apply 为 True 的排在前面，同状态下按 score 降序，最后按原向量召回 score 降序
         analyzed_jobs.sort(
             key=lambda x: (
-                x.get('deep_analysis', {}).get('can_apply', False),
-                x.get('deep_analysis', {}).get('score', 0),
-                x.get('score', 0)
+                x.get("deep_analysis", {}).get("can_apply", False),
+                x.get("deep_analysis", {}).get("score", 0),
+                x.get("score", 0),
             ),
-            reverse=True
+            reverse=True,
         )
 
         # 4. 截取最终需要展示的数量
         return analyzed_jobs[:top_k]
-
-# ==========================================
-# 1. 定义 Agent 输出的结构化数据模型
-# ==========================================
-class GapItem(BaseModel):
-    dimension: str = Field(description="维度名称，如 '核心专业技能', '工具与平台能力' 等")
-    required: str = Field(description="岗位原始要求")
-    current: str = Field(description="学生当前掌握情况")
-    gap_analysis: str = Field(description="差距分析，需具体到技术点，如 '缺乏 Milvus 标量过滤经验'")
-
-
-class DeepAnalysisResult(BaseModel):
-    can_apply: bool = Field(description="是否满足核心硬性要求及关键技能。若缺失核心项直接为 false")
-    score: int = Field(description="综合匹配度打分 0-100")
-    missing_key_skills: List[str] = Field(description="缺失的关键技能或硬性条件列表，若满足则为空列表")
-    gap_matrix: List[GapItem] = Field(description="详细的能力差距矩阵，仅列出有差距或需要提升的项")
-    actionable_advice: str = Field(description="给学生的一句话下一步行动建议")
-
-
-
-
-
-
-
-
-
 
 
 # 如果发现运行是model限流的话，就改career_analyst_agent.py这个文件

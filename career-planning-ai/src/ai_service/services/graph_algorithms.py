@@ -217,11 +217,13 @@ class GraphAlgorithms:
             if len(edges) == 1:
                 f, t, m = edges[0]
                 m["pareto_rank"] = 0
+                m["is_cross_community"] = m.get("is_cross_community", False) 
                 m.pop(TEMP_PENALTY_KEY, None) # 清理临时键
                 pareto_skeleton_edges[(f, t)] = m
                 continue
 
             objs = []
+
             for f, t, m in edges:
                 row =[]
                 for obj_name, is_higher_better in obj_configs:
@@ -247,7 +249,6 @@ class GraphAlgorithms:
 
                     # 清理内部使用的临时属性，保持输出结构干净
                     m.pop(TEMP_PENALTY_KEY, None)
-                    m.pop("is_cross_community", None)
 
                     pareto_skeleton_edges[(f, t)] = m
 
@@ -332,6 +333,9 @@ class GraphAlgorithms:
 
         # 2. 在纯内存中进行极速代数统计 (告别 Pydantic)
         total_jobs = len(set(row['job_id'] for row in raw_data))
+        if total_jobs == 0:
+            log.warning("无有效岗位数据, 跳过IDF计算")
+            return None
         comp_df = defaultdict(int)  # 记录每个能力在多少个岗位中出现过
 
         for row in raw_data:
@@ -343,6 +347,8 @@ class GraphAlgorithms:
         for comp_name, df in comp_df.items():
             # 经典 IDF 公式：log( N / DF )
             # 加上 1.0 是为了防止过于普遍的技能权重变成 0
+            if not raw_data:
+                return None
             idf_value = math.log(total_jobs / df) + 1.0 
 
             idf_updates.append({

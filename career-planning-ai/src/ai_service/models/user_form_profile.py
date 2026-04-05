@@ -181,6 +181,20 @@ class StudentFormProfile(BaseModel):
         alias="tools",
         description="工具/平台/框架列表（如‘Excel’‘Power BI’‘PyTorch’‘Figma’），去重后输出。",
     )
+    summary: str | None = Field(
+        None,
+        alias="summary",
+        description="ai对用户整体情况的总结描述，黄金语料")
+    strengths: list[str] | None = Field(
+        None,
+        alias="strengths",
+        description="优势列表"
+    )
+    weaknesses: list[str] | None = Field(
+        None,
+        alias="weaknesses",
+        description="劣势列表"
+    )
 
     # 3. 实践与产出 (这里是 AI 提取的“工作区”)
     # 修改：别名不与计算属性冲突，使用内部标识符
@@ -209,10 +223,10 @@ class StudentFormProfile(BaseModel):
     )
 
     # 4. 素质与规划
-    quiz: None = Field(
+    quizDetail: Optional[List[QuizDetailItem]] = Field(
         None,
-        alias="quiz",
-        description="保持为空对象，AI 不需要填充此字段，后续会根据其他字段内容自动生成测验分数结果。",
+        alias="quizDetail",
+        description="保持为空列表，AI 不需要填充此字段，后续会根据其他字段内容自动生成测验分数结果。",
     )
     innovation: Optional[str] = Field(
         None,
@@ -229,7 +243,7 @@ class StudentFormProfile(BaseModel):
         alias="targetIndustries",
         description="目标行业列表（如‘互联网’‘智能制造’‘金融科技’），去重后输出。",
     )
-    priorities: None = Field(
+    priorities: Optional[List[str]] = Field(
         None,
         alias="priorities",
         description="保持为空列表，AI 不需要填充此字段，后续会根据其他字段内容自动生成优先级排序结果。",
