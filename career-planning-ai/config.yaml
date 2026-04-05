@@ -9,14 +9,6 @@ communication:
   token:
     secret: <SECRET>
     expire: 1800
-lite_llm:
-  model_name: dashscope/qwen-max
-  qwen:
-    model_name: dashscope/qwen3.5-plus
-  deepseek:
-    model_name: dashscope/deepseek-v3-plus
-  image:
-    model_name: dashscope/qwen-vl-plus
 vector:
   model_name: text-embedding-v4
   llm_model_name: qwen-max
@@ -95,5 +87,9 @@ redis:
     code_ability: 7200
     report: 3600
     question: 3600
+neo4j:
+  url: neo4j+s://3f0cb79d.databases.neo4j.io
+  username: 3f0cb79d
+  password: <PASSWORD>
 other:
   ssl_verify: false
