@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, inject, ref } from 'vue'
+import { computed, inject, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/modules/user'
 import { useAppStore } from '@/stores/modules/app'
+import { getAccountPointsService } from '@/api/points'
 import { ArrowDown, User, SwitchButton, Menu as MenuIcon, Sunny, Moon } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
@@ -22,7 +23,12 @@ const userName = computed(
 const userAvatar = computed(() => (userStore.userInfo as any)?.avatar || '')
 
 const userPoints = computed(() => {
-  const rawPoints = Number((userStore.userInfo as any)?.points ?? (userStore.userInfo as any)?.score ?? 500)
+  const rawPoints = Number(
+    (userStore.userInfo as any)?.pointsBalance ??
+    (userStore.userInfo as any)?.points ??
+    (userStore.userInfo as any)?.score ??
+    500
+  )
   return Number.isNaN(rawPoints) ? 500 : rawPoints
 })
 
@@ -56,6 +62,28 @@ const handleLogout = () => {
   router.push('/login')
 }
 
+const syncAccountPoints = async () => {
+  const userId = Number(userStore.userInfo?.id)
+  if (!userStore.isLoggedIn || !userId) return
+
+  try {
+    const result = await getAccountPointsService(userId)
+    const payload = result.data
+
+    if (payload?.code !== 200 || !payload.data || !userStore.userInfo) {
+      return
+    }
+
+    userStore.userInfo = {
+      ...userStore.userInfo,
+      points: payload.data.pointsBalance,
+      pointsBalance: payload.data.pointsBalance
+    } as any
+  } catch (error) {
+    console.warn('同步账号积分失败', error)
+  }
+}
+
 const handleCommand = (command: string) => {
   if (command === 'logout') {
     confirmLogout()
@@ -85,6 +113,19 @@ const confirmLogout = () => {
       })
     })
 }
+
+onMounted(() => {
+  syncAccountPoints()
+})
+
+watch(
+  () => userStore.userInfo?.id,
+  (newId, oldId) => {
+    if (newId && newId !== oldId) {
+      syncAccountPoints()
+    }
+  }
+)
 </script>
 
 <template>

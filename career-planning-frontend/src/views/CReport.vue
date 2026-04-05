@@ -11,6 +11,13 @@
           <h1 class="hero-title">职业成长路径总览</h1>
           <p class="hero-desc">{{ data.student_summary }}</p>
 
+          <div class="hero-actions">
+            <el-button type="primary" size="large" :loading="consumeLoading" @click="handleConsumeReportPoints">
+              消耗 100 积分生成 AI 报告
+            </el-button>
+            <span class="hero-action-tip">调用 `/points/consume` 后会同步刷新当前积分</span>
+          </div>
+
           <div class="hero-stats">
             <div v-for="item in stats" :key="item.label" class="stat-item">
               <div class="stat-value">{{ item.value }}</div>
@@ -279,12 +286,36 @@
         </div>
       </template>
     </el-drawer>
+    <el-dialog v-model="consumeResultVisible" title="积分消费结果" width="640px">
+      <template v-if="consumeResult">
+        <div class="drawer-stack">
+          <div class="intern-detail-grid">
+            <div class="metric-card"><span>当前余额</span><strong>{{ consumeResult.pointsBalance }}</strong></div>
+            <div class="metric-card"><span>剩余积分</span><strong>{{ consumeResult.PointsRemainAmount }}</strong></div>
+            <div class="metric-card"><span>累计消耗</span><strong>{{ consumeResult.totalConsumed }}</strong></div>
+            <div class="metric-card"><span>状态</span><strong>{{ consumeResult.status }}</strong></div>
+          </div>
+
+          <el-descriptions :column="1" border>
+            <el-descriptions-item label="用户 ID">{{ consumeResult.userId }}</el-descriptions-item>
+            <el-descriptions-item label="记录 ID">{{ consumeResult.id }}</el-descriptions-item>
+            <el-descriptions-item label="会员截止时间">{{ consumeResult.endTime || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="活动截止时间">{{ consumeResult.ActivityEndTime || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="创建时间">{{ consumeResult.createTime || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="更新时间">{{ consumeResult.updateTime || '-' }}</el-descriptions-item>
+          </el-descriptions>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, defineComponent, h, reactive, ref } from 'vue'
 import { ArrowRight } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+import { useUserStore } from '@/stores/modules/user'
+import { consumePointsService, type PointsConsumeData } from '@/api/points'
 
 type ResourceItem = {
   id: string
@@ -520,6 +551,32 @@ const resourceDrawerVisible = ref(false)
 const internDrawerVisible = ref(false)
 const currentResource = ref<ResourceItem | null>(null)
 const currentIntern = ref<InternshipItem | null>(null)
+const consumeLoading = ref(false)
+const consumeResultVisible = ref(false)
+const consumeResult = ref<PointsConsumeData | null>(null)
+const userStore = useUserStore()
+
+const userPoints = computed(() => {
+  const rawPoints = Number(
+    (userStore.userInfo as any)?.pointsBalance ??
+    (userStore.userInfo as any)?.points ??
+    0
+  )
+  return Number.isNaN(rawPoints) ? 0 : rawPoints
+})
+
+const getVipLevel = () => {
+  const memberType = String((userStore.userInfo as any)?.memberType || 'normal').toLowerCase()
+  const vipMap: Record<string, number> = {
+    normal: 0,
+    monthly: 1,
+    quarterly: 2,
+    quarter: 2,
+    yearly: 3,
+    annual: 3
+  }
+  return vipMap[memberType] ?? 0
+}
 
 const tabOptions = [
   { label: '概览', value: 'overview' },
@@ -565,6 +622,53 @@ function openResource(resource: ResourceItem) {
 function openIntern(job: InternshipItem) {
   currentIntern.value = job
   internDrawerVisible.value = true
+}
+
+async function handleConsumeReportPoints() {
+  const userId = Number(userStore.userInfo?.id)
+  if (!userId) {
+    ElMessage.warning('请先登录后再生成 AI 报告')
+    return
+  }
+
+  if (userPoints.value < 100) {
+    ElMessage.error(`当前积分不足，生成报告需要 100 积分，当前仅剩 ${userPoints.value} 积分`)
+    return
+  }
+
+  consumeLoading.value = true
+  try {
+    const result = await consumePointsService({
+      amount: -100,
+      description: '购买AI职业成长报告',
+      status: 1,
+      type: 2,
+      userId,
+      vip: getVipLevel()
+    })
+
+    const payload = result.data
+    if (payload?.code !== 200 || !payload.data) {
+      throw new Error(payload?.msg || '积分消费失败')
+    }
+
+    consumeResult.value = payload.data
+    consumeResultVisible.value = true
+
+    if (userStore.userInfo) {
+      userStore.userInfo = {
+        ...userStore.userInfo,
+        points: payload.data.pointsBalance,
+        pointsBalance: payload.data.pointsBalance
+      } as any
+    }
+
+    ElMessage.success(`AI 报告积分扣减成功，当前剩余 ${payload.data.pointsBalance} 积分`)
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '积分消费失败')
+  } finally {
+    consumeLoading.value = false
+  }
 }
 
 const PlanPanel = defineComponent({
@@ -890,6 +994,19 @@ export default {}
   margin: 0;
   line-height: 1.9;
   color: rgba(255, 255, 255, 0.86);
+}
+
+.hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 20px;
+}
+
+.hero-action-tip {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 13px;
 }
 
 .hero-stats {
