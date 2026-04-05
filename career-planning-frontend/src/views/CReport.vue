@@ -354,7 +354,7 @@
               v-for="(action, idx) in data.action_checklist"
               :key="idx"
               :type="checkedActions[idx] ? 'success' : 'primary'"
-              :icon="checkedActions[idx] ? Check : CircleCheck"
+              :icon="checkedActions[idx] ? Check : Circle-Check"
             >
               <el-card 
                 :class="{ 'is-checked': checkedActions[idx] }"
@@ -620,7 +620,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import {
   InfoFilled, User, Warning, ArrowRight, ArrowDownBold,
   Check, CircleCheck, Timer, Document, ChatDotRound,
@@ -1030,12 +1030,10 @@ const parsedGaps = computed(() => {
   return data.value.current_gap.split(/;\s*|；/).filter(Boolean).map(gap => {
     const match = gap.match(/^\d+\.\s*(.+?)[:：](.+)$/)
     if (match) {
-      const titleText = match[1]?.trim() ?? ''
-      const descText = match[2]?.trim() ?? ''
       return {
-        title: titleText,
-        desc: descText,
-        level: titleText.includes('框架') || titleText.includes('数据库') ? 1 : 2
+        title: match[1].trim(),
+        desc: match[2].trim(),
+        level: match[1].includes('框架') || match[1].includes('数据库') ? 1 : 2
       }
     }
     return { title: '能力短板', desc: gap, level: 2 }
@@ -1064,9 +1062,8 @@ function openTasksDialog(milestone: MilestoneItem): void {
 }
 
 function openTaskDetail(task: TaskItem): void {
-  const resource = task.resources[0]
-  if (resource) {
-    openResource(resource)
+  if (task.resources.length > 0) {
+    openResource(task.resources[0])
   }
 }
 
@@ -1097,10 +1094,9 @@ function stringToColor(str: string): string {
   const colors = ['#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#3b82f6']
   let hash = 0
   for (let i = 0; i < str.length; i++) {
-    hash = ((hash << 5) - hash + str.charCodeAt(i)) | 0  // 限制为32位整数
+    hash = str.charCodeAt(i) + ((hash << 5) - hash)
   }
-  // 使用无符号右移处理负哈希值，避免 Math.abs(Integer.MIN_VALUE) 问题
-  return (colors[(hash >>> 0) % colors.length] ?? colors[0]) as string
+  return colors[Math.abs(hash) % colors.length]
 }
 
 function getResourceIcon(resource: ResourceItem): string {
