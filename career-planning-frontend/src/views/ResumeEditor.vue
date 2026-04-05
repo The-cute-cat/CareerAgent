@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { ArrowLeft, CircleCheck, Download, Files, RefreshRight, UploadFilled, Warning } from '@element-plus/icons-vue'

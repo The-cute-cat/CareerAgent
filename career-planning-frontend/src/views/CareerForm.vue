@@ -314,6 +314,29 @@ const completedStepCount = computed(() => {
   return [1, 2, 3, 4, 5].filter((step) => isStepCompleted(step)).length
 })
 
+const currentSectionDescription = computed(() => {
+  const descriptions: Record<string, string> = {
+    '1': '聚焦本步核心信息完善',
+    '2': '补充技能、证书与能力标签',
+    '3': '记录项目成果与实践履历',
+    '4': '完成测评后可提升画像准确度',
+    '5': '明确岗位偏好与发展方向'
+  }
+  return descriptions[activeMenu.value] || '聚焦本步核心信息完善'
+})
+
+const readinessText = computed(() => {
+  if (profileCompleteness.value >= 80) return '较完善'
+  if (profileCompleteness.value >= 40) return '完善中'
+  return '待完善'
+})
+
+const readinessHint = computed(() => {
+  if (profileCompleteness.value >= 80) return '信息较完整，后续建议会更准确'
+  if (profileCompleteness.value >= 40) return '继续补充关键信息可提升评估质量'
+  return '完善越充分，后续建议越准确'
+})
+
 const hasValidLanguage = (languages: Array<{ type: string; level: string }>) => {
   return Array.isArray(languages) && languages.some((language) => {
     const type = typeof language?.type === 'string' ? language.type.trim() : ''
@@ -2412,52 +2435,51 @@ const resetForm = () => {
         <el-card v-if="activeProfileTab === 'resume'" class="form-card">
           <template #header>
             <div class="dashboard-header-modern">
-              <div class="header-left">
-                <div class="current-step-badge">Phase {{ activeMenu }}</div>
-                <h2>{{ currentSectionTitle }}</h2>
-                <div class="step-indicator">
-                  {{ ['Profile', 'Expertise', 'Journey', 'Assessment', 'Objective'][parseInt(activeMenu) - 1] }}
+              <div class="dashboard-hero-main">
+                <div class="header-left">
+                  <h2>{{ currentSectionTitle }}</h2>
+                  <div class="step-indicator">第 {{ activeMenu }} 步，共 5 步</div>
                 </div>
+
+                <div class="dashboard-progress-panel">
+                  <span class="dashboard-progress-label">完成度 {{ formProgress }}%</span>
+                  <el-progress
+                    :percentage="formProgress"
+                    :show-text="false"
+                    :stroke-width="10"
+                    class="dashboard-progress-bar"
+                  />
+                </div>
+              </div>
+
+              <div class="dashboard-pill-row">
+                <span class="dashboard-pill dashboard-pill--primary">画像完整度 {{ profileCompleteness }}%</span>
+                <span class="dashboard-pill">逐步完善后可生成更准确评估</span>
               </div>
 
               <div class="dashboard-stat-row">
                 <div class="dash-stat-item">
-                  <div class="stat-icon purple">
-                    <el-icon>
-                      <Medal />
-                    </el-icon>
-                  </div>
                   <div class="stat-info">
-                    <span class="stat-label">画像精准度</span>
-                    <span class="stat-value">{{ profileCompleteness }}%</span>
+                    <span class="stat-label">当前阶段</span>
+                    <span class="stat-value">{{ currentSectionTitle }}</span>
+                    <span class="stat-desc">{{ currentSectionDescription }}</span>
                   </div>
-                  <div class="stat-glass-glow"></div>
                 </div>
 
                 <div class="dash-stat-item">
-                  <div class="stat-icon blue">
-                    <el-icon>
-                      <Finished />
-                    </el-icon>
-                  </div>
                   <div class="stat-info">
                     <span class="stat-label">已完成步骤</span>
                     <span class="stat-value">{{ completedStepCount }}/5</span>
+                    <span class="stat-desc">每完成一步都会提升画像可用性</span>
                   </div>
-                  <div class="stat-glass-glow"></div>
                 </div>
 
                 <div class="dash-stat-item">
-                  <div class="stat-icon orange">
-                    <el-icon>
-                      <DataAnalysis />
-                    </el-icon>
-                  </div>
                   <div class="stat-info">
                     <span class="stat-label">评估准备度</span>
-                    <span class="stat-value">{{ profileCompleteness >= 80 ? '高' : '中' }}</span>
+                    <span class="stat-value">{{ readinessText }}</span>
+                    <span class="stat-desc">{{ readinessHint }}</span>
                   </div>
-                  <div class="stat-glass-glow"></div>
                 </div>
               </div>
             </div>
@@ -2509,7 +2531,7 @@ const resetForm = () => {
             </div>
 
             <!-- 2. 技能与证书 -->
-            <div v-show="activeMenu === '2'" class="section-content">
+           <div v-show="activeMenu === '2'" class="section-content">
               <div class="form-section-title">外语能力</div>
               <el-form-item label="外语水平" prop="languages">
                 <div class="list-container">
@@ -2528,14 +2550,14 @@ const resetForm = () => {
                     <!-- 语种选择"其他"时的自定义输入 -->
                     <template v-if="lang.type === '其他'">
                       <el-input v-model="lang.other" placeholder="请输入语种" style="width: 150px" />
-                      <el-button type="primary" size="small" @click="confirmCustomLanguage(index, 'type')">
+                      <el-button type="primary" @click="confirmCustomLanguage(index, 'type')">
                         确认
                       </el-button>
                     </template>
                     <!-- 水平选择"其他"时的自定义输入 -->
                     <template v-else-if="lang.level === '其他'">
                       <el-input v-model="lang.other" placeholder="请输入证书" style="width: 150px" />
-                      <el-button type="primary" size="small" @click="confirmCustomLanguage(index, 'level')">
+                      <el-button type="primary" @click="confirmCustomLanguage(index, 'level')">
                         确认
                       </el-button>
                     </template>
@@ -2604,16 +2626,31 @@ const resetForm = () => {
               </el-form-item>
 
               <!-- 代码能力 -->
-              <el-form-item label="代码能力" prop="codeAbility">
+              <el-form-item 
+                label="代码能力" 
+                prop="codeAbility"
+              >
                 <div class="code-ability-panel">
                   <div class="code-ability-row">
-                    <el-input v-model="formData.codeAbility.links"
-                      placeholder="请输入 GitHub / Gitee 仓库链接，如 https://github.com/user/repo" style="flex: 1" />
-                    <el-button type="warning" :icon="DataAnalysis" :loading="codeAbilityEvaluating"
-                      @click="handleCodeAbilityEvaluate">
+                    <el-input
+                      v-model="formData.codeAbility.links"
+                      placeholder="请输入 GitHub / Gitee 仓库链接，如 https://github.com/user/repo"
+                      style="flex: 1"
+                    />
+                    <el-button
+                      type="warning"
+                      :icon="DataAnalysis"
+                      :loading="codeAbilityEvaluating"
+                      @click="handleCodeAbilityEvaluate"
+                    >
                       {{ codeAbilityEvaluating ? '评估中...' : '开始评估' }}
                     </el-button>
-                    <el-button v-if="codeAbilityResult" plain :icon="Rank" @click="showCodeAbilityResultDialog">
+                    <el-button
+                      v-if="codeAbilityResult"
+                      plain
+                      :icon="Rank"
+                      @click="showCodeAbilityResultDialog"
+                    >
                       查看结果
                     </el-button>
                   </div>
@@ -2621,7 +2658,12 @@ const resetForm = () => {
                   <div class="code-ability-toolbar">
                     <div class="code-ability-ai-toggle">
                       <span class="toggle-label">深度分析</span>
-                      <el-switch v-model="codeAbilityUseAi" inline-prompt active-text="开" inactive-text="关" />
+                      <el-switch
+                        v-model="codeAbilityUseAi"
+                        inline-prompt
+                        active-text="开"
+                        inactive-text="关"
+                      />
                       <span class="toggle-hint">开启后会返回 AI 深度分析的内容</span>
                     </div>
                     <div class="code-ability-input-hint">
@@ -2634,16 +2676,14 @@ const resetForm = () => {
                       <div class="summary-score">{{ codeAbilityResult.composite_score }}</div>
                       <div class="summary-meta">
                         <div class="summary-title">
-                          {{ lastEvaluatedCodeRepoUrls.length > 1 ? `已评估 ${lastEvaluatedCodeRepoUrls.length} 个仓库` :
-                            (getCodeRepoMeta(lastEvaluatedCodeRepoUrls[0] || '').repo || '未命名仓库') }}
+                          {{ lastEvaluatedCodeRepoUrls.length > 1 ? `已评估 ${lastEvaluatedCodeRepoUrls.length} 个仓库` : (getCodeRepoMeta(lastEvaluatedCodeRepoUrls[0] || '').repo || '未命名仓库') }}
                           <el-tag size="small" :type="getCodeAbilityTagType(codeAbilityResult.composite_score)">
                             {{ codeAbilityResult.level || '未评级' }}
                           </el-tag>
                         </div>
                         <div class="summary-subtitle">
                           {{ getRepoDisplayNames(lastEvaluatedCodeRepoUrls).slice(0, 3).join(' · ') }}
-                          <span v-if="lastEvaluatedCodeRepoUrls.length > 3"> 等 {{ lastEvaluatedCodeRepoUrls.length }}
-                            个仓库</span>
+                          <span v-if="lastEvaluatedCodeRepoUrls.length > 3"> 等 {{ lastEvaluatedCodeRepoUrls.length }} 个仓库</span>
                         </div>
                       </div>
                     </div>
@@ -2656,9 +2696,13 @@ const resetForm = () => {
             </div>
 
             <!-- 3. 经历与项目 -->
-            <div v-show="activeMenu === '3'" class="section-content">
-              <div class="form-section-title">项目经历</div>
-              <el-form-item label="项目或竞赛">
+            <div v-show="activeMenu === '3'" class="section-content experience-section">
+              <!-- 项目经历 -->
+              <div class="experience-block">
+                <div class="experience-block-title">
+                  <span class="dot-indicator"></span>
+                  <span>项目经历</span>
+                </div>
                 <div class="experience-list-modern">
                   <div v-for="(proj, index) in formData.projects" :key="index" class="premium-exp-card"
                     :class="{ 'is-competition': proj.isCompetition }">
@@ -2686,14 +2730,20 @@ const resetForm = () => {
                     </div>
                   </div>
                 </div>
-                <el-button class="add-experience-btn" type="primary" plain :icon="Plus" @click="openProjectDialog">
-                  <span class="btn-text">添加项目/竞赛</span>
-                  <span class="btn-hint">记录你的精彩作品</span>
-                </el-button>
-              </el-form-item>
+                <el-form-item label="项目或竞赛" class="experience-form-item">
+                  <div class="experience-add-box" @click="openProjectDialog">
+                    <span class="add-link">添加项目/竞赛</span>
+                    <span class="add-hint">记录你的精彩作品</span>
+                  </div>
+                </el-form-item>
+              </div>
 
-              <div class="form-section-title">实践经历</div>
-              <el-form-item label="实习/工作" prop="internships">
+              <!-- 实践经历 -->
+              <div class="experience-block">
+                <div class="experience-block-title">
+                  <span class="dot-indicator"></span>
+                  <span>实践经历</span>
+                </div>
                 <div class="experience-list-modern">
                   <div v-for="(intern, index) in formData.internships" :key="index"
                     class="premium-exp-card internship-themed">
@@ -2727,11 +2777,13 @@ const resetForm = () => {
                     </div>
                   </div>
                 </div>
-                <el-button class="add-experience-btn" type="primary" plain :icon="Plus" @click="openInternshipDialog">
-                  <span class="btn-text">添加实践经历</span>
-                  <span class="btn-hint">丰富你的职场履历</span>
-                </el-button>
-              </el-form-item>
+                <el-form-item label="实习/工作" prop="internships" class="experience-form-item">
+                  <div class="experience-add-box internship-box" @click="openInternshipDialog">
+                    <span class="add-link">添加实践经历</span>
+                    <span class="add-hint">丰富你的职场履历</span>
+                  </div>
+                </el-form-item>
+              </div>
             </div>
 
             <!-- 4. 素质测评 -->
@@ -3963,6 +4015,391 @@ const resetForm = () => {
   gap: 10px;
 }
 
+.sidebar-menu :deep(.el-menu-item:hover) {
+  background: rgba(237, 245, 255, 0.96);
+  color: #2f7df6;
+}
+
+.sidebar-menu :deep(.el-menu-item.is-active) {
+  background: linear-gradient(135deg, rgba(229, 241, 255, 0.98), rgba(242, 248, 255, 0.98));
+  color: #2f7df6;
+  box-shadow: 0 10px 20px rgba(47, 125, 246, 0.12);
+}
+
+.sidebar-menu :deep(.el-menu-item.is-completed) {
+  color: #10b981;
+}
+
+.sidebar-menu :deep(.el-menu-item.is-completed:not(.is-active)) {
+  background: rgba(240, 253, 244, 0.9);
+}
+
+.sidebar-menu :deep(.el-menu-item.is-completed:not(.is-active)):hover {
+  background: rgba(220, 252, 231, 0.96);
+}
+
+.menu-step {
+  width: 26px;
+  height: 26px;
+  border-radius: 9px;
+  background: #eef4fb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #6b7f96;
+  flex-shrink: 0;
+  transition: all 0.24s ease;
+}
+
+.sidebar-menu :deep(.el-menu-item.is-active .menu-step) {
+  background: linear-gradient(135deg, #409eff 0%, #1677ff 100%);
+  color: #fff;
+  box-shadow: 0 8px 16px rgba(64, 158, 255, 0.28);
+}
+
+.sidebar-menu :deep(.el-menu-item.is-completed .menu-step) {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  color: #fff;
+}
+
+.menu-text {
+  flex: 1;
+}
+
+.menu-check {
+  font-size: 16px;
+  color: #16a34a;
+  opacity: 0;
+  transform: scale(0.8);
+  transition: all 0.24s ease;
+}
+
+.sidebar-menu :deep(.el-menu-item.is-completed .menu-check) {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.resume-upload-section {
+  padding: 16px;
+  margin: 12px;
+  background: linear-gradient(180deg, rgba(244, 248, 255, 0.95), rgba(238, 245, 255, 0.92));
+  border-radius: 18px;
+  border: 1px solid rgba(220, 231, 244, 0.96);
+  flex-shrink: 0;
+  box-shadow: 0 12px 30px rgba(22, 59, 102, 0.08);
+}
+
+.upload-btn {
+  width: 100%;
+  border-radius: 14px;
+  font-weight: 500;
+  font-size: 13px;
+  padding: 10px 0;
+}
+
+.upload-btn.el-button--info {
+  background: #909399;
+  border: none;
+  color: #ffffff !important;
+}
+
+.upload-btn.el-button--info:hover {
+  background: #a6a9ad;
+}
+
+.resume-continue-btn {
+  width: 100%;
+  margin-top: 10px;
+  margin-left: auto;
+  padding: 10px 18px;
+  border-radius: 14px;
+  box-sizing: border-box;
+  border-color: rgba(230, 162, 60, 0.45);
+  color: #b76a00;
+  background: rgba(255, 247, 237, 0.92);
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.resume-continue-btn:hover {
+  border-color: rgba(230, 162, 60, 0.68);
+  color: #9a5a00;
+  background: rgba(255, 243, 224, 0.96);
+}
+
+.resume-continue-btn :deep(> span) {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.resume-continue-tip {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #8a6a2f;
+}
+
+.main-content {
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+}
+
+.form-card {
+  width: 100%;
+  max-width: 1040px;
+  margin: 0 auto;
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(220, 231, 244, 0.96);
+  height: auto;
+  min-height: fit-content;
+  box-shadow:
+    0 18px 42px rgba(22, 59, 102, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.84);
+  overflow: hidden;
+}
+
+.form-card :deep(.el-card__header) {
+  padding: 24px 28px;
+  border-bottom: 1px solid rgba(225, 234, 244, 0.94);
+  background: linear-gradient(180deg, rgba(248, 251, 255, 0.94), rgba(244, 248, 255, 0.92));
+}
+
+.form-card :deep(.el-card__body) {
+  padding: 28px;
+  height: auto;
+  min-height: auto;
+}
+
+.form-card :deep(.el-form) {
+  display: flex;
+  flex-direction: column;
+  height: auto;
+  min-height: auto;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+}
+
+.dashboard-header-modern {
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+
+.dashboard-hero-main {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.header-left {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 12px;
+}
+
+.title-section h2,
+.header-left h2 {
+  margin: 0;
+  font-size: 32px;
+  font-weight: 800;
+  line-height: 1.2;
+  color: #173a5d;
+}
+
+.subtitle {
+  margin: 0;
+  font-size: 13px;
+  color: #8aa0b7;
+  font-weight: 500;
+}
+
+.step-indicator {
+  color: #8aa3c0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.dashboard-progress-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+  min-width: 280px;
+  padding-top: 8px;
+}
+
+.dashboard-progress-label {
+  color: #6f89a8;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.dashboard-progress-bar {
+  width: 280px;
+}
+
+.dashboard-progress-bar :deep(.el-progress-bar__outer) {
+  background: rgba(15, 23, 42, 0.05);
+  border-radius: 999px;
+}
+
+.dashboard-progress-bar :deep(.el-progress-bar__inner) {
+  background: linear-gradient(90deg, #3b82f6 0%, #60a5fa 100%);
+  border-radius: 999px;
+}
+
+.dashboard-pill-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.dashboard-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 999px;
+  background: #edf3fc;
+  color: #6d85a4;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.dashboard-pill--primary {
+  background: #e9f1ff;
+  color: #2f7df6;
+}
+
+.header-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.header-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(47, 125, 246, 0.1);
+  color: #2f7df6;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.header-badge--soft {
+  background: rgba(136, 160, 186, 0.12);
+  color: #6f839a;
+}
+
+.dashboard-stat-row,
+.header-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.dashboard-stat-row {
+  min-width: min(100%, 560px);
+}
+
+.header-stats {
+  margin-top: 20px;
+}
+
+.dash-stat-item,
+.header-stat-card {
+  position: relative;
+  padding: 28px 28px 26px;
+  border-radius: 26px;
+  border: 1px solid rgba(210, 225, 244, 0.98);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 250, 255, 0.94));
+  box-shadow: 0 14px 36px rgba(67, 103, 149, 0.06);
+  overflow: hidden;
+}
+
+.dash-stat-item {
+  display: block;
+}
+
+.stat-info {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.stat-label {
+  display: inline-block;
+  margin-bottom: 0;
+  color: #7f9abd;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.header-stat-card strong,
+.stat-value {
+  display: block;
+  margin-bottom: 0;
+  color: #173a5d;
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.header-stat-card small {
+  display: block;
+  color: #8aa0b7;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.stat-desc {
+  color: #8aa3c0;
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+.progress-label {
+  font-size: 12px;
+  color: #6c8199;
+  font-weight: 600;
+}
+
+.progress-bar {
+  width: 180px;
+}
+
+.progress-bar :deep(.el-progress-bar__outer) {
+  background-color: #f0f0f0;
+  border-radius: 4px;
+}
+
+.progress-bar :deep(.el-progress-bar__inner) {
+  background: #409eff;
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
 /* 高端侧边栏重塑 */
 .premium-sidebar {
   background: rgba(255, 255, 255, 0.4);
@@ -4217,7 +4654,7 @@ const resetForm = () => {
 
 /* 表单内容样式 */
 .section-content {
-  padding: 18px 20px;
+ padding: 18px 20px;
   border: 1px solid rgba(227, 236, 245, 0.92);
   border-radius: 24px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(248, 251, 255, 0.96));
@@ -4240,22 +4677,24 @@ const resetForm = () => {
 
 /* 分组标题 */
 .form-section-title {
-  font-size: 18px;
-  font-weight: 800;
-  color: #1e293b;
-  margin: 32px 0 20px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #173a5d;
+  margin: 28px 0 18px;
+  padding-left: 0;
+  border-left: none;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
 }
 
 .form-section-title::before {
   content: '';
-  width: 4px;
-  height: 20px;
-  background: linear-gradient(180deg, #409eff 0%, #1677ff 100%);
-  border-radius: 4px;
-  box-shadow: 0 2px 6px rgba(64, 158, 255, 0.3);
+  width: 16px;
+  height: 16px;
+  background: linear-gradient(180deg, #60a5fa 0%, #3b82f6 100%);
+  border-radius: 50%;
+  box-shadow: 0 0 0 8px rgba(59, 130, 246, 0.12);
 }
 
 .form-section-title:first-child {
@@ -4286,25 +4725,26 @@ const resetForm = () => {
 }
 
 :deep(.el-form-item__label) {
-  font-size: 14px;
-  color: #274766;
-  font-weight: 600;
-  padding-right: 16px;
-  height: 40px;
-  line-height: 40px;
+  font-size: 16px;
+  color: #183b68;
+  font-weight: 700;
+  padding-right: 24px;
+  height: 48px;
+  line-height: 48px;
 }
 
 /* 输入框样式优化 */
 :deep(.el-input__wrapper),
 :deep(.el-textarea__inner) {
-  box-shadow: 0 0 0 1px rgba(214, 225, 238, 0.96) inset;
+  box-shadow: 0 0 0 1px rgba(208, 222, 239, 0.98) inset;
   transition: all 0.2s ease;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.96);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.98);
 }
 
 :deep(.el-input__wrapper) {
-  min-height: 42px;
+  min-height: 50px;
+  padding: 0 16px;
 }
 
 :deep(.el-input__wrapper:hover),
@@ -4314,13 +4754,13 @@ const resetForm = () => {
 
 :deep(.el-input__wrapper.is-focus) {
   box-shadow:
-    0 0 0 1px rgba(47, 125, 246, 0.8) inset,
+    0 0 0 2px rgba(59, 130, 246, 0.86) inset,
     0 0 0 4px rgba(47, 125, 246, 0.08);
 }
 
 /* 选择器样式 */
 :deep(.el-select .el-input__wrapper) {
-  border-radius: 4px;
+  border-radius: 16px;
 }
 
 :deep(.el-select .el-input__inner::placeholder) {
@@ -4329,7 +4769,7 @@ const resetForm = () => {
 
 /* 日期选择器 */
 :deep(.el-date-editor.el-input__wrapper) {
-  border-radius: 4px;
+  border-radius: 20px;
 }
 
 :deep(.el-date-editor .el-input__prefix) {
@@ -4338,11 +4778,17 @@ const resetForm = () => {
 
 /* 级联选择器 */
 :deep(.el-cascader .el-input__wrapper) {
-  border-radius: 4px;
+  border-radius: 16px;
 }
 
 :deep(.el-cascader .el-input__suffix) {
   color: #909399;
+}
+
+:deep(.el-form-item.is-required:not(.is-no-asterisk).asterisk-left > .el-form-item__label::before),
+:deep(.el-form-item.is-required:not(.is-no-asterisk) > .el-form-item__label::before) {
+  color: #ff6b6b;
+  margin-right: 6px;
 }
 
 /* 行间距优化 */
@@ -5135,6 +5581,15 @@ const resetForm = () => {
   background: #85ce61;
 }
 
+/* 列表样式 */
+.list-container,
+.input-list-group {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 /* 添加按钮样式 */
 .add-item-btn {
   margin-top: 10px;
@@ -5153,6 +5608,21 @@ const resetForm = () => {
 .add-input-row .el-button {
   padding: 0 20px;
   border-radius: 4px;
+  white-space: nowrap;
+}
+
+.list-row,
+.skill-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  background: linear-gradient(180deg, #f7fbff 0%, #f2f7fd 100%);
+  border-radius: 16px;
+  border: 1px solid rgba(220, 231, 244, 0.96);
+  transition: all 0.2s ease;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
 /* 技能名称 */
@@ -5160,13 +5630,14 @@ const resetForm = () => {
   font-weight: 500;
   color: #303133;
   font-size: 14px;
-  min-width: 80px;
+  min-width: 60px;
 }
 
-/* 技能操作按钮组 */
+/* 技能操作按钮组 - 靠右对齐 */
 .skill-actions {
   display: flex;
   gap: 4px;
+  margin-left: auto;
 }
 
 /* 代码能力行 */
@@ -6185,6 +6656,15 @@ const resetForm = () => {
     grid-template-columns: 1fr;
   }
 
+  .dashboard-header-modern {
+    flex-direction: column;
+  }
+
+  .dashboard-stat-row {
+    grid-template-columns: 1fr;
+    min-width: 0;
+  }
+
   .section-content {
     padding: 16px;
     border-radius: 20px;
@@ -6326,6 +6806,97 @@ const resetForm = () => {
 }
 
 .info-date {
+  font-size: 13px;
+  color: #909399;
+}
+
+/* 经历区块样式 */
+.experience-section {
+  padding: 0;
+}
+
+.experience-block {
+  margin-bottom: 32px;
+}
+
+.experience-block:last-child {
+  margin-bottom: 0;
+}
+
+.experience-block-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 500;
+  color: #303133;
+  margin-bottom: 20px;
+}
+
+.dot-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #409eff;
+  flex-shrink: 0;
+}
+
+/* 经历表单项样式 */
+.experience-form-item {
+  margin-bottom: 0;
+  margin-top: 12px;
+}
+
+.experience-form-item :deep(.el-form-item__label) {
+  font-size: 14px;
+  color: #606266;
+  font-weight: 400;
+  padding-right: 12px;
+}
+
+.experience-form-item :deep(.el-form-item__content) {
+  display: flex;
+  align-items: center;
+}
+
+.experience-add-box {
+  width: 100%;
+  min-height: 56px;
+  padding: 12px 20px;
+  border: 1.5px dashed #409eff;
+  border-radius: 8px;
+  background-color: #f5f9ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.experience-add-box:hover {
+  background-color: #ecf5ff;
+  border-color: #66b1ff;
+  box-shadow: 0 2px 12px rgba(64, 158, 255, 0.15);
+}
+
+.experience-add-box.internship-box {
+  border-color: #c0c4cc;
+  background-color: #fafafa;
+}
+
+.experience-add-box.internship-box:hover {
+  border-color: #409eff;
+  background-color: #f5f9ff;
+}
+
+.experience-add-box .add-link {
+  font-size: 14px;
+  color: #409eff;
+  font-weight: 500;
+}
+
+.experience-add-box .add-hint {
   font-size: 13px;
   color: #909399;
 }
