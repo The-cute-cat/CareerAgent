@@ -7,9 +7,10 @@ import { RouterView } from 'vue-router'
 </template>
 
 <style>
+/* 引入全局原子化样式 */
 @import '/css/style.css';
 
-/* 添加全局样式确保全屏显示 */
+/* 基础布局重置：确保全屏显示 */
 html, body, #app {
   height: 100%;
   margin: 0;
@@ -17,6 +18,7 @@ html, body, #app {
   width: 100%;
 }
 
+/* 根容器布局：使用 Flex 纵向排列 */
 #app {
   display: flex;
   flex-direction: column;

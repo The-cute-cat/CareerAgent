@@ -13,6 +13,16 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * CodeAbilityController
+ * 代码能力评估控制器
+ * 用于调用 AI 服务评估用户的代码能力
+ * 主要功能：
+ * 1. 接收代码仓库 URL，评估用户的代码能力
+ * 2. 支持使用 AI 进行智能分析
+ * 3. 返回代码能力评估结果
+ * @module CodeAbilityController
+ */
 @Slf4j
 @RestController
 @RequestMapping("/codeAbility")
@@ -21,6 +31,13 @@ public class CodeAbilityController {
 
     private final AiServiceClient aiServiceClient;
 
+    /**
+     * getCodeAbility
+     * 评估代码能力
+     *
+     * @param codeAbilityDTO 代码能力评估请求参数，包含代码仓库 URL 和是否使用 AI 标志
+     * @return 代码能力评估结果
+     */
     @PostMapping("/evaluate")
     public Result<Object> getCodeAbility(CodeAbilityDTO codeAbilityDTO) {
         Map<String, Object> params = new HashMap<>();
@@ -29,5 +46,5 @@ public class CodeAbilityController {
         AiChatResponse aiChatResponse = aiServiceClient.chatWithOtherJson("/codeAbility/evaluate", params, false);
         return Result.ok(aiChatResponse.getData());
     }
-
+    
 }

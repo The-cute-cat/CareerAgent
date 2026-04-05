@@ -154,7 +154,7 @@ const handleHeaderAction = (action) => {
   background: 
     radial-gradient(ellipse at top left, rgba(64, 158, 255, 0.05), transparent 50%),
     radial-gradient(ellipse at bottom right, rgba(118, 75, 162, 0.05), transparent 50%),
-    #f5f7fa;
+    var(--color-background-soft);
   overflow: hidden;
   font-family: 'Inter', -apple-system, sans-serif;
 }
@@ -194,10 +194,11 @@ const handleHeaderAction = (action) => {
 
 /* 今日摘要卡片 */
 .today-summary-card {
-  background: #ffffff;
+  background: var(--color-background);
   border-radius: 20px;
   padding: 24px;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.03);
+  border: 1px solid var(--color-border);
 }
 
 .summary-header {
@@ -209,9 +210,9 @@ const handleHeaderAction = (action) => {
   h3 {
     font-size: 16px;
     font-weight: 800;
-    color: #0f172a;
+    color: var(--color-heading);
     margin: 0;
-    .count { color: #64748b; font-weight: 500; font-size: 14px; margin-left: 4px; }
+    .count { color: var(--color-text); font-weight: 500; font-size: 14px; margin-left: 4px; }
   }
   
   .add-link {
@@ -224,23 +225,30 @@ const handleHeaderAction = (action) => {
 
 .summary-item {
   padding: 16px;
-  background: #f8fafc;
+  background: var(--color-background-soft);
   border-radius: 12px;
-  border: 1px solid #f1f5f9;
+  border: 1px solid var(--color-border);
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 12px;
   
-  .item-title { font-size: 14px; font-weight: 800; color: #1e293b; margin-bottom: 4px; }
-  .item-subtitle { font-size: 12px; color: #64748b; margin-bottom: 8px; }
-  .item-time { font-size: 12px; color: #1e62c5; font-weight: 600; display: flex; align-items: center; gap: 4px; }
+  .item-left {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  
+  .item-title { font-size: 14px; font-weight: 800; color: var(--color-heading); margin-bottom: 4px; }
+  .item-subtitle { font-size: 12px; color: var(--color-text); margin-bottom: 8px; }
+  .item-time { font-size: 12px; color: var(--el-color-primary); font-weight: 600; display: flex; align-items: center; gap: 4px; }
   
   .item-status-tag {
     font-size: 11px;
     padding: 4px 8px;
-    background: #fff7ed;
-    color: #f97316;
+    background: var(--color-background-soft);
+    color: var(--el-color-primary);
+    border: 1px solid var(--color-border);
     border-radius: 6px;
     font-weight: 700;
   }

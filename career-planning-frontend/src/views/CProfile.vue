@@ -1,10 +1,12 @@
-<script setup>
+<script setup lang="ts">
 import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { ArrowLeft } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/modules/user'
 import { logout as userLogoutService } from '@/api/user'
-import { ArrowLeft } from '@element-plus/icons-vue'
+import { getAccountPointsService } from '@/api/points'
+import type { AccountPointsData } from '@/api/points'
 
 import ProfileInfoPanel from '../components/CProfile_Component/ProfileInfoPanel.vue'
 import ProfileSidebar from '../components/CProfile_Component/ProfileSidebar.vue'
@@ -22,6 +24,8 @@ const sidebarCollapsed = ref(false)
 const activeMenu = ref('dashboard')
 const isMobileLayout = ref(false)
 const isMobileMenuOpen = ref(true)
+const accountPoints = ref<AccountPointsData | null>(null)
+const pointsLoading = ref(false)
 
 const isSettingsCenter = computed(() => route.path.includes('/settings'))
 
@@ -29,7 +33,7 @@ const handleResize = () => {
   if (typeof window !== 'undefined') {
     isMobileLayout.value = window.innerWidth <= 768
     if (!isMobileLayout.value) {
-      isMobileMenuOpen.value = true // Ensure menu always shows on desktop
+      isMobileMenuOpen.value = true
     }
   }
 }
@@ -40,49 +44,28 @@ watch(activeMenu, () => {
   }
 })
 
-onMounted(() => {
-  if (typeof window !== 'undefined') {
-    handleResize()
-    window.addEventListener('resize', handleResize)
-  }
-  
-  // 初始化菜单状态
-  if (isSettingsCenter.value) {
-    activeMenu.value = 'setting'
-  } else {
-    activeMenu.value = 'dashboard'
-  }
-})
-
-watch(() => route.path, () => {
-  if (isSettingsCenter.value) {
-    activeMenu.value = 'setting'
-  } else {
-    activeMenu.value = 'dashboard'
-  }
-})
-
-onUnmounted(() => {
-  if (typeof window !== 'undefined') {
-    window.removeEventListener('resize', handleResize)
-  }
-})
-
 const storedUser = userStore.userInfo || {}
 const defaultAvatar = 'https://cube.elemecdn.com/3/7c/3ea6beec64369c2642b92c6726f1epng.png'
 
 const userInfo = ref({
-  name: storedUser?.name || storedUser?.nickname || storedUser?.username || `用户${userStore.userInfo?.id || 5442}`,
-  avatar: storedUser?.avatar || defaultAvatar,
-  signature: storedUser?.signature || storedUser?.info || '成为更好的自己',
-  gender: storedUser?.gender || '男',
-  education: storedUser?.education || '博士',
-  experience: storedUser?.experience || '在校生',
-  industries: storedUser?.industries || '互联网、电子商务、计算机',
-  jobs: storedUser?.jobs || 'Java、前端开发工程师'
+  name: (storedUser as any)?.name || (storedUser as any)?.nickname || (storedUser as any)?.username || `用户${userStore.userInfo?.id || 5442}`,
+  avatar: (storedUser as any)?.avatar || defaultAvatar,
+  signature: (storedUser as any)?.signature || (storedUser as any)?.info || '成为更好的自己',
+  gender: (storedUser as any)?.gender || '男',
+  education: (storedUser as any)?.education || '本科',
+  experience: (storedUser as any)?.experience || '在校生',
+  industries: (storedUser as any)?.industries || '互联网、电子商务、计算机',
+  jobs: (storedUser as any)?.jobs || 'Java、前端开发工程师'
 })
 
-const displayPoints = computed(() => userStore.userInfo?.points || 300)
+const displayPoints = computed(() => {
+  if (typeof accountPoints.value?.pointsBalance === 'number') {
+    return accountPoints.value.pointsBalance
+  }
+
+  const storePoints = Number((userStore.userInfo as any)?.points)
+  return Number.isNaN(storePoints) ? 300 : storePoints
+})
 
 const allMenus = [
   { key: 'dashboard', label: '我的主页', onlyProfile: true },
@@ -95,34 +78,44 @@ const allMenus = [
 
 const visibleMenus = computed(() => {
   if (isSettingsCenter.value) {
-    // 设置中心：只显示设置和反馈
-    return allMenus.filter(m => m.onlySettings || m.key === 'feedback')
-  } else {
-    // 个人中心：排除掉仅设置项
-    return allMenus.filter(m => m.onlyProfile || m.key === 'feedback')
+    return allMenus.filter((m: any) => m.onlySettings || m.key === 'feedback')
   }
+  return allMenus.filter((m: any) => m.onlyProfile || m.key === 'feedback')
 })
 
-const pointRecords = ref([
-  {
-    id: 1,
-    type: '每日积分',
-    remain: 100,
-    total: 100,
-    expireText: ''
-  },
-  {
-    id: 2,
-    type: '邀请奖励',
-    remain: 200,
-    total: 200,
-    expireText: '距离到期还有 29 天'
+const pointRecords = computed(() => {
+  if (!accountPoints.value) {
+    return []
   }
-])
+
+  return [
+    {
+      id: 1,
+      type: '当前可用积分',
+      remain: accountPoints.value.pointsBalance,
+      total: accountPoints.value.pointsBalance,
+      expireText: '账户当前可用余额'
+    },
+    {
+      id: 2,
+      type: '累计消耗积分',
+      remain: accountPoints.value.totalConsumed,
+      total: accountPoints.value.totalConsumed,
+      expireText: '历史累计消耗'
+    },
+    {
+      id: 3,
+      type: '邀请奖励积分',
+      remain: accountPoints.value.referralRewardTotal,
+      total: accountPoints.value.referralRewardTotal,
+      expireText: `已邀请 ${accountPoints.value.referralCount} 人`
+    }
+  ]
+})
 
 const inviteCode = ref('ZHILU2026')
 
-const panelTitleMap = {
+const panelTitleMap: Record<string, string> = {
   dashboard: '我的主页',
   profile: '个人资料',
   member: '会员计划',
@@ -131,7 +124,7 @@ const panelTitleMap = {
   setting: '更多设置'
 }
 
-const panelDescriptionMap = {
+const panelDescriptionMap: Record<string, string> = {
   dashboard: '欢迎回来，在这里查看你的职业成长进度与最新动态。',
   profile: '在这里完善你的资料、兴趣方向和职业偏好，让个人中心更像你的专属名片。',
   member: '查看积分权益与会员状态，了解当前账户可使用的成长资源。',
@@ -140,7 +133,69 @@ const panelDescriptionMap = {
   setting: '统一管理隐私、协议、推荐偏好与账号相关设置。'
 }
 
-const updateUserInfo = (payload) => {
+const fetchAccountPoints = async () => {
+  const userId = Number(userStore.userInfo?.id)
+  if (!userId) return
+
+  pointsLoading.value = true
+  try {
+    const result = await getAccountPointsService(userId)
+    const payload = result.data
+
+    if (payload?.code !== 200 || !payload.data) {
+      throw new Error(payload?.msg || '获取积分信息失败')
+    }
+
+    accountPoints.value = payload.data
+
+    if (userStore.userInfo) {
+      userStore.userInfo = {
+        ...userStore.userInfo,
+        points: payload.data.pointsBalance,
+        pointsBalance: payload.data.pointsBalance
+      } as any
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '获取积分信息失败'
+    ElMessage.error(message)
+  } finally {
+    pointsLoading.value = false
+  }
+}
+
+onMounted(() => {
+  if (typeof window !== 'undefined') {
+    handleResize()
+    window.addEventListener('resize', handleResize)
+  }
+
+  fetchAccountPoints()
+
+  if (isSettingsCenter.value) {
+    activeMenu.value = 'setting'
+  } else {
+    activeMenu.value = 'dashboard'
+  }
+})
+
+watch(
+  () => route.path,
+  () => {
+    if (isSettingsCenter.value) {
+      activeMenu.value = 'setting'
+    } else {
+      activeMenu.value = 'dashboard'
+    }
+  }
+)
+
+onUnmounted(() => {
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('resize', handleResize)
+  }
+})
+
+const updateUserInfo = (payload: Record<string, any>) => {
   userInfo.value = {
     ...userInfo.value,
     ...payload
@@ -150,13 +205,13 @@ const updateUserInfo = (payload) => {
     userStore.userInfo = {
       ...userStore.userInfo,
       ...payload,
-      name: payload.name ?? userStore.userInfo.name,
+      name: payload.name ?? (userStore.userInfo as any).name,
       nickname: payload.nickname ?? userStore.userInfo.nickname,
       username: payload.username ?? userStore.userInfo.username,
       avatar: payload.avatar ?? userStore.userInfo.avatar,
-      signature: payload.signature ?? userStore.userInfo.signature,
+      signature: payload.signature ?? (userStore.userInfo as any).signature,
       info: payload.info ?? userStore.userInfo.info
-    }
+    } as any
   }
 
   ElMessage({
@@ -201,17 +256,17 @@ const confirmLogout = async () => {
   }
 }
 
-const handleSettingAction = (key) => {
+const handleSettingAction = (key: string) => {
   if (key === 'logout') {
     confirmLogout()
     return
   }
 
-  const actionMap = {
+  const actionMap: Record<string, string> = {
     recommend: '后续可跳转到个性化推荐设置页',
     agreement: '后续可跳转到用户协议页',
     privacy: '后续可跳转到隐私政策页',
-    cancel: '后续可接入注销账户逻辑',
+    cancel: '后续可接入注销账号逻辑',
     contact: '后续可跳转到联系我们页面'
   }
 
@@ -261,7 +316,13 @@ const handleSettingAction = (key) => {
               @update-user="updateUserInfo"
             />
 
-            <MemberPlanPanel v-else-if="activeMenu === 'member'" :points="displayPoints" :records="pointRecords" />
+            <MemberPlanPanel
+              v-else-if="activeMenu === 'member'"
+              :points="displayPoints"
+              :records="pointRecords"
+              :account-points="accountPoints"
+              :loading="pointsLoading"
+            />
 
             <InviteFriendsPanel v-else-if="activeMenu === 'invite'" :invite-code="inviteCode" />
 
