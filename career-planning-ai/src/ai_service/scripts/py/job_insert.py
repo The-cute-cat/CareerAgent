@@ -1,6 +1,6 @@
 import asyncio
 from pathlib import Path
-from typing import List
+from typing import List, Union
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 
@@ -70,28 +70,50 @@ async def process_and_insert_jobs(file_path: str, max_process: int = None):
         # 2. 批量保存岗位信息到数据库
         log.info("正在将岗位基础信息保存到数据库...")
         try:
-            saved_jobs = await job_repo.create_all(job_list)
+            await job_repo.create_all(job_list)
             log.info("岗位基础信息保存成功！")
         except Exception as e:
             log.error(f"保存岗位信息失败: {e}")
             return
 
 
+def get_all_files(folder_path: Union[str, Path], recursive: bool = True) -> List[str]:
+    """
+    获取文件夹下所有文件的绝对路径
+    :param folder_path: 文件夹路径（支持相对/绝对路径，如 "./data" 或 r"C:\test"）
+    :param recursive: 是否递归遍历子目录，默认 True
+    :return: 文件绝对路径列表
+    """
+    folder = Path(folder_path)
+    if not folder.exists():
+        raise FileNotFoundError(f"路径不存在: {folder_path}")
+    if not folder.is_dir():
+        raise NotADirectoryError(f"路径不是文件夹: {folder_path}")
 
-async def main():
-    """主函数：处理任务并确保资源正确清理"""
-    EXCEL_FILE_PATH = r"E:\软件工程相关资料\项目比赛\服创2026\岗位数据\.NET-1773231373303.csv"
+    if recursive:
+        return [str(f.resolve()) for f in folder.rglob("*") if f.is_file()]
+    else:
+        return [str(f.resolve()) for f in folder.iterdir() if f.is_file()]
 
-    # 确保在运行前设置了环境变量
-    # os.environ["LLM__API_KEY"] = "your-tongyi-api-key"
+
+async def main(max_concurrent: int = 5):
+    excel_file_paths = get_all_files(r"E:\软件工程相关资料\项目比赛\服创2026\岗位数据\数据")
+    semaphore = asyncio.Semaphore(max_concurrent)  # 限制并发数
+
+    async def safe_process(path):
+        async with semaphore:
+            try:
+                await process_and_insert_jobs(path)
+                print(f"✅ 成功: {path}")
+            except Exception as e:
+                print(f"❌ 失败 {path}: {e}")
 
     try:
-        # 运行异步主函数
-        # 建议先用 max_process=5 测试一下整条链路，没问题后再去掉这个参数跑全量
-        await process_and_insert_jobs(EXCEL_FILE_PATH)
+        # 并发调度所有任务，但受信号量严格控流
+        await asyncio.gather(*(safe_process(p) for p in excel_file_paths))
     finally:
-        # 确保引擎被正确关闭
         await engine.dispose()
+        print("🔌 数据库连接池已安全关闭")
 
 
 if __name__ == "__main__":
