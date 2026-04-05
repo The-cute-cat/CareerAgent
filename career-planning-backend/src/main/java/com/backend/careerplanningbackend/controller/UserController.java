@@ -113,12 +113,13 @@ public class UserController {
      * updateAvatar
      * 更换头像
      */
-    @GetMapping("/avatar")
-    public Result<String> updateAvatar(MultipartFile avatar) throws IOException {
+    @PostMapping("/avatar")  // 改为 @PostMapping
+    public Result<String> updateAvatar(@RequestParam("avatar") MultipartFile avatar) throws IOException {
         log.info("updateAvatar接收到的参数: {}", avatar.getOriginalFilename());
         return userService.updateAvatar(avatar);
     }
-    
+
+
     /**
      * refreshToken
      * 更新 双token

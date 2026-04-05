@@ -26,7 +26,9 @@
         </where>
     </update>
     <update id="updateAvatar">
-        
+        UPDATE user_stu
+        SET avatar = #{upload}
+        WHERE id = #{id}
     </update>
     <!--    <sql id="baseColumn">-->
 <!--        id, username, nickname, email, avatar, status, create_time, update_time-->

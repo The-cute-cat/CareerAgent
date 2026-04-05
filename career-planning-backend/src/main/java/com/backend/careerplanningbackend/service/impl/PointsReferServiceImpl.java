@@ -72,7 +72,7 @@ public class PointsReferServiceImpl implements PointsReferService {
     public Result<UserPointsVO> getAccountPoints(Long userId) {
 //        UserPoints accountPoints = userpointsMapper.getAccountPoints(id);
         UserPoints accountPoints = userpointsMapper.selectOne(
-                new LambdaQueryWrapper<UserPoints>().eq(UserPoints::getId, userId)
+                new LambdaQueryWrapper<UserPoints>().eq(UserPoints::getUserId, userId)
         );
         if(accountPoints == null) {
             return Result.fail("用户积分信息不存在");

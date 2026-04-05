@@ -1,9 +1,17 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Calendar, Opportunity, WarningFilled } from '@element-plus/icons-vue'
+import { Calendar, Opportunity, WarningFilled, RefreshRight, CircleCheck, Timer, Loading } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/modules/user'
 import type { AccountPointsData } from '@/api/points'
+import {
+  createPaymentService,
+  buildAlipayPagePayUrl,
+  queryPaymentStatusService,
+  type PaymentOrderVO,
+  type PaymentStatusVO
+} from '@/api/payment'
+import type { PaymentCreateRequest } from '@/api/payment'
 
 const props = defineProps({
   points: {
@@ -30,6 +38,17 @@ const activeCenter = ref<'member' | 'points'>('member')
 const upgradeVisible = ref(false)
 const earnVisible = ref(false)
 const insufficientVisible = ref(false)
+
+// 支付相关状态
+const payDialogVisible = ref(false)
+const payLoading = ref(false)
+const payQRCode = ref('')
+const currentOrderId = ref('')
+const currentPlan = ref<typeof memberPlans[0] | null>(null)
+const payStatus = ref<'pending' | 'paid' | 'expired' | 'cancelled'>('pending')
+const payCountdown = ref(300)
+const pollingTimer = ref<ReturnType<typeof setInterval> | null>(null)
+const countdownTimer = ref<ReturnType<typeof setInterval> | null>(null)
 
 const memberType = computed(() => String((userStore.userInfo as any)?.memberType || 'normal').toLowerCase())
 const memberExpireAt = computed(() => (userStore.userInfo as any)?.memberExpireAt || '')
@@ -148,9 +167,203 @@ const currentMemberPlan = computed(() => memberPlans.find((item) => item.key ===
 const expiryText = computed(() => memberExpireAt.value || '暂未开通会员')
 
 const handlePlanAction = (planKey: string) => {
-  upgradeVisible.value = true
-  ElMessage.success(`已为你打开${memberPlans.find((item) => item.key === planKey)?.title || '会员'}开通面板`)
+  const plan = memberPlans.find((item) => item.key === planKey)
+  if (!plan) return
+
+  currentPlan.value = plan
+  startPayment(plan)
 }
+
+const formatCountdown = (seconds: number) => {
+  const mins = Math.floor(seconds / 60)
+  const secs = seconds % 60
+  return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+}
+
+const startPayment = async (plan: typeof memberPlans[0]) => {
+  payLoading.value = true
+  payDialogVisible.value = true
+  payStatus.value = 'pending'
+  payCountdown.value = 300
+
+  try {
+    // 1. 构建创建订单请求参数
+    const memberLevelMap: Record<string, number> = {
+      'monthly': 1,
+      'quarterly': 2,
+      'yearly': 3
+    }
+
+    const request: PaymentCreateRequest = {
+      amount: parseFloat(plan.price),
+      pointsGranted: plan.giftPoints,
+      payType: 2,           // 2=支付宝
+      purpose: 2,           // 2=会员购买
+      memberLevel: memberLevelMap[plan.key]
+    }
+
+    // 2. 调用后端创建订单
+    const res = await createPaymentService(request)
+
+    if (res.data.code !== 0 || !res.data.data) {
+      ElMessage.error(res.data.msg || '创建支付订单失败')
+      closePayDialog()
+      return
+    }
+
+    const orderData: PaymentOrderVO = res.data.data
+    const orderId = String(orderData.id)  // 雪花算法生成的订单号
+    currentOrderId.value = orderId
+    currentPlan.value = plan
+
+    // 3. 构建支付宝电脑网站支付跳转URL
+    const payUrl = buildAlipayPagePayUrl(orderId)
+
+    // 4. 新窗口打开支付宝收银台
+    const payWindow = window.open(payUrl, '_blank', 'width=1200,height=800,menubar=no,toolbar=no,location=yes')
+
+    if (!payWindow) {
+      ElMessage.warning('支付窗口被拦截，请允许浏览器弹窗后重试')
+      payLoading.value = false
+      return
+    }
+
+    // 5. 开始轮询支付状态
+    startPolling(orderId)
+    // 开始倒计时
+    startCountdown()
+
+    ElMessage.info('请在支付宝页面完成支付')
+  } catch (error) {
+    console.error('支付错误:', error)
+    ElMessage.error('发起支付失败，请稍后重试')
+    closePayDialog()
+  } finally {
+    payLoading.value = false
+  }
+}
+
+const startPolling = (orderId: string) => {
+  // 清除之前的轮询
+  if (pollingTimer.value) {
+    clearInterval(pollingTimer.value)
+  }
+
+  let pollCount = 0
+  const maxPollCount = 100 // 最多轮询100次（约5分钟）
+
+  pollingTimer.value = setInterval(async () => {
+    pollCount++
+
+    if (pollCount > maxPollCount) {
+      stopPolling()
+      payStatus.value = 'expired'
+      return
+    }
+
+    try {
+      const res = await queryPaymentStatusService(orderId)
+
+      if (res.data.code === 0 && res.data.data) {
+        const statusData = res.data.data as PaymentStatusVO
+        payStatus.value = statusData.status as 'pending' | 'paid' | 'expired' | 'cancelled'
+
+        if (statusData.status === 'paid') {
+          stopPolling()
+          stopCountdown()
+          ElMessage.success('支付成功！会员权益已开通')
+
+          // TODO: 更新用户会员信息，需要后端返回 memberExpireAt
+          // if (statusData.memberExpireAt && userStore.userInfo) {
+          //   (userStore.userInfo as any).memberType = currentPlan.value?.key
+          //   ;(userStore.userInfo as any).memberExpireAt = statusData.memberExpireAt
+          // }
+
+          // 延迟关闭弹窗
+          setTimeout(() => {
+            closePayDialog()
+            upgradeVisible.value = false
+          }, 2000)
+        } else if (statusData.status === 'expired' || statusData.status === 'cancelled') {
+          stopPolling()
+          stopCountdown()
+        }
+      }
+    } catch (error) {
+      console.error('查询支付状态失败:', error)
+    }
+  }, 3000) // 每3秒轮询一次
+}
+
+const startCountdown = () => {
+  if (countdownTimer.value) {
+    clearInterval(countdownTimer.value)
+  }
+
+  countdownTimer.value = setInterval(() => {
+    payCountdown.value--
+    if (payCountdown.value <= 0) {
+      stopCountdown()
+      payStatus.value = 'expired'
+      stopPolling()
+    }
+  }, 1000)
+}
+
+const stopPolling = () => {
+  if (pollingTimer.value) {
+    clearInterval(pollingTimer.value)
+    pollingTimer.value = null
+  }
+}
+
+const stopCountdown = () => {
+  if (countdownTimer.value) {
+    clearInterval(countdownTimer.value)
+    countdownTimer.value = null
+  }
+}
+
+const closePayDialog = () => {
+  payDialogVisible.value = false
+  stopPolling()
+  stopCountdown()
+  payQRCode.value = ''
+  currentOrderId.value = ''
+  currentPlan.value = null
+  payStatus.value = 'pending'
+  payCountdown.value = 300
+}
+
+const refreshPaymentStatus = () => {
+  if (currentOrderId.value && payStatus.value === 'pending') {
+    queryPaymentStatusService(currentOrderId.value).then((res) => {
+      if (res.data.code === 0 && res.data.data) {
+        const statusData = res.data.data as PaymentStatusVO
+        payStatus.value = statusData.status as 'pending' | 'paid' | 'expired' | 'cancelled'
+        if (statusData.status === 'paid') {
+          stopPolling()
+          stopCountdown()
+          ElMessage.success('支付成功！会员权益已开通')
+          // TODO: 更新用户会员信息，需要后端返回 memberExpireAt
+          // if (statusData.memberExpireAt && userStore.userInfo) {
+          //   ;(userStore.userInfo as any).memberType = currentPlan.value?.key
+          //   ;(userStore.userInfo as any).memberExpireAt = statusData.memberExpireAt
+          // }
+          setTimeout(() => {
+            closePayDialog()
+            upgradeVisible.value = false
+          }, 2000)
+        }
+      }
+    })
+  }
+}
+
+onUnmounted(() => {
+  stopPolling()
+  stopCountdown()
+})
 
 const handleEarnAction = () => {
   earnVisible.value = true
@@ -372,6 +585,82 @@ const handleOpenMember = () => {
         </div>
       </div>
     </el-dialog>
+
+    <!-- 支付宝支付弹窗 -->
+    <el-dialog
+      v-model="payDialogVisible"
+      :title="`开通${currentPlan?.title || '会员'}`"
+      width="480px"
+      class="member-dialog pay-dialog"
+      :close-on-click-modal="false"
+      :show-close="payStatus !== 'pending'"
+      @close="closePayDialog"
+    >
+      <div v-loading="payLoading" class="pay-dialog-content">
+        <!-- 支付中状态 -->
+        <div v-if="payStatus === 'pending'" class="pay-pending">
+          <div class="pay-amount">
+            <span class="pay-amount-label">支付金额</span>
+            <span class="pay-amount-value">¥{{ currentPlan?.price }}</span>
+          </div>
+
+          <!-- 等待支付提示（电脑网站支付） -->
+          <div class="waiting-pay-box">
+            <div class="waiting-icon">
+              <el-icon class="loading-icon"><Loading /></el-icon>
+            </div>
+            <h4 class="waiting-title">正在等待支付完成</h4>
+            <p class="waiting-desc">已在浏览器新窗口打开支付宝收银台</p>
+            <p class="waiting-sub">请在支付宝页面完成支付，完成后本页面会自动更新</p>
+          </div>
+
+          <div class="pay-status-bar">
+            <div class="countdown">
+              <el-icon><Timer /></el-icon>
+              <span>支付剩余时间：{{ formatCountdown(payCountdown) }}</span>
+            </div>
+            <div class="polling-status">
+              <span class="polling-dot"></span>
+              <span>等待支付...</span>
+            </div>
+          </div>
+
+          <!-- 操作按钮 -->
+          <div class="waiting-actions">
+            <button class="ghost-btn" @click="closePayDialog">取消支付</button>
+            <button class="primary-btn" @click="refreshPaymentStatus">
+              <el-icon><RefreshRight /></el-icon>
+              已完成支付
+            </button>
+          </div>
+        </div>
+
+        <!-- 支付成功状态 -->
+        <div v-else-if="payStatus === 'paid'" class="pay-result pay-success">
+          <div class="result-icon">
+            <el-icon><CircleCheck /></el-icon>
+          </div>
+          <h4>支付成功</h4>
+          <p>您的{{ currentPlan?.title }}已开通</p>
+          <div class="result-actions">
+            <button class="primary-btn" @click="closePayDialog">确定</button>
+          </div>
+        </div>
+
+        <!-- 支付过期/取消状态 -->
+        <div v-else class="pay-result pay-failed">
+          <div class="result-icon failed">
+            <el-icon><WarningFilled /></el-icon>
+          </div>
+          <h4>{{ payStatus === 'expired' ? '支付已过期' : '支付已取消' }}</h4>
+          <p>请重新发起支付</p>
+          <div class="result-actions">
+            <button class="ghost-btn" @click="closePayDialog">关闭</button>
+            <button v-if="currentPlan" class="primary-btn" @click="startPayment(currentPlan)">重新支付</button>
+          </div>
+        </div>
+      </div>
+    </el-dialog>
   </section>
 </template>
 
@@ -452,6 +741,292 @@ const handleOpenMember = () => {
 .warning-icon { font-size: 48px; }
 .insufficient-box p { margin: 0; color: #64748b; line-height: 1.8; font-size: 15px; max-width: 80%; }
 .insufficient-actions { margin-top: 12px; }
+
+/* 支付弹窗样式 */
+.pay-dialog-content {
+  padding: 20px 0;
+}
+
+.pay-pending {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+
+.pay-amount {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.pay-amount-label {
+  font-size: 14px;
+  color: #64748b;
+}
+
+.pay-amount-value {
+  font-size: 36px;
+  font-weight: 900;
+  color: #0f172a;
+  background: linear-gradient(135deg, #1677ff, #47a1f5);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.qr-code-box {
+  width: 220px;
+  height: 220px;
+  border-radius: 16px;
+  background: #f8fafc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e2e8f0;
+}
+
+.qr-code-wrapper {
+  position: relative;
+  width: 200px;
+  height: 200px;
+}
+
+.qr-code-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+.qr-code-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.alipay-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: #1677ff;
+  border-radius: 999px;
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+  box-shadow: 0 4px 12px rgba(22, 119, 255, 0.3);
+}
+
+.alipay-icon {
+  width: 20px;
+  height: 20px;
+  background: white;
+  color: #1677ff;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.qr-code-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.loading-icon {
+  font-size: 32px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.pay-instructions {
+  text-align: center;
+}
+
+.pay-instruction-title {
+  margin: 0 0 4px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.pay-instruction-sub {
+  margin: 0;
+  font-size: 14px;
+  color: #64748b;
+}
+
+.pay-status-bar {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+  border-radius: 12px;
+  border: 1px solid #bae6fd;
+}
+
+.countdown {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #0369a1;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.polling-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #0891b2;
+  font-size: 13px;
+}
+
+.polling-dot {
+  width: 8px;
+  height: 8px;
+  background: #06b6d4;
+  border-radius: 50%;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.8); }
+}
+
+.pay-result {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 40px 20px;
+  gap: 16px;
+}
+
+.result-icon {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #10b981, #34d399);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 40px;
+  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.3);
+}
+
+.result-icon.failed {
+  background: linear-gradient(135deg, #ef4444, #f87171);
+  box-shadow: 0 8px 24px rgba(239, 68, 68, 0.3);
+}
+
+.pay-result h4 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.pay-result p {
+  margin: 0;
+  color: #64748b;
+  font-size: 15px;
+}
+
+.result-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+/* 等待支付样式（电脑网站支付） */
+.waiting-pay-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 32px 20px;
+  background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+  border-radius: 16px;
+  border: 1px solid #bae6fd;
+  margin: 16px 0;
+}
+
+.waiting-icon {
+  width: 64px;
+  height: 64px;
+  background: linear-gradient(135deg, #1677ff, #47a1f5);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+  box-shadow: 0 8px 24px rgba(22, 119, 255, 0.3);
+}
+
+.waiting-icon .loading-icon {
+  font-size: 32px;
+  color: white;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.waiting-title {
+  margin: 0 0 8px;
+  font-size: 18px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.waiting-desc {
+  margin: 0 0 4px;
+  font-size: 14px;
+  color: #0369a1;
+  font-weight: 600;
+}
+
+.waiting-sub {
+  margin: 0;
+  font-size: 13px;
+  color: #64748b;
+  text-align: center;
+  max-width: 280px;
+}
+
+.waiting-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+  justify-content: center;
+}
+
+.waiting-actions .ghost-btn,
+.waiting-actions .primary-btn {
+  padding: 12px 24px;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
 
 @media (max-width: 1200px) {
   .overview-grid, .plan-grid, .method-grid, .rule-grid, .benefit-list, .plan-grid--dialog, .dialog-method-grid, .summary-grid { grid-template-columns: 1fr; }
