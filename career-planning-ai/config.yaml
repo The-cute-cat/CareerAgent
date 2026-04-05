@@ -80,6 +80,9 @@ code_ability:
     temperature: 0.3
   github_token: <GITHUB_TOKEN>
   gitee_token: <GITEE_TOKEN>
+match_analyzer:
+  extra:
+    temperature: 0.2
 redis:
   host: <HOST>
   port: 0
@@ -90,5 +93,7 @@ redis:
     default: 86400 # 默认缓存超时时间，单位秒
     file_parse: 86400
     code_ability: 7200
+    report: 3600
+    question: 3600
 other:
   ssl_verify: false

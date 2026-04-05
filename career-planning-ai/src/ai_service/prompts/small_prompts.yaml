@@ -23,8 +23,18 @@ system_role: |
 growth_plan_user: |
   请为以下学生制定详细的职业成长计划：
   
-  **目标岗位**: {target_position}
+  **目标岗位画像**: {target_position_profile}
   **学生画像**: {student_profile}
   **已知能力差距**: {ability_gap}
   
   请严格按照工作流执行：先分析现状 -> 调用工具检索资源 -> 拆解里程碑和任务 -> 调用 `submit_growth_plan` 提交最终结果。
+user_job_match_analyzer_user: |
+  请根据以下内容进行岗位匹配分析：
+
+  【岗位画像】
+  {job_profile_text}
+
+  【用户画像】
+  {user_profile_text}
+
+  请严格输出 JSON。

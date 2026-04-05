@@ -162,12 +162,12 @@ class StuProfile(Base):
 
         data = {}
         for column in self.__table__.columns:
-            if column.name not in exclude_fields:
-                value = getattr(self, column.name)
+            if column._name not in exclude_fields:
+                value = getattr(self, column._name)
                 # 处理 datetime 类型，转换为 ISO 格式字符串
                 if isinstance(value, datetime):
                     value = value.isoformat()
-                data[column.name] = value
+                data[column._name] = value
 
         return data
 

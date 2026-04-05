@@ -39,7 +39,8 @@ import java.util.Map;
 
 import static com.backend.careerplanningbackend.util.PointsConstant.POINTS_FOR_REFERRAL;
 import static com.backend.careerplanningbackend.util.PointsConstant.POINTS_FOR_REGISTRATION;
-import static com.backend.careerplanningbackend.util.RedisConstant.*;
+import static com.backend.careerplanningbackend.util.RedisConstant.INVITE_CODE_KEY_PREFIX;
+import static com.backend.careerplanningbackend.util.RedisConstant.POINTS_CONSUME_KEY_PREFIX;
 import static com.backend.careerplanningbackend.util.SystemActivityConstant.Activity_End_Time;
 
 @Service
@@ -55,26 +56,26 @@ public class PointsReferServiceImpl implements PointsReferService {
     private final RabbitTemplate rabbitTemplate;
     private final AiServiceClient aiServiceClient;
     private final PayService payService;
-    
+
     /**
-     * getAccountPoints 
+     * getAccountPoints
      * 获取账户积分接口
+     *
      * @param userId
-     * @return
-     * 1. 根据用户ID查询UserPoints表，获取当前积分余额和相关信息
+     * @return 1. 根据用户ID查询UserPoints表，获取当前积分余额和相关信息
      * 2. 如果用户积分信息不存在，返回错误提示
      * 3. 将查询到的UserPoints信息转换为UserPointsVO对象，并返回给前端
      * 4. 返回UserPointsVO对象
      * 5. 返回积分信息
      */
-    
+
     @Override
     public Result<UserPointsVO> getAccountPoints(Long userId) {
 //        UserPoints accountPoints = userpointsMapper.getAccountPoints(id);
         UserPoints accountPoints = userpointsMapper.selectOne(
                 new LambdaQueryWrapper<UserPoints>().eq(UserPoints::getId, userId)
         );
-        if(accountPoints == null) {
+        if (accountPoints == null) {
             return Result.fail("用户积分信息不存在");
         }
         UserPointsVO userPointsVO = BeanUtil.copyProperties(accountPoints, UserPointsVO.class);
@@ -82,17 +83,17 @@ public class PointsReferServiceImpl implements PointsReferService {
     }
 
     /**
-     * register 
+     * register
      * 新用户注册领取积分接口
+     *
      * @param referralDTO
-     * @return 
-     * 1. 校验邀请码是否存在且有效
+     * @return 1. 校验邀请码是否存在且有效
      * 2. 更新UserReferral表，绑定用户ID，设置奖励积分和活动结束时间
      * 3. 在UserPoints表中为用户创建积分账户，初始积分为1000，设置状态和时间信息
      * 4. 在PointsTransaction表中记录这笔积分变动，类型为系统赠送，描述为新用户注册赠送积分
      * 5. 返回注册成功的积分信息
      */
-    
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Result<Object> register(@RequestBody ReferralDTO referralDTO) {
@@ -123,7 +124,7 @@ public class PointsReferServiceImpl implements PointsReferService {
                 log.error("用户 {} 已经被封了", userId);
                 return Result.fail("用户已经被封了");
             }
-        }else{
+        } else {
             User selectedOne = userMapper.selectOne(
                     new LambdaQueryWrapper<User>()
                             .select(User::getId, User::getStatus)
@@ -377,9 +378,9 @@ public class PointsReferServiceImpl implements PointsReferService {
     /**
      * invite 生成邀请码
      * 邀请好友接口
+     *
      * @param referralDTO
-     * @return
-     * 1. 获取当前用户ID
+     * @return 1. 获取当前用户ID
      * 2. 生成一个新的邀请码，并保存到UserReferral表中
      * 3. 返回邀请码
      */
@@ -391,7 +392,7 @@ public class PointsReferServiceImpl implements PointsReferService {
 
         ReferralDTO data = new ReferralDTO();
         data.setInviteCode(String.valueOf(nextId));
-        
+
         // referral 表示邀请大使
         data.setReferrerId(currentUserId);
         return Result.ok(data);
@@ -410,31 +411,33 @@ public class PointsReferServiceImpl implements PointsReferService {
                 .set(UserReferral::getEndTime, LocalDateTime.now().plusYears(1))
                 .set(UserReferral::getActivityEndTime, Activity_End_Time)
         );
-        if(updatedReferral == 0) {
+        if (updatedReferral == 0) {
             log.error("更新用户推荐信息失败");
             return Result.fail("更新用户推荐信息失败");
         }
         return Result.ok("邀请好友注册赠送积分已到账");
     }
 
-    /** todo 这里是给学生用户留着的 */
+    /**
+     * todo 这里是给学生用户留着的
+     */
     @Override
     public Result<Object> registerStudent(@RequestBody StudentTrueDTO studentTrueDTO) {
-        Map<String, Object> params =new HashMap<>();
+        Map<String, Object> params = new HashMap<>();
         params.put("name", studentTrueDTO.getName());
         params.put("schoolName", studentTrueDTO.getSchoolName());
         params.put("major", studentTrueDTO.getMajor());
-        params.put("grade",studentTrueDTO.getGrade());
+        params.put("grade", studentTrueDTO.getGrade());
         params.put("entranceTime", studentTrueDTO.getEntranceTime());
         params.put("graduatedTime", studentTrueDTO.getGraduatedTime());
-        AiChatResponse aiChatResponse = aiServiceClient.chatWithOtherJson("/points/student/register", params);
+        AiChatResponse aiChatResponse = aiServiceClient.chatWithOtherJson("/points/student/register", params, false);
         return Result.ok(aiChatResponse);
     }
 
     /**
      * 充值积分接口
-     * @return
-     * 1. 获取当前用户ID
+     *
+     * @return 1. 获取当前用户ID
      * 2. 根据用户ID查询UserPoints表，获取当前积分账户信息
      * 3. 如果用户积分账户不存在，返回错误提示
      * 4. 根据传入的积分变动值，计算新的积分余额，并更新UserPoints表中的积分余额和更新时间
@@ -444,13 +447,13 @@ public class PointsReferServiceImpl implements PointsReferService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Result<UserPoints> recharge(@RequestBody @Valid PointsMembershipChangeDTO pointsMembershipChangeDTO, HttpServletResponse response) {
-        
+
         UserPoints account = userpointsMapper.selectOne(
                 new LambdaQueryWrapper<UserPoints>()
                         .eq(UserPoints::getUserId, ThreadLocalUtil.getCurrentUserId())
         );
-        
-        if(account == null) {
+
+        if (account == null) {
             return Result.fail("用户积分信息不存在,可能是有人发起攻击来了,或者系统故障");
         }
 
@@ -462,17 +465,17 @@ public class PointsReferServiceImpl implements PointsReferService {
                 .eq(UserPoints::getUserId, ThreadLocalUtil.getCurrentUserId())
                 .set(UserPoints::getPointsBalance, newAmount)
         );
-        if(updated == 0) {
+        if (updated == 0) {
             return Result.fail("更新用户积分信息失败");
         }
 
         PointsTransaction paymentOrder = BeanUtil.copyProperties(pointsMembershipChangeDTO, PointsTransaction.class);
         paymentOrder.setAmount(newAmount);
         paymentOrder.setType(1);
-        
+
 //        redisIdWorker.nextId(POINTS_RECHARGE_KEY_PREFIX);
         paymentOrder.setDescription("充值积分");
-        
+
         int insert = pointsTransactionMapper.insert(paymentOrder);
         if (insert == 0) {
             return Result.fail("记录积分变动失败");
@@ -494,15 +497,15 @@ public class PointsReferServiceImpl implements PointsReferService {
 
     /**
      * consumePoints 消耗积分接口
-     * @return
-     * 1. 获取当前用户ID
+     *
+     * @return 1. 获取当前用户ID
      * 2. 根据用户ID查询UserPoints表，获取当前积分账户信息
      * 3. 如果用户积分账户不存在，返回错误提示
      * 4. 根据传入的积分变动值，计算新的积分余额，并更新UserPoints表中的积分余额和更新时间
      * 5. 在PointsTransaction表中记录这笔积分变动，类型为消费，描述为消费积分
      * 6. 返回消费成功的积分信息
      */
-    
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Result consumePoints(PointsMembershipChangeDTO pointsMembershipChangeDTO) {
@@ -512,7 +515,7 @@ public class PointsReferServiceImpl implements PointsReferService {
                         .eq(UserPoints::getUserId, ThreadLocalUtil.getCurrentUserId())
         );
 
-        if(account == null) {
+        if (account == null) {
             return Result.fail("用户积分信息不存在,可能是有人发起攻击来了,或者系统故障");
         }
 
@@ -524,18 +527,18 @@ public class PointsReferServiceImpl implements PointsReferService {
                 .eq(UserPoints::getUserId, ThreadLocalUtil.getCurrentUserId())
                 .set(UserPoints::getPointsBalance, newAmount)
         );
-        if(updated == 0) {
+        if (updated == 0) {
             return Result.fail("更新用户积分信息失败");
         }
 
         PointsTransaction entity = BeanUtil.copyProperties(pointsMembershipChangeDTO, PointsTransaction.class);
         entity.setAmount(newAmount);
         entity.setType(1);
-        
+
         redisIdWorker.nextId(POINTS_CONSUME_KEY_PREFIX);
         entity.setDescription("消费积分积分");
         int insert = pointsTransactionMapper.insert(entity);
-        
+
         if (insert == 0) {
             return Result.fail("记录积分变动失败");
         }
@@ -551,7 +554,7 @@ public class PointsReferServiceImpl implements PointsReferService {
                 .set(PointsTransaction::getAmount, POINTS_FOR_REFERRAL)
                 .set(PointsTransaction::getDescription, "邀请好友注册赠送积分")
         );
-        if(updated == 0) {
+        if (updated == 0) {
             log.error("更新用户推荐信息失败");
             return Result.fail("更新用户推荐信息失败");
         }
@@ -560,16 +563,16 @@ public class PointsReferServiceImpl implements PointsReferService {
 
     /**
      * deletePoints 删除积分接口
+     *
      * @param dto
-     * @return
-     * 1. 获取当前用户ID
+     * @return 1. 获取当前用户ID
      * 2. 根据用户ID查询UserPoints表，获取当前积分账户信息
      * 3. 如果用户积分账户不存在，返回错误提示
      * 4. 根据传入的积分变动值，计算新的积分余额，并更新UserPoints表中的积分余额和更新时间
      * 5. 在PointsTransaction表中记录这笔积分变动，类型为删除，描述为删除积分
      * 6. 返回删除成功的积分信息
      */
-    
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Result<Object> deletePoints(PointsMembershipChangeDTO dto) {
@@ -579,7 +582,7 @@ public class PointsReferServiceImpl implements PointsReferService {
                         .eq(UserPoints::getUserId, ThreadLocalUtil.getCurrentUserId())
         );
 
-        if(account == null) {
+        if (account == null) {
             return Result.fail("用户积分信息不存在,可能是有人发起攻击来了,或者系统故障");
         }
 
@@ -593,8 +596,8 @@ public class PointsReferServiceImpl implements PointsReferService {
                 .set(UserPoints::getUpdateTime, LocalDateTime.now())
                 .set(UserPoints::getStatus, 0)
         );
-        
-        if(updated == 0) {
+
+        if (updated == 0) {
             return Result.fail("删除用户积分信息失败");
         }
 

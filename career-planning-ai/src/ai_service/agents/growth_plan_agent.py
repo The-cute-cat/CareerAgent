@@ -34,12 +34,20 @@ class GrowthPlanAgent:
             middleware=[log_before_model, track_token_usage, monitor_tool]
         )
 
-    def generate_growth_plan(self, target_position: str, student_profile: str, ability_gap: str | None = None):
+    async def generate_growth_plan(
+            self,
+            target_position_profile: str,
+            student_profile: str,
+            ability_gap: str | None = None
+    ):
+        if not target_position_profile or not student_profile:
+            raise ValueError("target_position_profile 和 student_profile 不能为空")
+
         # 重置 Token 统计
         reset_token_stats()
 
         input_message = prompt_loader.small_prompts["growth_plan_user"].format(
-            target_position=target_position, student_profile=student_profile,
+            target_position_profile=target_position_profile, student_profile=student_profile,
             ability_gap=ability_gap if ability_gap else "暂无"
         )
         config: RunnableConfig = {
@@ -58,7 +66,11 @@ class GrowthPlanAgent:
             f"total_tokens={stats.total_tokens}, 模型调用次数={stats.call_count}"
         )
 
-        return self._parse_output(output)
+        growth_plan = self._parse_output(output)
+        if growth_plan:
+            return growth_plan.get("plan")
+        else:
+            raise ValueError("无法从 Agent 输出中提取成长计划")
 
     def _parse_output(self, output: dict) -> Dict[str, Any] | None:
         """
@@ -190,11 +202,22 @@ class GrowthPlanAgent:
 growth_plan_agent = GrowthPlanAgent()
 
 
-def main():
+async def main():
     import json
 
     # 测试参数
-    target_position = "Java后端开发工程师"
+    target_position_profile = json.dumps({
+        "岗位名称": "Java后端开发工程师",
+        "技术技能": ["Java", "Spring Boot", "MySQL", "Redis"],
+        "证书要求": {},
+        "能力要求": {
+            "创新能力": 60,
+            "学习能力": 70,
+            "抗压能力": 75,
+            "沟通能力": 65
+        },
+        # ... 其他画像字段
+    })
 
     student_profile = """
     {
@@ -255,8 +278,8 @@ def main():
     print("开始生成成长计划...")
     print("=" * 80)
 
-    result = growth_plan_agent.generate_growth_plan(
-        target_position=target_position,
+    result = await growth_plan_agent.generate_growth_plan(
+        target_position_profile=target_position_profile,
         student_profile=student_profile,
         ability_gap=ability_gap
     )
@@ -295,4 +318,6 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    import asyncio
+
+    asyncio.run(main())

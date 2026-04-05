@@ -1,7 +1,7 @@
 import asyncio
 from typing import Any
 
-from fastapi import APIRouter, Depends, BackgroundTasks
+from fastapi import APIRouter, Depends, BackgroundTasks, Form
 
 from ai_service.exceptions import CommonHandleError
 from ai_service.response.result import success
@@ -23,14 +23,19 @@ redis = RedisService.get_instance("parse")
 
 
 @router.post("/file")
-async def parse_file(file_info=Depends(handle_file), background_tasks: BackgroundTasks = None):
-    try:
-        cached_results, uncached_infos = await get_cache(file_info=file_info)
-    except Exception as e:
-        log.error(f"获取缓存失败: {e}", exc_info=True)
-        cached_results, uncached_infos = [], [file_info]
-    if len(uncached_infos) == 0:
-        return success(cached_results[0])
+async def parse_file(
+        file_info=Depends(handle_file),
+        cache_enabled: bool = Form(True, alias="cache_enabled"),
+        background_tasks: BackgroundTasks = None
+):
+    cached_results, uncached_infos = [], [file_info]
+    if cache_enabled:
+        try:
+            cached_results, uncached_infos = await get_cache(file_info=file_info)
+        except Exception as e:
+            log.error(f"获取缓存失败: {e}", exc_info=True)
+        if len(uncached_infos) == 0:
+            return success(cached_results[0])
     text = await _extract_text_from_file(file_info["save_path"], file_info["extension"])
     result = await struct_text_extractor.extract_from_text_to_user_form(text)
     background_tasks.add_task(save_cache, [result], uncached_infos)
@@ -38,14 +43,19 @@ async def parse_file(file_info=Depends(handle_file), background_tasks: Backgroun
 
 
 @router.post("/files")
-async def parse_files(file_infos=Depends(handle_files), background_tasks: BackgroundTasks = None):
-    try:
-        cached_results, uncached_infos = await get_cache(file_infos=file_infos)
-    except Exception as e:
-        log.error(f"获取缓存失败: {e}", exc_info=True)
-        cached_results, uncached_infos = [], file_infos
-    if len(uncached_infos) == 0:
-        return success(cached_results)
+async def parse_files(
+        file_infos=Depends(handle_files),
+        cache_enabled: bool = Form(True, alias="cache_enabled"),
+        background_tasks: BackgroundTasks = None
+):
+    cached_results, uncached_infos = [], file_infos
+    if cache_enabled:
+        try:
+            cached_results, uncached_infos = await get_cache(file_infos=file_infos)
+        except Exception as e:
+            log.error(f"获取缓存失败: {e}", exc_info=True)
+        if len(uncached_infos) == 0:
+            return success(cached_results)
     file_infos = uncached_infos
     async with semaphore:
         texts = await asyncio.gather(*[
@@ -105,7 +115,7 @@ async def get_cache(file_info=None, file_infos=None) -> tuple[list[dict[str, Any
     for info in file_infos:
         fingerprint = file_fingerprint(info["save_path"], HashAlgorithm.SHA256)
         if redis.exists(fingerprint):
-            result.append(redis.get(fingerprint,ttl=settings.redis.cache_timeout.file_parse))
+            result.append(redis.get(fingerprint, ttl=settings.redis.cache_timeout.file_parse))
         else:
             info_list.append(info)
     return result, info_list
