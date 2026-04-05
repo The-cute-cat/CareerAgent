@@ -3,12 +3,12 @@ import { computed, inject, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/modules/user'
 import { useAppStore } from '@/stores/modules/app'
-import { getAccountPointsService } from '@/api/points'
+import { getAccountPointsService, getUserInfoService } from '@/api/points'
 import { ArrowDown, User, SwitchButton, Menu as MenuIcon, Sunny, Moon } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const isMobileLayout = inject('isMobileLayout', ref(false))
-const toggleMobileDrawer = inject('toggleMobileDrawer', () => {})
+const toggleMobileDrawer = inject('toggleMobileDrawer', () => { })
 
 const route = useRoute()
 const router = useRouter()
@@ -63,6 +63,8 @@ const handleLogout = () => {
 }
 
 const syncAccountPoints = async () => {
+  console.log("syncAccountPoints", userStore.userInfo?.id)
+
   const userId = Number(userStore.userInfo?.id)
   if (!userStore.isLoggedIn || !userId) return
 
@@ -73,14 +75,36 @@ const syncAccountPoints = async () => {
     if (payload?.code !== 200 || !payload.data || !userStore.userInfo) {
       return
     }
+    console.log('同步账号积分', payload.data);
 
     userStore.userInfo = {
       ...userStore.userInfo,
-      points: payload.data.pointsBalance,
       pointsBalance: payload.data.pointsBalance
     } as any
   } catch (error) {
     console.warn('同步账号积分失败', error)
+  }
+}
+
+const syncUserInfo = async () => {
+  console.log("syncUserInfo", userStore.userInfo?.id)
+  const userId = Number(userStore.userInfo?.id)
+  if (!userStore.isLoggedIn || !userId) return
+
+  try {
+    const result = await getUserInfoService(userId)
+    const payload = result.data
+
+    if (payload?.code !== 200 || !payload.data || !userStore.userInfo) {
+      return
+    }
+    console.log('同步用户信息', payload.data);
+
+    userStore.userInfo = {
+      ...userStore.userInfo
+    } as any
+  } catch (error) {
+    console.warn('同步用户信息失败', error)
   }
 }
 
@@ -116,10 +140,11 @@ const confirmLogout = () => {
 
 onMounted(() => {
   syncAccountPoints()
+  syncUserInfo()
 })
 
 watch(
-  () => userStore.userInfo?.id,
+  () => (userStore.userInfo as any)?.user_id || userStore.userInfo?.id,
   (newId, oldId) => {
     if (newId && newId !== oldId) {
       syncAccountPoints()
@@ -145,20 +170,10 @@ watch(
       <!-- 环境背景色与主题切换 -->
       <div class="theme-switch-wrapper">
         <el-tooltip content="自定义背景色" placement="bottom">
-          <el-color-picker
-            v-model="appStore.customBgColor"
-            size="small"
-            show-alpha
-            class="bg-color-picker"
-          />
+          <el-color-picker v-model="appStore.customBgColor" size="small" show-alpha class="bg-color-picker" />
         </el-tooltip>
-        <el-switch
-          v-model="appStore.isDarkMode"
-          inline-prompt
-          :active-icon="Moon"
-          :inactive-icon="Sunny"
-          class="theme-toggle-switch"
-        />
+        <el-switch v-model="appStore.isDarkMode" inline-prompt :active-icon="Moon" :inactive-icon="Sunny"
+          class="theme-toggle-switch" />
       </div>
 
       <div v-if="!isLoggedIn" class="auth-buttons">
@@ -190,11 +205,15 @@ watch(
         <template #dropdown>
           <el-dropdown-menu class="custom-dropdown">
             <el-dropdown-item command="profile">
-              <el-icon><User /></el-icon>
+              <el-icon>
+                <User />
+              </el-icon>
               个人中心
             </el-dropdown-item>
             <el-dropdown-item divided command="logout" class="logout-item">
-              <el-icon><SwitchButton /></el-icon>
+              <el-icon>
+                <SwitchButton />
+              </el-icon>
               退出登录
             </el-dropdown-item>
           </el-dropdown-menu>
@@ -328,12 +347,14 @@ watch(
   border: 1px solid var(--color-border);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-  outline: none; /* 移除触发后的焦点轮廓，防止出现黑框 */
+  outline: none;
+  /* 移除触发后的焦点轮廓，防止出现黑框 */
 }
 
 .user-info:focus,
 .user-info:focus-visible {
-  outline: none; /* 彻底消除不同浏览器（如 Chrome）下的默认焦点框 */
+  outline: none;
+  /* 彻底消除不同浏览器（如 Chrome）下的默认焦点框 */
 }
 
 .user-info:hover {

@@ -26,7 +26,11 @@
         </where>
     </update>
     <update id="updateAvatar">
-        
+        update user_stu
+        set avatar=#{avatar}
+        <where>
+            id = #{id}
+        </where>
     </update>
     <!--    <sql id="baseColumn">-->
 <!--        id, username, nickname, email, avatar, status, create_time, update_time-->

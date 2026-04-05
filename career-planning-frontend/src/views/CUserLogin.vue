@@ -20,6 +20,7 @@ const handleLogin = async () => {
     if (result.data.code !== 200) {
       throw new Error(result.data.message || '登录失败')
     }
+    console.log("登录成功", result);
 
     userStore.setUserALLInfo(
       result.data.data.accessToken,
@@ -30,6 +31,8 @@ const handleLogin = async () => {
     router.push('/')
     showSuccessNotification()
   } catch (error) {
+    console.log(1223, error);
+
     const errorMessage = error instanceof Error ? error.message : '登录失败'
     ElMessage.error(errorMessage)
   } finally {
@@ -106,7 +109,9 @@ const showSuccessNotification = () => {
             <label class="field">
               <span class="field-label">用户名</span>
               <div class="field-box">
-                <el-icon><User /></el-icon>
+                <el-icon>
+                  <User />
+                </el-icon>
                 <input v-model="loginform.username" type="text" placeholder="请输入邮箱或用户名" required />
               </div>
             </label>
@@ -114,15 +119,15 @@ const showSuccessNotification = () => {
             <label class="field">
               <span class="field-label">密码</span>
               <div class="field-box">
-                <el-icon><Lock /></el-icon>
-                <input
-                  v-model="loginform.password"
-                  :type="showPassword ? 'text' : 'password'"
-                  placeholder="请输入密码"
-                  required
-                />
+                <el-icon>
+                  <Lock />
+                </el-icon>
+                <input v-model="loginform.password" :type="showPassword ? 'text' : 'password'" placeholder="请输入密码"
+                  required />
                 <button type="button" class="toggle-btn" @click="showPassword = !showPassword">
-                  <el-icon><component :is="showPassword ? Hide : View" /></el-icon>
+                  <el-icon>
+                    <component :is="showPassword ? Hide : View" />
+                  </el-icon>
                 </button>
               </div>
             </label>
@@ -133,7 +138,9 @@ const showSuccessNotification = () => {
 
             <button type="submit" class="primary-btn" :disabled="loading">
               <span>{{ loading ? '登录中...' : '登录' }}</span>
-              <el-icon><ArrowRight /></el-icon>
+              <el-icon>
+                <ArrowRight />
+              </el-icon>
             </button>
           </form>
 
@@ -211,9 +218,17 @@ const showSuccessNotification = () => {
 }
 
 @keyframes float {
-  0% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(50px, 30px) scale(1.1); }
-  100% { transform: translate(-30px, 60px) scale(0.9); }
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+
+  50% {
+    transform: translate(50px, 30px) scale(1.1);
+  }
+
+  100% {
+    transform: translate(-30px, 60px) scale(0.9);
+  }
 }
 
 .auth-shell {
@@ -269,7 +284,9 @@ const showSuccessNotification = () => {
   z-index: 0;
 }
 
-.aside-top, .aside-card, .aside-metrics {
+.aside-top,
+.aside-card,
+.aside-metrics {
   position: relative;
   z-index: 1;
 }
