@@ -105,45 +105,33 @@ public class PointsReferServiceImpl implements PointsReferService {
 //        }
         Long userId = referralDTO.getUserId();
         String inviteCode = referralDTO.getInviteCode();
+        UserReferral userReferral = null;
         if (StrUtil.isNotBlank(inviteCode)) {
-            UserReferral userReferral = userReferralMapper.selectOne(
+            userReferral = userReferralMapper.selectOne(
                     new LambdaQueryWrapper<UserReferral>()
                             .select(UserReferral::getUserId, UserReferral::getStatus)
                             .eq(UserReferral::getInviteCode, inviteCode)
             );
-//            UserReferral userReferral = userReferralMapper.selectOne(
-//                    new LambdaQueryWrapper<UserReferral>()
-//                            .eq(UserReferral::getInviteCode, inviteCode)
-//            );
-            if (userReferral == null) {
-                log.error("用户 {} 还没有注册成功", userId);
-                return Result.fail("用户还没有注册成功");
-            }
-            if (userReferral.getStatus() != 1) {
-                log.error("用户 {} 已经被封了", userId);
-                return Result.fail("用户已经被封了");
-            }
-        }else{
-            User selectedOne = userMapper.selectOne(
-                    new LambdaQueryWrapper<User>()
-                            .select(User::getId, User::getStatus)
-                            .eq(User::getId, userId)
-            );
+        }
+        User selectedOne = userMapper.selectOne(
+                new LambdaQueryWrapper<User>()
+                        .select(User::getId, User::getStatus)
+                        .eq(User::getId, userId)
+        );
 //            User selectedOne = userMapper.selectOne(
 //                    new LambdaQueryWrapper<User>()
 //                            .eq(User::getId, userId)
 //            );
-            if (selectedOne == null) {
-                log.error("用户 {} 还没有注册成功", userId);
-                return Result.fail("用户还没有注册成功");
-            }
-            if (selectedOne.getStatus() != 1) {
-                log.error("用户 {} 已经被封了", userId);
-                return Result.fail("用户已经被封了");
-            }
+        if (selectedOne == null) {
+            log.error("用户 {} 还没有注册成功", userId);
+            return Result.fail("用户还没有注册成功");
+        }
+        if (selectedOne.getStatus() != 1) {
+            log.error("用户 {} 已经被封了", userId);
+            return Result.fail("用户已经被封了");
         }
 
-        /** PointsTransaction insert */
+        /** 1 PointsTransaction insert */
         PointsTransaction pointsTransaction = new PointsTransaction();
         pointsTransaction.setUserId(userId);
         /* POINTS_FOR_REGISTRATION-新用户注册获得的积分-赠送积分 */
@@ -161,7 +149,7 @@ public class PointsReferServiceImpl implements PointsReferService {
         log.info("pointsTransactionMapper 表插入 userId{} 成功注册，inviteCode邀请码: {}, " +
                 "pointsTransactionMapper 表更新成功", userId, inviteCode);
 
-        /** UserPoints insert */
+        /** 2 UserPoints insert */
         UserPoints userPoints = new UserPoints();
         userPoints.setUserId(userId);
         /* 初始积分 POINTS_FOR_REGISTRATION */
@@ -182,13 +170,11 @@ public class PointsReferServiceImpl implements PointsReferService {
         log.info("userpointsMapper 表插入 userId {} 成功注册，inviteCode邀请码: {}, " +
                 "userpointsMapper 表更新成功", userId, inviteCode);
 
-        if (StrUtil.isBlank(inviteCode)) {
-            // 没有邀请码，直接返回积分
-            log.info("用户 {} 注册成功，没有邀请码，直接创建积分账户", userId);
-            return Result.ok("注册的积分已返回");
+        /** 3-UserReferral update */
+        if(userReferral==null) {
+            log.error("用户 {} 使用的邀请码 {} 无效", userId, inviteCode);
+            return Result.fail("邀请码无效");
         }
-
-        /** 1-UserReferral update */
         int updated = userReferralMapper.update(null, new LambdaUpdateWrapper<UserReferral>()
                 .eq(UserReferral::getInviteCode, inviteCode)
                 .set(UserReferral::getUserId, userId)

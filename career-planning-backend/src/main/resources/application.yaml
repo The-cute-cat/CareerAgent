@@ -15,7 +15,7 @@ spring:
   data:
     redis:
       host: ${redis_host}
-      port: ${redis_post}
+      port: ${redis_port}
       username: ${redis_username}
       password: ${redis_password}
       connect-timeout: 2000

@@ -283,25 +283,21 @@ const handleSettingAction = (key: string) => {
     <div class="page-glow page-glow-left"></div>
     <div class="page-glow page-glow-right"></div>
 
-    <ProfileSidebar
-      v-show="!isMobileLayout || isMobileMenuOpen"
-      v-model:activeMenu="activeMenu"
-      v-model:collapsed="sidebarCollapsed"
-      :menus="visibleMenus"
-      :user-info="userInfo"
-      :points="displayPoints"
-      class="responsive-sidebar"
-    />
+    <ProfileSidebar v-show="!isMobileLayout || isMobileMenuOpen" v-model:activeMenu="activeMenu"
+      v-model:collapsed="sidebarCollapsed" :menus="visibleMenus" :user-info="userInfo" :points="displayPoints"
+      class="responsive-sidebar" />
 
     <div class="right-panel" v-show="!isMobileLayout || !isMobileMenuOpen">
       <div class="panel-shell">
         <div class="mobile-nav-header" v-if="isMobileLayout">
-          <el-icon class="back-btn" @click="isMobileMenuOpen = true"><ArrowLeft /></el-icon>
+          <el-icon class="back-btn" @click="isMobileMenuOpen = true">
+            <ArrowLeft />
+          </el-icon>
           <span class="mobile-nav-title">{{ panelTitleMap[activeMenu] }}</span>
         </div>
 
         <div class="content-intro" v-else>
-          <div class="intro-badge">个人中心</div>
+          <!-- <div class="intro-badge">个人中心</div> -->
           <h1>{{ panelTitleMap[activeMenu] }}</h1>
           <p>{{ panelDescriptionMap[activeMenu] }}</p>
         </div>
@@ -310,19 +306,11 @@ const handleSettingAction = (key: string) => {
           <div :key="activeMenu" class="panel-content">
             <ProfileDashboard v-if="activeMenu === 'dashboard'" :user-info="userInfo" />
 
-            <ProfileInfoPanel
-              v-else-if="activeMenu === 'profile'"
-              :user-info="userInfo"
-              @update-user="updateUserInfo"
-            />
+            <ProfileInfoPanel v-else-if="activeMenu === 'profile'" :user-info="userInfo"
+              @update-user="updateUserInfo" />
 
-            <MemberPlanPanel
-              v-else-if="activeMenu === 'member'"
-              :points="displayPoints"
-              :records="pointRecords"
-              :account-points="accountPoints"
-              :loading="pointsLoading"
-            />
+            <MemberPlanPanel v-else-if="activeMenu === 'member'" :points="displayPoints" :records="pointRecords"
+              :account-points="accountPoints" :loading="pointsLoading" />
 
             <InviteFriendsPanel v-else-if="activeMenu === 'invite'" :invite-code="inviteCode" />
 
@@ -379,13 +367,23 @@ const handleSettingAction = (key: string) => {
 }
 
 @keyframes floatLeft {
-  0% { transform: translate(0, 0) scale(1); }
-  100% { transform: translate(40px, 30px) scale(1.1); }
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+
+  100% {
+    transform: translate(40px, 30px) scale(1.1);
+  }
 }
 
 @keyframes floatRight {
-  0% { transform: translate(0, 0) scale(1); }
-  100% { transform: translate(-50px, -40px) scale(1.05); }
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+
+  100% {
+    transform: translate(-50px, -40px) scale(1.05);
+  }
 }
 
 .right-panel {
@@ -496,6 +494,7 @@ const handleSettingAction = (key: string) => {
     opacity: 0;
     transform: translateY(6px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
