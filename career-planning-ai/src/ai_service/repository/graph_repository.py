@@ -26,8 +26,8 @@ from ai_service.services import log
 
 
 class GraphRepository:
-    def __init__(self, uri: str, user, password):
-        self.driver = GraphDatabase.driver(uri, auth=(user, password))
+    def __init__(self, url: str, user: str, password: str):
+        self.driver = GraphDatabase.driver(url, auth=(user, password))
         self.model = SentenceTransformer(
             "all-MiniLM-L6-v2"
         )  # 用于文本Embedding的轻量级模型
@@ -46,7 +46,7 @@ class GraphRepository:
 
     # 输入数据类型安全校验
     @staticmethod
-    def _validate_input_data(job_data: dict)-> bool:
+    def _validate_input_data(job_data: dict) -> bool:
         """
         严格校验job_data中的关键字段是否为数字类型
         """
@@ -108,8 +108,8 @@ class GraphRepository:
                         RETURN j.id AS id,
                             j.id AS job_id,
                             coalesce(j.job_name, '') AS job_name,
-                            coalesce(j.coarse_community_id, '') AS coarse_community_id,
-                            coalesce(j.fine_community_id, '') AS fine_community_id,
+                            coalesce(j.macro_community_id, j.coarse_community_id, 0) AS macro_community_id,
+                            coalesce(j.micro_community_id, j.fine_community_id, 0) AS micro_community_id,
                             coalesce(j.salary_rank, 1) AS salary_rank,
                             coalesce(j.min_experience, 0) AS min_experience,
                             coalesce(j.min_degree, 0) AS min_degree,
@@ -160,11 +160,13 @@ class GraphRepository:
             to_node_dict = job_evolve.to_job.model_dump(exclude_none=True)
             edge_dict = job_evolve.edge.model_dump(exclude_none=True)
 
-            batch_payload.append({
-                "from_node": from_node_dict,
-                "to_node": to_node_dict,
-                "edge_props": edge_dict
-            })
+            batch_payload.append(
+                {
+                    "from_node": from_node_dict,
+                    "to_node": to_node_dict,
+                    "edge_props": edge_dict,
+                }
+            )
 
         # 2. 高性能 UNWIND 批量写入 Cypher
         # 核心逻辑：
@@ -187,7 +189,10 @@ class GraphRepository:
             e.cos_low = data.edge_props.cos_low,
             e.salary_gain = data.edge_props.salary_gain,
             e.transfer_cost = data.edge_props.transfer_cost,
-            e.final_routing_cost = data.edge_props.final_routing_cost
+            e.final_routing_cost = data.edge_props.final_routing_cost,
+            e.pareto_rank = coalesce(data.edge_props.pareto_rank, 0),
+            e.is_cross_macro = coalesce(data.edge_props.is_cross_macro, false),
+            e.is_cross_micro = coalesce(data.edge_props.is_cross_micro, false)
         """
 
         # 3. 执行 Cypher
@@ -196,8 +201,12 @@ class GraphRepository:
 
         # 4. 最终校验（可选，给你定心丸）
         with self.driver.session() as session:
-            node_count = session.run("MATCH (j:Job) RETURN count(j) AS cnt").single()["cnt"]
-            edge_count = session.run("MATCH ()-[e:EVOLVE_TO]->() RETURN count(e) AS cnt").single()["cnt"]
+            node_count = session.run("MATCH (j:Job) RETURN count(j) AS cnt").single()[
+                "cnt"
+            ]
+            edge_count = session.run(
+                "MATCH ()-[e:EVOLVE_TO]->() RETURN count(e) AS cnt"
+            ).single()["cnt"]
 
         log.info("🎉 ==============================================")
         log.info(f"🎉 JobEvolution 批量写入完成！")
@@ -340,6 +349,7 @@ class GraphRepository:
         MAX_EXP = 10.0  # 假设10年为封顶
         MAX_SALARY_RANK = 3.0
 
+        # 3. 结构化属性归一化矩阵
         attr_matrix = np.array(
             [
                 [
@@ -396,22 +406,11 @@ class GraphRepository:
             major_diff = 0 if job_a_info["major"] == job_b_info["major"] else 1
             transfer_cost = round((exp_diff + degree_diff + major_diff) / 10.0, 4)
 
-            # ======================
-            # 指标4：final_routing_cost（不变）
-            # ======================
-            combined_attraction = (
-                (jaccard_score * 0.5) + (cos_low * 0.3) + (salary_gain * 0.2)
-            )
-            final_routing_cost = round(
-                max(1.0 - combined_attraction + transfer_cost, 0.0001), 4
-            )
-
             complete_edges[(job_a, job_b)] = {
                 "jaccard_high": jaccard_score,
                 "cos_low": cos_low,
                 "salary_gain": salary_gain,
                 "transfer_cost": transfer_cost,
-                "final_routing_cost": final_routing_cost,
             }
 
         # 校验 + 确认
@@ -456,7 +455,9 @@ class GraphRepository:
         job_data = self.get_all_jobs()
         is_valid = GraphRepository._validate_input_data(job_data)
         if not is_valid:
-            log.error("输入数据校验失败，存在非数字类型的关键字段！请检查日志中的错误详情并修正数据后重试。")
+            log.error(
+                "输入数据校验失败，存在非数字类型的关键字段！请检查日志中的错误详情并修正数据后重试。"
+            )
             return
 
         all_job_ids = list(job_data.keys())
@@ -466,13 +467,13 @@ class GraphRepository:
             "coarse_resolution": 0.1,
             "coarse_isolation_threshold": 0.1,
             "fine_resolution": 1.0,
-            "fine_isolation_threshold": 0.05
+            "fine_isolation_threshold": 0.05,
         }
         multi_objective_dict: Dict[str, Literal[0, 1]] = {
             "jaccard_high": 1,
             "cos_low": 1,
             "salary_gain": 1,
-            "transfer_cost": 0
+            "transfer_cost": 0,
         }
 
         GraphRepository.manual_confirm(
@@ -507,37 +508,84 @@ class GraphRepository:
         pareto_skeleton_edges = GraphAlgorithms.run_pareto_sparsification(
             community_map=coarse_community_map,
             multi_objective_dict=multi_objective_dict,
-            edge_info_map=edge_info_map
-        )
-
-        # 7.用final_routing_cost和帕累托剪枝后的边跑第二次细聚类（仅在第一层前沿边上跑)
-        fine_community_map = GraphAlgorithms.run_clustering(
-            edge_score_map={(a, b): v["final_routing_cost"] for (a, b), v in pareto_skeleton_edges.items()},
-            nodes=all_job_ids,
-            resolution=clustering_data["fine_resolution"],
-            isolation_threshold=clustering_data["fine_isolation_threshold"],
-            weight_transform_fn=lambda x: (1.0 / (max(x, 0) + 0.1)) ** 2
+            edge_info_map=edge_info_map,
+            keep_fronts=2,
         )
 
         # 展示帕累托筛选后的边数和之前的对比
         log.info(f"原始候选边数: {len(jaccard_map)}")
         log.info(f"帕累托筛选后的边数: {len(pareto_skeleton_edges)}")
 
+        # 根据帕累托等级和跨社区标识，重新修正 Dijkstra 寻路成本
+        log.info("正在根据帕累托等级与跨社区标识修正最终寻路权重...")
+        for (a, b), m in pareto_skeleton_edges.items():
+            # 基础吸引力 (Jaccard + Cosine + Salary)
+            base_attraction = (
+                (m["jaccard_high"] * 0.5)
+                + (m["cos_low"] * 0.3)
+                + (m["salary_gain"] * 0.2)
+            )
+
+            # 1. 增加等级惩罚：第二前沿（rank 1）比第一前沿（rank 0）更难走
+            rank_penalty = m["pareto_rank"] * 0.15
+
+            # 2. 增加跨界惩罚：物理上的跨行业难度
+            cross_penalty = 0.5 if m["is_cross_community"] else 0.0
+
+            # 3. 最终坍缩：成本 = (1 - 吸引力) + 各种惩罚
+            m["final_routing_cost"] = round(
+                max(
+                    1.0
+                    - base_attraction
+                    + m["transfer_cost"]
+                    + rank_penalty
+                    + cross_penalty,
+                    0.001,
+                ),
+                4,
+            )
+
+        # 去掉 is_cross_community 字段, 兼容GraphEdgeEvolve类
+        for (a, b), m in pareto_skeleton_edges.items():
+            del m["is_cross_community"]
+
         GraphRepository.manual_confirm(
-            "帕累托筛选完成",
+            "帕累托筛选与权重更新完成",
             "是否开始第二次细聚类？（建议先人工确认社区划分结果是否合理，再继续后续构建）",
         )
+        # 7.用final_routing_cost和帕累托剪枝后的边跑第二次细聚类（仅在第一层前沿边上跑)
+        fine_community_map = GraphAlgorithms.run_clustering(
+            edge_score_map={
+                (a, b): v["final_routing_cost"]
+                for (a, b), v in pareto_skeleton_edges.items()
+            },
+            nodes=all_job_ids,
+            resolution=clustering_data["fine_resolution"],
+            isolation_threshold=clustering_data["fine_isolation_threshold"],
+            weight_transform_fn=lambda x: (1.0 / (max(x, 0) + 0.1)) ** 2,
+        )
 
-        # 8. 将最终的社区划分结果（coarse_community_map和fine_community_map）注入到岗位属性中，准备写回图数据库
+        # 8. 将最终的社区划分结果注入到岗位属性中（字段以 GraphNodeJob 为准）
         for job_id in all_job_ids:
-            job_data[job_id]["coarse_community_id"] = coarse_community_map.get(job_id, -1)
-            job_data[job_id]["fine_community_id"] = fine_community_map.get(job_id, -1)
+            job_data[job_id]["macro_community_id"] = coarse_community_map.get(
+                job_id, -1
+            )
+            job_data[job_id]["micro_community_id"] = fine_community_map.get(job_id, -1)
 
-        #展示最终的社区划分结果
+        # 给所有evolve边注入跨社区标识（第一层粗社区，第二层细社区）
+        for (a, b), m in pareto_skeleton_edges.items():
+            m["is_cross_macro"] = (
+                job_data[a]["macro_community_id"] != job_data[b]["macro_community_id"]
+            )
+            m["is_cross_micro"] = (
+                job_data[a]["micro_community_id"] != job_data[b]["micro_community_id"]
+            )
+
+        # 展示最终的社区划分结果
         community_counts = defaultdict(int)
         for job_id in all_job_ids:
-            coarse_id = job_data[job_id]["coarse_community_id"]
-            micro_id = job_data[job_id]["fine_community_id"]
+            coarse_id = job_data[job_id]["macro_community_id"]
+            micro_id = job_data[job_id]["micro_community_id"]
             community_counts[(coarse_id, micro_id)] += 1
 
         log.info("最终社区划分结果:")

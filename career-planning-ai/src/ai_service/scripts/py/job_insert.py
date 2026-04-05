@@ -1,6 +1,10 @@
 import asyncio
 from pathlib import Path
+<<<<<<< HEAD
 from typing import List, Union
+=======
+from typing import List
+>>>>>>> origin/master
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 
@@ -90,10 +94,16 @@ def get_all_files(folder_path: Union[str, Path], recursive: bool = True) -> List
     if not folder.is_dir():
         raise NotADirectoryError(f"路径不是文件夹: {folder_path}")
 
+<<<<<<< HEAD
     if recursive:
         return [str(f.resolve()) for f in folder.rglob("*") if f.is_file()]
     else:
         return [str(f.resolve()) for f in folder.iterdir() if f.is_file()]
+=======
+async def main():
+    """主函数：处理任务并确保资源正确清理"""
+    EXCEL_FILE_PATH = r"E:\软件工程相关资料\项目比赛\服创2026\岗位数据\.NET-1773231373303.csv"
+>>>>>>> origin/master
 
 
 async def main(max_concurrent: int = 5):

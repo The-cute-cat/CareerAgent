@@ -20,6 +20,7 @@ import java.util.Map;
  * 2. 调用 AiServiceClient 与 AI 服务进行交互，获取问题相关的结果
  * 3. 返回结果给前端
  * 4. 记录日志，便于调试和监控
+ *
  * @modeule QuestionController
  */
 @Slf4j
@@ -27,7 +28,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 @RequestMapping("/question")
 public class QuestionController {
-    
+
     private final AiServiceClient aiServiceClient;
 
     /**
@@ -43,15 +44,15 @@ public class QuestionController {
         Map<String, Object> params = new HashMap<>();
         AiChatResponse aiChatResponse = null;
 
-        System.out.println("questionDTO.getType():"+questionDTO.getType());
-        System.out.println("questionDTO.getName():"+questionDTO.getName());
+        System.out.println("questionDTO.getType():" + questionDTO.getType());
+        System.out.println("questionDTO.getName():" + questionDTO.getName());
 
-        if("skill".equals(questionDTO.getType())){
+        if ("skill".equals(questionDTO.getType())) {
             params.put("skill", questionDTO.getName());
-            aiChatResponse = aiServiceClient.chatWithOther("/question/skill_generate", params);
-        }else if("tool".equals(questionDTO.getType())){
+            aiChatResponse = aiServiceClient.chatWithOther("/question/generate", params, true);
+        } else if ("tool".equals(questionDTO.getType())) {
             params.put("tool", questionDTO.getName());
-            aiChatResponse = aiServiceClient.chatWithOther("/question/tool_generate", params);
+            aiChatResponse = aiServiceClient.chatWithOther("/question/tool_generate", params, true);
         }
 
         return Result.ok(aiChatResponse.getData());
@@ -60,7 +61,7 @@ public class QuestionController {
     /**
      * checkStudentAnswer
      * 检查问答题的答案
-     * 
+     *
      * @param questionDTO
      * @return
      */
@@ -73,8 +74,8 @@ public class QuestionController {
         params.put("questions", questionDTO.getQuestions());
         params.put("student_answer", questionDTO.getStudentAnswer());
         params.put("evaluation_criteria", questionDTO.getEvaluationCriteria());
-        AiChatResponse aiChatResponse = aiServiceClient.chatWithOther("/question/check_student_answer", params);
+        AiChatResponse aiChatResponse = aiServiceClient.chatWithOther("/question/check_student_answer", params, true);
         return Result.ok(aiChatResponse.getData());
     }
-    
+
 }

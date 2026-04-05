@@ -33,6 +33,10 @@ class EvaluateRequest(BaseModel):
         default=True,
         description="是否使用AI大模型进行深度分析"
     )
+    cache_enabled: bool = Field(
+        default=True,
+        description="是否使用缓存"
+    )
 
 
 @router.post("/evaluate")
@@ -48,12 +52,13 @@ async def evaluate(
     基础评分约需3-5秒，开启AI分析约需8-15秒。
     """
     try:
-        try:
-            cache = get_cache(request)
-            if cache:
-                return success(cache)
-        except Exception as e:
-            log.error(f"获取缓存失败: {str(e)}")
+        if request.cache_enabled:
+            try:
+                cache = get_cache(request)
+                if cache:
+                    return success(cache)
+            except Exception as e:
+                log.error(f"获取缓存失败: {str(e)}")
         result = await code_ability_evaluator.evaluate(
             url=request.url,
             use_ai=request.use_ai
@@ -79,7 +84,7 @@ async def evaluate(
 def get_cache(request: EvaluateRequest):
     if not redis.is_available:
         return None
-    str_request = json.dumps(request.model_dump(), sort_keys=True)
+    str_request = json.dumps(request.model_dump(), ensure_ascii=False, sort_keys=True)
     fingerprint = text_fingerprint(str_request)
     return redis.get(fingerprint, None, ttl=settings.redis.cache_timeout.code_ability)
 
@@ -87,6 +92,6 @@ def get_cache(request: EvaluateRequest):
 def save_cache(result: dict, request: EvaluateRequest):
     if not redis.is_available:
         return
-    str_request = json.dumps(request.model_dump(), sort_keys=True)
+    str_request = json.dumps(request.model_dump(), ensure_ascii=False, sort_keys=True)
     fingerprint = text_fingerprint(str_request)
     redis.set(fingerprint, result, settings.redis.cache_timeout.code_ability)

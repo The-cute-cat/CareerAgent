@@ -33,7 +33,10 @@ public class AliOSSUtils {
 
         // 避免文件覆盖
         String originalFilename = file.getOriginalFilename();
-        String fileName = UUID.randomUUID().toString() + originalFilename.substring(originalFilename.lastIndexOf("."));
+
+        Long currentUserId = ThreadLocalUtil.getCurrentUserId();
+        String dir = "avatar/" +currentUserId + "/"; // 可以根据需要设置目录结构，例如按照用户 ID 分类存储
+        String fileName = dir + UUID.randomUUID().toString() + originalFilename.substring(originalFilename.lastIndexOf("."));
 
         // 上传文件到 OSS
         OSS ossClient = new OSSClientBuilder().build(endpoint, accessKeyId, accessKeySecret);

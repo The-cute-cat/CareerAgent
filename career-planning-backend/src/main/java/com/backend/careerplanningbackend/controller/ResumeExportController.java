@@ -8,13 +8,31 @@ import org.springframework.web.bind.annotation.*;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 
+/**
+ * ResumeExportController
+ * 简历导出控制器
+ * 用于将简历数据导出为不同格式的文件
+ * 主要功能：
+ * 1. 支持导出为 Word 格式 (.docx)
+ * 2. 支持导出为 PDF 格式
+ * 3. 支持导出为 Markdown 格式 (.md)
+ * 4. 使用 POI-tl 模板引擎渲染 Word 文档
+ * @module ResumeExportController
+ */
 @RestController
 @RequestMapping("/api/resume")
 public class ResumeExportController {
 
-    // 假设这是前端传过来的 JSON 对应的 Java 实体类
-//     public class ResumeData { String name; String phone; List<WorkExp> workExp; ... }
-
+    /**
+     * exportResume
+     * 导出简历文件
+     * 支持导出为 Word、PDF、Markdown 三种格式
+     *
+     * @param format 导出格式，支持：word、pdf、md
+     * @param resumeData 简历数据
+     * @param response HTTP 响应对象
+     * @throws Exception 导出异常
+     */
     @PostMapping("/export/{format}")
     public void exportResume(
             @PathVariable("format") String format,
@@ -30,8 +48,8 @@ public class ResumeExportController {
                 // 设置 Word 的 Content-Type 和下载文件名
                 response.setContentType("application/vnd.openxmlformats-officedocument.wordprocessingml.document");
                 response.setHeader(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=resume.docx");
-                
-                // 伪代码：调用 POI-tl 渲染 Word 并写入流
+
+                // 使用 POI-tl 渲染 Word 并写入流
                  XWPFTemplate template = XWPFTemplate.compile("template.docx").render(resumeData);
                  template.write(out);
                  template.close();
@@ -42,7 +60,7 @@ public class ResumeExportController {
                 response.setContentType("application/pdf");
                 // inline 表示在浏览器直接预览（如果浏览器支持），attachment 表示直接下载
                 response.setHeader(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=resume.pdf");
-                
+
                 // 伪代码：HTML 转 PDF 并写入流
 //                 String html = thymeleafEngine.process("resume", resumeData);
 //                 PdfUtil.generatePdfFromHtml(html, out);
@@ -52,7 +70,7 @@ public class ResumeExportController {
                 // 设置 Markdown 的 Content-Type
                 response.setContentType("text/markdown");
                 response.setHeader(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=resume.md");
-                
+
                 // 伪代码：拼接 Markdown 字符串并转为字节写入流
 //                 String markdownText = generateMarkdownString(resumeData);
 //                 out.write(markdownText.getBytes(StandardCharsets.UTF_8));

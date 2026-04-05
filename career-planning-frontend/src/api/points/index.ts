@@ -44,6 +44,14 @@ export const getAccountPointsService = (id: number) => {
   return request.get<Result<AccountPointsData>>(`/points/account/${id}`)
 }
 
+<<<<<<< HEAD
+=======
+export const getUserInfoService = (id: number) => {
+
+  return request.get<Result<AccountPointsData>>(`/user/info`)
+}
+
+>>>>>>> origin/master
 export const consumePointsService = (data: PointsConsumeRequest) => {
   if (ENABLE_MOCK) {
     return mockConsumePointsApi(data)
@@ -51,3 +59,34 @@ export const consumePointsService = (data: PointsConsumeRequest) => {
 
   return request.post<Result<PointsConsumeData>>('/points/consume', data)
 }
+<<<<<<< HEAD
+=======
+
+export interface PointsMembershipChangeDTO {
+  userId: number
+  amount: number
+  type: number
+  vip?: number
+  status?: number
+  description?: string
+}
+
+export const rechargePointsService = (data: PointsMembershipChangeDTO) => {
+  return request.post<Result<any>>('/points/recharge', data)
+}
+
+export interface PackageData {
+  id: number
+  name: string
+  price: number
+  points?: number
+  type: number
+  description?: string
+  status?: number
+  [key: string]: any
+}
+
+export const getPackagesByTypeService = (type: number) => {
+  return request.get<Result<PackageData[]>>(`/package/list/type/${type}`)
+}
+>>>>>>> origin/master

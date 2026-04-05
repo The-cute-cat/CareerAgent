@@ -61,7 +61,7 @@ class _Communication(BaseModel):
 class _LLMModelBase(BaseModel):
     """模型配置基类"""
     _skip_verify: bool = PrivateAttr(default=False)
-    name: str = ""
+    _name: str = ""
     api_key: SecretStr = SecretStr("")  # 敏感信息，使用时调用 .get_secret_value() 方法获取
     base_url: str = ""
     model_name: str = ""
@@ -86,27 +86,27 @@ class _LLMModelBase(BaseModel):
             return self
         if not self.api_key.get_secret_value() or self.api_key.get_secret_value() == "<api_key>":
             raise ValueError(
-                f"请在 .env 文件中配置正确的 {self.name if self.name else self.__class__.__name__} API Key"
+                f"请在 .env 文件中配置正确的 {self._name if self._name else self.__class__.__name__} API Key"
             )
         if not self.base_url:
             raise ValueError(
-                f"请在 .env 文件中配置正确的 {self.name if self.name else self.__class__.__name__} Base URL"
+                f"请在 .env 文件中配置正确的 {self._name if self._name else self.__class__.__name__} Base URL"
             )
         if not self.model_name:
             raise ValueError(
-                f"请在 .env 文件中配置正确的 {self.name if self.name else self.__class__.__name__} Model Name"
+                f"请在 .env 文件中配置正确的 {self._name if self._name else self.__class__.__name__} Model Name"
             )
         if self.timeout <= 0:
             raise ValueError(
-                f"请在 .env 文件中配置正确的 {self.name if self.name else self.__class__.__name__} Timeout"
+                f"请在 .env 文件中配置正确的 {self._name if self._name else self.__class__.__name__} Timeout"
             )
         if self.max_retries <= 0:
             raise ValueError(
-                f"请在 .env 文件中配置正确的 {self.name if self.name else self.__class__.__name__} Max Retries"
+                f"请在 .env 文件中配置正确的 {self._name if self._name else self.__class__.__name__} Max Retries"
             )
         if self.max_concurrent_requests <= 0:
             raise ValueError(
-                f"请在 .env 文件中配置正确的 {self.name if self.name else self.__class__.__name__} Max Concurrent Requests"
+                f"请在 .env 文件中配置正确的 {self._name if self._name else self.__class__.__name__} Max Concurrent Requests"
             )
         return self
 
@@ -135,23 +135,23 @@ class _LLM(_LLMModelBase):
 
 
 class _LiteLLM(_LLM):
-    name: str = "LiteLLM"
+    _name: str = "LiteLLM"
     model_name: str = ""
 
     class Qwen(_LLM):
-        name: str = "LLM_Qwen"
+        _name: str = "LLM_Qwen"
         model_name: str = ""
 
     qwen: Qwen = Field(default_factory=Qwen)
 
     class Deepseek(_LLM):
-        name: str = "LLM_Deepseek"
+        _name: str = "LLM_Deepseek"
         model_name: str = ""
 
     deepseek: Deepseek = Field(default_factory=Deepseek)
 
     class Image(_LLM):
-        name: str = "LLM_Image"
+        _name: str = "LLM_Image"
         model_name: str = ""
 
     image: Image = Field(default_factory=Image)
@@ -250,7 +250,7 @@ class _Milvus(BaseModel):
 
 
 class _ChromaConfig(_LLM):
-    name: str = "Chroma"
+    _name: str = "Chroma"
     model_name: str = ""
     extra: dict[str, Any] = {}
     save_path: str = ""
@@ -276,7 +276,7 @@ class _ChromaConfig(_LLM):
 
 
 class _CodeAbility(_LLM):
-    name: str = "CodeAbility"
+    _name: str = "CodeAbility"
     model_name: str = ""
     extra: dict[str, Any] = {}
     github_token: SecretStr = SecretStr("")
@@ -293,12 +293,16 @@ class _CodeAbility(_LLM):
 
     @field_validator("gitee_token")
     @classmethod
-    def validate(cls, v):
+    def validate_gitee_token(cls, v):
         if v.get_secret_value() in ("<GITEE_TOKEN>", "<token>", "", None):
             print(
                 "⚠️警告：请在.env文件中配置gitee个人访问令牌，否则可能因gitee访问速率限制，导致无法获取gitee仓库信息。")
             return SecretStr("")
         return v
+
+
+class _MatchAnalyzer(_LLM):
+    extra: dict[str, Any] = {}
 
 
 class _RedisConfig(BaseModel):
@@ -313,6 +317,8 @@ class _RedisConfig(BaseModel):
         default: int = 3600
         file_parse: int = 3600
         code_ability: int = 3600
+        report: int = 3600
+        question: int = 3600
 
     cache_timeout: CacheTimeout = Field(default_factory=CacheTimeout)
 
@@ -322,6 +328,20 @@ class _RedisConfig(BaseModel):
             self.is_can_use = False
             print("⚠️警告：请在.env文件中配置redis相关配置，否则导致无法使用redis缓存。")
         return self
+
+
+class _Neo4jConfig(BaseModel):
+    url: str = ""
+    username: str = ""
+    password: SecretStr = SecretStr("")
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v):
+        if v.get_secret_value() in ("<PASSWORD>", "<password>", "", None):
+            print("⚠️警告：请在.env文件中配置neo4j密码，否则无法使用图数据库功能。")
+            return SecretStr("")
+        return v
 
 
 class _Other(BaseModel):
@@ -353,8 +373,10 @@ class Settings(BaseSettings):
     vector: _Vector = Field(default_factory=_Vector)
     milvus: _Milvus = Field(default_factory=_Milvus)
     chroma_config: _ChromaConfig = Field(default_factory=_ChromaConfig)
+    match_analyzer: _MatchAnalyzer = Field(default_factory=_MatchAnalyzer)
     code_ability: _CodeAbility = Field(default_factory=_CodeAbility)
     redis: _RedisConfig = Field(default_factory=_RedisConfig)
+    neo4j: _Neo4jConfig = Field(default_factory=_Neo4jConfig)
     other: _Other = Field(default_factory=_Other)
 
     @model_validator(mode="after")

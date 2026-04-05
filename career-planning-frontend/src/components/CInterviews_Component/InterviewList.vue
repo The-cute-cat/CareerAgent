@@ -5,10 +5,19 @@ import InterviewCard from './InterviewCard.vue'
 
 const props = defineProps({
   interviews: { type: Array, default: () => [] },
-  selectedDate: { type: String, default: '' }
+  selectedDate: { type: String, default: '' },
+  activeTab: { type: String, default: 'all' }
 })
 
-const activeTab = ref('all')
+const activeTab = ref(props.activeTab)
+
+// 当父组件改变分类（如通过侧边栏点击路由）时，同步子组件状态
+watch(
+  () => props.activeTab,
+  (val) => {
+    if (val) activeTab.value = val
+  }
+)
 const searchQuery = ref('')
 
 const formattedTitle = computed(() => {
@@ -100,11 +109,11 @@ const filteredInterviews = computed(() => {
 .interview-list-container {
   display: flex;
   flex-direction: column;
-  background: #ffffff;
+  background: var(--color-background);
   border-radius: 20px;
   overflow: hidden;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.8);
+  border: 1px solid var(--color-border);
 }
 
 .main-header-bar {
@@ -166,10 +175,10 @@ const filteredInterviews = computed(() => {
     font-weight: 600;
     height: 48px;
     padding: 0 24px;
-    color: #64748b;
+    color: var(--color-text);
     
     &.is-active {
-      color: #3b82f6;
+      color: var(--el-color-primary);
     }
   }
 
@@ -211,9 +220,9 @@ const filteredInterviews = computed(() => {
   justify-content: center;
   padding: 80px 0;
   text-align: center;
-  background: #ffffff;
+  background: var(--color-background);
   border-radius: 20px;
-  border: 1px dashed #cbd5e1;
+  border: 1px dashed var(--color-border);
 
   .empty-icon {
     font-size: 48px;

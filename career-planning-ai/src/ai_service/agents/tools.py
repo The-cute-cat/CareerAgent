@@ -6,8 +6,10 @@
 2. 仅返回必要字段供 AI 理解资源内容
 3. 所有工具统一返回格式：{id, type, summary, ...}
 """
+from typing import Dict, Any
 from langchain_core.tools import tool
 
+from ai_service.models.growth_plan import GrowthPlan
 from ai_service.services.chroma_service import ChromaService
 from config import settings
 
@@ -17,6 +19,7 @@ __all__ = [
     "query_intern",
     "query_videos",
     "get_resources_by_ids",
+    "submit_growth_plan",
 ]
 
 
@@ -180,6 +183,79 @@ def get_resources_by_ids(resource_refs: list[dict]) -> dict[str, list[dict]]:
         results["interns"] = _format_interns(data)
 
     return results
+
+
+@tool(
+    description="""成长计划提交工具。**这是最终提交步骤**，用于校验成长计划字段是否完整合规。
+
+**完整字段规范（所有字段必填）**：
+
+```json
+{
+  "student_summary": "学生背景概述（必填）",
+  "target_position": "目标岗位名称（必填）",
+  "current_gap": "当前与目标的主要差距（必填）",
+  "short_term_plan": {
+    "duration": "如'1-3个月'（必填）",
+    "goal": "短期核心目标（必填）",
+    "focus_areas": ["重点提升领域1", "重点提升领域2"]（必填，数组）,
+    "milestones": [{
+      "milestone_name": "里程碑名称（必填）",
+      "target_date": "目标时间如'第1个月末'（必填）",
+      "key_results": ["成果1", "成果2"]（必填，数组）,
+      "tasks": [{
+        "task_name": "任务名称（必填）",
+        "description": "具体要做什么（必填）",
+        "priority": "高/中/低（必填）",
+        "estimated_time": "如'2周'（必填）",
+        "skill_target": "要提升的技能点（必填）",
+        "success_criteria": "如何判断完成（必填）",
+        "resources": [{"id": "xxx", "type": "book/video/project/intern", "name": "名称", "reason": "推荐理由"}]
+      }]
+    }],
+    "quick_wins": ["快速成果1", "快速成果2"]
+  },
+  "mid_term_plan": {
+    "duration": "如'3-12个月'（必填）",
+    "goal": "中期核心目标（必填）",
+    "skill_roadmap": ["技能1", "技能2"]（必填，数组）,
+    "milestones": [{同上结构}],
+    "career_progression": "预期达到的职业水平（必填）",
+    "recommended_internships": [{"id": "xxx", "type": "intern", "name": "岗位名", "reason": "推荐理由"}]
+  },
+  "action_checklist": ["行动项1", "行动项2"],
+  "tips": ["建议1", "建议2"]
+}
+```
+
+**关键约束**：
+1. 必须先完成资源检索，resources 中的 id 必须来自工具返回
+2. 所有标记"必填"的字段不可省略或为空
+3. 数组字段至少包含一个元素"""
+)
+def submit_growth_plan(plan: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    提交最终的职业成长计划（仅校验字段）
+    
+    Args:
+        plan: 完整的成长计划字典，必须符合 GrowthPlan 模型结构
+        
+    Returns:
+        仅返回成功/失败状态，不返回计划内容
+    """
+    try:
+        # 验证并解析为 GrowthPlan 模型（仅校验字段）
+        GrowthPlan(**plan)
+        return {
+            "status": "success",
+            "message": "成长计划校验通过"
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"成长计划校验失败: {str(e)}",
+            "error_type": type(e).__name__
+        }
 
 
 # noinspection SpellCheckingInspection
