@@ -50,7 +50,7 @@ const defaultAvatar = 'https://cube.elemecdn.com/3/7c/3ea6beec64369c2642b92c6726
 const userInfo = ref({
   name: (storedUser as any)?.name || (storedUser as any)?.nickname || (storedUser as any)?.username || `用户${userStore.userInfo?.id || 5442}`,
   avatar: (storedUser as any)?.avatar || defaultAvatar,
-  signature: (storedUser as any)?.signature || (storedUser as any)?.info || '成为更好的自己',
+  signature: (storedUser as any)?.signature || (storedUser as any)?.info || '利用职路AI,为更好的自己',
   gender: (storedUser as any)?.gender || '男',
   education: (storedUser as any)?.education || '本科',
   experience: (storedUser as any)?.experience || '在校生',
@@ -94,21 +94,21 @@ const pointRecords = computed(() => {
       type: '当前可用积分',
       remain: accountPoints.value.pointsBalance,
       total: accountPoints.value.pointsBalance,
-      expireText: '账户当前可用余额'
+      expireText: '账户当前可用余额 ' + accountPoints.value.pointsBalance
     },
     {
       id: 2,
       type: '累计消耗积分',
       remain: accountPoints.value.totalConsumed,
       total: accountPoints.value.totalConsumed,
-      expireText: '历史累计消耗'
+      expireText: '历史累计消耗 ' + accountPoints.value.totalConsumed
     },
     {
       id: 3,
       type: '邀请奖励积分',
       remain: accountPoints.value.referralRewardTotal,
       total: accountPoints.value.referralRewardTotal,
-      expireText: `已邀请 ${accountPoints.value.referralCount} 人`
+      expireText: `已邀请 ${accountPoints.value.referralCount == null ? 0 : accountPoints.value.referralCount} 人`
     }
   ]
 })
@@ -283,25 +283,21 @@ const handleSettingAction = (key: string) => {
     <div class="page-glow page-glow-left"></div>
     <div class="page-glow page-glow-right"></div>
 
-    <ProfileSidebar
-      v-show="!isMobileLayout || isMobileMenuOpen"
-      v-model:activeMenu="activeMenu"
-      v-model:collapsed="sidebarCollapsed"
-      :menus="visibleMenus"
-      :user-info="userInfo"
-      :points="displayPoints"
-      class="responsive-sidebar"
-    />
+    <ProfileSidebar v-show="!isMobileLayout || isMobileMenuOpen" v-model:activeMenu="activeMenu"
+      v-model:collapsed="sidebarCollapsed" :menus="visibleMenus" :user-info="userInfo" :points="displayPoints"
+      class="responsive-sidebar" />
 
     <div class="right-panel" v-show="!isMobileLayout || !isMobileMenuOpen">
       <div class="panel-shell">
         <div class="mobile-nav-header" v-if="isMobileLayout">
-          <el-icon class="back-btn" @click="isMobileMenuOpen = true"><ArrowLeft /></el-icon>
+          <el-icon class="back-btn" @click="isMobileMenuOpen = true">
+            <ArrowLeft />
+          </el-icon>
           <span class="mobile-nav-title">{{ panelTitleMap[activeMenu] }}</span>
         </div>
 
         <div class="content-intro" v-else>
-          <div class="intro-badge">个人中心</div>
+          <!-- <div class="intro-badge">个人中心</div> -->
           <h1>{{ panelTitleMap[activeMenu] }}</h1>
           <p>{{ panelDescriptionMap[activeMenu] }}</p>
         </div>
@@ -310,19 +306,11 @@ const handleSettingAction = (key: string) => {
           <div :key="activeMenu" class="panel-content">
             <ProfileDashboard v-if="activeMenu === 'dashboard'" :user-info="userInfo" />
 
-            <ProfileInfoPanel
-              v-else-if="activeMenu === 'profile'"
-              :user-info="userInfo"
-              @update-user="updateUserInfo"
-            />
+            <ProfileInfoPanel v-else-if="activeMenu === 'profile'" :user-info="userInfo"
+              @update-user="updateUserInfo" />
 
-            <MemberPlanPanel
-              v-else-if="activeMenu === 'member'"
-              :points="displayPoints"
-              :records="pointRecords"
-              :account-points="accountPoints"
-              :loading="pointsLoading"
-            />
+            <MemberPlanPanel v-else-if="activeMenu === 'member'" :points="displayPoints" :records="pointRecords"
+              :account-points="accountPoints" :loading="pointsLoading" />
 
             <InviteFriendsPanel v-else-if="activeMenu === 'invite'" :invite-code="inviteCode" />
 
@@ -379,13 +367,23 @@ const handleSettingAction = (key: string) => {
 }
 
 @keyframes floatLeft {
-  0% { transform: translate(0, 0) scale(1); }
-  100% { transform: translate(40px, 30px) scale(1.1); }
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+
+  100% {
+    transform: translate(40px, 30px) scale(1.1);
+  }
 }
 
 @keyframes floatRight {
-  0% { transform: translate(0, 0) scale(1); }
-  100% { transform: translate(-50px, -40px) scale(1.05); }
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+
+  100% {
+    transform: translate(-50px, -40px) scale(1.05);
+  }
 }
 
 .right-panel {
@@ -496,6 +494,7 @@ const handleSettingAction = (key: string) => {
     opacity: 0;
     transform: translateY(6px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);

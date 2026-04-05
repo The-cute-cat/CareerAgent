@@ -26,9 +26,17 @@
         </where>
     </update>
     <update id="updateAvatar">
+<<<<<<< HEAD
         UPDATE user_stu
         SET avatar = #{upload}
         WHERE id = #{id}
+=======
+        update user_stu
+        set avatar=#{avatar}
+        <where>
+            id = #{id}
+        </where>
+>>>>>>> 515246b35b63c3a496139daa7dd8cc2ade987475
     </update>
     <!--    <sql id="baseColumn">-->
 <!--        id, username, nickname, email, avatar, status, create_time, update_time-->

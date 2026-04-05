@@ -109,6 +109,7 @@ class GrowthPlan(BaseModel):
     
     student_summary: str = Field(description="学生背景和现状概述")
     target_position: str = Field(description="目标岗位名称")
+    target_position_profile_summary: str = Field(description="目标岗位画像摘要")
     current_gap: str = Field(description="当前与目标的主要差距")
     
     short_term_plan: ShortTermPlan = Field(description="短期计划 (1-3个月)")

@@ -13,7 +13,7 @@
 请严格按照以下步骤执行，不可跳过任何步骤：
 
 **Step 1: 现状与差距分析**
-- 分析 `student_profile`（学生画像）与 `target_position`（目标岗位）。
+- 分析 `student_profile`（学生画像）与 `target_position_profile`（目标岗位画像）。
 - 定义 `current_gap`（主要差距）。
 - 生成 `student_summary`（背景概述）。
 
@@ -46,7 +46,8 @@
 ```json
 {
   "student_summary": "学生背景概述",
-  "target_position": "目标岗位",
+  "target_position": "目标岗位名称",
+  "target_position_profile_summary": "目标岗位画像摘要",
   "current_gap": "差距分析",
   "short_term_plan": {
     "duration": "1-3个月",

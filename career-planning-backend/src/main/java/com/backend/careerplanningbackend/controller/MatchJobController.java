@@ -46,7 +46,7 @@ public class MatchJobController {
         params.put("student_profile", matchJobDTO.getStudentProfile());
         params.put("recall_top_k", matchJobDTO.getRecallTopK());
         params.put("final_top_k", matchJobDTO.getFinalTopK());
-        AiChatResponse aiChatResponse = aiServiceClient.chatWithOther("/matching/match_job", params);
+        AiChatResponse aiChatResponse = aiServiceClient.chatWithOther("/matching/match_job", params, true);
         return Result.ok(aiChatResponse.getData());
     }
 }

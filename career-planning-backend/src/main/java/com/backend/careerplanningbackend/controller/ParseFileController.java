@@ -28,6 +28,7 @@ import java.util.List;
  * 2. 调用相应的服务进行文件解析
  * 3. 返回解析结果给前端
  * 4. 记录日志，便于调试和监控
+ *
  * @modeule ParseFileController
  */
 @Slf4j
@@ -38,10 +39,12 @@ public class ParseFileController {
 
     private final AiServiceClient aiServiceClient;
     private final AliOSSUtils aliOSSUtils;
-    private final FileUploadMapper  fileUploadMapper;
+    private final FileUploadMapper fileUploadMapper;
+
     /**
      * parseFile
      * 解析单个文件
+     *
      * @param file
      * @return
      */
@@ -52,9 +55,9 @@ public class ParseFileController {
     ) throws IOException {
         log.info("name: {}, size: {} bytes, leixing: {}",
                 file.getOriginalFilename(), file.getSize(), file.getContentType());
-        
-        Long userId= ThreadLocalUtil.getCurrentUserId();
-        
+
+        Long userId = ThreadLocalUtil.getCurrentUserId();
+
         String upload = aliOSSUtils.upload(file);
         FileUpload fileUpload = new FileUpload();
         fileUpload.setUserId(userId);
@@ -62,17 +65,17 @@ public class ParseFileController {
         fileUpload.setFileUrl(upload);
         fileUploadMapper.insert(fileUpload);
 
-        List<MultipartFile>files = new ArrayList<>();
+        List<MultipartFile> files = new ArrayList<>();
         files.add(file);
-        AiChatResponse aiChatResponse = aiServiceClient.chatWithMultipartFiles("/parse/file", files, "");
+        AiChatResponse aiChatResponse = aiServiceClient.chatWithMultipartFiles("/parse/file", files, "", false);
         log.info("parse-file接收到的参数: {}", aiChatResponse.toString());
-        System.out.println("python端传来的数据:"+aiChatResponse.getData());
+        System.out.println("python端传来的数据:" + aiChatResponse.getData());
 
-        System.out.println("user_id:"+userId);
-        System.out.println("overwrite:"+overwrite);
-        System.out.println("file.getOriginalFilename():"+file.getOriginalFilename());
-        System.out.println("file.getSize():"+file.getSize());
-        System.out.println("file.getContentType():"+file.getContentType());
+        System.out.println("user_id:" + userId);
+        System.out.println("overwrite:" + overwrite);
+        System.out.println("file.getOriginalFilename():" + file.getOriginalFilename());
+        System.out.println("file.getSize():" + file.getSize());
+        System.out.println("file.getContentType():" + file.getContentType());
 
         return Result.ok(aiChatResponse.getData());
     }
@@ -81,16 +84,17 @@ public class ParseFileController {
     /**
      * parseFiles
      * 解析多个文件
+     *
      * @param file
      * @return
      */
     @PostMapping("/files")
-    public Result<Object>parseFiles(@RequestParam("file") MultipartFile file) {
+    public Result<Object> parseFiles(@RequestParam("file") MultipartFile file) {
         log.info("parse-resume接收到的参数: {}", file.toString());
 
-        List<MultipartFile>files = new ArrayList<>();
+        List<MultipartFile> files = new ArrayList<>();
         files.add(file);
-        AiChatResponse aiChatResponse = aiServiceClient.chatWithMultipartFiles("/parse/file", files, "");
+        AiChatResponse aiChatResponse = aiServiceClient.chatWithMultipartFiles("/parse/file", files, "", false);
         log.info("parse-file接收到的参数: {}", aiChatResponse.toString());
         return Result.ok(aiChatResponse.getData());
     }

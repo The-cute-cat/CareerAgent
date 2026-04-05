@@ -154,6 +154,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
         User newUser = new User();
         BeanUtil.copyProperties(user, newUser, "passwordConfirm", "code");
+        newUser.setAvatar("https://career-planning-backend.oss-cn-guangzhou.aliyuncs.com/avatar/1028/7d3ac68d73489daeb9194ef119235d84.jpg");
         //注册功能点实现
         int rows = userMapper.register(newUser);
         if (rows == 0) {

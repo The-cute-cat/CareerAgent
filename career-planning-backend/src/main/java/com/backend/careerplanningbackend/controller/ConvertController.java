@@ -59,10 +59,10 @@ public class ConvertController {
         params.put("targetJob", convertDTO.getTargetJob());
         params.put("targetIndustries", convertDTO.getTargetIndustries());
         params.put("priorities", convertDTO.getPriorities());
-        AiChatResponse aiChatResponse = aiServiceClient.chatWithOtherJson("/convert/user_form_to_userprofile", params);
+        AiChatResponse aiChatResponse = aiServiceClient.chatWithOtherJson("/convert/user_form_to_userprofile", params, true);
         Map<String, Object> params2 = new HashMap<>();
         params2.put("student_profile", aiChatResponse.getData());
-        aiChatResponse = aiServiceClient.chatWithOtherJson("/matching/jobs", params2);
+        aiChatResponse = aiServiceClient.chatWithOtherJson("/matching/jobs", params2, true);
         return Result.ok(aiChatResponse.getData());
     }
 

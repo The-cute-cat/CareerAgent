@@ -37,8 +37,13 @@ public class PointsReferController {
      * getAccountPoints 获取账户积分接口
      * @param id 用户ID
      */
+<<<<<<< HEAD
     @PostMapping("/account/{id}")
     public Result<UserPointsVO> getAccountPoints(@PathVariable("id") Long id) {
+=======
+    @GetMapping("/account/{id}")
+    public Result<UserPointsVO> getAccountPoints(@PathVariable Long id) {
+>>>>>>> 515246b35b63c3a496139daa7dd8cc2ade987475
         log.info("userId: {}", id);
         return referralService.getAccountPoints(id);
     }
