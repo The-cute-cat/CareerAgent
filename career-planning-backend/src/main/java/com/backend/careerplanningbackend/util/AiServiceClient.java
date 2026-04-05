@@ -23,6 +23,7 @@ import java.util.Optional;
  * AI 服务客户端
  * 用于与 AI 服务进行交互，支持普通调用和流式调用
  */
+@SuppressWarnings("unused")
 @Slf4j
 @Component
 public class AiServiceClient {
@@ -46,24 +47,26 @@ public class AiServiceClient {
      * 调用 AI 服务（同步阻塞方式）
      * 支持自动重试机制
      *
-     * @param url     请求的 API 路径
-     * @param request 请求参数对象
+     * @param url         请求的 API 路径
+     * @param request     请求参数对象
+     * @param enableRetry 是否启用重试机制
      * @return AI 服务响应结果
      * @throws RuntimeException 当所有重试都失败时抛出
      */
-    private AiChatResponse callAiService(String url, AiChatRequest request) {
-        return universalAiService(url, buildFileBody(request));
+    private AiChatResponse callAiService(String url, AiChatRequest request, boolean enableRetry) {
+        return universalAiService(url, buildFileBody(request), enableRetry);
     }
 
     /**
      * 通用 AI 服务调用方法（同步阻塞方式）
      *
-     * @param url     请求的 API 路径（相对路径，会拼接 baseUrl）
-     * @param builder 已构建好的多部分表单请求体
+     * @param url         请求的 API 路径（相对路径，会拼接 baseUrl）
+     * @param builder     已构建好的多部分表单请求体
+     * @param enableRetry 是否启用重试机制
      * @return AI 服务响应结果
      * @throws RuntimeException 当所有重试都失败时抛出
      */
-    private AiChatResponse universalAiService(String url, MultipartBodyBuilder builder) {
+    private AiChatResponse universalAiService(String url, MultipartBodyBuilder builder, boolean enableRetry) {
         return executeWithRetry(url, webClientBuilder -> {
             String token = AITokenUtil.createToken();
             return webClient.post()
@@ -75,17 +78,18 @@ public class AiServiceClient {
                     .bodyToMono(AiChatResponse.class)
                     .timeout(Duration.ofMillis(properties.getTimeout()))
                     .block(Duration.ofMillis(properties.getTimeout()));
-        }, () -> builder, "AI服务");
+        }, () -> builder, "AI服务", enableRetry);
     }
 
     /**
      * 自定义参数对话（JSON格式，阻塞方式）
      *
-     * @param url    请求的 API 路径
-     * @param params 自定义参数映射
+     * @param url         请求的 API 路径
+     * @param params      自定义参数映射
+     * @param enableRetry 是否启用重试机制
      * @return AI 响应结果
      */
-    public AiChatResponse chatWithOtherJson(String url, Map<String, Object> params) {
+    public AiChatResponse chatWithOtherJson(String url, Map<String, Object> params, boolean enableRetry) {
         return executeWithRetry(url, ignored -> {
             String token = AITokenUtil.createToken();
             return webClient.post()
@@ -97,7 +101,7 @@ public class AiServiceClient {
                     .bodyToMono(AiChatResponse.class)
                     .timeout(Duration.ofMillis(properties.getTimeout()))
                     .block(Duration.ofMillis(properties.getTimeout()));
-        }, () -> null, "AI服务(JSON格式)");
+        }, () -> null, "AI服务(JSON格式)", enableRetry);
     }
 
     /**
@@ -107,13 +111,24 @@ public class AiServiceClient {
      * @param requestExecutor  请求执行函数
      * @param bodySupplier     请求体构建函数
      * @param serviceName      服务名称（用于日志）
+     * @param enableRetry      是否启用重试机制
      * @return AI 响应结果
      * @throws RuntimeException 当所有重试都失败时抛出
      */
     private AiChatResponse executeWithRetry(String url,
                                             RequestExecutor requestExecutor,
                                             BodySupplier bodySupplier,
-                                            String serviceName) {
+                                            String serviceName,
+                                            boolean enableRetry) {
+        if (!enableRetry) {
+            long startTime = System.currentTimeMillis();
+            log.info("调用 {}，URL: {}", serviceName, url);
+            AiChatResponse response = requestExecutor.execute(bodySupplier != null ? bodySupplier.get() : null);
+            long time = System.currentTimeMillis() - startTime;
+            log.info("调用{}结束，耗时：{}ms", serviceName, time);
+            return response;
+        }
+        
         int tryCount = 0;
         while (tryCount < properties.getRetry().getMaxAttempts()) {
             tryCount++;
@@ -287,11 +302,12 @@ public class AiServiceClient {
      * @param url            请求的 API 路径
      * @param message        消息内容
      * @param conversationId 对话 ID
+     * @param enableRetry    是否启用重试机制
      * @return AI 响应结果
      */
-    public AiChatResponse chatWithMessage(String url, String message, String conversationId) {
+    public AiChatResponse chatWithMessage(String url, String message, String conversationId, boolean enableRetry) {
         AiChatRequest request = new AiChatRequest(conversationId, message);
-        return callAiService(url, request);
+        return callAiService(url, request, enableRetry);
     }
 
     /**
@@ -300,11 +316,12 @@ public class AiServiceClient {
      * @param url            请求的 API 路径
      * @param files          文件列表
      * @param conversationId 对话 ID，若为空则不传递
+     * @param enableRetry    是否启用重试机制
      * @return AI 响应结果
      */
-    public AiChatResponse chatWithFiles(String url, List<File> files, String conversationId) {
+    public AiChatResponse chatWithFiles(String url, List<File> files, String conversationId, boolean enableRetry) {
         AiChatRequest request = AiChatRequest.ofFiles(conversationId, null, files);
-        return callAiService(url, request);
+        return callAiService(url, request, enableRetry);
     }
 
     /**
@@ -315,12 +332,13 @@ public class AiServiceClient {
      * @param url            请求的 API 路径
      * @param multipartFiles MultipartFile 文件列表
      * @param conversationId 对话 ID，若为空则不传递
+     * @param enableRetry    是否启用重试机制
      * @return AI 响应结果
      */
     public AiChatResponse chatWithMultipartFiles(String url, List<MultipartFile> multipartFiles,
-                                                 String conversationId) {
+                                                 String conversationId, boolean enableRetry) {
         AiChatRequest request = AiChatRequest.ofMultipartFiles(conversationId, null, multipartFiles);
-        return callAiService(url, request);
+        return callAiService(url, request, enableRetry);
     }
 
     /**
@@ -330,12 +348,13 @@ public class AiServiceClient {
      * @param message        消息内容
      * @param files          文件列表
      * @param conversationId 对话 ID
+     * @param enableRetry    是否启用重试机制
      * @return AI 响应结果
      */
     public AiChatResponse chatWithMessageAndFiles(String url, String message, List<File> files,
-                                                  String conversationId) {
+                                                  String conversationId, boolean enableRetry) {
         AiChatRequest request = AiChatRequest.ofFiles(conversationId, message, files);
-        return callAiService(url, request);
+        return callAiService(url, request, enableRetry);
     }
 
     /**
@@ -347,12 +366,13 @@ public class AiServiceClient {
      * @param message        消息内容
      * @param files          MultipartFile 文件列表
      * @param conversationId 对话 ID
+     * @param enableRetry    是否启用重试机制
      * @return AI 响应结果
      */
     public AiChatResponse chatWithMessageAndMultipartFiles(String url, String message, List<MultipartFile> files,
-                                                           String conversationId) {
+                                                           String conversationId, boolean enableRetry) {
         AiChatRequest request = AiChatRequest.ofMultipartFiles(conversationId, message, files);
-        return callAiService(url, request);
+        return callAiService(url, request, enableRetry);
     }
 
     /**
@@ -361,12 +381,13 @@ public class AiServiceClient {
      * 用于发送非标准格式的请求到 AI 服务，
      * 支持任意键值对参数，适用于特殊接口调用。
      *
-     * @param url    请求的 API 路径
-     * @param params 自定义参数映射
+     * @param url         请求的 API 路径
+     * @param params      自定义参数映射
+     * @param enableRetry 是否启用重试机制
      * @return AI 响应结果
      */
-    public AiChatResponse chatWithOther(String url, Map<String, Object> params) {
-        return universalAiService(url, buildOtherBody(params));
+    public AiChatResponse chatWithOther(String url, Map<String, Object> params, boolean enableRetry) {
+        return universalAiService(url, buildOtherBody(params), enableRetry);
     }
 
     /**

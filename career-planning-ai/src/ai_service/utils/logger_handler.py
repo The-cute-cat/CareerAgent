@@ -1,5 +1,6 @@
 import logging
 import os
+import sys
 from datetime import datetime
 
 from config import settings
@@ -10,6 +11,42 @@ LOG_ROOT = settings.path_config.log
 DEFAULT_LOG_FORMAT = logging.Formatter(
     '%(asctime)s %(name)-12s %(levelname)-8s - %(filename)s:%(lineno)d - %(message)s'
 )
+
+
+class ColorHandler(logging.StreamHandler):
+    """彩色日志输出处理器，支持PyCharm终端"""
+    GRAY = "90"
+    BLUE = "34"
+    GREEN = "32"
+    YELLOW = "33"
+    RED = "31"
+    MAGENTA = "35"
+    CYAN = "36"
+    WHITE = "38;5;250"  # 灰白色
+    RESET = "0"
+
+    def __init__(self, stream=None):
+        super().__init__(stream or sys.stdout)
+
+    def emit(self, record):
+        try:
+            msg = self.format(record)
+            level_color_map = {
+                logging.DEBUG: self.CYAN,
+                logging.INFO: self.WHITE,
+                logging.WARNING: self.YELLOW,
+                logging.ERROR: self.RED,
+                logging.CRITICAL: self.MAGENTA
+            }
+            color = level_color_map.get(record.levelno, self.WHITE)
+            # 正确的ANSI转义序列格式
+            colored_msg = f"\033[{color}m{msg}\033[{self.RESET}m"
+            self.stream.write(colored_msg + self.terminator)
+            self.flush()
+        except RecursionError:
+            raise
+        except Exception:
+            self.handleError(record)
 
 
 def get_logger(name: str = "default", console_level: int = logging.INFO, file_level=logging.DEBUG,
@@ -39,7 +76,11 @@ def get_logger(name: str = "default", console_level: int = logging.INFO, file_le
     # 避免重复添加 Handler
     if logger.handlers:
         return logger
-    console_handler = logging.StreamHandler()
+
+    # 禁止向上传播到 root logger，避免日志重复
+    logger.propagate = False
+    
+    console_handler = ColorHandler()
     console_handler.setLevel(console_level)
     console_handler.setFormatter(DEFAULT_LOG_FORMAT)
 

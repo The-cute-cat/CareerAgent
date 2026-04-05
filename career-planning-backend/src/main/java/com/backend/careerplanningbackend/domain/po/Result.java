@@ -22,7 +22,7 @@ public class Result<T> {
         return new Result<>(200, null, data);
     }
 
-    public static Result<List<?>> ok(List<?> data) {
+    public static Result<List<?>> ok(String msg,List<?> data) {
         return new Result<>(200, null, data);
     }
 

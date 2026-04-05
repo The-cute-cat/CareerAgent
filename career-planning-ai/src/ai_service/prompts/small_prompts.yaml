@@ -1,4 +1,4 @@
-# 使用说明
+# 短小提示词配置文件使用说明
 # example: |-
 #  使用 | 保留换行，使用 |- 不保留末尾换行
 code_ability: |
@@ -21,10 +21,20 @@ system_role: |
       如果输入数据是空的，你的输出也必须反映空状态。
 
 growth_plan_user: |
-  请为该学生生成一份职业成长计划书。
-  ## 学生信息
-  - **目标岗位**: {target_position}
-  - **学生画像**: {student_profile}
-  - **当前能力差距**: {ability_gap}
-  ## 要求
-  请依据学生现状，结合你的资源检索工具，分别生成“短期计划”和“中期计划”。每个计划需包含明确的阶段目标、推荐资源（需调用工具获取）及具体执行建议。
+  请为以下学生制定详细的职业成长计划：
+  
+  **目标岗位画像**: {target_position_profile}
+  **学生画像**: {student_profile}
+  **已知能力差距**: {ability_gap}
+  
+  请严格按照工作流执行：先分析现状 -> 调用工具检索资源 -> 拆解里程碑和任务 -> 调用 `submit_growth_plan` 提交最终结果。
+user_job_match_analyzer_user: |
+  请根据以下内容进行岗位匹配分析：
+
+  【岗位画像】
+  {job_profile_text}
+
+  【用户画像】
+  {user_profile_text}
+
+  请严格输出 JSON。

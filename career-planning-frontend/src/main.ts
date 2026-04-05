@@ -10,6 +10,7 @@ import piniaPluginPersistedstate from 'pinia-plugin-persistedstate'
 // 引入 echarts
 import * as echarts from 'echarts'
 import 'element-plus/dist/index.css'
+import 'element-plus/theme-chalk/dark/css-vars.css'
 
 const pinia = createPinia()
 pinia.use(piniaPluginPersistedstate)

@@ -67,7 +67,7 @@ class RedisService:
             )
             self._client.ping()
             logger.info(
-                f"✅ Redis 服务连接成功: host={settings.redis.host}, port={settings.redis.port}"
+                f"✅ Redis 服务连接成功: host={settings.redis.host}, port={settings.redis.port}, prefix={self._prefix}"
             )
         except RedisError as e:
             self._is_available = False
