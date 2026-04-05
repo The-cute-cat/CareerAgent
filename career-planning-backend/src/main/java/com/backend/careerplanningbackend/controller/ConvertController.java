@@ -14,6 +14,17 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * ConvertController
+ * 数据转换控制器
+ * 用于将用户表单数据转换为用户画像数据，并进行职位匹配
+ * 主要功能：
+ * 1. 接收前端提交的用户表单数据（教育、技能、项目等信息）
+ * 2. 调用 AI 服务将表单数据转换为结构化的用户画像
+ * 3. 基于用户画像进行职位匹配推荐
+ * 4. 返回匹配的职位列表
+ * @module ConvertController
+ */
 @RestController
 @RequestMapping("/convert")
 @Slf4j
@@ -22,6 +33,13 @@ public class ConvertController {
 
     private final AiServiceClient aiServiceClient;
 
+    /**
+     * userFormToUserProfile
+     * 将用户表单数据转换为用户画像并匹配职位
+     *
+     * @param convertDTO 用户表单数据，包含教育背景、专业技能、项目经历、实习经历等信息
+     * @return 匹配的职位列表
+     */
     @PostMapping("/user_form_to_userprofile")
     public Object userFormToUserProfile(@RequestBody ConvertDTO convertDTO) {
         log.info("userFormToUserProfile接收到的参数: {}", convertDTO);
