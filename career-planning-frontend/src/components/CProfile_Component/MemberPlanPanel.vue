@@ -47,7 +47,7 @@ const memberPlans = [
     duration: '3 个月',
     price: '36',
     unit: '/季',
-    dailyCost: '相当于每日 0.40 元', 
+    dailyCost: '相当于每日 0.40 元',
     dailyPoints: 120, // Strict adherence to user's requirement
     totalPoints: 10800,
     tag: '性价比之选',
@@ -115,7 +115,7 @@ const currentSelectedMemberObj = computed(() => {
 const inviteBenefits = [
   { text: '简历定制及优化 12 次', icon: Reading, color: '#3b82f6' },
   { text: '创建 12 条成效路径', icon: Promotion, color: '#6366f1' },
-  { text: '深度搜索 Chat 50 次', icon: Search, color: '#0ea5e9' }, 
+  { text: '深度搜索 Chat 50 次', icon: Search, color: '#0ea5e9' },
   { text: '分析 16 个目标职位', icon: Setting, color: '#8b5cf6' }
 ]
 
@@ -162,22 +162,30 @@ const handleInvite = () => {
   <section class="member-panel">
     <!-- 主视图头部 -->
     <div class="panel-header">
-      <el-icon class="back-icon"><Back /></el-icon>
+      <!-- <el-icon class="back-icon">
+        <Back />
+      </el-icon> -->
       <h2 class="panel-title">会员积分</h2>
-      <el-icon class="more-icon"><MoreFilled /></el-icon>
+      <!-- <el-icon class="more-icon">
+        <MoreFilled />
+      </el-icon> -->
     </div>
 
     <!-- 基础会员卡片 -->
     <div class="member-status-card">
       <div class="ms-left">
-        <div class="ms-icon"><el-icon><Medal/></el-icon></div>
+        <div class="ms-icon"><el-icon>
+            <Medal />
+          </el-icon></div>
         <div class="ms-info">
           <h3>{{ currentMemberText }}</h3>
           <p>{{ expiryText }}</p>
         </div>
       </div>
       <button class="ms-btn" @click="openPurchaseCenter('member')">
-        <el-icon><TrendCharts/></el-icon>
+        <el-icon>
+          <TrendCharts />
+        </el-icon>
       </button>
     </div>
 
@@ -189,7 +197,9 @@ const handleInvite = () => {
         <div class="tp-desc">邀请好友，免费领会员权益</div>
       </div>
       <button class="tp-btn" @click="openPurchaseCenter('points')">
-        <el-icon><ShoppingCart/></el-icon> 获取
+        <el-icon>
+          <ShoppingCart />
+        </el-icon> 获取
       </button>
     </div>
 
@@ -208,21 +218,20 @@ const handleInvite = () => {
           <div class="ri-top">
             <div class="ri-title">
               <el-icon :class="item.type === '每日积分' ? 'icon-calendar' : 'icon-invite'">
-                <Calendar v-if="item.type === '每日积分'"/>
-                <Share v-else/>
+                <Calendar v-if="item.type === '每日积分'" />
+                <Share v-else />
               </el-icon>
               {{ item.type }}
             </div>
           </div>
           <div class="ri-progress">
-             <div class="progress-bg">
-               <div class="progress-fill" 
-                    :style="{ 
-                      width: (item.remain / item.total * 100) + '%', 
-                      backgroundColor: item.type === '每日积分' ? '#3b82f6' : '#10b981' 
-                    }">
-               </div>
-             </div>
+            <div class="progress-bg">
+              <div class="progress-fill" :style="{
+                width: (item.remain / item.total * 100) + '%',
+                backgroundColor: item.type === '每日积分' ? '#3b82f6' : '#10b981'
+              }">
+              </div>
+            </div>
           </div>
           <div class="ri-bottom">
             <span class="ri-remain">剩余: {{ item.remain }}</span>
@@ -234,37 +243,49 @@ const handleInvite = () => {
     </div>
 
     <!-- 统一购买中心弹窗 -->
-    <el-dialog v-model="purchaseCenterVisible" :show-close="false" width="700px" class="purchase-dialog" :destroy-on-close="true">
+    <el-dialog v-model="purchaseCenterVisible" :show-close="false" width="700px" class="purchase-dialog"
+      :destroy-on-close="true">
       <template #header="{ close }">
         <div class="dialog-custom-header">
-          <el-icon class="back-icon" @click="close"><Back /></el-icon>
+          <el-icon class="back-icon" @click="close">
+            <Back />
+          </el-icon>
           <span class="dialog-title">会员积分</span>
-          <el-icon class="close-icon" @click="close"><Close /></el-icon>
+          <el-icon class="close-icon" @click="close">
+            <Close />
+          </el-icon>
         </div>
       </template>
 
       <div class="purchase-center-container">
         <!-- Tab 切换 -->
         <div class="tab-switcher">
-          <div class="tab-item" :class="{active: activePurchaseTab === 'points'}" @click="activePurchaseTab = 'points'">
-            <el-icon><Coin /></el-icon> 积分购买
+          <div class="tab-item" :class="{ active: activePurchaseTab === 'points' }"
+            @click="activePurchaseTab = 'points'">
+            <el-icon>
+              <Coin />
+            </el-icon> 积分购买
           </div>
-          <div class="tab-item" :class="{active: activePurchaseTab === 'member'}" @click="activePurchaseTab = 'member'">
-            <el-icon><Medal /></el-icon> 订阅会员
+          <div class="tab-item" :class="{ active: activePurchaseTab === 'member' }"
+            @click="activePurchaseTab = 'member'">
+            <el-icon>
+              <Medal />
+            </el-icon> 订阅会员
           </div>
         </div>
 
-        <div class="banner" :class="{'member-banner': activePurchaseTab === 'member'}">
-           <el-icon><TrendCharts /></el-icon> 投资未来的自己，加速成长的曲线
+        <div class="banner" :class="{ 'member-banner': activePurchaseTab === 'member' }">
+          <el-icon>
+            <TrendCharts />
+          </el-icon> 投资未来的自己，加速成长的曲线
         </div>
 
         <!-- =============== 积分购买 Tab =============== -->
         <div v-if="activePurchaseTab === 'points'" class="points-purchase-view">
           <div class="purchase-cards">
-            <div v-for="plan in pointsPurchasePlans" :key="plan.key" 
-                 class="p-card" :class="{ 'active': selectedPointsPlan === plan.key }"
-                 @click="selectedPointsPlan = plan.key"
-                 :style="{ '--theme-color': plan.color }">
+            <div v-for="plan in pointsPurchasePlans" :key="plan.key" class="p-card"
+              :class="{ 'active': selectedPointsPlan === plan.key }" @click="selectedPointsPlan = plan.key"
+              :style="{ '--theme-color': plan.color }">
               <div class="p-card-tag" :style="{ backgroundColor: plan.color }">{{ plan.tag }}</div>
               <div class="p-card-points">{{ plan.points }} 积分</div>
               <div class="p-card-price">
@@ -284,12 +305,16 @@ const handleInvite = () => {
             <h4 class="invite-title">邀请好友得积分</h4>
             <div class="invite-benefits">
               <div class="ib-item" v-for="(bene, index) in inviteBenefits" :key="index">
-                <el-icon class="ib-icon" :style="{color: bene.color}"><component :is="bene.icon"/></el-icon> 
+                <el-icon class="ib-icon" :style="{ color: bene.color }">
+                  <component :is="bene.icon" />
+                </el-icon>
                 {{ bene.text }}
               </div>
             </div>
             <div class="invite-footer">
-              <el-icon><InfoFilled/></el-icon> 邀请好友免费获得积分
+              <el-icon>
+                <InfoFilled />
+              </el-icon> 邀请好友免费获得积分
             </div>
             <button class="primary-btn invite-btn" @click="handleInvite">邀请好友</button>
           </div>
@@ -298,10 +323,9 @@ const handleInvite = () => {
         <!-- =============== 订阅会员 Tab =============== -->
         <div v-else class="member-subscribe-view">
           <div class="purchase-cards member-cards">
-            <div v-for="plan in memberPlans" :key="plan.key" 
-                 class="m-card" :class="{ 'active': selectedMemberPlan === plan.key }"
-                 @click="selectedMemberPlan = plan.key" 
-                 :style="{ '--theme-color': plan.color }">
+            <div v-for="plan in memberPlans" :key="plan.key" class="m-card"
+              :class="{ 'active': selectedMemberPlan === plan.key }" @click="selectedMemberPlan = plan.key"
+              :style="{ '--theme-color': plan.color }">
               <div class="m-card-tag" :style="{ backgroundColor: plan.color }">{{ plan.tag }}</div>
               <div class="m-card-duration">{{ plan.title }}</div>
               <div class="m-card-months" :style="{ color: selectedMemberPlan === plan.key ? plan.color : '#1e293b' }">
@@ -317,22 +341,30 @@ const handleInvite = () => {
           </div>
 
           <div class="member-summary">
-            <el-icon><Coin /></el-icon> 每日 {{ currentSelectedMemberObj.dailyPoints }} 积分，总计 {{ currentSelectedMemberObj.totalPoints }} 积分
+            <el-icon>
+              <Coin />
+            </el-icon> 每日 {{ currentSelectedMemberObj.dailyPoints }} 积分，总计 {{ currentSelectedMemberObj.totalPoints }} 积分
           </div>
 
           <div class="payment-section">
             <div class="pay-info">
-              <el-icon><WarningFilled/></el-icon> 您已选择：{{ currentSelectedMemberObj.title }}（¥ {{ currentSelectedMemberObj.price }} {{ currentSelectedMemberObj.unit }}）
+              <el-icon>
+                <WarningFilled />
+              </el-icon> 您已选择：{{ currentSelectedMemberObj.title }}（¥ {{ currentSelectedMemberObj.price }} {{
+                currentSelectedMemberObj.unit }}）
             </div>
             <div class="pay-method">
               <div class="alipay">
                 <span class="alipay-icon">支</span> 支付宝支付
               </div>
               <div class="more-methods">
-                更多支付方式 <el-icon><ArrowRight /></el-icon>
+                更多支付方式 <el-icon>
+                  <ArrowRight />
+                </el-icon>
               </div>
             </div>
-            <button class="primary-btn subscribe-btn" @click="handlePay" :style="{ backgroundColor: currentSelectedMemberObj.color }">
+            <button class="primary-btn subscribe-btn" @click="handlePay"
+              :style="{ backgroundColor: currentSelectedMemberObj.color }">
               立即订阅
             </button>
           </div>
@@ -362,13 +394,17 @@ const handleInvite = () => {
   color: #0f172a;
 }
 
-.back-icon, .more-icon {
+.back-icon,
+.more-icon {
   font-size: 20px;
   cursor: pointer;
   color: #1e293b;
   transition: all 0.2s;
 }
-.back-icon:hover { color: #3b82f6; }
+
+.back-icon:hover {
+  color: #3b82f6;
+}
 
 .panel-title {
   margin: 0;
@@ -436,7 +472,10 @@ const handleInvite = () => {
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
   transition: transform 0.2s;
 }
-.ms-btn:hover { transform: scale(1.05); }
+
+.ms-btn:hover {
+  transform: scale(1.05);
+}
 
 .total-points-card {
   display: flex;
@@ -482,9 +521,13 @@ const handleInvite = () => {
   gap: 6px;
   cursor: pointer;
   transition: all 0.2s;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
-.tp-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,0.15); }
+
+.tp-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+}
 
 .pr-header {
   display: flex;
@@ -507,7 +550,10 @@ const handleInvite = () => {
   color: #64748b;
   cursor: pointer;
 }
-.pr-links span:hover { color: #3b82f6; }
+
+.pr-links span:hover {
+  color: #3b82f6;
+}
 
 .record-list {
   display: flex;
@@ -519,7 +565,7 @@ const handleInvite = () => {
   background: #fff;
   padding: 24px;
   border-radius: 16px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.02);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
 }
 
 .ri-top {
@@ -536,8 +582,15 @@ const handleInvite = () => {
   color: #1e293b;
 }
 
-.icon-calendar { color: #3b82f6; font-size: 20px; }
-.icon-invite { color: #10b981; font-size: 20px; }
+.icon-calendar {
+  color: #3b82f6;
+  font-size: 20px;
+}
+
+.icon-invite {
+  color: #10b981;
+  font-size: 20px;
+}
 
 .ri-progress {
   margin-bottom: 12px;
@@ -576,9 +629,11 @@ const handleInvite = () => {
   border-radius: 20px;
   overflow: hidden;
 }
+
 ::v-deep(.purchase-dialog .el-dialog__header) {
   display: none;
 }
+
 ::v-deep(.purchase-dialog .el-dialog__body) {
   padding: 0;
   background: #f8fafc;
@@ -598,13 +653,17 @@ const handleInvite = () => {
   color: #1e293b;
 }
 
-.close-icon, .back-icon {
+.close-icon,
+.back-icon {
   font-size: 20px;
   color: #64748b;
   cursor: pointer;
   transition: color 0.2s;
 }
-.close-icon:hover { color: #ef4444; }
+
+.close-icon:hover {
+  color: #ef4444;
+}
 
 .tab-switcher {
   display: flex;
@@ -612,7 +671,7 @@ const handleInvite = () => {
   background: #fff;
   border-radius: 12px;
   padding: 6px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
 }
 
 .tab-item {
@@ -649,6 +708,7 @@ const handleInvite = () => {
   gap: 8px;
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
 }
+
 .banner.member-banner {
   background: linear-gradient(135deg, #818cf8, #4f46e5);
   box-shadow: 0 4px 12px rgba(79, 70, 229, 0.2);
@@ -661,7 +721,8 @@ const handleInvite = () => {
   margin-bottom: 24px;
 }
 
-.p-card, .m-card {
+.p-card,
+.m-card {
   flex: 1;
   background: #fff;
   border-radius: 16px;
@@ -671,21 +732,24 @@ const handleInvite = () => {
   cursor: pointer;
   position: relative;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
 }
 
-.p-card:hover, .m-card:hover {
+.p-card:hover,
+.m-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
 }
 
-.p-card.active, .m-card.active {
+.p-card.active,
+.m-card.active {
   border-color: var(--theme-color, #3b82f6);
   background: #fff;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.05);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.05);
 }
 
-.p-card-tag, .m-card-tag {
+.p-card-tag,
+.m-card-tag {
   position: absolute;
   top: 0;
   left: 50%;
@@ -696,7 +760,7 @@ const handleInvite = () => {
   font-size: 12px;
   font-weight: 700;
   white-space: nowrap;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
 }
 
 .p-card-points {
@@ -706,7 +770,8 @@ const handleInvite = () => {
   margin: 16px 0 12px;
 }
 
-.p-card-price, .m-card-price {
+.p-card-price,
+.m-card-price {
   color: #94a3b8;
   display: flex;
   justify-content: center;
@@ -714,13 +779,29 @@ const handleInvite = () => {
   min-height: 38px;
 }
 
-.p-card.active .p-card-price, .m-card.active .m-card-price {
+.p-card.active .p-card-price,
+.m-card.active .m-card-price {
   color: var(--theme-color, #3b82f6);
 }
 
-.currency { font-size: 14px; font-weight: 600; margin-right: 2px; }
-.amount { font-size: 32px; font-weight: 900; line-height: 1; }
-.decimals, .unit { font-size: 14px; font-weight: 600; margin-left: 2px; }
+.currency {
+  font-size: 14px;
+  font-weight: 600;
+  margin-right: 2px;
+}
+
+.amount {
+  font-size: 32px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.decimals,
+.unit {
+  font-size: 14px;
+  font-weight: 600;
+  margin-left: 2px;
+}
 
 .m-card-duration {
   font-size: 14px;
@@ -728,6 +809,7 @@ const handleInvite = () => {
   font-weight: 600;
   margin-top: 12px;
 }
+
 .m-card-months {
   font-size: 24px;
   font-weight: 900;
@@ -735,6 +817,7 @@ const handleInvite = () => {
   margin: 8px 0 16px;
   transition: color 0.3s;
 }
+
 .m-card-daily {
   font-size: 12px;
   color: #94a3b8;
@@ -746,7 +829,7 @@ const handleInvite = () => {
   margin: 0 24px 24px;
   border-radius: 16px;
   padding: 24px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
 }
 
 .invite-title {
@@ -771,6 +854,7 @@ const handleInvite = () => {
   color: #475569;
   font-weight: 500;
 }
+
 .ib-icon {
   font-size: 18px;
   background: #f1f5f9;
@@ -803,7 +887,12 @@ const handleInvite = () => {
   cursor: pointer;
   transition: all 0.2s;
 }
-.primary-btn:hover { opacity: 0.9; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2); }
+
+.primary-btn:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+}
 
 .member-summary {
   display: flex;
@@ -820,7 +909,7 @@ const handleInvite = () => {
   margin: 0 24px 24px;
   border-radius: 16px;
   padding: 24px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
 }
 
 .pay-info {
@@ -851,6 +940,7 @@ const handleInvite = () => {
   font-weight: 600;
   color: #1e293b;
 }
+
 .alipay-icon {
   width: 28px;
   height: 28px;
@@ -872,7 +962,10 @@ const handleInvite = () => {
   cursor: pointer;
   font-weight: 500;
 }
-.more-methods:hover { color: #3b82f6; }
+
+.more-methods:hover {
+  color: #3b82f6;
+}
 
 .subscribe-btn {
   background: #4f46e5;

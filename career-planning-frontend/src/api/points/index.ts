@@ -44,6 +44,11 @@ export const getAccountPointsService = (id: number) => {
   return request.get<Result<AccountPointsData>>(`/points/account/${id}`)
 }
 
+export const getUserInfoService = (id: number) => {
+
+  return request.get<Result<AccountPointsData>>(`/user/info`)
+}
+
 export const consumePointsService = (data: PointsConsumeRequest) => {
   if (ENABLE_MOCK) {
     return mockConsumePointsApi(data)

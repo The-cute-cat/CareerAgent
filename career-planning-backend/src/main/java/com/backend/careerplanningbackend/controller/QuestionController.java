@@ -49,7 +49,7 @@ public class QuestionController {
 
         if ("skill".equals(questionDTO.getType())) {
             params.put("skill", questionDTO.getName());
-            aiChatResponse = aiServiceClient.chatWithOther("/question/skill_generate", params, true);
+            aiChatResponse = aiServiceClient.chatWithOther("/question/generate", params, true);
         } else if ("tool".equals(questionDTO.getType())) {
             params.put("tool", questionDTO.getName());
             aiChatResponse = aiServiceClient.chatWithOther("/question/tool_generate", params, true);

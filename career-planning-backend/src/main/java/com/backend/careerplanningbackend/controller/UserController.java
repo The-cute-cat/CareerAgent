@@ -93,7 +93,7 @@ public class UserController {
      * getUserInfo
      * 查询用户信息
      */
-    @GetMapping("/get-user-info")
+    @GetMapping("/info")
     public Result<UserDTO> getUserInfo() {
         log.info("get-user-info请求");
         return userService.getUserInfo();

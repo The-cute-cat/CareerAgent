@@ -50,7 +50,7 @@ const defaultAvatar = 'https://cube.elemecdn.com/3/7c/3ea6beec64369c2642b92c6726
 const userInfo = ref({
   name: (storedUser as any)?.name || (storedUser as any)?.nickname || (storedUser as any)?.username || `用户${userStore.userInfo?.id || 5442}`,
   avatar: (storedUser as any)?.avatar || defaultAvatar,
-  signature: (storedUser as any)?.signature || (storedUser as any)?.info || '成为更好的自己',
+  signature: (storedUser as any)?.signature || (storedUser as any)?.info || '利用职路AI,为更好的自己',
   gender: (storedUser as any)?.gender || '男',
   education: (storedUser as any)?.education || '本科',
   experience: (storedUser as any)?.experience || '在校生',

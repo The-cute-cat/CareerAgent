@@ -71,13 +71,16 @@ public class PointsReferServiceImpl implements PointsReferService {
     @Override
     public Result<UserPointsVO> getAccountPoints(Long userId) {
 //        UserPoints accountPoints = userpointsMapper.getAccountPoints(id);
+        Long currentUserId = ThreadLocalUtil.getCurrentUserId();
         UserPoints accountPoints = userpointsMapper.selectOne(
-                new LambdaQueryWrapper<UserPoints>().eq(UserPoints::getId, userId)
+                new LambdaQueryWrapper<UserPoints>().eq(UserPoints::getUserId, currentUserId)
         );
         if(accountPoints == null) {
+            log.error("用户 {} 的积分信息不存在", userId);
             return Result.fail("用户积分信息不存在");
         }
         UserPointsVO userPointsVO = BeanUtil.copyProperties(accountPoints, UserPointsVO.class);
+        log.info("用户 {} 的积分信息: {}", userId, userPointsVO);
         return Result.ok(userPointsVO);
     }
 
@@ -413,7 +416,7 @@ public class PointsReferServiceImpl implements PointsReferService {
         params.put("grade",studentTrueDTO.getGrade());
         params.put("entranceTime", studentTrueDTO.getEntranceTime());
         params.put("graduatedTime", studentTrueDTO.getGraduatedTime());
-        AiChatResponse aiChatResponse = aiServiceClient.chatWithOtherJson("/points/student/register", params);
+        AiChatResponse aiChatResponse = aiServiceClient.chatWithOtherJson("/points/student/register", params,true);
         return Result.ok(aiChatResponse);
     }
 

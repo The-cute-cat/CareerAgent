@@ -19,6 +19,8 @@ export interface UserInfo {
   updateTime: string
   accessToken: string
   refreshToken: string
+  pointBalance: number
+  endTime: string
 }
 
 /** 用户信息响应 */
