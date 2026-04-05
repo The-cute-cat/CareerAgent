@@ -56,3 +56,16 @@ export const consumePointsService = (data: PointsConsumeRequest) => {
 
   return request.post<Result<PointsConsumeData>>('/points/consume', data)
 }
+
+export interface PointsMembershipChangeDTO {
+  userId: number
+  amount: number
+  type: number
+  vip?: number
+  status?: number
+  description?: string
+}
+
+export const rechargePointsService = (data: PointsMembershipChangeDTO) => {
+  return request.post<Result<any>>('/points/recharge', data)
+}

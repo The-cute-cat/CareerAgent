@@ -94,21 +94,21 @@ const pointRecords = computed(() => {
       type: '当前可用积分',
       remain: accountPoints.value.pointsBalance,
       total: accountPoints.value.pointsBalance,
-      expireText: '账户当前可用余额'
+      expireText: '账户当前可用余额 ' + accountPoints.value.pointsBalance
     },
     {
       id: 2,
       type: '累计消耗积分',
       remain: accountPoints.value.totalConsumed,
       total: accountPoints.value.totalConsumed,
-      expireText: '历史累计消耗'
+      expireText: '历史累计消耗 ' + accountPoints.value.totalConsumed
     },
     {
       id: 3,
       type: '邀请奖励积分',
       remain: accountPoints.value.referralRewardTotal,
       total: accountPoints.value.referralRewardTotal,
-      expireText: `已邀请 ${accountPoints.value.referralCount} 人`
+      expireText: `已邀请 ${accountPoints.value.referralCount == null ? 0 : accountPoints.value.referralCount} 人`
     }
   ]
 })

@@ -6,6 +6,7 @@ import {
   ArrowRight, Share, ShoppingCart, WarningFilled, Promotion, ChatLineRound, Reading, Setting, MoreFilled, Search, InfoFilled
 } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/modules/user'
+import { rechargePointsService, type PointsMembershipChangeDTO } from '@/api/points'
 import type { AccountPointsData } from '@/api/points'
 
 const props = defineProps({
@@ -112,6 +113,11 @@ const currentSelectedMemberObj = computed(() => {
   return found || memberPlans[1]!
 })
 
+const currentSelectedPointsObj = computed(() => {
+  const found = pointsPurchasePlans.find(p => p.key === selectedPointsPlan.value)
+  return found || pointsPurchasePlans[1]!
+})
+
 const inviteBenefits = [
   { text: '简历定制及优化 12 次', icon: Reading, color: '#3b82f6' },
   { text: '创建 12 条成效路径', icon: Promotion, color: '#6366f1' },
@@ -148,8 +154,35 @@ const openPurchaseCenter = (tab: 'points' | 'member') => {
   purchaseCenterVisible.value = true
 }
 
-const handlePay = () => {
-  ElMessage.success(`支付请求已提交（模拟）`)
+const handlePay = async () => {
+  if (activePurchaseTab.value === 'points') {
+    try {
+      const payload: PointsMembershipChangeDTO = {
+        userId: Number(userStore.userInfo?.id),
+        amount: currentSelectedPointsObj.value.points,
+        type: 1 // 1:充值
+      }
+      if (!payload.userId) {
+        ElMessage.error('未获取到用户信息')
+        return
+      }
+
+      // 临时显示loading效果可以通过封装或其他方式，这里先简单调用
+      const res = await rechargePointsService(payload)
+      if (res.data.code === 200) {
+        ElMessage.success('充值成功')
+        purchaseCenterVisible.value = false
+        // TODO: 可在此处触发父组件刷新积分余额的事件
+      } else {
+        ElMessage.error(res.data.msg || '充值失败')
+      }
+    } catch (err: any) {
+      ElMessage.error(err.message || '网络或服务器错误，充值请求失败')
+    }
+  } else {
+    // 处理会员购买逻辑
+    ElMessage.success(`支付请求已提交（会员）`)
+  }
 }
 
 const handleInvite = () => {
@@ -244,7 +277,7 @@ const handleInvite = () => {
 
     <!-- 统一购买中心弹窗 -->
     <el-dialog v-model="purchaseCenterVisible" :show-close="false" width="700px" class="purchase-dialog"
-      :destroy-on-close="true">
+      :destroy-on-close="true" append-to-body>
       <template #header="{ close }">
         <div class="dialog-custom-header">
           <el-icon class="back-icon" @click="close">
@@ -301,7 +334,7 @@ const handleInvite = () => {
             </div>
           </div>
 
-          <div class="invite-panel">
+          <div v-if="selectedPointsPlan === 'invite'" class="invite-panel">
             <h4 class="invite-title">邀请好友得积分</h4>
             <div class="invite-benefits">
               <div class="ib-item" v-for="(bene, index) in inviteBenefits" :key="index">
@@ -317,6 +350,28 @@ const handleInvite = () => {
               </el-icon> 邀请好友免费获得积分
             </div>
             <button class="primary-btn invite-btn" @click="handleInvite">邀请好友</button>
+          </div>
+
+          <div v-else class="payment-section">
+            <div class="pay-info">
+              <el-icon>
+                <WarningFilled />
+              </el-icon> 您已选择：{{ currentSelectedPointsObj.title }}（¥ {{ currentSelectedPointsObj.price }}）
+            </div>
+            <div class="pay-method">
+              <div class="alipay">
+                <span class="alipay-icon">支</span> 支付宝支付
+              </div>
+              <div class="more-methods">
+                更多支付方式 <el-icon>
+                  <ArrowRight />
+                </el-icon>
+              </div>
+            </div>
+            <button class="primary-btn subscribe-btn" @click="handlePay"
+              :style="{ backgroundColor: currentSelectedPointsObj.color }">
+              立即充值
+            </button>
           </div>
         </div>
 

@@ -113,7 +113,7 @@ public class UserController {
      * updateAvatar
      * 更换头像
      */
-    @GetMapping("/avatar")
+    @PostMapping("/avatar")
     public Result<String> updateAvatar(MultipartFile avatar) throws IOException {
         log.info("updateAvatar接收到的参数: {}", avatar.getOriginalFilename());
         return userService.updateAvatar(avatar);
