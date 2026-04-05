@@ -69,3 +69,18 @@ export interface PointsMembershipChangeDTO {
 export const rechargePointsService = (data: PointsMembershipChangeDTO) => {
   return request.post<Result<any>>('/points/recharge', data)
 }
+
+export interface PackageData {
+  id: number
+  name: string
+  price: number
+  points?: number
+  type: number
+  description?: string
+  status?: number
+  [key: string]: any
+}
+
+export const getPackagesByTypeService = (type: number) => {
+  return request.get<Result<PackageData[]>>(`/package/list/type/${type}`)
+}

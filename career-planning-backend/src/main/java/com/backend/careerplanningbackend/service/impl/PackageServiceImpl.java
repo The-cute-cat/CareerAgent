@@ -6,7 +6,6 @@ import com.backend.careerplanningbackend.domain.po.Result;
 import com.backend.careerplanningbackend.mapper.PackageMapper;
 import com.backend.careerplanningbackend.service.PackageService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
@@ -168,7 +167,7 @@ public class PackageServiceImpl implements PackageService {
             );
             
             log.info("成功查询类型为{}的套餐，数量: {}", type, packages.size());
-            return Result.ok((List<Package>) (List<?>) packages);
+            return Result.ok(packages);
         } catch (Exception e) {
             log.error("查询套餐列表异常", e);
             return Result.fail("查询套餐列表异常: " + e.getMessage());
