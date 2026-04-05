@@ -12,6 +12,9 @@ class UserForm(BaseModel):
     languages: list[LanguageDetail] | None = Field(None, description="语言能力")
     certificates: list[str] | None = Field(None, description="证书列表")
     certificatesOther: str | None = None
+    summary: str | None = Field(None, description="ai对用户整体情况的总结描述，黄金语料")
+    strengths: list[str] | None = Field(None, description="优势列表")
+    weaknesses: list[str] | None = Field(None, description="劣势列表")
     skills: list[SkillDetail] | None = Field(None, description="技能列表")
     tools: list[ToolDetail] | None = Field(None, description="工具列表")
     codeLinks: str | None = Field(None, description="代码仓库链接,如GitHub/Gitee,多个逗号分隔")
@@ -58,5 +61,8 @@ class UserForm(BaseModel):
             - 目标职位: {self.targetJob or "待定"}
             - 期望行业: {fmt_list(self.targetIndustries)}
             - 核心价值观优先级: {" > ".join([p for p in self.priorities]) if self.priorities else "未排序"}
+            - AI总结: {self.summary or "无"}
+            - 优势: {fmt_list(self.strengths)}
+            - 劣势: {fmt_list(self.weaknesses)}
             </candidate_raw_data>
                     """.strip()
