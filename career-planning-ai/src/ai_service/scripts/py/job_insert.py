@@ -1,8 +1,11 @@
 import asyncio
 from pathlib import Path
 <<<<<<< HEAD
+<<<<<<< HEAD
 from typing import List, Union
 =======
+=======
+>>>>>>> origin/master
 from typing import List
 >>>>>>> origin/master
 
@@ -103,6 +106,9 @@ def get_all_files(folder_path: Union[str, Path], recursive: bool = True) -> List
 async def main():
     """主函数：处理任务并确保资源正确清理"""
     EXCEL_FILE_PATH = r"E:\软件工程相关资料\项目比赛\服创2026\岗位数据\.NET-1773231373303.csv"
+<<<<<<< HEAD
+>>>>>>> origin/master
+=======
 >>>>>>> origin/master
 
 
