@@ -44,7 +44,7 @@ async function fetchPage(url) {
 const html_url = fs.existsSync('./temp/csv/url.txt') ? fs.readFileSync('./temp/csv/url.txt', 'utf8').split('\n') :[];
 const fail_url = [];
 
-async function get_data(url) {
+async function get_position_data(url) {
     const allData = [];
     let job_id = ""
     /**@type {CheerioAPI} */
@@ -247,7 +247,7 @@ const list = ["kw01500O80EO062", "kw00N00JG08K058", "kw011G08O",
     "kwCA06EBR55THG2NF5F85LS20", "kwBEF6BFCOFQAUS", "kwBEF6BFATSLT0MNG8"
 ]
 for (const item of list) {
-    const data = await get_data(`https://www.zhaopin.com/sou/jl489/${item}`);
+    const data = await get_position_data(`https://www.zhaopin.com/sou/jl489/${item}`);
     try {
         saveToCSV(data)
     } catch (e) {

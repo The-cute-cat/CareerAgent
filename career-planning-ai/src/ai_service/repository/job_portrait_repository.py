@@ -48,15 +48,6 @@ class JobPortraitRepository:
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def get_by_job_id(self, job_id: int) -> Optional[JobPortrait]:
-        """
-        根据岗位 ID (job_id) 获取岗位画像
-        这是最常用的查询方式，因为通常是一对一关系
-        """
-        stmt = select(JobPortrait).where(JobPortrait.job_id == job_id)
-        result = await self.session.execute(stmt)
-        return result.scalar_one_or_none()
-
     async def get_list(
             self,
             page: int = 1,

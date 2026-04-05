@@ -11,4 +11,4 @@ export default pinia
 // 等价于下面的从模块导出
 
 export * from './modules/user'
-export * from './modules/jsonResume'
+export * from './modules/app'

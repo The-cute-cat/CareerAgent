@@ -12,7 +12,8 @@ __all__ = [
 class ApiException(Exception):
     """自定义API异常"""
 
-    def __init__(self, code: int, msg: str = None, data: Any = None):
+    def __init__(self, code: int, msg: str | None = None, data: Any = None):
+        super().__init__(msg)
         self.code = code
         self.msg = msg
         self.data = data

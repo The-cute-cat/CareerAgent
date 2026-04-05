@@ -183,6 +183,14 @@ class ChromaService:
             result = self._vector_store.add_documents(documents, ids=ids)
             logger.info(f"成功添加 {len(documents)} 个文档到集合 {self._collection_name}")
             return result
+        except KeyError as e:
+            logger.error(f"DashScope API 调用失败，可能是限流或网络问题。KeyError: {e}")
+            raise RuntimeError(
+                "DashScope embedding API 调用失败。常见原因：\n"
+                "1. API 限流 - 请稍后重试或减少并发请求\n"
+                "2. API 密钥无效 - 请检查配置\n"
+                "3. 网络问题 - 请检查网络连接"
+            ) from e
         except Exception as e:
             logger.error(f"添加文档失败: {e}")
             raise

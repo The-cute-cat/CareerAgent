@@ -44,9 +44,12 @@ public class PointsReferController {
     }
 
     /**
-     * insertUserPoints 新用户赠送积分接口
-     * 注册接口
-     * @param referralDTO
+     * register
+     * 新用户注册赠送积分接口
+     * 用户注册成功后，系统会自动赠送一定数量的积分
+     *
+     * @param referralDTO 注册信息，包含邀请码等
+     * @return 注册结果
      */
     @PostMapping("/register")
     public Result<Object> register(ReferralDTO referralDTO) {
@@ -54,10 +57,13 @@ public class PointsReferController {
         return referralService.register(referralDTO);
     }
     
-    /** 
+    /**
      * invite
      * 邀请好友接口
-     * @param referralDTO
+     * 用户可以通过邀请好友注册来获得额外的积分奖励
+     *
+     * @param referralDTO 邀请信息
+     * @return 邀请码信息
      */
     @PostMapping("/invite")
     public Result<ReferralDTO> invite(ReferralDTO referralDTO) {
@@ -66,7 +72,12 @@ public class PointsReferController {
     }
 
     /**
-     * registerStudent 大学生认证接口
+     * registerStudent
+     * 大学生认证接口
+     * 学生用户认证成功后，系统会自动赠送一定数量的积分
+     *
+     * @param studentTrueDTO 学生认证信息
+     * @return 认证结果
      */
     @PostMapping("/register/student")
     public Result<Object> registerStudent(StudentTrueDTO studentTrueDTO) {
@@ -75,9 +86,13 @@ public class PointsReferController {
     }
 
     /**
-     * recharge 充值接口
-     * 新用户赠送积分接口
-     * @param dto
+     * recharge
+     * 充值积分接口
+     * 用户可以通过充值来增加自己的积分余额
+     *
+     * @param dto 充值信息
+     * @param response HTTP 响应对象
+     * @return 充值后的积分信息
      */
     @PostMapping("/recharge")
     public Result<UserPoints> recharge(@RequestBody @Valid PointsMembershipChangeDTO dto, HttpServletResponse response) {
@@ -86,9 +101,12 @@ public class PointsReferController {
     }
 
     /**
-     * consumePoints 消耗积分接口
-     * 用户使用积分接口
-     * 
+     * consumePoints
+     * 消耗积分接口
+     * 用户在购买课程或服务时可以使用积分抵扣部分金额，消耗相应的积分
+     *
+     * @param dto 积分消耗信息
+     * @return 消耗后的积分信息
      */
     @PostMapping("/consume")
     public Result<UserPoints> consumePoints(@RequestBody @Valid PointsMembershipChangeDTO dto) {
@@ -97,6 +115,14 @@ public class PointsReferController {
     }
     
     
+    /**
+     * deletePoints
+     * 删除积分接口
+     * 用于扣除用户积分，传入负数表示扣除积分
+     *
+     * @param dto 积分变更信息
+     * @return 操作结果
+     */
     @PostMapping("/delete")
     public Result<Object> deletePoints(@RequestBody @Valid PointsMembershipChangeDTO dto) {
         log.info("dto: {}", dto);

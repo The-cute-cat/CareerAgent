@@ -1,4 +1,3 @@
-__all__ = ['fix_json_file']
 # -*- coding: utf-8 -*-
 """
 JSON 格式自动修复工具
@@ -8,10 +7,16 @@ JSON 格式自动修复工具
 import json
 import re
 import shutil
-from pathlib import Path
 from datetime import datetime
-from typing import Tuple, List, Dict, Any, Optional, Union
+from pathlib import Path
+from typing import Tuple, List, Dict, Any, Union
+
 from ai_service.utils.logger_handler import log
+
+__all__ = [
+    "fix_json_file",
+    "JSONFixer"
+]
 
 
 class JSONFixer:
@@ -33,6 +38,7 @@ class JSONFixer:
     @staticmethod
     def remove_bom(content: str) -> str:
         """移除 BOM 头"""
+        # noinspection SpellCheckingInspection
         if content.startswith('\ufeff'):
             return content[1:]
         return content
@@ -290,7 +296,7 @@ class JSONFixer:
             report['errors'].append(msg)
             return False, msg, report
 
-        # 如果已经是有效 JSON，无需修复
+        # 如果已经是 有效 JSON，无需修复
         success, data, error = JSONFixer.try_parse(original_content)
         if success:
             if verbose:
@@ -472,13 +478,11 @@ def fix_json_file(file_path: Union[str, Path],
     return success, message
 
 
-
-
 # ==========================================
 # 使用示例
 # ==========================================
 
-if __name__ == "__main__":
+def main():
     # 示例 1: 修复单个文件
     print("=" * 70)
     print("示例 1: 修复单个文件")
@@ -494,8 +498,9 @@ if __name__ == "__main__":
     else:
         print(f"\n❌ {message}")
 
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("示例 2: 批量修复目录")
-    print("="*70)
+    print("=" * 70)
 
-
+if __name__ == "__main__":
+    main()

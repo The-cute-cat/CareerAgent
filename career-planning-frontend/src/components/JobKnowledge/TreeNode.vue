@@ -1,70 +1,56 @@
 <template>
-  <div class="knowledge-tree-node" :style="{ '--level': props.level }">
-    <div class="node-row">
-      <button
-        v-if="hasChildren"
-        type="button"
-        class="toggle-btn"
-        :aria-label="expanded ? '收起子节点' : '展开子节点'"
-        @click="expanded = !expanded"
-      >
-        <el-icon>
-          <ArrowDown v-if="expanded" />
-          <ArrowRight v-else />
-        </el-icon>
-      </button>
-      <span v-else class="toggle-placeholder"></span>
-
-      <button
-        type="button"
-        class="node-card"
-        :class="{
-          active: props.activeId === props.node.id,
-          completed: props.node.status === 'completed',
-          current: props.node.status === 'current',
-        }"
-        @click="emit('select', props.node)"
-      >
-        <div class="node-card__header">
-          <div class="node-title-group">
-            <span class="node-title">{{ props.node.label }}</span>
-            <span class="node-summary">{{ props.node.summary }}</span>
-          </div>
-          <span class="status-badge" :class="props.node.status">
-            {{ statusLabelMap[props.node.status] }}
+  <div class="tree-node" :style="{ '--depth': String(depth) }">
+    <div class="tree-node__branch">
+      <div class="tree-node__self">
+        <button
+          type="button"
+          class="tree-node__label"
+          :class="{
+            active: activeId === node.id,
+            expandable: hasChildren,
+            opened: expanded,
+            [node.status]: true,
+          }"
+          @click="emit('select', node)"
+        >
+          <span class="status-dot" :class="node.status"></span>
+          <span class="tree-node__text">{{ node.label }}</span>
+          <span v-if="node.difficulty" class="difficulty-tag" :class="getDifficultyClass(node.difficulty)">
+            {{ node.difficulty }}
           </span>
-        </div>
+        </button>
 
-        <div class="node-meta">
-          <span>{{ props.node.difficulty }}</span>
-          <span>{{ props.node.duration }}</span>
-          <span>{{ props.node.resources.length }} 个资源</span>
-        </div>
+        <button
+          v-if="hasChildren"
+          type="button"
+          class="tree-node__toggle"
+          :aria-label="expanded ? '收起下一级内容' : '展开下一级内容'"
+          @click.stop="expanded = !expanded"
+        >
+          <el-icon>
+            <ArrowDownBold v-if="expanded" />
+            <ArrowRightBold v-else />
+          </el-icon>
+        </button>
+      </div>
 
-        <div v-if="props.node.tags.length" class="node-tags">
-          <span v-for="tag in props.node.tags.slice(0, 4)" :key="tag" class="tag-chip">
-            {{ tag }}
-          </span>
-        </div>
-      </button>
-    </div>
-
-    <div v-if="hasChildren && expanded" class="children">
-      <TreeNode
-        v-for="child in props.node.children"
-        :key="child.id"
-        :node="child"
-        :level="props.level + 1"
-        :active-id="props.activeId"
-        @select="emit('select', $event)"
-      />
+      <div v-if="hasChildren && expanded" class="tree-node__children">
+        <TreeNode
+          v-for="child in node.children"
+          :key="child.id"
+          :node="child"
+          :depth="depth + 1"
+          :active-id="activeId"
+          @select="emit('select', $event)"
+        />
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { ArrowDown, ArrowRight } from '@element-plus/icons-vue'
+import { ArrowDownBold, ArrowRightBold } from '@element-plus/icons-vue'
 
 export interface KnowledgeTreeNode {
   id: string
@@ -83,11 +69,11 @@ export interface KnowledgeTreeNode {
 const props = withDefaults(
   defineProps<{
     node: KnowledgeTreeNode
-    level?: number
+    depth?: number
     activeId?: string
   }>(),
   {
-    level: 0,
+    depth: 0,
     activeId: '',
   },
 )
@@ -96,204 +82,219 @@ const emit = defineEmits<{
   select: [node: KnowledgeTreeNode]
 }>()
 
-const expanded = ref(props.level < 1)
+const expanded = ref(false)
 const hasChildren = computed(() => props.node.children.length > 0)
 
-const statusLabelMap: Record<KnowledgeTreeNode['status'], string> = {
-  completed: '已掌握',
-  current: '进行中',
-  planned: '待学习',
+function getDifficultyClass(difficulty: string): string {
+  const map: Record<string, string> = {
+    '基础': 'easy',
+    '进阶': 'medium',
+    '高级': 'hard',
+  }
+  return map[difficulty] || 'medium'
 }
 </script>
 
 <style scoped lang="scss">
-.knowledge-tree-node {
-  --line-color: rgba(148, 163, 184, 0.28);
+.tree-node {
   position: relative;
-  padding-left: calc(var(--level) * 18px);
 }
 
-.knowledge-tree-node::before {
-  content: '';
-  position: absolute;
-  left: calc(var(--level) * 18px + 10px);
-  top: 0;
-  bottom: 0;
-  width: 1px;
-  background: var(--line-color);
-}
-
-.node-row {
-  position: relative;
+.tree-node__branch {
   display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  margin-bottom: 14px;
+  align-items: center;
+  gap: 20px;
+  min-height: 70px;
 }
 
-.node-row::before {
-  content: '';
-  position: absolute;
-  left: 10px;
-  top: 18px;
-  width: 14px;
-  height: 1px;
-  background: var(--line-color);
-}
-
-.toggle-btn,
-.toggle-placeholder {
+.tree-node__self {
   position: relative;
-  z-index: 1;
-  flex: 0 0 22px;
-  width: 22px;
-  height: 22px;
-  margin-top: 8px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
 }
 
-.toggle-btn {
+.tree-node__label {
+  min-width: 200px;
+  max-width: 260px;
+  padding: 8px 16px 8px 36px;
+  border-radius: 18px;
+  border: 1px solid #e2e8f0;
+  background: white;
+  color: #1e293b;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+
+  .status-dot {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    transition: all 0.2s;
+
+    &.completed {
+      background: #10b981;
+      box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+    }
+
+    &.current {
+      background: #3b82f6;
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+      animation: pulse 1.5s infinite;
+    }
+
+    &.planned {
+      background: #94a3b8;
+    }
+  }
+
+  .difficulty-tag {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 30px;
+    background: #f1f5f9;
+    color: #475569;
+
+    &.easy {
+      background: #dcfce7;
+      color: #15803d;
+    }
+
+    &.medium {
+      background: #fef9c3;
+      color: #854d0e;
+    }
+
+    &.hard {
+      background: #fee2e2;
+      color: #b91c1c;
+    }
+  }
+
+  &:hover {
+    transform: translateY(-1px);
+    border-color: #93c5fd;
+    box-shadow: 0 8px 20px rgba(37, 99, 235, 0.12);
+  }
+
+  &.active {
+    border-color: #2563eb;
+    background: #eff6ff;
+    color: #1e40af;
+    box-shadow: 0 8px 20px rgba(37, 99, 235, 0.15);
+
+    .status-dot {
+      transform: translateY(-50%) scale(1.2);
+    }
+  }
+
+  &.opened {
+    background: #f8fafc;
+  }
+}
+
+.tree-node__toggle {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #64748b;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(191, 219, 254, 0.9);
-  border-radius: 999px;
-  background: #fff;
-  color: #2563eb;
   cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: all 0.2s;
+  border: 1px solid #e2e8f0;
+
+  &:hover {
+    color: #2563eb;
+    background: #eff6ff;
+    border-color: #bfdbfe;
+  }
 }
 
-.toggle-btn:hover {
-  transform: scale(1.05);
-  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.14);
-}
-
-.node-card {
+.tree-node__children {
   position: relative;
-  z-index: 1;
-  width: 100%;
-  padding: 16px 18px;
-  text-align: left;
-  border: 1px solid rgba(219, 231, 245, 0.94);
-  border-radius: 20px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(245, 249, 255, 0.96));
-  box-shadow: 0 16px 36px rgba(28, 74, 126, 0.06);
-  cursor: pointer;
-  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
-}
-
-.node-card:hover {
-  transform: translateY(-2px);
-  border-color: rgba(96, 165, 250, 0.5);
-  box-shadow: 0 20px 44px rgba(37, 99, 235, 0.1);
-}
-
-.node-card.active {
-  border-color: rgba(37, 99, 235, 0.55);
-  box-shadow: 0 22px 50px rgba(37, 99, 235, 0.16);
-  background: linear-gradient(180deg, rgba(239, 246, 255, 0.98), rgba(255, 255, 255, 0.98));
-}
-
-.node-card.completed {
-  border-left: 4px solid #22c55e;
-}
-
-.node-card.current {
-  border-left: 4px solid #f59e0b;
-}
-
-.node-card__header {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
+  flex-direction: column;
+  gap: 16px;
+  padding-left: 32px;
+  margin-top: 8px;
 
-.node-title-group {
-  min-width: 0;
-}
-
-.node-title {
-  display: block;
-  color: #16324f;
-  font-size: 16px;
-  font-weight: 800;
-}
-
-.node-summary {
-  display: block;
-  margin-top: 4px;
-  color: #6b7f94;
-  font-size: 13px;
-  line-height: 1.6;
-}
-
-.status-badge {
-  flex-shrink: 0;
-  min-width: 68px;
-  padding: 5px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 700;
-  text-align: center;
-}
-
-.status-badge.completed {
-  background: rgba(34, 197, 94, 0.12);
-  color: #15803d;
-}
-
-.status-badge.current {
-  background: rgba(245, 158, 11, 0.14);
-  color: #b45309;
-}
-
-.status-badge.planned {
-  background: rgba(59, 130, 246, 0.1);
-  color: #2563eb;
-}
-
-.node-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 14px;
-  margin-top: 12px;
-  color: #72879c;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.node-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.tag-chip {
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: rgba(226, 232, 240, 0.7);
-  color: #47627f;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.children {
-  margin-left: 12px;
-}
-
-@media (max-width: 768px) {
-  .knowledge-tree-node {
-    padding-left: calc(var(--level) * 10px);
+  &::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 24px;
+    bottom: 24px;
+    width: 2px;
+    background: linear-gradient(to bottom, #cbd5e1, #e2e8f0);
+    border-radius: 2px;
   }
+}
 
-  .knowledge-tree-node::before {
-    left: calc(var(--level) * 10px + 10px);
+.tree-node__children > :deep(.tree-node) {
+  position: relative;
+
+  &::before {
+    content: '';
+    position: absolute;
+    left: -32px;
+    top: 35px;
+    width: 32px;
+    height: 2px;
+    background: linear-gradient(90deg, #cbd5e1, #e2e8f0);
+    border-radius: 2px;
   }
+}
 
-  .node-card__header {
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(59, 130, 246, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+  }
+}
+
+@media (max-width: 1024px) {
+  .tree-node__branch {
+    align-items: flex-start;
     flex-direction: column;
+    gap: 12px;
+    min-height: auto;
+  }
+
+  .tree-node__children {
+    padding-left: 20px;
+
+    &::before,
+    > :deep(.tree-node)::before {
+      display: none;
+    }
+  }
+
+  .tree-node__label {
+    min-width: 180px;
+    max-width: 240px;
   }
 }
 </style>

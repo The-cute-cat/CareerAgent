@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Calendar, Coin, Opportunity, Present, WarningFilled } from '@element-plus/icons-vue'
+import { Calendar, Opportunity, WarningFilled } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/modules/user'
+import type { AccountPointsData } from '@/api/points'
 
 const props = defineProps({
   points: {
@@ -12,6 +13,14 @@ const props = defineProps({
   records: {
     type: Array,
     default: () => []
+  },
+  accountPoints: {
+    type: Object as () => AccountPointsData | null,
+    default: null
+  },
+  loading: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -25,6 +34,20 @@ const insufficientVisible = ref(false)
 const memberType = computed(() => String((userStore.userInfo as any)?.memberType || 'normal').toLowerCase())
 const memberExpireAt = computed(() => (userStore.userInfo as any)?.memberExpireAt || '')
 const displayPoints = computed(() => Number(props.points || (userStore.userInfo as any)?.points || 0))
+const accountSummary = computed(() => props.accountPoints)
+
+const formatDateTime = (value?: string) => {
+  if (!value) return '暂无'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+
+  const yyyy = date.getFullYear()
+  const mm = String(date.getMonth() + 1).padStart(2, '0')
+  const dd = String(date.getDate()).padStart(2, '0')
+  const hh = String(date.getHours()).padStart(2, '0')
+  const min = String(date.getMinutes()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd} ${hh}:${min}`
+}
 
 const memberPlans = [
   {
@@ -79,7 +102,7 @@ const consumptionRules = [
 const memberBenefits = [
   '开通时赠送专属积分礼包',
   '每月自动发放会员积分',
-  '积分消耗享受专属折扣',
+  '积分消费享受专属折扣',
   '高级能力与模板优先解锁',
   '高峰时段享受更高处理优先级'
 ]
@@ -96,6 +119,19 @@ const pointRecords = computed(() => {
   ]
 })
 
+const pointSummaryCards = computed(() => {
+  if (!accountSummary.value) {
+    return []
+  }
+
+  return [
+    { title: '账户余额', value: accountSummary.value.pointsBalance, desc: '当前可直接使用的积分' },
+    { title: '累计消耗', value: accountSummary.value.totalConsumed, desc: '历史使用掉的积分总量' },
+    { title: '邀请人数', value: accountSummary.value.referralCount, desc: '通过邀请带来的注册人数' },
+    { title: '邀请奖励', value: accountSummary.value.referralRewardTotal, desc: '邀请累计获得的积分奖励' }
+  ]
+})
+
 const currentMemberText = computed(() => {
   const map: Record<string, string> = {
     normal: '普通用户',
@@ -109,7 +145,6 @@ const currentMemberText = computed(() => {
 })
 
 const currentMemberPlan = computed(() => memberPlans.find((item) => item.key === memberType.value))
-
 const expiryText = computed(() => memberExpireAt.value || '暂未开通会员')
 
 const handlePlanAction = (planKey: string) => {
@@ -161,7 +196,10 @@ const handleOpenMember = () => {
         <div class="overview-label">可用积分</div>
         <div class="overview-value">{{ displayPoints }}</div>
         <div class="overview-desc">
-          {{ currentMemberPlan ? `当前享受积分消耗${currentMemberPlan.discount}` : '普通用户按原价消耗积分' }}
+          {{ currentMemberPlan ? `当前享受积分消费 ${currentMemberPlan.discount}` : '普通用户按原价消耗积分' }}
+        </div>
+        <div v-if="accountSummary" class="points-update-time">
+          最近更新时间：{{ formatDateTime(accountSummary.updateTime) }}
         </div>
         <div class="overview-actions">
           <button class="ghost-btn ghost-btn--light" @click="handleEarnAction">获取积分</button>
@@ -190,7 +228,7 @@ const handleOpenMember = () => {
           <ul class="plan-meta">
             <li>开通赠送 {{ plan.giftPoints }} 积分</li>
             <li>每月发放 {{ plan.monthlyPoints }} 积分</li>
-            <li>功能消耗享受 {{ plan.discount }}</li>
+            <li>功能消费享受 {{ plan.discount }}</li>
           </ul>
           <button class="primary-btn" @click="handlePlanAction(plan.key)">立即开通</button>
         </article>
@@ -229,6 +267,23 @@ const handleOpenMember = () => {
         </article>
       </div>
 
+      <div v-if="accountSummary || loading" class="records-panel">
+        <div class="section-head">
+          <div>
+            <h3>账户积分概览</h3>
+            <p>展示账户积分接口返回的余额、消耗、邀请和更新时间信息。</p>
+          </div>
+        </div>
+        <div v-if="loading" class="account-empty">积分数据加载中...</div>
+        <div v-else class="summary-grid">
+          <div v-for="item in pointSummaryCards" :key="item.title" class="summary-card">
+            <span>{{ item.title }}</span>
+            <strong>{{ item.value }}</strong>
+            <p>{{ item.desc }}</p>
+          </div>
+        </div>
+      </div>
+
       <div class="rules-panel">
         <div class="section-head">
           <div>
@@ -248,10 +303,11 @@ const handleOpenMember = () => {
         <div class="section-head">
           <div>
             <h3>积分明细</h3>
-            <p>展示当前可用积分来源，便于你判断优先使用哪一类积分。</p>
+            <p>结合账户接口结果，展示当前余额、累计消耗与邀请奖励来源。</p>
           </div>
         </div>
-        <div class="record-list">
+        <div v-if="loading" class="account-empty">积分明细加载中...</div>
+        <div v-else-if="pointRecords.length" class="record-list">
           <div v-for="item in pointRecords" :key="item.id" class="record-item">
             <div class="record-icon">
               <el-icon><Calendar /></el-icon>
@@ -266,6 +322,7 @@ const handleOpenMember = () => {
             </div>
           </div>
         </div>
+        <div v-else class="account-empty">当前暂无积分数据</div>
       </div>
     </div>
 
@@ -287,7 +344,7 @@ const handleOpenMember = () => {
             <ul class="plan-meta">
               <li>赠送 {{ plan.giftPoints }} 积分</li>
               <li>每月补给 {{ plan.monthlyPoints }} 积分</li>
-              <li>积分消耗 {{ plan.discount }}</li>
+              <li>积分消费 {{ plan.discount }}</li>
             </ul>
           </article>
         </div>
@@ -337,6 +394,7 @@ const handleOpenMember = () => {
 .overview-card--points .overview-label, .overview-card--points .overview-desc { color: #475569; }
 .overview-value { margin: 12px 0 10px; font-size: 52px; line-height: 1; font-weight: 900; color: #0f172a; letter-spacing: -0.02em; }
 .overview-card--points .overview-value { color: #0f172a; }
+.points-update-time { margin-top: 10px; font-size: 13px; color: #475569; }
 .ghost-btn { align-self: flex-start; padding: 12px 24px; border-radius: 999px; font-weight: 700; background: #fff; color: #1e62c5; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
 .ghost-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 16px rgba(0,0,0,0.1); }
 .ghost-btn--light { background: #fff; border: 1px solid #cbd5e1; color: #334155; }
@@ -348,8 +406,8 @@ const handleOpenMember = () => {
 .section-head p, .method-card p, .dialog-intro p { margin: 0; line-height: 1.7; font-size: 14px; }
 .text-btn { padding: 0; color: #1677ff; background: transparent; font-weight: 700; }
 .plan-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
-.plan-card, .method-card, .rule-card, .record-item, .benefit-item { border-radius: 28px; border: 1px solid rgba(255, 255, 255, 0.8); background: rgba(255,255,255,0.65); backdrop-filter: blur(16px); box-shadow: 0 8px 24px rgba(15, 23, 42, 0.03), inset 0 1px 2px rgba(255,255,255,0.9); transition: all 0.3s ease; }
-.plan-card:hover, .method-card:hover, .record-item:hover { transform: translateY(-4px); box-shadow: 0 16px 40px rgba(15, 23, 42, 0.06), inset 0 1px 2px rgba(255,255,255,1); }
+.plan-card, .method-card, .rule-card, .record-item, .benefit-item, .summary-card { border-radius: 28px; border: 1px solid rgba(255, 255, 255, 0.8); background: rgba(255,255,255,0.65); backdrop-filter: blur(16px); box-shadow: 0 8px 24px rgba(15, 23, 42, 0.03), inset 0 1px 2px rgba(255,255,255,0.9); transition: all 0.3s ease; }
+.plan-card:hover, .method-card:hover, .record-item:hover, .summary-card:hover { transform: translateY(-4px); box-shadow: 0 16px 40px rgba(15, 23, 42, 0.06), inset 0 1px 2px rgba(255,255,255,1); }
 .plan-card { padding: 32px 28px; display: flex; flex-direction: column; }
 .plan-card.is-quarterly { position: relative; border-color: rgba(99, 102, 241, 0.3); background: linear-gradient(180deg, rgba(255,255,255,0.95), rgba(238,242,255,0.5)); box-shadow: 0 16px 40px rgba(99, 102, 241, 0.08), inset 0 1px 2px rgba(255,255,255,1); }
 .plan-card.is-quarterly::before { content: ''; position: absolute; inset: -2px; border-radius: 30px; padding: 2px; background: linear-gradient(135deg, #a855f7, #6366f1); -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); -webkit-mask-composite: xor; mask-composite: exclude; opacity: 0.5; pointer-events: none; }
@@ -368,12 +426,17 @@ const handleOpenMember = () => {
 .plan-card.is-quarterly .primary-btn { background: linear-gradient(135deg, #9333ea, #6366f1); box-shadow: 0 8px 24px rgba(147, 51, 234, 0.3); }
 .benefit-panel, .rules-panel, .records-panel { padding: 32px; background: rgba(255,255,255,0.6); }
 .benefit-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-.benefit-item, .rule-card, .record-item, .method-card { padding: 22px 24px; }
+.benefit-item, .rule-card, .record-item, .method-card, .summary-card { padding: 22px 24px; }
 .benefit-item { display: flex; align-items: center; gap: 16px; color: #1e293b; font-weight: 700; font-size: 15px; }
 .benefit-item .el-icon, .warning-icon { color: #1677ff; font-size: 20px; }
 .method-card { display: flex; flex-direction: column; gap: 12px; }
 .method-points { font-size: 32px; font-weight: 900; color: #1677ff; }
-.rule-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px;}
+.summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.summary-card span, .account-empty { color: #64748b; font-size: 13px; }
+.summary-card strong { display: block; margin: 10px 0 8px; color: #0f172a; font-size: 30px; font-weight: 900; }
+.summary-card p { margin: 0; color: #475569; line-height: 1.6; font-size: 13px; }
+.account-empty { padding: 28px 8px; text-align: center; }
+.rule-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .rule-card { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-weight: 600; color: #334155; }
 .rule-card strong, .record-side strong { color: #1677ff; font-size: 18px; font-weight: 800; }
 .record-list { display: flex; flex-direction: column; gap: 16px; }
@@ -391,6 +454,6 @@ const handleOpenMember = () => {
 .insufficient-actions { margin-top: 12px; }
 
 @media (max-width: 1200px) {
-  .overview-grid, .plan-grid, .method-grid, .rule-grid, .benefit-list, .plan-grid--dialog, .dialog-method-grid { grid-template-columns: 1fr; }
+  .overview-grid, .plan-grid, .method-grid, .rule-grid, .benefit-list, .plan-grid--dialog, .dialog-method-grid, .summary-grid { grid-template-columns: 1fr; }
 }
 </style>
