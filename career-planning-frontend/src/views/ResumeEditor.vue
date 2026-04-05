@@ -1,9 +1,9 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { ArrowLeft, CircleCheck, Download, Files, RefreshRight, UploadFilled, Warning } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
-import { useJsonResumeStore } from '@/stores'
+import { useJsonResumeStore } from '@/stores/modules/jsonResume'
 import { loadCareerFormData } from '@/utils/career-runtime'
 import { exportManualResumeToWord, exportResumePreviewToPdf } from '@/utils/resume-export'
 
@@ -178,16 +178,16 @@ const hydrate = () => {
     education: [trim(resume?.education?.[0]?.studyType) || trim(cached?.education), trim(resume?.education?.[0]?.area) || cached?.major?.join(' / ') || ''].filter(Boolean).join(' / '),
     school: trim(resume?.education?.[0]?.institution) || trim(extras.educationHistory?.[0]?.institution),
     summary: trim(resume?.basics.summary) || trim(extras.basics.summary),
-    skills: [...(resume?.skills?.flatMap(i => i.keywords || []) || []), ...(cached?.skills?.map(i => i.name) || [])].filter(Boolean).join(', '),
-    awards: [...(resume?.certificates?.map(i => i.name) || []), ...(cached?.certificates || [])].filter(Boolean).join('\n'),
-    languages: [...(resume?.languages?.map(i => [i.language, i.fluency].filter(Boolean).join(' ')) || []), ...(cached?.languages?.map(i => [i.type, i.level].filter(Boolean).join(' ')) || [])].filter(Boolean).join('\n'),
+    skills: [...(resume?.skills?.flatMap((i: { keywords?: string[] }) => i.keywords || []) || []), ...(cached?.skills?.map((i: { name: string }) => i.name) || [])].filter(Boolean).join(', '),
+    awards: [...(resume?.certificates?.map((i: { name: string }) => i.name) || []), ...(cached?.certificates || [])].filter(Boolean).join('\n'),
+    languages: [...(resume?.languages?.map((i: { language: string; fluency?: string }) => [i.language, i.fluency].filter(Boolean).join(' ')) || []), ...(cached?.languages?.map((i: { type: string; level?: string }) => [i.type, i.level].filter(Boolean).join(' ')) || [])].filter(Boolean).join('\n'),
     portfolio: trim(resume?.basics.profiles?.[0]?.url) || trim(extras.basics.url) || trim(cached?.codeAbility?.links),
     work: [
-      ...(resume?.work?.map(i => ({ company: trim(i.name), position: trim(i.position), date: [trim(i.startDate), trim(i.endDate) || '至今'].filter(Boolean).join(' - '), desc: [trim(i.summary), ...(i.highlights || [])].filter(Boolean).join('\n') })) || []),
+      ...(resume?.work?.map((i: { name?: string; position?: string; startDate?: string; endDate?: string; summary?: string; highlights?: string[] }) => ({ company: trim(i.name), position: trim(i.position), date: [trim(i.startDate), trim(i.endDate) || '至今'].filter(Boolean).join(' - '), desc: [trim(i.summary), ...(i.highlights || [])].filter(Boolean).join('\n') })) || []),
       ...(cached?.internships?.map(i => ({ company: trim(i.company), position: trim(i.role), date: Array.isArray(i.date) && i.date.length === 2 ? i.date.map(d => new Date(d).toISOString().slice(0, 10)).join(' - ') : '', desc: trim(i.desc) })) || [])
     ].slice(0, 2).concat(Array.from({ length: 2 }, () => ({ company: '', position: '', date: '', desc: '' }))).slice(0, 2),
     projects: [
-      ...(resume?.projects?.map(i => ({ name: trim(i.name), tech: i.keywords?.join(', ') || '', date: [trim(i.startDate), trim(i.endDate)].filter(Boolean).join(' - '), desc: [trim(i.description), ...(i.highlights || [])].filter(Boolean).join('\n') })) || []),
+      ...(resume?.projects?.map((i: { name?: string; keywords?: string[]; startDate?: string; endDate?: string; description?: string; highlights?: string[] }) => ({ name: trim(i.name), tech: i.keywords?.join(', ') || '', date: [trim(i.startDate), trim(i.endDate)].filter(Boolean).join(' - '), desc: [trim(i.description), ...(i.highlights || [])].filter(Boolean).join('\n') })) || []),
       ...(cached?.projects?.map(i => ({ name: trim(i.name), tech: '', date: i.isCompetition ? '竞赛项目' : '', desc: trim(i.desc) })) || [])
     ].slice(0, 2).concat(Array.from({ length: 2 }, () => ({ name: '', tech: '', date: '', desc: '' }))).slice(0, 2)
   })
