@@ -1,4 +1,7 @@
 import os
+
+from sklearn.decomposition import PCA
+
 # 配置 Hugging Face 镜像源
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 
@@ -24,11 +27,11 @@ except Exception:
 # 模型：BAAI/bge-base-zh-v1.5 或 BAAI/bge-small-zh-v1.5 或 BAAI/bge-tiny-zh-v1.5
 async def cluster_standard_jobs_with_hdbscan(
     session: AsyncSession,
-    min_cluster_size: int = 8,# 1. 形成簇的最小样本数
+    min_cluster_size: int = 5,# 1. 形成簇的最小样本数
     batch_size: int = 64,
     embedding_model: str = "BAAI/bge-base-zh-v1.5",
     hdbscan_min_samples: int = 3,    # 2. 核心点的最小邻居数 (密度敏感度)
-    desc_max_len: int = 150,
+    desc_max_len: int = 10000,
     collection_name: str = "job_original_embeddings",
 ) -> Dict[int, List[JobInfo]]:
     """
@@ -85,6 +88,9 @@ async def cluster_standard_jobs_with_hdbscan(
         return {-1: valid_jobs}
 
     log.info(f"开始 HDBSCAN 聚类，样本数：{total}，向量形状：{embeddings.shape}")
+    # PCA 降维
+    if embeddings.shape[1] > 128:
+        embeddings = PCA(n_components=128).fit_transform(embeddings)
     clusterer = hdbscan.HDBSCAN(
         min_cluster_size=min_cluster_size,   # 1. 形成簇的最小样本数
         min_samples=hdbscan_min_samples,# 2. 核心点的最小邻居数 (密度敏感度)
@@ -112,10 +118,8 @@ async def cluster_standard_jobs_with_hdbscan(
     log.info(f"标准岗位类别数：{num_clusters}")
     log.info(f"噪声点数量：{noise_count} ({noise_ratio:.2%})")
 
-    cluster_sizes = Counter([int(lbl) for lbl in cluster_labels if lbl != -1])
-    if cluster_sizes:
-        top_sizes = sorted(cluster_sizes.items(), key=lambda x: x[1], reverse=True)[:10]
-        log.info(f"Top 簇规模（前10）：{top_sizes}")
+
+
 
     if silhouette_score and num_clusters > 1:
         try:
@@ -123,11 +127,6 @@ async def cluster_standard_jobs_with_hdbscan(
             masked_embeddings = embeddings[mask]
             masked_labels = cluster_labels[mask]
 
-            if len(masked_labels) >= 10 and len(set(masked_labels)) > 1:
-                sil = silhouette_score(masked_embeddings, masked_labels, metric="euclidean")
-                log.info(f"Silhouette（去噪后）：{sil:.4f}")
-            else:
-                log.info("Silhouette：去噪后样本/簇数不足，跳过计算")
         except Exception as e:
             log.warning(f"计算 Silhouette 失败：{e}")
     elif not silhouette_score:
@@ -148,13 +147,7 @@ async def main():
     try:
         async with AsyncSessionLocal() as session:
             clustered_result = await cluster_standard_jobs_with_hdbscan(
-                session=session,
-                min_cluster_size=8,
-                hdbscan_min_samples=3,
-                batch_size=64,
-                embedding_model="BAAI/bge-base-zh-v1.5",
-                desc_max_len=150,
-                collection_name="job_original_embeddings",
+                session=session
             )
         return clustered_result
     finally:
