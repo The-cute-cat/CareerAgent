@@ -143,7 +143,7 @@
             <!-- 技能路线图或重点领域 -->
             <div class="skills-cloud">
               <span 
-                v-for="(skill, idx) in activePhase === 'short' ? (currentPlan as ShortTermPlan).focus_areas : (currentPlan as MidTermPlan).skill_roadmap" 
+                v-for="(skill, idx) in currentPhaseSkills" 
                 :key="idx"
                 class="skill-item"
                 :style="{ animationDelay: `${idx * 0.1}s` }"
@@ -229,7 +229,7 @@
           </div>
 
           <!-- 快速见效或职业预期 -->
-          <div v-if="activePhase === 'short'" class="quick-wins-section">
+          <div v-if="activePhase === 'short' && 'quick_wins' in currentPlan" class="quick-wins-section">
             <h3>快速见效行动</h3>
             <el-row :gutter="16">
               <el-col 
@@ -247,7 +247,7 @@
             </el-row>
           </div>
 
-          <div v-else class="career-preview-section">
+          <div v-else-if="activePhase === 'mid' && 'career_progression' in currentPlan" class="career-preview-section">
             <h3>职业发展预期</h3>
             <el-alert 
               :title="(currentPlan as MidTermPlan).career_progression"
@@ -354,7 +354,6 @@
               v-for="(action, idx) in data.action_checklist"
               :key="idx"
               :type="checkedActions[idx] ? 'success' : 'primary'"
-              :icon="checkedActions[idx] ? Check : Circle-Check"
             >
               <el-card 
                 :class="{ 'is-checked': checkedActions[idx] }"
@@ -620,13 +619,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, watch, reactive } from 'vue'
 import {
   InfoFilled, User, Warning, ArrowRight, ArrowDownBold,
-  Check, CircleCheck, Timer, Document, ChatDotRound,
+  Check, Timer, Document, ChatDotRound,
   Link, Location, Money
 } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
 import * as echarts from 'echarts'
 
 // ==================== 严格类型定义 ====================
@@ -973,6 +971,13 @@ const currentPlan = computed<ShortTermPlan | MidTermPlan>(() => {
   return activePhase.value === 'short' ? data.value.short_term_plan : data.value.mid_term_plan
 })
 
+const currentPhaseSkills = computed<string[]>(() => {
+  if (activePhase.value === 'short') {
+    return (currentPlan.value as ShortTermPlan).focus_areas || []
+  }
+  return (currentPlan.value as MidTermPlan).skill_roadmap || []
+})
+
 const actionProgress = computed(() => {
   const total = data.value.action_checklist.length
   const completed = Object.values(checkedActions).filter(Boolean).length
@@ -1030,10 +1035,12 @@ const parsedGaps = computed(() => {
   return data.value.current_gap.split(/;\s*|；/).filter(Boolean).map(gap => {
     const match = gap.match(/^\d+\.\s*(.+?)[:：](.+)$/)
     if (match) {
+      const title = match[1]?.trim() || '能力短板'
+      const desc = match[2]?.trim() || gap
       return {
-        title: match[1].trim(),
-        desc: match[2].trim(),
-        level: match[1].includes('框架') || match[1].includes('数据库') ? 1 : 2
+        title,
+        desc,
+        level: title.includes('框架') || title.includes('数据库') ? 1 : 2
       }
     }
     return { title: '能力短板', desc: gap, level: 2 }
@@ -1062,8 +1069,10 @@ function openTasksDialog(milestone: MilestoneItem): void {
 }
 
 function openTaskDetail(task: TaskItem): void {
-  if (task.resources.length > 0) {
-    openResource(task.resources[0])
+  if (!task.resources?.length) return
+  const resource = task.resources[0]
+  if (resource) {
+    openResource(resource)
   }
 }
 
@@ -1091,12 +1100,13 @@ function getPriorityType(priority: Priority): '' | 'danger' | 'warning' | 'info'
 }
 
 function stringToColor(str: string): string {
-  const colors = ['#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#3b82f6']
+  const colors = ['#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#3b82f6'] as const
+  if (!str || str.length === 0) return colors[0]
   let hash = 0
   for (let i = 0; i < str.length; i++) {
     hash = str.charCodeAt(i) + ((hash << 5) - hash)
   }
-  return colors[Math.abs(hash) % colors.length]
+  return colors[(Math.abs(hash) % colors.length) as 0 | 1 | 2 | 3 | 4 | 5]
 }
 
 function getResourceIcon(resource: ResourceItem): string {
@@ -1109,13 +1119,19 @@ function getResourceIcon(resource: ResourceItem): string {
 }
 
 function getResourceTitle(resource: ResourceItem): string {
-  if (resource.type === 'project') return (resource as ProjectResource).name
-  return (resource as VideoResource | BookResource).title
+  if (resource.type === 'project') {
+    return (resource as ProjectResource).name || '未命名项目'
+  }
+  return (resource as VideoResource | BookResource).title || '未命名资源'
 }
 
 function getResourceMeta(resource: ResourceItem): string {
-  if (resource.type === 'video') return (resource as VideoResource).author
-  if (resource.type === 'book') return (resource as BookResource).author
+  if (resource.type === 'video') {
+    return (resource as VideoResource).author || '未知作者'
+  }
+  if (resource.type === 'book') {
+    return (resource as BookResource).author || '未知作者'
+  }
   return (resource as ProjectResource).language || 'Open Source'
 }
 
