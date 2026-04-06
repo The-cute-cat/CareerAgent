@@ -20,6 +20,7 @@ public class LoginInterceptor implements HandlerInterceptor {
         String accessToken = request.getHeader("Authorization");
 
         if (StrUtil.isBlank(accessToken)) {
+            log.error("未携带token");
             //没有短token  401
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.getWriter().write("未携带token");
@@ -27,12 +28,14 @@ public class LoginInterceptor implements HandlerInterceptor {
         }
         // 3. 移除Bearer前缀（如果前端添加了的话）
         if (accessToken.startsWith("Bearer ")) {
+            log.error("accessToken: " + accessToken);
             accessToken = accessToken.substring(7);
         }
 
         try{
             // 4. 验证token有效性    401
             if (JwtUtil.isTokenExpired(accessToken)) { 
+                log.error("token已过期");
                 response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                 response.getWriter().write("token已过期");
                 return false;
@@ -51,6 +54,7 @@ public class LoginInterceptor implements HandlerInterceptor {
             //token无效
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.getWriter().write("token无效,短token过期了");
+            log.error("Token验证失败: " + e.getMessage());
             return false;
         }
     }

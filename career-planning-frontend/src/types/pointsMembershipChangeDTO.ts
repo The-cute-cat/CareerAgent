@@ -1,23 +1,10 @@
-
 export interface PointsMembershipChangeDTO {
-
-  // 套餐id
-  id: number
-
-  name: string
-
-  // 1:充值,2:消费
-  type: 1 | 2
-
-  // 充值金额
-  amount: number
+  packageId: number       // 套餐id
+  amount: number          // 支付金额 (BigDecimal)
+  points: number          // 积分数 (Integer)
+  payType: number         // 支付方式: 1微信, 2支付宝
   
-  // 描述
-  description: string
-
-  // 充值积分
-  points: number
-
-  // 状态
-  status: number
+  description?: number    // 后端要求 Integer 类型
+  membershipLevel?: number // 会员等级 (月卡=1, 季卡=2, 年卡=3)
+  name?: string           // 套餐名称
 }

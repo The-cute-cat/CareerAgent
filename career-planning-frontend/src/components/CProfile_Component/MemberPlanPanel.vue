@@ -6,7 +6,7 @@ import {
   ArrowRight, Share, ShoppingCart, WarningFilled, Promotion, ChatLineRound, Reading, Setting, MoreFilled, Search, InfoFilled
 } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/modules/user'
-import { rechargePointsService, getPackagesByTypeService, type PointsMembershipChangeDTO } from '@/api/points'
+import { rechargePointsService, getPackagesByTypeService, type PointsMembershipChangeDTO, getAlipayService } from '@/api/points'
 import type { AccountPointsData } from '@/api/points'
 import alipayIcon from '@/assets/images/alipay.png'
 import wechatIcon from '@/assets/images/wechat.png'
@@ -39,8 +39,80 @@ const selectedPointsPlan = ref<number | string>('invite')
 const payMethodVisible = ref(false)
 const currentPayMethod = ref<'alipay' | 'wechat'>('alipay')
 
-const memberPlans = ref<any[]>([])
-const pointsPurchasePlans = ref<any[]>([])
+const DEFAULT_MEMBER_PLANS = [
+  {
+    key: 'monthly',
+    packageId: 'monthly',
+    title: '月度会员',
+    duration: '1 个月',
+    price: '15',
+    points: 10800,
+    unit: '/月',
+    tag: '尝鲜首选',
+    color: '#3b82f6',
+    gradient: 'linear-gradient(135deg, #60a5fa, #3b82f6)'
+  },
+  {
+    key: 'quarterly',
+    packageId: 'quarterly',
+    title: '季度会员',
+    duration: '3 个月',
+    price: '36',
+    points: 10800,
+    unit: '/季',
+    tag: '性价比之选',
+    color: '#6366f1',
+    gradient: 'linear-gradient(135deg, #818cf8, #4f46e5)'
+  },
+  {
+    key: 'yearly',
+    packageId: 'yearly',
+    title: '年度会员',
+    duration: '12 个月',
+    price: '128',
+    points: 131400,
+    unit: '/年',
+    tag: '最大优惠',
+    color: '#a855f7',
+    gradient: 'linear-gradient(135deg, #c084fc, #9333ea)'
+  }
+]
+
+const DEFAULT_POINTS_PLANS = [
+  {
+    key: 'invite',
+    packageId: 'invite',
+    title: '免费获取',
+    points: 500,
+    price: '0.00',
+    tag: '免费获取',
+    color: '#f59e0b',
+    gradient: 'linear-gradient(135deg, #fbbf24, #f59e0b)'
+  },
+  {
+    key: 'basic',
+    packageId: 'basic',
+    title: '尝鲜首选',
+    points: 1000,
+    price: '9.90',
+    tag: '尝鲜首选',
+    color: '#3b82f6',
+    gradient: 'linear-gradient(135deg, #60a5fa, #3b82f6)'
+  },
+  {
+    key: 'value',
+    packageId: 'value',
+    title: '高性价比',
+    points: 3000,
+    price: '16.60',
+    tag: '高性价比',
+    color: '#8b5cf6',
+    gradient: 'linear-gradient(135deg, #a78bfa, #7c3aed)'
+  }
+]
+
+const memberPlans = ref<any[]>(DEFAULT_MEMBER_PLANS)
+const pointsPurchasePlans = ref<any[]>(DEFAULT_POINTS_PLANS)
 
 const memberType = computed(() => String((userStore.userInfo as any)?.memberType || 'normal').toLowerCase())
 const displayPoints = computed(() => Number(props.points || (userStore.userInfo as any)?.points || 0))
@@ -64,7 +136,7 @@ const fetchPackages = async () => {
       const backendPoints = pointsRes.data.data.map((pkg: any, index: number) => {
         const theme = themes[index % themes.length] as ColorTheme
         return {
-          id: pkg.id,
+          packageId: pkg.id,
           key: pkg.id,
           title: pkg.name || pkg.description || `积分方案 ${pkg.id}`,
           points: pkg.points || 0,
@@ -78,7 +150,7 @@ const fetchPackages = async () => {
       pointsPurchasePlans.value = [
         {
           key: 'invite',
-          id: 'invite',
+          packageId: 'invite',
           title: '免费获取',
           points: 500,
           price: '0.00',
@@ -92,20 +164,20 @@ const fetchPackages = async () => {
 
     if (memberRes.data.code === 200 && memberRes.data.data) {
       memberPlans.value = memberRes.data.data.map((pkg: any) => ({
-        id: pkg.id,
+        packageId: pkg.id,
         key: pkg.id,
         title: pkg.name || pkg.description || '会员套餐',
         duration: pkg.description || '会员',
         price: (pkg.price || pkg.amount || 0).toString(),
+        points: pkg.points || 0,
         unit: pkg.description?.includes('年') ? '/年' : pkg.description?.includes('季') ? '/季' : '/月',
-        dailyCost: `相当于每日 ${((pkg.price || pkg.amount || 0) / 30).toFixed(2)} 元`,
-        tag: pkg.status === 1 ? '热门' : '推荐',
-        color: pkg.id === 1 ? '#3b82f6' : pkg.id === 2 ? '#6366f1' : '#a855f7',
+        tag: pkg?.status === 1 ? '热门' : '推荐',
+        color: pkg?.id === 1 ? '#3b82f6' : pkg?.id === 2 ? '#6366f1' : '#a855f7',
         gradient: 'linear-gradient(135deg, #60a5fa, #3b82f6)'
       }))
 
       if (memberPlans.value.length > 0) {
-        selectedMemberPlan.value = memberPlans.value[0].id
+        selectedMemberPlan.value = memberPlans.value[0].packageId
       }
     }
   } catch (error) {
@@ -119,13 +191,13 @@ onMounted(() => {
 })
 
 const currentSelectedMemberObj = computed(() => {
-  const found = memberPlans.value.find(p => p.id === selectedMemberPlan.value)
-  return found || memberPlans.value[0] || { id: 0, price: '0', points: 0, title: '' }
+  const found = memberPlans.value.find(p => p.packageId === selectedMemberPlan.value)
+  return found || memberPlans.value[0] || { packageId: 0, price: '0', points: 0, title: '' }
 })
 
 const currentSelectedPointsObj = computed(() => {
-  const found = pointsPurchasePlans.value.find(p => p.id === selectedPointsPlan.value)
-  return found || pointsPurchasePlans.value[0] || { id: 0, price: '0', points: 0, title: '' }
+  const found = pointsPurchasePlans.value.find(p => p.packageId === selectedPointsPlan.value)
+  return found || pointsPurchasePlans.value[0] || { packageId: 0, price: '0', points: 0, title: '' }
 })
 
 const inviteBenefits = [
@@ -167,20 +239,27 @@ const openPurchaseCenter = (tab: 'points' | 'member') => {
 const handlePay = async () => {
   const pkg = activePurchaseTab.value === 'points' ? currentSelectedPointsObj.value : currentSelectedMemberObj.value
 
-  if (!pkg.id || pkg.id === 'invite') {
-    if (pkg.id === 'invite') handleInvite()
+  if (!pkg.packageId || pkg.packageId === 'invite') {
+    if (pkg.packageId === 'invite') handleInvite()
     return
   }
 
   try {
     const payload: PointsMembershipChangeDTO = {
-      id: pkg.id,
+      packageId: Number(pkg.packageId) || 0,
       name: pkg.title,
-      type: 1, // 1:充值
       amount: Number(pkg.price),
       points: pkg.points || 0,
-      description: pkg.tag || `购买套餐: ${pkg.title}`,
-      status: 1 // 初始状态
+      payType: currentPayMethod.value === 'wechat' ? 1 : 2, // 1:微信, 2:支付宝
+    }
+
+    // 处理会员等级：如果是会员购买，根据套餐类型设置等级
+    if (activePurchaseTab.value === 'member') {
+      const pid = String(pkg.packageId).toLowerCase()
+      if (pid.includes('monthly') || pkg.packageId === 1) payload.membershipLevel = 1
+      else if (pid.includes('quarterly') || pkg.packageId === 2) payload.membershipLevel = 2
+      else if (pid.includes('yearly') || pkg.packageId === 3) payload.membershipLevel = 3
+      else payload.membershipLevel = 1 // 默认
     }
 
     if (!userStore.userInfo?.id) {
@@ -190,7 +269,11 @@ const handlePay = async () => {
 
     const res = await rechargePointsService(payload)
     if (res.data.code === 200) {
-      ElMessage.success('支付请求已提交')
+      ElMessage.success('下单成功')
+      console.log('下单成功', res.data.data)
+      const orderNo = res.data.data;
+      // 加上 /api 前缀，让跳转请求被 vite.config.ts 拦截并代理到后端
+      window.location.href = `/api/alipay/pay/${orderNo}`;
       purchaseCenterVisible.value = false
     } else {
       ElMessage.error(res.data.msg || '提交支付失败')
@@ -343,9 +426,8 @@ const handleInvite = () => {
         <div v-if="activePurchaseTab === 'points'" class="points-purchase-view">
           <div class="purchase-cards">
             <div v-for="plan in pointsPurchasePlans" :key="plan.key" class="p-card"
-              :class="{ 'active': selectedPointsPlan === plan.id || selectedPointsPlan === plan.key }" 
-              @click="selectedPointsPlan = plan.id || plan.key"
-              :style="{ '--theme-color': plan.color }">
+              :class="{ 'active': selectedPointsPlan === plan.packageId || selectedPointsPlan === plan.key }"
+              @click="selectedPointsPlan = plan.packageId || plan.key" :style="{ '--theme-color': plan.color }">
               <div class="p-card-tag" :style="{ backgroundColor: plan.color }">{{ plan.tag }}</div>
               <div class="p-card-points">{{ plan.points }} 积分</div>
               <div class="p-card-price">
@@ -377,7 +459,9 @@ const handleInvite = () => {
               </el-icon> 邀请好友免费获得积分
             </div>
             <button class="primary-btn invite-btn" @click="handleInvite">
-              <el-icon><Share /></el-icon> 立即邀请好友领积分
+              <el-icon>
+                <Share />
+              </el-icon> 立即邀请好友领积分
             </button>
           </div>
 
@@ -412,7 +496,9 @@ const handleInvite = () => {
             </div>
             <button class="primary-btn subscribe-btn" @click="handlePay"
               :style="{ backgroundColor: currentSelectedPointsObj.color }">
-              <el-icon><ShoppingCart /></el-icon> 
+              <el-icon>
+                <ShoppingCart />
+              </el-icon>
               确认支付并充值 {{ currentSelectedPointsObj.points }} 积分
             </button>
           </div>
@@ -421,12 +507,13 @@ const handleInvite = () => {
         <!-- =============== 订阅会员 Tab =============== -->
         <div v-else class="member-subscribe-view">
           <div class="purchase-cards member-cards">
-            <div v-for="plan in memberPlans" :key="plan.key" class="m-card"
-              :class="{ 'active': selectedMemberPlan === plan.key }" @click="selectedMemberPlan = plan.key"
+            <div v-for="plan in memberPlans" :key="plan.packageId" class="m-card"
+              :class="{ 'active': selectedMemberPlan === plan.packageId }" @click="selectedMemberPlan = plan.packageId"
               :style="{ '--theme-color': plan.color }">
               <div class="m-card-tag" :style="{ backgroundColor: plan.color }">{{ plan.tag }}</div>
               <div class="m-card-duration">{{ plan.title }}</div>
-              <div class="m-card-months" :style="{ color: selectedMemberPlan === plan.key ? plan.color : '#1e293b' }">
+              <div class="m-card-months"
+                :style="{ color: selectedMemberPlan === plan.packageId ? plan.color : '#1e293b' }">
                 {{ plan.duration }}
               </div>
               <div class="m-card-price">
@@ -434,14 +521,14 @@ const handleInvite = () => {
                 <span class="amount">{{ plan.price }}</span>
                 <span class="unit">{{ plan.unit }}</span>
               </div>
-              <div class="m-card-daily">{{ plan.dailyCost }}</div>
+              <div class="m-card-daily">包含 {{ plan.points }} 积分</div>
             </div>
           </div>
 
           <div class="member-summary">
             <el-icon>
               <Coin />
-            </el-icon> 每日 {{ currentSelectedMemberObj.dailyPoints }} 积分，总计 {{ currentSelectedMemberObj.totalPoints }} 积分
+            </el-icon> 总计包含 {{ currentSelectedMemberObj.points }} 积分 (购买后一次性发放)
           </div>
 
           <div class="payment-section">
@@ -475,7 +562,9 @@ const handleInvite = () => {
             </div>
             <button class="primary-btn subscribe-btn" @click="handlePay"
               :style="{ backgroundColor: currentSelectedMemberObj.color }">
-              <el-icon><Medal /></el-icon> 
+              <el-icon>
+                <Medal />
+              </el-icon>
               确认并支付 ¥{{ currentSelectedMemberObj.price }}
             </button>
           </div>

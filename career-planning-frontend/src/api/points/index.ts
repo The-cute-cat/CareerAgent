@@ -78,3 +78,7 @@ export interface PackageData {
 export const getPackagesByTypeService = (type: number) => {
   return request.get<Result<PackageData[]>>(`/package/list/type/${type}`)
 }
+
+export const getAlipayService = (orderNo: number) => {
+  return request.get(`/alipay/pay/${orderNo}`)
+}

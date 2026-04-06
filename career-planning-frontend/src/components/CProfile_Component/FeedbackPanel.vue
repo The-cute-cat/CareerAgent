@@ -59,7 +59,9 @@ const typeOptions = [
 <template>
   <div class="feedback-panel">
     <div class="tip-banner">
-      <el-icon class="tip-icon"><InfoFilled /></el-icon>
+      <el-icon class="tip-icon">
+        <InfoFilled />
+      </el-icon>
       <span>您的反馈对我们非常重要，反馈建议一经采纳将赠送 <strong>200 积分</strong>！</span>
     </div>
 
@@ -67,30 +69,22 @@ const typeOptions = [
       <div class="form-row">
         <div class="form-label">反馈类型</div>
         <el-select v-model="feedbackType" style="width: 100%">
-          <el-option
-            v-for="opt in typeOptions"
-            :key="opt.value"
-            :label="opt.label"
-            :value="opt.value"
-          />
+          <el-option v-for="opt in typeOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
         </el-select>
       </div>
 
       <div class="form-row">
         <div class="form-label">反馈内容 <span class="required">*</span></div>
-        <el-input
-          v-model="feedbackContent"
-          type="textarea"
-          :rows="5"
-          placeholder="请详细描述您的问题或建议，我们非常期待您的声音..."
-        />
+        <el-input v-model="feedbackContent" type="textarea" :rows="5" placeholder="请详细描述您的问题或建议，我们非常期待您的声音..." />
       </div>
 
       <div class="form-row">
         <div class="form-label">添加截图 <span class="optional">可选，最多5张</span></div>
         <label class="upload-area">
           <div class="upload-placeholder">
-            <el-icon><Picture /></el-icon>
+            <el-icon>
+              <Picture />
+            </el-icon>
             <span>点击或拖拽添加图片</span>
           </div>
           <input type="file" accept="image/*" multiple class="hidden-input" @change="handleUpload" />
@@ -100,7 +94,9 @@ const typeOptions = [
           <div v-for="(item, index) in imageList" :key="index" class="preview-item">
             <img :src="item.url" alt="" />
             <div class="preview-delete" @click="removeImage(index)">
-              <el-icon><Delete /></el-icon>
+              <el-icon>
+                <Delete />
+              </el-icon>
             </div>
           </div>
         </div>
@@ -108,7 +104,7 @@ const typeOptions = [
 
       <div class="form-row">
         <div class="form-label">联系方式 <span class="optional">可选</span></div>
-        <el-input v-model="feedbackContact" placeholder="邮箱或手机号，方便我们联系您" />
+        <el-input v-model="feedbackContact" placeholder="邮箱，方便我们联系您" />
       </div>
     </div>
 

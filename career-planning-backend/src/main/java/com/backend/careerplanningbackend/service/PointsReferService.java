@@ -1,5 +1,6 @@
 package com.backend.careerplanningbackend.service;
 
+import com.backend.careerplanningbackend.domain.dto.PaymentCreateDTO;
 import com.backend.careerplanningbackend.domain.dto.PointsMembershipChangeDTO;
 import com.backend.careerplanningbackend.domain.dto.ReferralDTO;
 import com.backend.careerplanningbackend.domain.dto.StudentTrueDTO;
@@ -20,7 +21,7 @@ public interface PointsReferService {
     
     Result<Object> registerStudent(StudentTrueDTO studentTrueDTO);
 
-    Result<UserPoints> recharge(@Valid PointsMembershipChangeDTO dto, HttpServletResponse response);
+    Result<Long> recharge(@Valid PaymentCreateDTO paymentCreateDTO);
 
     Result receiverPoints(ReferralDTO referralDTO);
 

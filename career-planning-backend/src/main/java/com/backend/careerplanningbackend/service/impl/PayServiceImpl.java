@@ -97,7 +97,7 @@ public class PayServiceImpl implements PayService {
         request.setNotifyUrl(alipayConfig.getNotifyUrl());
 
         JSONObject biz = new JSONObject();
-        biz.put("out_trade_no", paymentOrder.getOrderNo()); //这是payment_order的order_no, 亦是points_transaction 的主键 id
+        biz.put("out_trade_no", paymentOrder.getId()); //这是payment_order的order_no, 亦是points_transaction 的主键 id
         biz.put("total_amount", paymentOrder.getAmount());
         biz.put("subject", "积分充值订单-" + paymentOrder.getId());
         biz.put("product_code", "FAST_INSTANT_TRADE_PAY"); // 电脑网站支付固定值
@@ -120,11 +120,11 @@ public class PayServiceImpl implements PayService {
     @Override
     public void pagePay(Long orderNumber, HttpServletResponse response) throws IOException {
         PaymentOrder paymentOrder = paymentOrderMapper.selectOne(new LambdaQueryWrapper<PaymentOrder>()
-                .eq(PaymentOrder::getOrderNo, orderNumber)
+                .eq(PaymentOrder::getId, orderNumber)
         );
 
         if (paymentOrder == null){
-            log.error("订单不存在:{}", orderNumber);
+            log.error("pagePay 订单不存在:{}", orderNumber);
             throw new RuntimeException("订单不存在");
         }
         // 初始化配置
@@ -137,7 +137,7 @@ public class PayServiceImpl implements PayService {
         request.setNotifyUrl(alipayConfig.getNotifyUrl());
 
         JSONObject biz = new JSONObject();
-        biz.put("out_trade_no", paymentOrder.getOrderNo()); //这是payment_order的order_no, 亦是points_transaction 的主键 id
+        biz.put("out_trade_no", paymentOrder.getId()); //这是payment_order的order_no, 亦是points_transaction 的主键 id
         biz.put("total_amount", paymentOrder.getAmount());
         biz.put("subject", "积分充值订单-" + paymentOrder.getId());
         biz.put("product_code", "FAST_INSTANT_TRADE_PAY"); // 电脑网站支付固定值
@@ -157,45 +157,45 @@ public class PayServiceImpl implements PayService {
         System.out.println("沙箱支付展示订单展示，回调");
     }
 
-    @Override
-    public void pagePayByUserId(Long orderNumber, HttpServletResponse response) throws AlipayApiException, IOException {
-        PaymentOrder paymentOrder = paymentOrderMapper.selectOne(new LambdaQueryWrapper<PaymentOrder>()
-                .eq(PaymentOrder::getUserId, orderNumber)
-        );
-
-        if (paymentOrder == null){
-            log.error("订单不存在:{}", orderNumber);
-            throw new RuntimeException("订单不存在");
-        }
-        // 初始化配置
-        AlipayClient alipayClient = new DefaultAlipayClient(alipayConfig.getGateway(),
-                alipayConfig.getAppId(), alipayConfig.getPrivateKey(), FORMAT, CHARSET,
-                alipayConfig.getPublicKey(), SIGN_TYPE);
-
-        AlipayTradePagePayRequest request = new AlipayTradePagePayRequest();
-        request.setReturnUrl(alipayConfig.getReturnUrl());
-        request.setNotifyUrl(alipayConfig.getNotifyUrl());
-
-        JSONObject biz = new JSONObject();
-        biz.put("out_trade_no", paymentOrder.getOrderNo()); //这是payment_order的order_no, 亦是points_transaction 的主键 id
-        biz.put("total_amount", paymentOrder.getAmount());
-        biz.put("subject", "积分充值订单-" + paymentOrder.getId());
-        biz.put("product_code", "FAST_INSTANT_TRADE_PAY"); // 电脑网站支付固定值
-        request.setBizContent(biz.toString());
-
-        String body=null;
-        try {
-            body = alipayClient.pageExecute(request).getBody();
-        } catch (AlipayApiException e) {
-            e.printStackTrace();
-        }
-        // 直接返回一段带表单的 html，前端浏览器会自动提交跳转
-        response.setContentType("text/html;charset=UTF-8");
-        response.getWriter().write(body);   // 自动提交表单
-        response.getWriter().flush();
-        response.getWriter().close();
-        System.out.println("沙箱支付展示订单展示，回调");
-    }
+//    @Override
+//    public void pagePayByUserId(Long userId, HttpServletResponse response) throws AlipayApiException, IOException {
+//        PaymentOrder paymentOrder = paymentOrderMapper.selectOne(new LambdaQueryWrapper<PaymentOrder>()
+//                .eq(PaymentOrder::getUserId, userId)
+//        );
+//
+//        if (paymentOrder == null){
+//            log.error("pagePayByUserId 订单不存在:{}", userId);
+//            throw new RuntimeException("订单不存在");
+//        }
+//        // 初始化配置
+//        AlipayClient alipayClient = new DefaultAlipayClient(alipayConfig.getGateway(),
+//                alipayConfig.getAppId(), alipayConfig.getPrivateKey(), FORMAT, CHARSET,
+//                alipayConfig.getPublicKey(), SIGN_TYPE);
+//
+//        AlipayTradePagePayRequest request = new AlipayTradePagePayRequest();
+//        request.setReturnUrl(alipayConfig.getReturnUrl());
+//        request.setNotifyUrl(alipayConfig.getNotifyUrl());
+//
+//        JSONObject biz = new JSONObject();
+//        biz.put("out_trade_no", paymentOrder.getOrderNo()); //这是payment_order的order_no, 亦是points_transaction 的主键 id
+//        biz.put("total_amount", paymentOrder.getAmount());
+//        biz.put("subject", "积分充值订单-" + paymentOrder.getId());
+//        biz.put("product_code", "FAST_INSTANT_TRADE_PAY"); // 电脑网站支付固定值
+//        request.setBizContent(biz.toString());
+//
+//        String body=null;
+//        try {
+//            body = alipayClient.pageExecute(request).getBody();
+//        } catch (AlipayApiException e) {
+//            e.printStackTrace();
+//        }
+//        // 直接返回一段带表单的 html，前端浏览器会自动提交跳转
+//        response.setContentType("text/html;charset=UTF-8");
+//        response.getWriter().write(body);   // 自动提交表单
+//        response.getWriter().flush();
+//        response.getWriter().close();
+//        System.out.println("沙箱支付展示订单展示，回调");
+//    }
 
     @Override
     public void notifyPayment(HttpServletRequest request) {

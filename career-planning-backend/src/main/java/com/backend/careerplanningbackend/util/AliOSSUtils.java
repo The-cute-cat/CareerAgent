@@ -52,6 +52,39 @@ public class AliOSSUtils {
         return url; // 把上传到oss的路径返回
     }
 
+    /**
+     * 实现上传图片到OSS
+     */
+    public String uploadFeedback(MultipartFile file) throws IOException {
+        String endpoint = aliOSSProperties.getEndpoint();
+        String accessKeyId = aliOSSProperties.getAccessKeyId();
+        String accessKeySecret = aliOSSProperties.getAccessKeySecret();
+        String bucketName = aliOSSProperties.getBucketName();
+
+        // 获取上传的文件的输入流
+        InputStream inputStream = file.getInputStream();
+
+        // 避免文件覆盖
+        String originalFilename = file.getOriginalFilename();
+
+        Long currentUserId = ThreadLocalUtil.getCurrentUserId();
+        String dir = "feedback/" +currentUserId + "/"; // 可以根据需要设置目录结构，例如按照用户 ID 分类存储
+        String fileName = dir + UUID.randomUUID().toString() + originalFilename.substring(originalFilename.lastIndexOf("."));
+
+        // 上传文件到 OSS
+        OSS ossClient = new OSSClientBuilder().build(endpoint, accessKeyId, accessKeySecret);
+        ossClient.putObject(bucketName, fileName, inputStream);
+
+        // 文件访问路径
+        String url = endpoint.split("//")[0] + "//" + bucketName + "." + endpoint.split("//")[1] + "/" + fileName;
+
+        // 关闭ossClient
+        ossClient.shutdown();
+        log.info("阿里云url: {}" , url);
+        System.out.println("阿里云url=" + url);
+        return url; // 把上传到oss的路径返回
+    }
+
 //    private String endpoint = "https://oss-cn-hangzhou.aliyuncs.com";
 //    private String accessKeyId = "{huanjingbianliang-accessKeyId}";
 //    private String accessKeySecret = "{huanjingbianliang-accessKeySecret}";
