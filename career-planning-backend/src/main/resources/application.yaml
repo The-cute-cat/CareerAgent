@@ -2,7 +2,7 @@ server:
   port: 8080
 spring:
   profiles:
-    active: dev #todo
+    active: prod #todo
   application:
     name: career-planning-backend
   # 数据源配置
@@ -21,8 +21,8 @@ spring:
       connect-timeout: 2000
   # 邮件配置
   mail:
-    host: ${email_host:smtp.qq.com}
-    port: ${email_post:587}
+    host: ${email_host}
+    port: ${email_post}
     username: ${MAIL_USERNAME_QQ}
     password: ${MAIL_PASSWORD_QQ}
     protocol: smtp
@@ -75,7 +75,7 @@ mybatis-plus:
 
 communication:
   token:
-    secret: ${JWT_SECRET}
+    secret: ${<SECRET>}
     expire: 1800
 ai:
   service:
