@@ -26,19 +26,14 @@ public class PointsMembershipChangeDTO {
     @NotNull(message = "变动类型不能为空")
     private Integer type;
 
-<<<<<<< HEAD
 
-=======
->>>>>>> 515246b35b63c3a496139daa7dd8cc2ade987475
     
     /** 会员等级，0:非会员, 1:普通会员, 2:高级会员, 3:至尊会员 */
     private Integer vip;
     
     private Integer status;
-    
-<<<<<<< HEAD
 
-=======
     private String description;
->>>>>>> 515246b35b63c3a496139daa7dd8cc2ade987475
+
+
 }
