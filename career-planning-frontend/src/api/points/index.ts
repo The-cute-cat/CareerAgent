@@ -41,7 +41,12 @@ export const getAccountPointsService = (id: number) => {
     return mockGetAccountPointsApi(id)
   }
 
-  return request.get<Result<AccountPointsData>>(`/points/account/${id}`)
+  return request.post<Result<AccountPointsData>>(`/points/account/${id}`)
+}
+
+export const getUserInfoService = (id: number) => {
+
+  return request.get<Result<AccountPointsData>>(`/user/info`)
 }
 
 export const getUserInfoService = (id: number) => {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   Calendar, Opportunity, Back, Close, Coin, Medal, TrendCharts,
@@ -8,6 +8,14 @@ import {
 import { useUserStore } from '@/stores/modules/user'
 import { rechargePointsService, type PointsMembershipChangeDTO } from '@/api/points'
 import type { AccountPointsData } from '@/api/points'
+import {
+  createPaymentService,
+  buildAlipayPagePayUrl,
+  queryPaymentStatusService,
+  type PaymentOrderVO,
+  type PaymentStatusVO
+} from '@/api/payment'
+import type { PaymentCreateRequest } from '@/api/payment'
 
 const props = defineProps({
   points: { type: Number, default: 0 },
@@ -23,6 +31,17 @@ const purchaseCenterVisible = ref(false)
 const activePurchaseTab = ref<'points' | 'member'>('points')
 const selectedMemberPlan = ref('quarterly')
 const selectedPointsPlan = ref('basic')
+
+// 支付相关状态
+const payDialogVisible = ref(false)
+const payLoading = ref(false)
+const payQRCode = ref('')
+const currentOrderId = ref('')
+const currentPlan = ref<typeof memberPlans[0] | null>(null)
+const payStatus = ref<'pending' | 'paid' | 'expired' | 'cancelled'>('pending')
+const payCountdown = ref(300)
+const pollingTimer = ref<ReturnType<typeof setInterval> | null>(null)
+const countdownTimer = ref<ReturnType<typeof setInterval> | null>(null)
 
 const memberType = computed(() => String((userStore.userInfo as any)?.memberType || 'normal').toLowerCase())
 const displayPoints = computed(() => Number(props.points || (userStore.userInfo as any)?.points || 0))

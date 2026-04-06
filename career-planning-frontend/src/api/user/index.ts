@@ -6,9 +6,10 @@ import type { loginForm, userInfoResponseData } from '../../types/user'
 enum API {
   REGISTER = '/user/register',
   LOGIN_URL = '/user/login',
-  GET_USER_INFO = '/user/info',
+  GET_USER_INFO = '/user/get-user-info',
   LOGOUT = '/user/logout',
   FORGOT_PASSWORD = '/user/forgot-password',
+  UPDATE_AVATAR = '/user/avatar',
 }
 
 // 用户注册接口
@@ -29,6 +30,17 @@ export const logout = () => {
 //忘记密码接口
 export const forgotPassword = (data: any) => {
   return request.post(API.FORGOT_PASSWORD, data)
+}
+
+/**
+ * 更换头像
+ * @param file 头像文件
+ * @returns 头像URL
+ */
+export const updateAvatar = (file: File) => {
+  const formData = new FormData()
+  formData.append('avatar', file)
+  return request.post<string>(API.UPDATE_AVATAR, formData)
 }
 
 export default API
