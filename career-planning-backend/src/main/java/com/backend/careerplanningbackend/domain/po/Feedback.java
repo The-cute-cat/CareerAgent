@@ -21,13 +21,13 @@ public class Feedback {
     @TableId(type = IdType.AUTO)
     private Integer id;
 
-    private String feedbackContent;
+    private String content;
 
     private String response;
 
     private Integer userId;
 
-    private String email;
+    private String contact;
 
     private String type;
     

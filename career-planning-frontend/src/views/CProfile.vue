@@ -132,7 +132,7 @@ const panelTitleMap: Record<string, string> = {
   profile: '个人资料',
   member: '会员计划',
   invite: '邀请好友',
-  feedback: '反馈建议',
+  feedback: '反馈建议--(采纳后赠送 200 积分)',
   setting: '更多设置'
 }
 

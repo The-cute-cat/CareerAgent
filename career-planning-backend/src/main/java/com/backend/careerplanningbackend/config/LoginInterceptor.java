@@ -28,7 +28,6 @@ public class LoginInterceptor implements HandlerInterceptor {
         }
         // 3. 移除Bearer前缀（如果前端添加了的话）
         if (accessToken.startsWith("Bearer ")) {
-            log.error("accessToken: " + accessToken);
             accessToken = accessToken.substring(7);
         }
 
