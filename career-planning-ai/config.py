@@ -293,7 +293,7 @@ class _CodeAbility(_LLM):
 
     @field_validator("gitee_token")
     @classmethod
-    def validate(cls, v):
+    def validate_gitee_token(cls, v):
         if v.get_secret_value() in ("<GITEE_TOKEN>", "<token>", "", None):
             print(
                 "⚠️警告：请在.env文件中配置gitee个人访问令牌，否则可能因gitee访问速率限制，导致无法获取gitee仓库信息。")
@@ -330,6 +330,20 @@ class _RedisConfig(BaseModel):
         return self
 
 
+class _Neo4jConfig(BaseModel):
+    url: str = ""
+    username: str = ""
+    password: SecretStr = SecretStr("")
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v):
+        if v.get_secret_value() in ("<PASSWORD>", "<password>", "", None):
+            print("⚠️警告：请在.env文件中配置neo4j密码，否则无法使用图数据库功能。")
+            return SecretStr("")
+        return v
+
+
 class _Other(BaseModel):
     ssl_verify: bool | str = True
 
@@ -362,6 +376,7 @@ class Settings(BaseSettings):
     match_analyzer: _MatchAnalyzer = Field(default_factory=_MatchAnalyzer)
     code_ability: _CodeAbility = Field(default_factory=_CodeAbility)
     redis: _RedisConfig = Field(default_factory=_RedisConfig)
+    neo4j: _Neo4jConfig = Field(default_factory=_Neo4jConfig)
     other: _Other = Field(default_factory=_Other)
 
     @model_validator(mode="after")

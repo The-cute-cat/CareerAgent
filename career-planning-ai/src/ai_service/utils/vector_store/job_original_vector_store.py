@@ -92,7 +92,7 @@ def clean_title(title: str) -> str:
     return title
 
 
-def build_text_feature(job: JobInfo, desc_max_len: int = 150) -> str:
+def build_text_feature(job: JobInfo, desc_max_len: int = 10000) -> str:
     """
     构建用于向量化/聚类的文本特征：
     - 标题为主
@@ -152,11 +152,20 @@ class JobOriginalVectorStore:
 
     def _connect_milvus(self) -> None:
         """连接 Milvus / Zilliz。"""
+        # 增加 gRPC 接收消息大小限制 (例如 64MB)，防止查询返回数据量过大时报错
+        # RESOURCE_EXHAUSTED: grpc: received message larger than max
+        conn_args = {
+            "grpc_args": [
+                ("grpc.max_receive_message_length", 64 * 1024 * 1024),
+                ("grpc.max_send_message_length", 64 * 1024 * 1024),
+            ]
+        }
+
         if self.url != "<url>" and self.token != "<token>":
-            connections.connect("default", uri=self.url, token=self.token)
+            connections.connect("default", uri=self.url, token=self.token, **conn_args)
             log.info("✅ 已连接到 Zilliz 云服务")
         else:
-            connections.connect("default", host=self.host, port=self.port)
+            connections.connect("default", host=self.host, port=self.port, **conn_args)
             log.info(f"✅ 已连接到本地 Milvus: {self.host}:{self.port}")
 
     def _load_embedder(self) -> SentenceTransformer:
@@ -205,7 +214,7 @@ class JobOriginalVectorStore:
     def build_valid_jobs_and_texts(
         cls,
         jobs: List[JobInfo],
-        desc_max_len: int = 150,
+        desc_max_len: int = 10000,
     ) -> Tuple[List[JobInfo], List[int], List[str], List[int]]:
         """
         构建可向量化输入。
@@ -279,7 +288,7 @@ class JobOriginalVectorStore:
         session: AsyncSession,
         filters: Optional[Dict[str, Any]] = None,
         batch_size: int = 64,
-        desc_max_len: int = 150,
+        desc_max_len: int = 10000,
     ) -> Dict[str, Any]:
         """
         根据“数据库岗位数量 vs 向量库数量”执行同步。
@@ -367,27 +376,64 @@ class JobOriginalVectorStore:
             "skipped_ids": skipped_ids,
         }
 
-    def query_embeddings_by_job_ids(
+    async def query_embeddings_by_job_ids(
         self,
         job_ids: List[int],
-        query_batch_size: int = 1000,
+        batch_size: int = 1000,
+        max_workers: int = 10,
     ) -> Dict[int, np.ndarray]:
-        """按 job_id 批量读取向量，返回 {job_id: embedding}。"""
+        """
+        优化版：按 job_id 批量读取向量，返回 {job_id: embedding}。
+        使用内存索引 + 大批量获取 + 异步并行查询。
+
+        Args:
+            job_ids: 待查询 job_id 列表
+            batch_size: 每个批次查询大小
+            max_workers: 最大并发协程数，限制并发压力
+
+        Returns:
+            Dict[job_id, np.ndarray]: job_id 对应的向量
+        """
         if not job_ids:
             return {}
 
-        embedding_map: Dict[int, np.ndarray] = {}
         self.collection.load()
 
-        for start in range(0, len(job_ids), query_batch_size):
-            batch_ids = job_ids[start:start + query_batch_size]
-            expr = f"job_id in [{','.join(str(int(job_id)) for job_id in batch_ids)}]"
-            rows = self.collection.query(
-                expr=expr,
-                output_fields=["job_id", "embedding"],
-            )
-            for row in rows:
-                embedding_map[int(row["job_id"])] = np.array(row["embedding"], dtype=np.float32)
+        # 使用信号量控制并发数，防止瞬间压力过大
+        semaphore = asyncio.Semaphore(max_workers)
+
+        async def fetch_batch(batch_ids: List[int]) -> Dict[int, np.ndarray]:
+            async with semaphore:
+                result = {}
+                ids_str = ", ".join(map(str, batch_ids))
+                expr = f"job_id in [{ids_str}]"
+                
+                # 在 IO 密集型操作中使用 loop.run_in_executor 或直接异步调用（pymilvus query 是同步阻塞的）
+                loop = asyncio.get_event_loop()
+                rows = await loop.run_in_executor(
+                    None, 
+                    lambda: self.collection.query(
+                        expr=expr, 
+                        output_fields=["job_id", "embedding"]
+                    )
+                )
+                
+                for row in rows:
+                    jid = int(row["job_id"])
+                    result[jid] = np.array(row["embedding"], dtype=np.float32)
+                return result
+
+        tasks = [
+            fetch_batch(job_ids[i:i + batch_size])
+            for i in range(0, len(job_ids), batch_size)
+        ]
+
+        results = await asyncio.gather(*tasks)
+
+        # 合并结果
+        embedding_map: Dict[int, np.ndarray] = {}
+        for r in results:
+            embedding_map.update(r)
 
         return embedding_map
 
@@ -396,7 +442,7 @@ class JobOriginalVectorStore:
         session: AsyncSession,
         filters: Optional[Dict[str, Any]] = None,
         batch_size: int = 64,
-        desc_max_len: int = 150,
+        desc_max_len: int = 10000,
     ) -> Tuple[List[JobInfo], np.ndarray, Dict[str, Any]]:
         """
         提供给 HDBSCAN 调用：
@@ -421,7 +467,6 @@ class JobOriginalVectorStore:
             all_jobs,
             desc_max_len=desc_max_len,
         )
-
         if not valid_jobs:
             log.warning("清洗后没有可用于聚类的岗位文本。")
             return valid_jobs, np.empty((0, self.dim), dtype=np.float32), {
@@ -430,8 +475,8 @@ class JobOriginalVectorStore:
                 "skipped": len(skipped_ids),
                 "skipped_ids": skipped_ids,
             }
-
-        embedding_map = self.query_embeddings_by_job_ids(job_ids)
+        embedding_map = await self.query_embeddings_by_job_ids(job_ids)
+        log.info(f"成功读取 {len(embedding_map)} 条岗位向量。")
         missing_ids = [job_id for job_id in job_ids if job_id not in embedding_map]
         if missing_ids:
             raise ValueError(
@@ -457,7 +502,7 @@ class JobOriginalVectorStore:
         session: AsyncSession,
         filters: Optional[Dict[str, Any]] = None,
         batch_size: int = 64,
-        desc_max_len: int = 150,
+        desc_max_len: int = 10000,
     ) -> Dict[str, Any]:
         """
         保留全量入口：直接把数据库全部岗位重新向量化并 upsert。
@@ -521,7 +566,7 @@ class JobOriginalVectorStore:
         session: AsyncSession,
         filters: Optional[Dict[str, Any]] = None,
         batch_size: int = 64,
-        desc_max_len: int = 150,
+        desc_max_len: int = 10000,
     ) -> Dict[str, Any]:
         return await self.vectorize_and_store_all(
             session=session,
@@ -579,6 +624,7 @@ class JobOriginalVectorStore:
         log.info(f"✅ 已删除岗位向量：job_id={job_id}")
 
     def reset_collection(self) -> None:
+        """删除整个集合并重新创建。谨慎使用！"""
         self.collection.drop()
         self.collection = self._init_collection()
 
@@ -605,10 +651,7 @@ async def main():
     try:
         async with AsyncSessionLocal() as session:
             result = await store.sync_embeddings_with_database(
-                session=session,
-                filters=None,
-                batch_size=64,
-                desc_max_len=150,
+                session=session
             )
             print(result)
     finally:
@@ -617,3 +660,8 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+    # store = JobOriginalVectorStore(
+    #     collection_name="job_original_embeddings",
+    #     embedding_model="BAAI/bge-base-zh-v1.5",
+    # )
+    # store.reset_collection()

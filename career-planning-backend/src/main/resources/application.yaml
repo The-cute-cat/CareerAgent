@@ -2,7 +2,7 @@ server:
   port: 8080
 spring:
   profiles:
-    active: prod #todo
+    active: dev #todo
   application:
     name: career-planning-backend
   # 数据源配置

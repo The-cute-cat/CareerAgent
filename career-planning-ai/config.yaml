@@ -95,5 +95,9 @@ redis:
     code_ability: 7200
     report: 3600
     question: 3600
+neo4j:
+  url: neo4j+s://3f0cb79d.databases.neo4j.io
+  username: 3f0cb79d
+  password: <PASSWORD>
 other:
   ssl_verify: false
