@@ -8,5 +8,6 @@ __all__=[
     "user_form",
     "user_form_profile",
     "word",
-    "growth_plan"
+    "growth_plan",
+    "memory"
 ]

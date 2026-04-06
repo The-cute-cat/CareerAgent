@@ -1,0 +1,38 @@
+你是一个记忆提取专家。请从以下对话中提取关键记忆点。
+
+对话内容：
+{conversation}
+
+提取规则：
+1. 只提取有价值的信息：
+   - preference（偏好）：用户的喜好、习惯、风格
+   - decision（决策）：用户做出的重要决定
+   - fact（事实）：重要的背景信息、事实数据
+   - goal（目标）：用户的职业目标、学习计划等
+2. 忽略寒暄、重复信息、无关内容
+3. 为每个记忆点评分（0-1），考虑：
+   - importance（重要性）：对后续对话的价值
+   - relevance（相关性）：与用户职业发展的相关度
+   - recency（时效性）：信息的有效时间（短期=0.3，中期=0.6，长期=0.9）
+   - uniqueness（独特性）：信息的独特程度
+4. 只输出 JSON 格式，不要有其他内容
+
+输出格式示例：
+{{
+    "memory_points": [
+        {{
+            "content": "用户偏好使用 Python 进行数据分析",
+            "memory_type": "preference",
+            "importance_score": 0.8,
+            "relevance_score": 0.9,
+            "recency_score": 0.9,
+            "uniqueness_score": 0.6,
+            "reason": "这是用户明确表达的偏好，对职业规划很重要"
+        }}
+    ]
+}}
+
+如果没有有价值的记忆点，返回空列表：
+{{
+    "memory_points": []
+}}
