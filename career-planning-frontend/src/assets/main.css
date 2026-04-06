@@ -44,3 +44,18 @@ a {
 a:hover {
   color: #66b1ff;
 }
+
+/* 全局移除交互元素的选中焦点边框 (Focus outline) */
+button,
+input,
+select,
+textarea,
+a,
+[role="button"] {
+  outline: none !important;
+}
+
+/* 移除浏览器默认焦点阴影 */
+*:focus {
+  outline: none !important;
+}
