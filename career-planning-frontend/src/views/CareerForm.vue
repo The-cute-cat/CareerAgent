@@ -2461,12 +2461,18 @@ const resetForm = () => {
                   <div class="stat-info">
                     <span class="stat-label">当前阶段</span>
 <<<<<<< HEAD
+<<<<<<< HEAD
                     <span class="stat-value">{{ currentSectionTitle }}</span>
 =======
                     <div class="stat-value-row">
                       <span class="stat-value">{{ currentSectionTitle }}</span>
                     </div>
 >>>>>>> origin/master
+=======
+                    <div class="stat-value-row">
+                      <span class="stat-value">{{ currentSectionTitle }}</span>
+                    </div>
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
                     <span class="stat-desc">{{ currentSectionDescription }}</span>
                   </div>
                 </div>
@@ -2475,12 +2481,18 @@ const resetForm = () => {
                   <div class="stat-info">
                     <span class="stat-label">已完成步骤</span>
 <<<<<<< HEAD
+<<<<<<< HEAD
                     <span class="stat-value">{{ completedStepCount }}/5</span>
 =======
                     <div class="stat-value-row">
                       <span class="stat-value">{{ completedStepCount }}/5</span>
                     </div>
 >>>>>>> origin/master
+=======
+                    <div class="stat-value-row">
+                      <span class="stat-value">{{ completedStepCount }}/5</span>
+                    </div>
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
                     <span class="stat-desc">每完成一步都会提升画像可用性</span>
                   </div>
                 </div>
@@ -2489,12 +2501,18 @@ const resetForm = () => {
                   <div class="stat-info">
                     <span class="stat-label">评估准备度</span>
 <<<<<<< HEAD
+<<<<<<< HEAD
                     <span class="stat-value">{{ readinessText }}</span>
 =======
                     <div class="stat-value-row">
                       <span class="stat-value">{{ readinessText }}</span>
                     </div>
 >>>>>>> origin/master
+=======
+                    <div class="stat-value-row">
+                      <span class="stat-value">{{ readinessText }}</span>
+                    </div>
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
                     <span class="stat-desc">{{ readinessHint }}</span>
                   </div>
                 </div>

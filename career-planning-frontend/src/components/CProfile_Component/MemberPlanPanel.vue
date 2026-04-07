@@ -3,6 +3,7 @@ import { computed, ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
 <<<<<<< HEAD
+<<<<<<< HEAD
   Calendar, Opportunity, Back, Close, Coin, Medal, TrendCharts,
   ArrowRight, Share, ShoppingCart, WarningFilled, Promotion, ChatLineRound, Reading, Setting, MoreFilled, Search, InfoFilled
 } from '@element-plus/icons-vue'
@@ -15,6 +16,13 @@ import type { AccountPointsData } from '@/api/points'
   Loading, CircleCheckFilled, CircleCloseFilled
 } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/modules/user'
+=======
+  Calendar, Back, Close, Coin, Medal, TrendCharts,
+  ArrowRight, Share, ShoppingCart, WarningFilled, Promotion, Reading, Setting, Search, InfoFilled,
+  Loading, CircleCheckFilled, CircleCloseFilled
+} from '@element-plus/icons-vue'
+import { useUserStore } from '@/stores/modules/user'
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
 import { rechargePointsService, getPackagesByTypeService, type PointsMembershipChangeDTO, getAlipayService } from '@/api/points'
 import type { AccountPointsData } from '@/api/points'
 import alipayIcon from '@/assets/images/alipay.png'
@@ -53,18 +61,26 @@ interface PointsPlan {
   color: string
   gradient: string
 }
+<<<<<<< HEAD
 >>>>>>> origin/master
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
 
 const props = defineProps({
   points: { type: Number, default: 0 },
   records: { type: Array, default: () => [] },
   accountPoints: { type: Object as () => AccountPointsData | null, default: null },
 <<<<<<< HEAD
+<<<<<<< HEAD
   loading: { type: Boolean, default: false }
 =======
   loading: { type: Boolean, default: false },
   inviteCode: { type: String as () => string | null, default: null }
 >>>>>>> origin/master
+=======
+  loading: { type: Boolean, default: false },
+  inviteCode: { type: String as () => string | null, default: null }
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
 })
 
 const emit = defineEmits(['open-invite'])
@@ -74,6 +90,7 @@ const userStore = useUserStore()
 // Purchase Center Dialog
 const purchaseCenterVisible = ref(false)
 const activePurchaseTab = ref<'points' | 'member'>('points')
+<<<<<<< HEAD
 <<<<<<< HEAD
 const selectedMemberPlan = ref('quarterly')
 const selectedPointsPlan = ref('basic')
@@ -90,12 +107,21 @@ const currentPayMethod = ref<'alipay' | 'wechat'>('alipay')
 
 const DEFAULT_MEMBER_PLANS = [
 >>>>>>> origin/master
+=======
+const selectedMemberPlan = ref<number | string>('quarterly')
+const selectedPointsPlan = ref<number | string>('invite')
+const payMethodVisible = ref(false)
+const currentPayMethod = ref<'alipay' | 'wechat'>('alipay')
+
+const DEFAULT_MEMBER_PLANS = [
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
   {
     key: 'monthly',
     packageId: 'monthly',
     title: '月度会员',
     duration: '1 个月',
     price: '15',
+<<<<<<< HEAD
 <<<<<<< HEAD
     unit: '/月',
     dailyCost: '相当于每日 0.50 元',
@@ -108,6 +134,11 @@ const DEFAULT_MEMBER_PLANS = [
     unit: '/月',
     tag: '尝鲜首选',
 >>>>>>> origin/master
+=======
+    points: 10800,
+    unit: '/月',
+    tag: '尝鲜首选',
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
     color: '#3b82f6',
     gradient: 'linear-gradient(135deg, #60a5fa, #3b82f6)'
   },
@@ -117,6 +148,7 @@ const DEFAULT_MEMBER_PLANS = [
     title: '季度会员',
     duration: '3 个月',
     price: '36',
+<<<<<<< HEAD
 <<<<<<< HEAD
     unit: '/季',
     dailyCost: '相当于每日 0.40 元',
@@ -129,6 +161,11 @@ const DEFAULT_MEMBER_PLANS = [
     unit: '/季',
     tag: '性价比之选',
 >>>>>>> origin/master
+=======
+    points: 10800,
+    unit: '/季',
+    tag: '性价比之选',
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
     color: '#6366f1',
     gradient: 'linear-gradient(135deg, #818cf8, #4f46e5)'
   },
@@ -138,6 +175,7 @@ const DEFAULT_MEMBER_PLANS = [
     title: '年度会员',
     duration: '12 个月',
     price: '128',
+<<<<<<< HEAD
 <<<<<<< HEAD
     unit: '/年',
     dailyCost: '相当于每日 0.35 元',
@@ -150,11 +188,17 @@ const DEFAULT_MEMBER_PLANS = [
     unit: '/年',
     tag: '最大优惠',
 >>>>>>> origin/master
+=======
+    points: 131400,
+    unit: '/年',
+    tag: '最大优惠',
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
     color: '#a855f7',
     gradient: 'linear-gradient(135deg, #c084fc, #9333ea)'
   }
 ]
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 const pointsPurchasePlans = [
   {
@@ -166,6 +210,8 @@ const pointsPurchasePlans = [
     tag: '免费获取',
     badgeClass: 'is-free',
 =======
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
 const DEFAULT_POINTS_PLANS = [
   {
     key: 'invite',
@@ -174,12 +220,16 @@ const DEFAULT_POINTS_PLANS = [
     points: 500,
     price: '0.00',
     tag: '免费获取',
+<<<<<<< HEAD
 >>>>>>> origin/master
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
     color: '#f59e0b',
     gradient: 'linear-gradient(135deg, #fbbf24, #f59e0b)'
   },
   {
     key: 'basic',
+<<<<<<< HEAD
 <<<<<<< HEAD
     title: '尝鲜首选',
     points: 1000,
@@ -188,17 +238,23 @@ const DEFAULT_POINTS_PLANS = [
     tag: '尝鲜首选',
     badgeClass: 'is-basic',
 =======
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
     packageId: 'basic',
     title: '尝鲜首选',
     points: 1000,
     price: '9.90',
     tag: '尝鲜首选',
+<<<<<<< HEAD
 >>>>>>> origin/master
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
     color: '#3b82f6',
     gradient: 'linear-gradient(135deg, #60a5fa, #3b82f6)'
   },
   {
     key: 'value',
+<<<<<<< HEAD
 <<<<<<< HEAD
     title: '高性价比',
     points: 3000,
@@ -207,17 +263,23 @@ const DEFAULT_POINTS_PLANS = [
     tag: '高性价比',
     badgeClass: 'is-value',
 =======
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
     packageId: 'value',
     title: '高性价比',
     points: 3000,
     price: '16.60',
     tag: '高性价比',
+<<<<<<< HEAD
 >>>>>>> origin/master
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
     color: '#8b5cf6',
     gradient: 'linear-gradient(135deg, #a78bfa, #7c3aed)'
   }
 ]
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 const currentSelectedMemberObj = computed(() => {
   const found = memberPlans.find(p => p.key === selectedMemberPlan.value)
@@ -228,6 +290,8 @@ const currentSelectedPointsObj = computed(() => {
   const found = pointsPurchasePlans.find(p => p.key === selectedPointsPlan.value)
   return found || pointsPurchasePlans[1]!
 =======
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
 const memberPlans = ref<any[]>(DEFAULT_MEMBER_PLANS)
 const pointsPurchasePlans = ref<any[]>(DEFAULT_POINTS_PLANS)
 
@@ -315,7 +379,10 @@ const currentSelectedMemberObj = computed(() => {
 const currentSelectedPointsObj = computed(() => {
   const found = pointsPurchasePlans.value.find(p => p.packageId === selectedPointsPlan.value)
   return found || pointsPurchasePlans.value[0] || { packageId: 0, price: '0', points: 0, title: '' }
+<<<<<<< HEAD
 >>>>>>> origin/master
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
 })
 
 const inviteBenefits = [
@@ -330,12 +397,17 @@ const pointRecords = computed(() => {
   if ((props.records as any[]).length) return props.records as any[]
   return [
 <<<<<<< HEAD
+<<<<<<< HEAD
     { id: 1, type: '每日积分', remain: 0, total: 100, expireText: '今日已领取' },
     { id: 2, type: '邀请奖励', remain: 17, total: 200, expireText: '距离到期还有 19 天' }
 =======
     { id: 1, type: '每日积分', remain: 0, total: 100, expireText: '今日积分已领取' },
     { id: 2, type: '邀请奖励', remain: 0, total: 0, expireText: '暂无邀请奖励' }
 >>>>>>> origin/master
+=======
+    { id: 1, type: '每日积分', remain: 0, total: 100, expireText: '今日积分已领取' },
+    { id: 2, type: '邀请奖励', remain: 0, total: 0, expireText: '暂无邀请奖励' }
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
   ]
 })
 
@@ -360,6 +432,7 @@ const openPurchaseCenter = (tab: 'points' | 'member') => {
 }
 
 const handlePay = async () => {
+<<<<<<< HEAD
 <<<<<<< HEAD
   if (activePurchaseTab.value === 'points') {
     try {
@@ -462,12 +535,83 @@ const handleInvite = () => {
   }
 }
 
+=======
+  const pkg = activePurchaseTab.value === 'points' ? currentSelectedPointsObj.value : currentSelectedMemberObj.value
+
+  if (!pkg.packageId || pkg.packageId === 'invite') {
+    if (pkg.packageId === 'invite') handleInvite()
+    return
+  }
+
+  try {
+    const payload: PointsMembershipChangeDTO = {
+      packageId: Number(pkg.packageId) || 0,
+      name: pkg.title,
+      amount: Number(pkg.price),
+      points: pkg.points || 0,
+      payType: currentPayMethod.value === 'wechat' ? 1 : 2, // 1:微信, 2:支付宝
+    }
+
+    // 处理会员等级：如果是会员购买，根据套餐类型设置等级
+    if (activePurchaseTab.value === 'member') {
+      const pid = String(pkg.packageId).toLowerCase()
+      if (pid.includes('monthly') || pkg.packageId === 1) payload.membershipLevel = 1
+      else if (pid.includes('quarterly') || pkg.packageId === 2) payload.membershipLevel = 2
+      else if (pid.includes('yearly') || pkg.packageId === 3) payload.membershipLevel = 3
+      else payload.membershipLevel = 1 // 默认
+    }
+
+    if (!userStore.userInfo?.id) {
+      ElMessage.error('未获取到用户信息，请重新登录')
+      return
+    }
+
+    const res = await rechargePointsService(payload)
+    if (res.data.code === 200) {
+      ElMessage.success('下单成功')
+      console.log('下单成功', res.data.data)
+      const orderNo = res.data.data;
+      // 加上 /api 前缀，让跳转请求被 vite.config.ts 拦截并代理到后端
+      window.location.href = `/api/alipay/pay/${orderNo}`;
+      purchaseCenterVisible.value = false
+    } else {
+      ElMessage.error(res.data.msg || '提交支付失败')
+    }
+  } catch (err: any) {
+    ElMessage.error(err.message || '网络或服务器错误，支付请求失败')
+  }
+}
+
+// 旧的处理函数，现在指向新的支付流程
+const handlePay = async () => {
+  await startPayment()
+}
+
+const handleInvite = () => {
+  if (props.inviteCode) {
+    const inviteLink = `${window.location.origin}/register?inviteCode=${props.inviteCode}`
+    navigator.clipboard.writeText(inviteLink).then(() => {
+      ElMessage.success("邀请链接已复制到剪贴板！")
+    }).catch(() => {
+      ElMessage.error("复制失败，请重试")
+    })
+  } else {
+    ElMessage.warning("您尚未注册为邀请大使，请先完成注册")
+    emit('open-invite')
+    purchaseCenterVisible.value = false
+  }
+}
+
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
 // 组件卸载时清理定时器
 onUnmounted(() => {
   clearTimers()
 })
 
+<<<<<<< HEAD
 >>>>>>> origin/master
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
 </script>
 
 <template>
@@ -555,7 +699,10 @@ onUnmounted(() => {
     </div>
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
     <!-- 支付状态弹窗 -->
     <el-dialog v-model="payDialogVisible" :show-close="false" width="420px" class="pay-status-dialog" :close-on-click-modal="false"
       append-to-body>
@@ -627,7 +774,10 @@ onUnmounted(() => {
       </div>
     </el-dialog>
 
+<<<<<<< HEAD
 >>>>>>> origin/master
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
     <!-- 统一购买中心弹窗 -->
     <el-dialog v-model="purchaseCenterVisible" :show-close="false" width="700px" class="purchase-dialog"
       :destroy-on-close="true" append-to-body>
@@ -671,12 +821,17 @@ onUnmounted(() => {
           <div class="purchase-cards">
             <div v-for="plan in pointsPurchasePlans" :key="plan.key" class="p-card"
 <<<<<<< HEAD
+<<<<<<< HEAD
               :class="{ 'active': selectedPointsPlan === plan.key }" @click="selectedPointsPlan = plan.key"
               :style="{ '--theme-color': plan.color }">
 =======
               :class="{ 'active': selectedPointsPlan === plan.packageId || selectedPointsPlan === plan.key }"
               @click="selectedPointsPlan = plan.packageId || plan.key" :style="{ '--theme-color': plan.color }">
 >>>>>>> origin/master
+=======
+              :class="{ 'active': selectedPointsPlan === plan.packageId || selectedPointsPlan === plan.key }"
+              @click="selectedPointsPlan = plan.packageId || plan.key" :style="{ '--theme-color': plan.color }">
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
               <div class="p-card-tag" :style="{ backgroundColor: plan.color }">{{ plan.tag }}</div>
               <div class="p-card-points">{{ plan.points }} 积分</div>
               <div class="p-card-price">
@@ -686,12 +841,17 @@ onUnmounted(() => {
                 <template v-else>
                   <span class="currency">¥</span>
 <<<<<<< HEAD
+<<<<<<< HEAD
                   <span class="amount">{{ plan.price.split('.')[0] }}</span>
                   <span class="decimals">.{{ plan.price.split('.')[1] || '00' }}</span>
 =======
                   <span class="amount">{{ String(plan.price).split('.')[0] }}</span>
                   <span class="decimals">.{{ String(plan.price).split('.')[1] || '00' }}</span>
 >>>>>>> origin/master
+=======
+                  <span class="amount">{{ String(plan.price).split('.')[0] }}</span>
+                  <span class="decimals">.{{ String(plan.price).split('.')[1] || '00' }}</span>
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
                 </template>
               </div>
             </div>
@@ -713,6 +873,7 @@ onUnmounted(() => {
               </el-icon> 邀请好友免费获得积分
             </div>
 <<<<<<< HEAD
+<<<<<<< HEAD
             <button class="primary-btn invite-btn" @click="handleInvite">邀请好友</button>
           </div>
 
@@ -728,6 +889,8 @@ onUnmounted(() => {
               </div>
               <div class="more-methods">
 =======
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
             <button class="primary-btn invite-btn" @click="handleInvite">
               <el-icon>
                 <Share />
@@ -759,7 +922,10 @@ onUnmounted(() => {
                 <img :src="wechatIcon" class="method-img-icon" alt="WeChat" /> 微信支付
               </div>
               <div class="more-methods" @click="payMethodVisible = true">
+<<<<<<< HEAD
 >>>>>>> origin/master
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
                 更多支付方式 <el-icon>
                   <ArrowRight />
                 </el-icon>
@@ -768,13 +934,19 @@ onUnmounted(() => {
             <button class="primary-btn subscribe-btn" @click="handlePay"
               :style="{ backgroundColor: currentSelectedPointsObj.color }">
 <<<<<<< HEAD
+<<<<<<< HEAD
               立即充值
 =======
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
               <el-icon>
                 <ShoppingCart />
               </el-icon>
               确认支付并充值 {{ currentSelectedPointsObj.points }} 积分
+<<<<<<< HEAD
 >>>>>>> origin/master
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
             </button>
           </div>
         </div>
@@ -783,6 +955,7 @@ onUnmounted(() => {
         <div v-else class="member-subscribe-view">
           <div class="purchase-cards member-cards">
 <<<<<<< HEAD
+<<<<<<< HEAD
             <div v-for="plan in memberPlans" :key="plan.key" class="m-card"
               :class="{ 'active': selectedMemberPlan === plan.key }" @click="selectedMemberPlan = plan.key"
               :style="{ '--theme-color': plan.color }">
@@ -790,6 +963,8 @@ onUnmounted(() => {
               <div class="m-card-duration">{{ plan.title }}</div>
               <div class="m-card-months" :style="{ color: selectedMemberPlan === plan.key ? plan.color : '#1e293b' }">
 =======
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
             <div v-for="plan in memberPlans" :key="plan.packageId" class="m-card"
               :class="{ 'active': selectedMemberPlan === plan.packageId }" @click="selectedMemberPlan = plan.packageId"
               :style="{ '--theme-color': plan.color }">
@@ -797,7 +972,10 @@ onUnmounted(() => {
               <div class="m-card-duration">{{ plan.title }}</div>
               <div class="m-card-months"
                 :style="{ color: selectedMemberPlan === plan.packageId ? plan.color : '#1e293b' }">
+<<<<<<< HEAD
 >>>>>>> origin/master
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
                 {{ plan.duration }}
               </div>
               <div class="m-card-price">
@@ -806,16 +984,21 @@ onUnmounted(() => {
                 <span class="unit">{{ plan.unit }}</span>
               </div>
 <<<<<<< HEAD
+<<<<<<< HEAD
               <div class="m-card-daily">{{ plan.dailyCost }}</div>
 =======
               <div class="m-card-daily">包含 {{ plan.points }} 积分</div>
 >>>>>>> origin/master
+=======
+              <div class="m-card-daily">包含 {{ plan.points }} 积分</div>
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
             </div>
           </div>
 
           <div class="member-summary">
             <el-icon>
               <Coin />
+<<<<<<< HEAD
 <<<<<<< HEAD
             </el-icon> 每日 {{ currentSelectedMemberObj.dailyPoints }} 积分，总计 {{ currentSelectedMemberObj.totalPoints }} 积分
           </div>
@@ -833,6 +1016,8 @@ onUnmounted(() => {
               </div>
               <div class="more-methods">
 =======
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
             </el-icon> 总计包含 {{ currentSelectedMemberObj.points }} 积分 (购买后一次性发放)
           </div>
 
@@ -860,7 +1045,10 @@ onUnmounted(() => {
                 <img :src="wechatIcon" class="method-img-icon" alt="WeChat" /> 微信支付
               </div>
               <div class="more-methods" @click="payMethodVisible = true">
+<<<<<<< HEAD
 >>>>>>> origin/master
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
                 更多支付方式 <el-icon>
                   <ArrowRight />
                 </el-icon>
@@ -869,13 +1057,19 @@ onUnmounted(() => {
             <button class="primary-btn subscribe-btn" @click="handlePay"
               :style="{ backgroundColor: currentSelectedMemberObj.color }">
 <<<<<<< HEAD
+<<<<<<< HEAD
               立即订阅
 =======
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
               <el-icon>
                 <Medal />
               </el-icon>
               确认并支付 ¥{{ currentSelectedMemberObj.price }}
+<<<<<<< HEAD
 >>>>>>> origin/master
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
             </button>
           </div>
         </div>
@@ -1255,9 +1449,12 @@ onUnmounted(() => {
 .m-card.active {
   border-color: var(--theme-color, #3b82f6);
 <<<<<<< HEAD
+<<<<<<< HEAD
   background: #fff;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.05);
 =======
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
   border-width: 2.5px;
   background: #fff;
   transform: translateY(-6px) scale(1.03);
@@ -1292,7 +1489,10 @@ onUnmounted(() => {
   font-size: 14px;
   font-weight: 900;
   z-index: 4;
+<<<<<<< HEAD
 >>>>>>> origin/master
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
 }
 
 .p-card-tag,
@@ -1460,7 +1660,10 @@ onUnmounted(() => {
 }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
 .order-summary-card {
   border-radius: 12px;
   padding: 16px;
@@ -1508,7 +1711,10 @@ onUnmounted(() => {
   color: #ef4444;
 }
 
+<<<<<<< HEAD
 >>>>>>> origin/master
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
 .pay-info {
   display: flex;
   align-items: center;
@@ -1568,7 +1774,10 @@ onUnmounted(() => {
   background: #4f46e5;
 }
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
 
 .method-img-icon {
   width: 28px;
@@ -1577,5 +1786,8 @@ onUnmounted(() => {
   margin-right: 8px;
   border-radius: 4px;
 }
+<<<<<<< HEAD
 >>>>>>> origin/master
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
 </style>

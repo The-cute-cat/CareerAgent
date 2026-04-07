@@ -1,5 +1,6 @@
 <template>
 <<<<<<< HEAD
+<<<<<<< HEAD
   <div class="growth-plan-page">
     <div class="page-shell">
       <section class="hero-grid">
@@ -252,6 +253,74 @@
                   <span class="progress-percent">{{ actionProgress }}%</span>
                   <span class="progress-label">行动完成度</span>
                 </div>
+=======
+  <div class="growth-plan-container">
+    <div class="max-width-wrapper">
+      <!-- Header Section: 目标岗位与核心指标 -->
+      <header class="plan-header-section">
+        <div class="header-content">
+          <div class="position-badge">
+            <el-tag size="large" effect="dark" round class="plan-type-tag">
+              职业成长计划
+            </el-tag>
+            <h1 class="position-title">{{ data.target_position }}</h1>
+          </div>
+          <p class="position-summary">{{ data.target_position_profile_summary }}</p>
+          
+          <div class="header-stats">
+            <div v-for="stat in headerStats" :key="stat.label" class="stat-card">
+              <div class="stat-value" :class="stat.type">{{ stat.value }}</div>
+              <div class="stat-label">{{ stat.label }}</div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- 主内容网格 -->
+      <div class="main-grid">
+        <!-- 左侧：能力分析雷达图 -->
+        <div class="left-column">
+          <section class="chart-section ability-section">
+            <div class="section-header">
+              <h3>能力差距分析</h3>
+              <el-tooltip content="基于当前技能与目标岗位要求的差距分析">
+                <el-icon><Info-Filled /></el-icon>
+              </el-tooltip>
+            </div>
+            <div ref="radarChartRef" class="radar-chart"></div>
+            <div class="ability-legend">
+              <div class="legend-item">
+                <span class="dot current"></span>
+                <span>当前水平</span>
+              </div>
+              <div class="legend-item">
+                <span class="dot target"></span>
+                <span>目标要求</span>
+              </div>
+            </div>
+          </section>
+
+          <!-- 学生画像卡片 -->
+          <section class="info-card profile-card">
+            <div class="card-header">
+              <el-icon size="20"><User /></el-icon>
+              <span>学生画像</span>
+            </div>
+            <p class="profile-text">{{ data.student_summary }}</p>
+          </section>
+        </div>
+
+        <!-- 右侧：行动计划与进度 -->
+        <div class="right-column">
+          <!-- 行动进度圆环 -->
+          <section class="progress-section">
+            <div class="progress-ring-wrapper">
+              <div class="progress-ring" :style="progressStyle">
+                <div class="progress-content">
+                  <span class="progress-percent">{{ actionProgress }}%</span>
+                  <span class="progress-label">行动完成度</span>
+                </div>
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
               </div>
             </div>
             
@@ -338,6 +407,7 @@
                 {{ skill }}
               </span>
             </div>
+<<<<<<< HEAD
           </div>
 
           <!-- 里程碑时间线 -->
@@ -415,6 +485,85 @@
             </el-timeline>
           </div>
 
+=======
+          </div>
+
+          <!-- 里程碑时间线 -->
+          <div class="milestones-timeline">
+            <el-timeline>
+              <el-timeline-item
+                v-for="(milestone, idx) in currentPlan.milestones"
+                :key="idx"
+                :type="activePhase === 'short' ? 'success' : 'warning'"
+                :hollow="true"
+                placement="top"
+              >
+                <el-card class="milestone-card" shadow="hover">
+                  <template #header>
+                    <div class="milestone-header" @click="toggleMilestone(idx)">
+                      <div class="milestone-title-wrapper">
+                        <h4>{{ milestone.milestone_name }}</h4>
+                        <el-tag size="small" effect="plain">{{ milestone.target_date }}</el-tag>
+                      </div>
+                      <el-icon class="expand-icon" :class="{ expanded: expandedMilestones.includes(idx) }">
+                        <Arrow-Down-Bold />
+                      </el-icon>
+                    </div>
+                  </template>
+                  
+                  <div v-show="expandedMilestones.includes(idx)" class="milestone-body">
+                    <!-- 关键成果 -->
+                    <div class="key-results">
+                      <div class="sub-title">关键成果</div>
+                      <ul class="result-list">
+                        <li v-for="(kr, kidx) in milestone.key_results" :key="kidx">
+                          <el-icon color="#10b981"><Check /></el-icon>
+                          <span>{{ kr }}</span>
+                        </li>
+                      </ul>
+                    </div>
+
+                    <!-- 任务列表（横向滚动或弹窗） -->
+                    <div class="tasks-section">
+                      <div class="sub-title">
+                        任务清单
+                        <el-button text type="primary" size="small" @click="openTasksDialog(milestone)">
+                          查看全部 {{ milestone.tasks.length }} 个任务
+                        </el-button>
+                      </div>
+                      <div class="tasks-preview">
+                        <div 
+                          v-for="task in milestone.tasks.slice(0, 2)" 
+                          :key="task.task_name"
+                          class="task-preview-card"
+                          @click="openTaskDetail(task)"
+                        >
+                          <div class="task-header">
+                            <span class="task-name">{{ task.task_name }}</span>
+                            <el-tag 
+                              :type="getPriorityType(task.priority)" 
+                              size="small" 
+                              effect="dark"
+                            >
+                              {{ task.priority }}
+                            </el-tag>
+                          </div>
+                          <div class="task-meta">
+                            <span><el-icon><Timer /></el-icon> {{ task.estimated_time }}</span>
+                            <span v-if="task.resources.length">
+                              <el-icon><Document /></el-icon> {{ task.resources.length }} 资源
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </el-card>
+              </el-timeline-item>
+            </el-timeline>
+          </div>
+
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
           <!-- 快速见效或职业预期 -->
           <div v-if="activePhase === 'short' && 'quick_wins' in currentPlan" class="quick-wins-section">
             <h3>快速见效行动</h3>
@@ -451,6 +600,7 @@
                 <el-button text type="primary" @click="internDialogVisible = true">
                   查看全部
                 </el-button>
+<<<<<<< HEAD
               </div>
               <el-carousel :interval="5000" type="card" height="280px">
                 <el-carousel-item 
@@ -502,6 +652,39 @@
                 <div class="card-title">界面结构建议</div>
                 <div class="card-subtitle">适合比赛演示，也方便后续继续扩展</div>
               </div>
+=======
+              </div>
+              <el-carousel :interval="5000" type="card" height="280px">
+                <el-carousel-item 
+                  v-for="job in (currentPlan as MidTermPlan).recommended_internships" 
+                  :key="job.id"
+                >
+                  <div class="intern-card" @click="openInternDetail(job)">
+                    <div class="intern-company-header">
+                      <div 
+                        class="company-logo" 
+                        :style="{ backgroundColor: stringToColor(job.company_name) }"
+                      >
+                        {{ job.company_name.charAt(0) }}
+                      </div>
+                      <div class="company-info">
+                        <div class="job-title">{{ job.job_title }}</div>
+                        <div class="company-name">{{ job.company_name }}</div>
+                      </div>
+                    </div>
+                    <div class="job-meta-tags">
+                      <el-tag size="small">{{ job.city }}</el-tag>
+                      <el-tag size="small" type="warning">{{ job.salary }}</el-tag>
+                      <el-tag size="small" type="info">{{ job.job_type }}</el-tag>
+                    </div>
+                    <div class="job-reason" v-if="job.reason">{{ job.reason }}</div>
+                    <div v-if="job.match_score" class="match-badge">
+                      匹配度 {{ job.match_score }}%
+                    </div>
+                  </div>
+                </el-carousel-item>
+              </el-carousel>
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
             </div>
           </template>
 
@@ -556,6 +739,7 @@
       </template>
     </el-drawer>
 
+<<<<<<< HEAD
     <el-drawer v-model="internDrawerVisible" size="48%" title="岗位详情">
       <template v-if="currentIntern">
         <div class="drawer-stack">
@@ -648,6 +832,48 @@
             </el-col>
           </el-row>
         </div>
+=======
+        <!-- 学习建议 -->
+        <div v-else class="tips-content" key="tips">
+          <el-row :gutter="24">
+            <el-col :xs="24" :lg="16">
+              <div class="tips-carousel-wrapper">
+                <el-carousel direction="vertical" :interval="6000" height="300px" indicator-position="outside">
+                  <el-carousel-item v-for="(tip, idx) in data.tips" :key="idx">
+                    <div class="tip-card-large">
+                      <div class="tip-number">0{{ idx + 1 }}</div>
+                      <div class="tip-content">{{ tip }}</div>
+                      <div class="tip-decoration">
+                        <el-icon :size="60" color="rgba(99, 102, 241, 0.2)"><Chat-Dot-Round /></el-icon>
+                      </div>
+                    </div>
+                  </el-carousel-item>
+                </el-carousel>
+              </div>
+            </el-col>
+            <el-col :xs="24" :lg="8">
+              <div class="stats-panel">
+                <h4>数据统计</h4>
+                <div ref="pieChartRef" class="pie-chart"></div>
+                <div class="stats-list">
+                  <div class="stat-line">
+                    <span>总里程碑</span>
+                    <span class="value">{{ totalMilestones }}</span>
+                  </div>
+                  <div class="stat-line">
+                    <span>总任务数</span>
+                    <span class="value">{{ totalTasks }}</span>
+                  </div>
+                  <div class="stat-line">
+                    <span>学习资源</span>
+                    <span class="value">{{ totalResources }}</span>
+                  </div>
+                </div>
+              </div>
+            </el-col>
+          </el-row>
+        </div>
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
       </Transition>
 
       <!-- 行动清单抽屉 -->
@@ -929,6 +1155,7 @@
 </template>
 
 <script setup lang="ts">
+<<<<<<< HEAD
 <<<<<<< HEAD
 import { computed, defineComponent, h, reactive, ref } from 'vue'
 import { ArrowRight } from '@element-plus/icons-vue'
@@ -2316,6 +2543,627 @@ watch(gapDialogVisible, (val) => {
 })
 </script>
 
+=======
+import { ref, computed, onMounted, onUnmounted, nextTick, watch, reactive } from 'vue'
+import {
+  InfoFilled, User, Warning, ArrowRight, ArrowDownBold,
+  Check, Timer, Document, ChatDotRound,
+  Link, Location, Money
+} from '@element-plus/icons-vue'
+import * as echarts from 'echarts'
+
+// ==================== 严格类型定义 ====================
+
+type Priority = '高' | '中' | '低'
+
+type ResourceType = 'video' | 'book' | 'project'
+
+interface BaseResource {
+  id: string
+  type: ResourceType
+  reason: string
+  content: string
+  url: string
+}
+
+interface VideoResource extends BaseResource {
+  type: 'video'
+  title: string
+  author: string
+  cover_image?: string
+  category: string
+  category_name?: string
+  tags?: string
+  play_count?: string
+  like_count?: string
+  favorite_count?: string
+  duration?: string
+  publish_date?: string
+}
+
+interface BookResource extends BaseResource {
+  type: 'book'
+  title: string
+  author: string
+  translator?: string
+  publisher?: string
+  publish_date?: string
+  isbn?: string
+  pages?: string
+  cover_url?: string
+  rating_score?: string
+  category?: string
+  keyword?: string
+}
+
+interface ProjectResource extends BaseResource {
+  type: 'project'
+  name: string
+  description: string
+  tech_tags?: string
+  use_cases?: string
+  difficulty?: '初级' | '进阶'
+  stars?: number
+  language?: string
+}
+
+type ResourceItem = VideoResource | BookResource | ProjectResource
+
+interface TaskItem {
+  task_name: string
+  description: string
+  priority: Priority
+  estimated_time: string
+  skill_target: string
+  success_criteria: string
+  resources: ResourceItem[]
+}
+
+interface MilestoneItem {
+  milestone_name: string
+  target_date: string
+  key_results: string[]
+  tasks: TaskItem[]
+}
+
+interface ShortTermPlan {
+  duration: string
+  goal: string
+  focus_areas: string[]
+  milestones: MilestoneItem[]
+  quick_wins: string[]
+}
+
+interface InternshipItem {
+  id: string
+  job_title: string
+  company_name: string
+  company_industry: string
+  company_scale: string
+  salary: string
+  city: string
+  degree: string
+  days_per_week: number
+  months: number
+  job_type: string
+  tech_stack: string
+  url: string
+  content: string
+  reason: string
+  match_score?: number
+}
+
+interface MidTermPlan {
+  duration: string
+  goal: string
+  skill_roadmap: string[]
+  milestones: MilestoneItem[]
+  career_progression: string
+  recommended_internships: InternshipItem[]
+}
+
+interface GrowthPlanData {
+  student_summary: string
+  target_position: string
+  target_position_profile_summary: string
+  current_gap: string
+  short_term_plan: ShortTermPlan
+  mid_term_plan: MidTermPlan
+  action_checklist: string[]
+  tips: string[]
+}
+
+// ==================== 数据与状态 ====================
+
+const data = ref<GrowthPlanData>({
+  student_summary: '计算机科学与技术专业本科在读，具备Java、MySQL、HTML/CSS/JavaScript基础技能，掌握Git、Maven、IDEA等开发工具。有学生信息管理系统（后端开发）和校园网站（前端开发）项目经验，获蓝桥杯程序设计竞赛省级三等奖。英语能力良好（CET-6 520分），学习能力强（评分4/5），逻辑思维清晰（评分4/5），职业倾向技术型。核心短板：无实习经历，缺乏Spring Boot、MyBatis等企业级框架经验，数据库优化能力薄弱，无分布式系统知识，缺少有竞争力的开源项目。',
+  target_position: 'Java后端开发工程师',
+  target_position_profile_summary: '负责服务端架构设计与开发，要求精通Spring Boot、MyBatis等主流框架，熟悉MySQL数据库设计与优化，了解分布式系统原理，具备良好的代码规范意识和团队协作能力。',
+  current_gap: '1. 企业级框架掌握不足：对Spring Boot、MyBatis等主流框架缺乏系统学习和实战经验；2. 数据库能力薄弱：数据库设计、SQL优化、索引优化等能力不足；3. 分布式微服务知识空白：对分布式系统、微服务架构缺乏了解；4. 项目经验不足：缺少企业级项目开发经验，简历竞争力不够；5. 无实习经历：缺乏实际工作经验和团队协作经验。',
+  short_term_plan: {
+    duration: '1-3个月',
+    goal: '夯实Java后端基础，掌握Spring Boot+MyBatis主流框架，提升数据库设计与优化能力，完成1-2个企业级项目实战',
+    focus_areas: ['Spring Boot框架开发', 'MyBatis持久层框架', 'MySQL数据库设计与优化', 'RESTful API设计'],
+    milestones: [
+      {
+        milestone_name: 'Spring Boot框架入门与实战',
+        target_date: '第1个月末',
+        key_results: [
+          '完成Spring Boot基础学习，理解核心概念（IOC、AOP、自动配置）',
+          '掌握Spring Boot项目搭建、配置管理、常用注解',
+          '完成至少1个Spring Boot实战项目（博客系统或商城模块）'
+        ],
+        tasks: [
+          {
+            task_name: '学习Spring Boot核心概念与基础开发',
+            description: '通过视频教程系统学习Spring Boot框架，包括项目搭建、配置文件、常用注解、依赖注入、AOP等核心概念，理解Spring Boot自动配置原理',
+            priority: '高',
+            estimated_time: '2周',
+            skill_target: 'Spring Boot框架开发能力',
+            success_criteria: '能够独立搭建Spring Boot项目，理解IOC容器和AOP原理，掌握常用注解的使用场景',
+            resources: [
+              {
+                id: 'v001',
+                type: 'video',
+                title: '黑马程序员SpringBoot教程',
+                author: '黑马程序员',
+                url: 'https://www.bilibili.com/video/BV1Lq4y1J77x',
+                category: '后端开发',
+                publish_date: '2021-05-04',
+                play_count: '125.3万',
+                duration: '6:23:45',
+                reason: '适合快速入门，覆盖Spring Boot核心知识点',
+                content: '6小时快速入门Spring Boot，从基础到实战，适合夯实基础。'
+              },
+              {
+                id: 'b001',
+                type: 'book',
+                title: 'Spring Boot实战',
+                author: '汪云飞',
+                publisher: '电子工业出版社',
+                isbn: '9787121384321',
+                rating_score: '8.5',
+                url: 'https://book.douban.com/subject/xxxx',
+                reason: '经典入门书籍，理论与实践结合',
+                content: '本书从Spring Boot的基础知识讲起，逐步深入到企业级应用开发。'
+              }
+            ]
+          },
+          {
+            task_name: '完成Spring Boot+Vue前后端分离博客项目',
+            description: '跟随实战教程完成一个完整的前后端分离博客系统，包括用户管理、文章发布、评论功能、分类标签等模块。',
+            priority: '高',
+            estimated_time: '3周',
+            skill_target: '企业级项目开发能力、RESTful API设计',
+            success_criteria: '完成项目开发并部署运行，能够演示完整功能',
+            resources: [
+              {
+                id: 'p001',
+                type: 'project',
+                name: 'vue-springboot-blog',
+                description: '基于Vue.js和Spring Boot的前后端分离博客系统',
+                stars: 1250,
+                language: 'Java',
+                difficulty: '初级',
+                tech_tags: 'Spring Boot,Vue.js,MyBatis,MySQL',
+                url: 'https://github.com/example/blog',
+                reason: '项目结构清晰，适合作为第一个实战项目',
+                content: '完整的博客系统，包含用户认证、文章管理、评论系统等模块。'
+              }
+            ]
+          }
+        ]
+      },
+      {
+        milestone_name: 'MySQL数据库设计与优化能力提升',
+        target_date: '第2个月末',
+        key_results: ['掌握索引、锁机制、执行计划分析', '能够进行SQL性能分析和优化'],
+        tasks: [
+          {
+            task_name: '系统学习MySQL高级知识',
+            description: '深入学习索引原理、锁机制、事务隔离级别、执行计划分析、慢查询优化。',
+            priority: '高',
+            estimated_time: '2周',
+            skill_target: 'MySQL数据库优化能力',
+            success_criteria: '能够分析执行计划，识别慢查询原因，掌握索引优化策略',
+            resources: []
+          }
+        ]
+      }
+    ],
+    quick_wins: [
+      '本周内完成Spring Boot开发环境搭建（JDK 17、Maven 3.8+、IDEA）',
+      '注册GitHub账号并Fork mall项目，开始研读项目文档',
+      '制定每日学习计划：工作日每天2小时，周末每天6小时'
+    ]
+  },
+  mid_term_plan: {
+    duration: '3-12个月',
+    goal: '深入掌握分布式微服务架构，积累企业级项目经验，获得实习机会，建立个人技术影响力',
+    skill_roadmap: ['Spring Cloud微服务架构', 'Redis缓存技术', '消息队列', 'Docker容器化部署', '分布式系统原理', '高并发系统设计'],
+    milestones: [
+      {
+        milestone_name: '微服务架构学习与实战',
+        target_date: '第6个月末',
+        key_results: ['掌握Spring Cloud核心组件', '完成微服务项目改造', '掌握Docker容器化部署'],
+        tasks: [
+          {
+            task_name: '学习Spring Cloud微服务架构',
+            description: '系统学习Spring Cloud微服务全家桶，包括服务注册发现、服务调用、网关、熔断降级等。',
+            priority: '高',
+            estimated_time: '4周',
+            skill_target: '微服务架构设计与开发能力',
+            success_criteria: '能够搭建Spring Cloud微服务项目，理解各组件作用和使用场景',
+            resources: [
+              {
+                id: 'b002',
+                type: 'book',
+                title: '深入理解分布式系统',
+                author: '唐伟志',
+                publisher: '机械工业出版社',
+                isbn: '9787111681234',
+                rating_score: '9.0',
+                url: 'https://book.douban.com/subject/35794814/',
+                reason: '系统讲解分布式系统原理，为微服务学习打下理论基础',
+                content: '全面介绍分布式系统的核心概念、算法和实践。'
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    career_progression: '具备1年以上企业级项目开发经验，熟练掌握Spring Boot+MyBatis+Spring Cloud技术栈，能够独立负责模块开发，有大型互联网实习经历。',
+    recommended_internships: [
+      {
+        id: 'i001',
+        job_title: 'Java后端开发实习生',
+        company_name: '字节跳动',
+        company_industry: '互联网',
+        company_scale: '10000人以上',
+        salary: '400-500元/天',
+        city: '北京',
+        degree: '本科及以上',
+        days_per_week: 4,
+        months: 3,
+        job_type: '日常实习',
+        tech_stack: 'Java,MySQL,Redis,Spring Boot',
+        url: 'https://job.bytedance.com/',
+        content: '负责抖音电商后台服务开发，参与高并发系统设计与优化。',
+        reason: '大厂核心部门，技术氛围好，能接触到高并发场景',
+        match_score: 92
+      },
+      {
+        id: 'i002',
+        job_title: '后端工程师实习生',
+        company_name: '美团',
+        company_industry: '生活服务',
+        company_scale: '10000人以上',
+        salary: '300-400元/天',
+        city: '北京',
+        degree: '本科',
+        days_per_week: 5,
+        months: 6,
+        job_type: '暑期实习',
+        tech_stack: 'Java,MySQL,Kafka,Microservices',
+        url: 'https://zhaopin.meituan.com/',
+        content: '参与美团外卖后端系统开发，负责订单、配送等核心业务模块。',
+        reason: '业务复杂度高，能锻炼系统设计能力，转正机会大',
+        match_score: 88
+      }
+    ]
+  },
+  action_checklist: [
+    '本周内完成Spring Boot开发环境搭建（JDK 17、Maven 3.8+、IDEA）',
+    '注册GitHub账号并Fork mall项目，开始研读项目文档',
+    '制定每日学习计划：工作日每天2小时，周末每天6小时',
+    '准备简历模板，梳理项目经验和技术栈',
+    '完成牛客网Java基础100题练习',
+    '参加至少一次技术分享会或线上直播'
+  ],
+  tips: [
+    '先掌握Spring Boot单体应用开发，再学习Spring Cloud微服务架构，循序渐进',
+    '项目经验是核心竞争力：务必完成2-3个有质量的项目并部署到云服务器',
+    '重视Java基础、数据库、计算机网络等底层知识，面试必考',
+    '通过博客、GitHub、社区问答建立个人技术影响力，展示学习能力',
+    '算法要持续刷题，建议每日LeetCode一题，保持手感'
+  ]
+})
+
+// 状态管理
+const activePhase = ref<'short' | 'mid' | 'tips'>('short')
+const checkedActions = reactive<Record<number, boolean>>({})
+const expandedMilestones = ref<number[]>([0])
+const drawerVisible = ref(false)
+const taskDialogVisible = ref(false)
+const selectedMilestone = ref<MilestoneItem | null>(null)
+const expandedTasks = ref<number[]>([0])
+const resourceDrawerVisible = ref(false)
+const currentResource = ref<ResourceItem | null>(null)
+const internDetailVisible = ref(false)
+const selectedIntern = ref<InternshipItem | null>(null)
+const internDialogVisible = ref(false)
+const gapDialogVisible = ref(false)
+
+// 图表Refs
+const radarChartRef = ref<HTMLDivElement>()
+const pieChartRef = ref<HTMLDivElement>()
+const gapChartRef = ref<HTMLDivElement>()
+let charts: echarts.ECharts[] = []
+
+// ==================== 计算属性 ====================
+
+const currentPlan = computed<ShortTermPlan | MidTermPlan>(() => {
+  return activePhase.value === 'short' ? data.value.short_term_plan : data.value.mid_term_plan
+})
+
+const currentPhaseSkills = computed<string[]>(() => {
+  if (activePhase.value === 'short') {
+    return (currentPlan.value as ShortTermPlan).focus_areas || []
+  }
+  return (currentPlan.value as MidTermPlan).skill_roadmap || []
+})
+
+const actionProgress = computed(() => {
+  const total = data.value.action_checklist.length
+  const completed = Object.values(checkedActions).filter(Boolean).length
+  return total ? Math.round((completed / total) * 100) : 0
+})
+
+const progressStyle = computed(() => ({
+  background: `conic-gradient(#6366f1 ${actionProgress.value * 3.6}deg, #e5e7eb 0deg)`
+}))
+
+const headerStats = computed(() => [
+  { label: '短期里程碑', value: data.value.short_term_plan.milestones.length, type: 'success' },
+  { label: '中期里程碑', value: data.value.mid_term_plan.milestones.length, type: 'warning' },
+  { label: '推荐岗位', value: data.value.mid_term_plan.recommended_internships.length, type: 'info' },
+  { label: '行动项', value: data.value.action_checklist.length, type: 'primary' }
+])
+
+const totalMilestones = computed(() => 
+  data.value.short_term_plan.milestones.length + data.value.mid_term_plan.milestones.length
+)
+
+const totalTasks = computed(() => {
+  let count = 0
+  const countTasks = (plan: ShortTermPlan | MidTermPlan) => {
+    plan.milestones.forEach(m => { count += m.tasks.length })
+  }
+  countTasks(data.value.short_term_plan)
+  countTasks(data.value.mid_term_plan)
+  return count
+})
+
+const totalResources = computed(() => {
+  let count = 0
+  const countRes = (plan: ShortTermPlan | MidTermPlan) => {
+    plan.milestones.forEach(m => {
+      m.tasks.forEach(t => { count += t.resources.length })
+    })
+  }
+  countRes(data.value.short_term_plan)
+  countRes(data.value.mid_term_plan)
+  return count
+})
+
+const allInternships = computed(() => data.value.mid_term_plan.recommended_internships)
+
+const gapBriefs = computed(() => {
+  const gaps = data.value.current_gap.split(/;\s*|；/).filter(Boolean).slice(0, 3)
+  return gaps.map((g, i) => ({
+    title: g.split('：')[0]?.replace(/^\d+\.\s*/, '') || g.slice(0, 20),
+    level: i < 2 ? 1 : 2
+  }))
+})
+
+const parsedGaps = computed(() => {
+  return data.value.current_gap.split(/;\s*|；/).filter(Boolean).map(gap => {
+    const match = gap.match(/^\d+\.\s*(.+?)[:：](.+)$/)
+    if (match) {
+      const title = match[1]?.trim() || '能力短板'
+      const desc = match[2]?.trim() || gap
+      return {
+        title,
+        desc,
+        level: title.includes('框架') || title.includes('数据库') ? 1 : 2
+      }
+    }
+    return { title: '能力短板', desc: gap, level: 2 }
+  })
+})
+
+// ==================== 方法 ====================
+
+function toggleAction(index: number): void {
+  checkedActions[index] = !checkedActions[index]
+}
+
+function toggleMilestone(index: number): void {
+  const i = expandedMilestones.value.indexOf(index)
+  if (i > -1) {
+    expandedMilestones.value.splice(i, 1)
+  } else {
+    expandedMilestones.value.push(index)
+  }
+}
+
+function openTasksDialog(milestone: MilestoneItem): void {
+  selectedMilestone.value = milestone
+  expandedTasks.value = [0]
+  taskDialogVisible.value = true
+}
+
+function openTaskDetail(task: TaskItem): void {
+  if (!task.resources?.length) return
+  const resource = task.resources[0]
+  if (resource) {
+    openResource(resource)
+  }
+}
+
+function openResource(resource: ResourceItem): void {
+  currentResource.value = resource
+  resourceDrawerVisible.value = true
+}
+
+function openInternDetail(intern: InternshipItem): void {
+  selectedIntern.value = intern
+  internDetailVisible.value = true
+}
+
+function openExternalLink(url: string): void {
+  window.open(url, '_blank')
+}
+
+function getPriorityType(priority: Priority): '' | 'danger' | 'warning' | 'info' {
+  const map: Record<Priority, '' | 'danger' | 'warning' | 'info'> = {
+    '高': 'danger',
+    '中': 'warning',
+    '低': 'info'
+  }
+  return map[priority] || ''
+}
+
+function stringToColor(str: string): string {
+  const colors = ['#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#3b82f6'] as const
+  if (!str || str.length === 0) return colors[0]
+  let hash = 0
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash)
+  }
+  return colors[(Math.abs(hash) % colors.length) as 0 | 1 | 2 | 3 | 4 | 5]
+}
+
+function getResourceIcon(resource: ResourceItem): string {
+  const icons: Record<ResourceType, string> = {
+    video: '▶️',
+    book: '📚',
+    project: '💻'
+  }
+  return icons[resource.type]
+}
+
+function getResourceTitle(resource: ResourceItem): string {
+  if (resource.type === 'project') {
+    return (resource as ProjectResource).name || '未命名项目'
+  }
+  return (resource as VideoResource | BookResource).title || '未命名资源'
+}
+
+function getResourceMeta(resource: ResourceItem): string {
+  if (resource.type === 'video') {
+    return (resource as VideoResource).author || '未知作者'
+  }
+  if (resource.type === 'book') {
+    return (resource as BookResource).author || '未知作者'
+  }
+  return (resource as ProjectResource).language || 'Open Source'
+}
+
+// ==================== ECharts ====================
+
+function initRadarChart(): void {
+  if (!radarChartRef.value) return
+  const chart = echarts.init(radarChartRef.value)
+  chart.setOption({
+    color: ['#6366f1', '#10b981'],
+    radar: {
+      indicator: [
+        { name: 'Java基础', max: 100 },
+        { name: 'Spring生态', max: 100 },
+        { name: '数据库', max: 100 },
+        { name: '分布式', max: 100 },
+        { name: '项目经验', max: 100 },
+        { name: '算法', max: 100 }
+      ],
+      radius: '65%',
+      splitNumber: 4,
+      axisName: { color: '#6b7280', fontSize: 11 },
+      splitLine: { lineStyle: { color: '#e5e7eb' } },
+      splitArea: { show: false }
+    },
+    series: [{
+      type: 'radar',
+      data: [
+        { value: [75, 30, 50, 10, 40, 65], name: '当前水平', areaStyle: { opacity: 0.2 } },
+        { value: [85, 90, 85, 80, 85, 80], name: '目标要求', areaStyle: { opacity: 0.2 }, lineStyle: { type: 'dashed' } }
+      ]
+    }],
+    legend: { bottom: 0, data: ['当前水平', '目标要求'], itemGap: 20 }
+  })
+  charts.push(chart)
+}
+
+function initPieChart(): void {
+  if (!pieChartRef.value) return
+  const chart = echarts.init(pieChartRef.value)
+  chart.setOption({
+    color: ['#6366f1', '#10b981', '#f59e0b', '#ef4444'],
+    series: [{
+      type: 'pie',
+      radius: ['45%', '75%'],
+      avoidLabelOverlap: false,
+      itemStyle: { borderRadius: 8, borderColor: '#fff', borderWidth: 2 },
+      label: { show: false },
+      data: [
+        { name: '短期任务', value: 8 },
+        { name: '中期任务', value: 4 },
+        { name: '已完成', value: 3 },
+        { name: '待开始', value: 9 }
+      ]
+    }]
+  })
+  charts.push(chart)
+}
+
+function initGapChart(): void {
+  if (!gapChartRef.value || !gapDialogVisible.value) return
+  const chart = echarts.init(gapChartRef.value)
+  const gaps = parsedGaps.value.slice(0, 5)
+  chart.setOption({
+    radar: {
+      indicator: gaps.map(g => ({ name: g.title.slice(0, 4), max: 100 })),
+      radius: '60%'
+    },
+    series: [{
+      type: 'radar',
+      data: [{
+        value: gaps.map(g => g.level === 1 ? 90 : 70),
+        name: '紧迫度',
+        areaStyle: { color: 'rgba(239, 68, 68, 0.2)' },
+        lineStyle: { color: '#ef4444' }
+      }]
+    }]
+  })
+  charts.push(chart)
+}
+
+// ==================== 生命周期 ====================
+
+onMounted(() => {
+  nextTick(() => {
+    initRadarChart()
+    initPieChart()
+  })
+  window.addEventListener('resize', handleResize)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', handleResize)
+  charts.forEach(chart => chart.dispose())
+  charts = []
+})
+
+function handleResize(): void {
+  charts.forEach(chart => chart.resize())
+}
+
+watch(gapDialogVisible, (val) => {
+  if (val) setTimeout(initGapChart, 100)
+})
+</script>
+
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
 <style scoped>
 /* ==================== 基础样式 ==================== */
 .growth-plan-container {
@@ -2650,11 +3498,15 @@ watch(gapDialogVisible, (val) => {
 }
 
 .action-item.completed .action-text {
+<<<<<<< HEAD
 >>>>>>> origin/master
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
   text-decoration: line-through;
   color: #9ca3af;
 }
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 .tab-bar {
   margin-bottom: 20px;
@@ -2870,6 +3722,8 @@ watch(gapDialogVisible, (val) => {
   gap: 10px;
   color: #475569;
 =======
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
 /* ==================== 阶段标签 ==================== */
 .phase-tabs {
   margin-bottom: 24px;
@@ -3018,11 +3872,15 @@ watch(gapDialogVisible, (val) => {
   display: flex;
   flex-direction: column;
   gap: 10px;
+<<<<<<< HEAD
 >>>>>>> origin/master
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
 }
 
 .result-list li {
   display: flex;
+<<<<<<< HEAD
 <<<<<<< HEAD
   gap: 8px;
   line-height: 1.8;
@@ -3174,6 +4032,8 @@ watch(gapDialogVisible, (val) => {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
 =======
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
   align-items: flex-start;
   gap: 8px;
   color: #4b5563;
@@ -3551,11 +4411,15 @@ watch(gapDialogVisible, (val) => {
 .resources-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+<<<<<<< HEAD
 >>>>>>> origin/master
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
   gap: 12px;
   margin-top: 12px;
 }
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 .quickwin-item {
   padding: 14px;
@@ -3670,6 +4534,8 @@ watch(gapDialogVisible, (val) => {
 }
 </style>
 =======
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
 .resource-item {
   display: flex;
   align-items: center;
@@ -4043,5 +4909,9 @@ watch(gapDialogVisible, (val) => {
   opacity: 0;
   transform: translateX(-20px);
 }
+<<<<<<< HEAD
 </style>
 >>>>>>> origin/master
+=======
+</style>
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829

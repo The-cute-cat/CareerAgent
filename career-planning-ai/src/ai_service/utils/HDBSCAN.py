@@ -3,10 +3,15 @@ import os
 from sklearn.decomposition import PCA
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 from ai_service.services.database_manage import get_db_url
 
 >>>>>>> origin/master
+=======
+from ai_service.services.database_manage import get_db_url
+
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
 # 配置 Hugging Face 镜像源
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 
@@ -29,6 +34,7 @@ except Exception:
 # 模型：BAAI/bge-base-zh-v1.5 或 BAAI/bge-small-zh-v1.5 或 BAAI/bge-tiny-zh-v1.5
 async def cluster_standard_jobs_with_hdbscan(
 <<<<<<< HEAD
+<<<<<<< HEAD
     session: AsyncSession,
     min_cluster_size: int = 5,# 1. 形成簇的最小样本数
     batch_size: int = 64,
@@ -37,6 +43,8 @@ async def cluster_standard_jobs_with_hdbscan(
     desc_max_len: int = 10000,
     collection_name: str = "job_original_embeddings",
 =======
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
         session: AsyncSession,
         min_cluster_size: int = 5,  # 1. 形成簇的最小样本数
         batch_size: int = 64,
@@ -44,7 +52,10 @@ async def cluster_standard_jobs_with_hdbscan(
         hdbscan_min_samples: int = 3,  # 2. 核心点的最小邻居数 (密度敏感度)
         desc_max_len: int = 10000,
         collection_name: str = "job_original_embeddings",
+<<<<<<< HEAD
 >>>>>>> origin/master
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
 ) -> Dict[int, List[JobInfo]]:
     """
     基于岗位标题 + 精简描述的 HDBSCAN 聚类版本。
@@ -131,11 +142,14 @@ async def cluster_standard_jobs_with_hdbscan(
     log.info(f"噪声点数量：{noise_count} ({noise_ratio:.2%})")
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 
 
 =======
 >>>>>>> origin/master
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
     if silhouette_score and num_clusters > 1:
         try:
             mask = cluster_labels != -1

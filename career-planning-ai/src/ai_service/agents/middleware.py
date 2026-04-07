@@ -40,6 +40,7 @@ def get_token_stats() -> TokenStats:
     """获取当前 Token 统计"""
     return _token_stats.get()
 
+<<<<<<< HEAD
 
 @dataclass
 class TokenStats:
@@ -62,6 +63,8 @@ def get_token_stats() -> TokenStats:
     """获取当前 Token 统计"""
     return _token_stats.get()
 
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
 
 @wrap_tool_call
 def monitor_tool(

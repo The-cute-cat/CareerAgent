@@ -24,6 +24,7 @@ growth_plan_user: |
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
   请为该学生生成一份职业成长计划书。
   ## 学生信息
   - **目标岗位**: {target_position}
@@ -36,6 +37,8 @@ growth_plan_user: |
 >>>>>>> origin/master
 =======
 >>>>>>> origin/master
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
   请为以下学生制定详细的职业成长计划：
   
   **目标岗位画像**: {target_position_profile}
@@ -54,12 +57,15 @@ user_job_match_analyzer_user: |
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
   请严格输出 JSON。
 >>>>>>> origin/master
 =======
   请严格输出 JSON。
 >>>>>>> origin/master
 =======
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
   请严格输出 JSON。
 compression_prompt: |
   你是一个对话压缩专家。请将以下对话压缩为简洁的摘要。
@@ -85,5 +91,9 @@ conversation_agent_system_prompt: |
   当前对话上下文：
   {context}
 
+<<<<<<< HEAD
   请根据用户的提问给出专业、有帮助的回答。
 >>>>>>> origin/master
+=======
+  请根据用户的提问给出专业、有帮助的回答。
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829

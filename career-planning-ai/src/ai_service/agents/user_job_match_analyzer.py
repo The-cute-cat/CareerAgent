@@ -9,6 +9,7 @@ from pydantic import ConfigDict, BaseModel, Field
 
 from ai_service.agents import log
 <<<<<<< HEAD
+<<<<<<< HEAD
 from ai_service.repository.connection_session import AsyncSessionLocal
 from ai_service.repository.job_portrait_repository import JobPortraitRepository
 from ai_service.repository.stu_portrait_repository import StuProfileRepository
@@ -17,6 +18,11 @@ from ai_service.repository.job_portrait_repository import JobPortraitRepository
 from ai_service.repository.stu_portrait_repository import StuProfileRepository
 from ai_service.services.database_manage import AsyncSessionLocal
 >>>>>>> origin/master
+=======
+from ai_service.repository.job_portrait_repository import JobPortraitRepository
+from ai_service.repository.stu_portrait_repository import StuProfileRepository
+from ai_service.services.database_manage import AsyncSessionLocal
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
 from ai_service.services.prompt_loader import prompt_loader
 from config import settings
 
@@ -48,6 +54,7 @@ SYSTEM_PROMPT = prompt_loader.user_job_match_analyzer
 USER_PROMPT = prompt_loader.small_prompts["user_job_match_analyzer_user"]
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 # =========================
 # 3. 创建 LLM
@@ -55,6 +62,8 @@ USER_PROMPT = prompt_loader.small_prompts["user_job_match_analyzer_user"]
 
 =======
 >>>>>>> origin/master
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
 def _create_llm(
         model_name: str,
         api_key: str | None = settings.match_analyzer.api_key.get_secret_value(),
@@ -114,25 +123,34 @@ async def get_profile_text(job_id: int, user_id: int) -> tuple[str, str]:
         job_portrait_repo = JobPortraitRepository(session)
         user_portrait_repo = StuProfileRepository(session)
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 =======
 >>>>>>> origin/master
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
         # 3. 查询岗位画像
         job_profile = await job_portrait_repo.get_by_id(job_id)
         if not job_profile:
             raise ValueError(f"未找到岗位画像，job_id={job_id}")
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 =======
 >>>>>>> origin/master
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
         # 4. 查询用户画像
         user_profile = await user_portrait_repo.get_by_stu_id(user_id)
         if not user_profile:
             raise ValueError(f"未找到用户画像，user_id={user_id}")
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 =======
 >>>>>>> origin/master
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
         # 5. 构造输入文本
         job_profile_text = _build_profile_json_text(job_profile.skills_req)
         user_profile_text = _build_profile_json_text(user_profile.skills_stu)

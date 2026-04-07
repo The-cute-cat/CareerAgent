@@ -40,10 +40,14 @@ public class PointsReferController {
      */
     @GetMapping("/account/{id}")
 <<<<<<< HEAD
+<<<<<<< HEAD
     public Result<UserPointsVO> getAccountPoints(@PathVariable Long id) {
 =======
     public Result<UserPointsVO> getAccountPoints(@PathVariable("id") Long id) {
 >>>>>>> origin/master
+=======
+    public Result<UserPointsVO> getAccountPoints(@PathVariable("id") Long id) {
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
         log.info("userId: {}", id);
         return referralService.getAccountPoints(id);
     }

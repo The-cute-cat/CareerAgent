@@ -47,11 +47,14 @@ export const getAccountPointsService = (id: number) => {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 =======
 >>>>>>> origin/master
 =======
 >>>>>>> origin/master
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
 export const getUserInfoService = (id: number) => {
 
   return request.get<Result<AccountPointsData>>(`/user/info`)
@@ -59,11 +62,14 @@ export const getUserInfoService = (id: number) => {
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 >>>>>>> origin/master
 =======
 >>>>>>> origin/master
 =======
 >>>>>>> origin/master
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
 export const consumePointsService = (data: PointsConsumeRequest) => {
   if (ENABLE_MOCK) {
     return mockConsumePointsApi(data)
@@ -71,6 +77,7 @@ export const consumePointsService = (data: PointsConsumeRequest) => {
 
   return request.post<Result<PointsConsumeData>>('/points/consume', data)
 }
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
@@ -91,6 +98,11 @@ export interface PointsMembershipChangeDTO {
 import type { PointsMembershipChangeDTO } from '@/types/pointsMembershipChangeDTO'
 export type { PointsMembershipChangeDTO }
 >>>>>>> origin/master
+=======
+
+import type { PointsMembershipChangeDTO } from '@/types/pointsMembershipChangeDTO'
+export type { PointsMembershipChangeDTO }
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
 
 export const rechargePointsService = (data: PointsMembershipChangeDTO) => {
   return request.post<Result<any>>('/points/recharge', data)
@@ -112,12 +124,18 @@ export const getPackagesByTypeService = (type: number) => {
 }
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 >>>>>>> origin/master
 =======
 >>>>>>> origin/master
 =======
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
 
 export const getAlipayService = (orderNo: number) => {
   return request.get(`/alipay/pay/${orderNo}`)
 }
+<<<<<<< HEAD
 >>>>>>> origin/master
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829

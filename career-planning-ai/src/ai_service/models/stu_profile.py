@@ -165,6 +165,7 @@ class StuProfile(Base):
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
             if column.name not in exclude_fields:
                 value = getattr(self, column.name)
                 # 处理 datetime 类型，转换为 ISO 格式字符串
@@ -176,6 +177,8 @@ class StuProfile(Base):
 >>>>>>> origin/master
 =======
 >>>>>>> origin/master
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
             if column._name not in exclude_fields:
                 value = getattr(self, column._name)
                 # 处理 datetime 类型，转换为 ISO 格式字符串
@@ -184,11 +187,14 @@ class StuProfile(Base):
                 data[column._name] = value
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 >>>>>>> origin/master
 =======
 >>>>>>> origin/master
 =======
 >>>>>>> origin/master
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
 
         return data
 

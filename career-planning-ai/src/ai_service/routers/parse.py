@@ -29,19 +29,27 @@ async def parse_file(
     if cache_enabled:
         try:
 <<<<<<< HEAD
+<<<<<<< HEAD
             cached_results, uncached_infos = await get_cache(file_info=file_info)
 =======
             cached_results, uncached_infos = await _get_cache(file_info=file_info)
 >>>>>>> origin/master
+=======
+            cached_results, uncached_infos = await _get_cache(file_info=file_info)
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
         except Exception as e:
             log.error(f"获取缓存失败: {e}", exc_info=True)
         if len(uncached_infos) == 0:
             return success(cached_results[0])
 <<<<<<< HEAD
+<<<<<<< HEAD
     text = await _extract_text_from_file(file_info["save_path"], file_info["extension"])
 =======
     text = await extract_from_file(file_info["save_path"], file_info["extension"])
 >>>>>>> origin/master
+=======
+    text = await extract_from_file(file_info["save_path"], file_info["extension"])
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
     result = await struct_text_extractor.extract_from_text_to_user_form(text)
     background_tasks.add_task(_save_cache, [result], uncached_infos)
     return success(result)
@@ -57,10 +65,14 @@ async def parse_files(
     if cache_enabled:
         try:
 <<<<<<< HEAD
+<<<<<<< HEAD
             cached_results, uncached_infos = await get_cache(file_infos=file_infos)
 =======
             cached_results, uncached_infos = await _get_cache(file_infos=file_infos)
 >>>>>>> origin/master
+=======
+            cached_results, uncached_infos = await _get_cache(file_infos=file_infos)
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
         except Exception as e:
             log.error(f"获取缓存失败: {e}", exc_info=True)
         if len(uncached_infos) == 0:

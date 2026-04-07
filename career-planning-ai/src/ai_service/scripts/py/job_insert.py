@@ -3,6 +3,7 @@ from pathlib import Path
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 from typing import List, Union
 =======
 =======
@@ -12,6 +13,9 @@ from typing import List
 =======
 from typing import List, Union
 >>>>>>> origin/master
+=======
+from typing import List, Union
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 
@@ -103,12 +107,16 @@ def get_all_files(folder_path: Union[str, Path], recursive: bool = True) -> List
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 >>>>>>> origin/master
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
     if recursive:
         return [str(f.resolve()) for f in folder.rglob("*") if f.is_file()]
     else:
         return [str(f.resolve()) for f in folder.iterdir() if f.is_file()]
+<<<<<<< HEAD
 <<<<<<< HEAD
 =======
 async def main():
@@ -120,6 +128,8 @@ async def main():
 >>>>>>> origin/master
 =======
 >>>>>>> origin/master
+=======
+>>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
 
 
 async def main(max_concurrent: int = 5):
