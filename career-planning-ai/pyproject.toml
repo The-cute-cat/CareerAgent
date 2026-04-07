@@ -51,7 +51,7 @@ dependencies = [
     "umap-learn (>=0.5.11,<0.6.0)",
     "chromadb (>=1.5.5,<2.0.0)",
     "langchain-chroma (>=1.1.0,<2.0.0)",
-    "opentelemetry-proto (>=1.30.0)",  # 解决 protobuf 5.x 兼容性问题（pymilvus 需要 protobuf>=5.27.2）
+    "opentelemetry-proto (>=1.30.0)",
     "beautifulsoup4 (>=4.14.3,<5.0.0)",
     "neo4j (>=6.1.0,<7.0.0)",
     "networkx (>=3.6.1,<4.0.0)",

@@ -476,4 +476,143 @@ public class AiServiceClient {
     public Flux<String> chatWithOtherStream(String url, Map<String, Object> params) {
         return universalAiServiceStream(url, buildOtherBody(params));
     }
+
+    /**
+     * 通用 GET 请求方法
+     *
+     * @param url         请求的 API 路径（可包含路径参数）
+     * @param queryParams 查询参数（可选）
+     * @param serviceName 服务名称（用于日志）
+     * @param enableRetry 是否启用重试机制
+     * @return AI 响应结果
+     */
+    public AiChatResponse getRequest(String url, Map<String, Object> queryParams, String serviceName, boolean enableRetry) {
+        return executeWithRetry(url, ignored -> {
+            String token = AITokenUtil.createToken();
+            WebClient.RequestHeadersSpec<?> request = webClient.get()
+                    .uri(uriBuilder -> {
+                        uriBuilder.path(properties.getBaseUrl() + url);
+                        if (queryParams != null) {
+                            queryParams.forEach((key, value) -> {
+                                if (value != null) {
+                                    uriBuilder.queryParam(key, value);
+                                }
+                            });
+                        }
+                        return uriBuilder.build();
+                    })
+                    .header("Authorization", "Bearer " + token);
+
+            return request.retrieve()
+                    .bodyToMono(AiChatResponse.class)
+                    .timeout(Duration.ofMillis(properties.getTimeout()))
+                    .block(Duration.ofMillis(properties.getTimeout()));
+        }, () -> null, serviceName, enableRetry);
+    }
+
+    /**
+     * 通用 DELETE 请求方法
+     *
+     * @param url         请求的 API 路径（可包含路径参数）
+     * @param serviceName 服务名称（用于日志）
+     * @param enableRetry 是否启用重试机制
+     * @return AI 响应结果
+     */
+    public AiChatResponse deleteRequest(String url, String serviceName, boolean enableRetry) {
+        return executeWithRetry(url, ignored -> {
+            String token = AITokenUtil.createToken();
+            return webClient.delete()
+                    .uri(properties.getBaseUrl() + url)
+                    .header("Authorization", "Bearer " + token)
+                    .retrieve()
+                    .bodyToMono(AiChatResponse.class)
+                    .timeout(Duration.ofMillis(properties.getTimeout()))
+                    .block(Duration.ofMillis(properties.getTimeout()));
+        }, () -> null, serviceName, enableRetry);
+    }
+
+    /**
+     * 通用 PUT 请求方法（表单格式）
+     *
+     * @param url         请求的 API 路径（可包含路径参数）
+     * @param params      表单参数
+     * @param serviceName 服务名称（用于日志）
+     * @param enableRetry 是否启用重试机制
+     * @return AI 响应结果
+     */
+    public AiChatResponse putRequest(String url, Map<String, Object> params, String serviceName, boolean enableRetry) {
+        return executeWithRetry(url, ignored -> {
+            String token = AITokenUtil.createToken();
+            MultipartBodyBuilder builder = new MultipartBodyBuilder();
+            if (params != null) {
+                for (Map.Entry<String, Object> entry : params.entrySet()) {
+                    builder.part(entry.getKey(), entry.getValue());
+                }
+            }
+            return webClient.put()
+                    .uri(properties.getBaseUrl() + url)
+                    .header("Authorization", "Bearer " + token)
+                    .contentType(MediaType.MULTIPART_FORM_DATA)
+                    .body(BodyInserters.fromMultipartData(builder.build()))
+                    .retrieve()
+                    .bodyToMono(AiChatResponse.class)
+                    .timeout(Duration.ofMillis(properties.getTimeout()))
+                    .block(Duration.ofMillis(properties.getTimeout()));
+        }, () -> null, serviceName, enableRetry);
+    }
+
+
+//    /**
+//     * 获取会话历史记录（GET 请求）
+//     *
+//     * @param sessionId 会话 ID
+//     * @param limit     限制返回数量（可选）
+//     * @return AI 响应结果，包含会话历史记录
+//     */
+//    public AiChatResponse getChatHistory(String sessionId, Integer limit) {
+//        Map<String, Object> queryParams = limit != null ? Map.of("limit", limit) : null;
+//        return getRequest("/chat/history/" + sessionId, queryParams, "获取会话历史", false);
+//    }
+//
+//    /**
+//     * 获取用户的会话列表（GET 请求）
+//     *
+//     * @param userId   用户 ID
+//     * @param page     页码
+//     * @param pageSize 每页数量
+//     * @return AI 响应结果，包含会话列表
+//     */
+//    public AiChatResponse getUserSessions(String userId, Integer page, Integer pageSize) {
+//        Map<String, Object> queryParams = new java.util.HashMap<>();
+//        queryParams.put("user_id", userId);
+//        if (page != null) {
+//            queryParams.put("page", page);
+//        }
+//        if (pageSize != null) {
+//            queryParams.put("page_size", pageSize);
+//        }
+//        return getRequest("/chat/sessions", queryParams, "获取会话列表", false);
+//    }
+//
+//    /**
+//     * 清除会话（DELETE 请求）
+//     *
+//     * @param sessionId 会话 ID
+//     * @return AI 响应结果
+//     */
+//    public AiChatResponse clearSession(String sessionId) {
+//        return deleteRequest("/chat/session/" + sessionId, "清除会话", false);
+//    }
+//
+//    /**
+//     * 更新会话标题（PUT 请求）
+//     *
+//     * @param sessionId 会话 ID
+//     * @param title     新标题
+//     * @return AI 响应结果
+//     */
+//    public AiChatResponse updateSessionTitle(String sessionId, String title) {
+//        Map<String, Object> params = Map.of("title", title);
+//        return putRequest("/chat/session/" + sessionId + "/title", params, "更新会话标题", false);
+//    }
 }

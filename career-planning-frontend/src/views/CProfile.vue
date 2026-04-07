@@ -6,6 +6,7 @@ import { ArrowLeft } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/modules/user'
 import { logout as userLogoutService } from '@/api/user'
 import { getAccountPointsService } from '@/api/points'
+import { getInviteCodeService } from '@/api/points/invite'
 import type { AccountPointsData } from '@/api/points'
 import { getUserInfo } from '@/api/user'
 
@@ -100,28 +101,39 @@ const pointRecords = computed(() => {
     {
       id: 2,
       type: '累计消耗积分',
-      remain: accountPoints.value.totalConsumed,
-      total: accountPoints.value.totalConsumed,
-      expireText: '历史累计消耗 ' + accountPoints.value.totalConsumed
+      remain: accountPoints.value.totalConsumed || 0,
+      total: accountPoints.value.totalConsumed || 0,
+      expireText: '历史累计消耗 ' + (accountPoints.value.totalConsumed || 0)
     },
-    {
+    ...(accountPoints.value.referralCount > 0 ? [{
       id: 3,
       type: '邀请奖励积分',
-      remain: accountPoints.value.referralRewardTotal,
-      total: accountPoints.value.referralRewardTotal,
-      expireText: `已邀请 ${accountPoints.value.referralCount == null ? 0 : accountPoints.value.referralCount} 人`
-    }
+      remain: accountPoints.value.referralRewardTotal || 0,
+      total: accountPoints.value.referralRewardTotal || 0,
+      expireText: `已邀请 ${accountPoints.value.referralCount} 人`
+    }] : [])
   ]
 })
 
-const inviteCode = ref('ZHILU2026')
+const inviteCode = ref<string | null>(null)
+
+const fetchInviteCode = async () => {
+  try {
+    const res = await getInviteCodeService()
+    if (res.data.code === 200) {
+      inviteCode.value = res.data.data || null
+    }
+  } catch (error) {
+    console.error('获取邀请码失败:', error)
+  }
+}
 
 const panelTitleMap: Record<string, string> = {
   dashboard: '我的主页',
   profile: '个人资料',
   member: '会员计划',
   invite: '邀请好友',
-  feedback: '反馈建议',
+  feedback: '反馈建议--(采纳后赠送 200 积分)',
   setting: '更多设置'
 }
 
@@ -171,6 +183,7 @@ onMounted(() => {
   }
 
   fetchAccountPoints()
+  fetchInviteCode()
 
   if (isSettingsCenter.value) {
     activeMenu.value = 'setting'
@@ -394,9 +407,11 @@ const refreshUserInfoAfterPurchase = async () => {
               @update-user="updateUserInfo" />
 
             <MemberPlanPanel v-else-if="activeMenu === 'member'" :points="displayPoints" :records="pointRecords"
-              :account-points="accountPoints" :loading="pointsLoading" @purchase-success="refreshUserInfoAfterPurchase" />
+              :account-points="accountPoints" :loading="pointsLoading" :invite-code="inviteCode"
+              @open-invite="activeMenu = 'invite'" />
 
-            <InviteFriendsPanel v-else-if="activeMenu === 'invite'" :invite-code="inviteCode" />
+            <InviteFriendsPanel v-else-if="activeMenu === 'invite'" :invite-code="inviteCode"
+              @refresh-invite="fetchInviteCode" />
 
             <FeedbackPanel v-else-if="activeMenu === 'feedback'" />
 
@@ -492,20 +507,7 @@ const refreshUserInfoAfterPurchase = async () => {
 
 .content-intro {
   margin-bottom: 32px;
-  padding-bottom: 28px;
-  border-bottom: 1px solid rgba(226, 236, 248, 0.7);
   position: relative;
-}
-
-.content-intro::after {
-  content: '';
-  position: absolute;
-  bottom: -1px;
-  left: 0;
-  width: 60px;
-  height: 2px;
-  background: linear-gradient(90deg, #94a3b8, transparent);
-  border-radius: 2px;
 }
 
 .content-intro h1 {
