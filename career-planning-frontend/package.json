@@ -18,6 +18,7 @@
     "test:coverage": "vitest --coverage"
   },
   "dependencies": {
+    "@antv/g6": "^5.1.0",
     "@antv/layout": "^1.2.14-beta.8",
     "@antv/x6": "^3.1.7",
     "@antv/x6-vue-shape": "^3.0.2",

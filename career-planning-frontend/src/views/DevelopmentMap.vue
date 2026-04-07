@@ -62,124 +62,112 @@
           </div>
         </div>
       </div>
+    </div>
 
-      <!-- 侧边详情面板 -->
-      <transition name="slide-fade">
-        <div v-if="selectedNode || selectedEdge" class="detail-panel">
-          <!-- 节点详情 -->
-          <div v-if="selectedNode" class="node-detail">
-            <div class="panel-header">
-              <h3>{{ selectedNode.name }}</h3>
-              <el-tag :type="getNodeType(selectedNode)" size="small">
-                {{ getNodeTypeText(selectedNode) }}
-              </el-tag>
-              <el-button 
-                circle 
-                size="small" 
-                class="close-btn"
-                @click="selectedNode = null"
-              >
-                <el-icon><Close /></el-icon>
-              </el-button>
-            </div>
-            
-            <div class="panel-content">
-              <div class="info-section">
-                <h4>岗位信息</h4>
-                <p><strong>岗位ID:</strong> {{ selectedNode.jobId }}</p>
-                <p v-if="selectedNode.category"><strong>所属类别:</strong> {{ selectedNode.category }}</p>
+    <!-- 详情弹窗 -->
+    <el-dialog
+      v-model="dialogVisible"
+      :title="dialogTitle"
+      width="420px"
+      :close-on-click-modal="false"
+      class="detail-dialog"
+    >
+      <!-- 节点详情 -->
+      <div v-if="selectedNode" class="node-detail">
+        <div class="panel-header">
+          <h3>{{ selectedNode.name }}</h3>
+          <el-tag :type="getNodeType(selectedNode)" size="small">
+            {{ getNodeTypeText(selectedNode) }}
+          </el-tag>
+        </div>
+        
+        <div class="panel-content">
+          <div class="info-section">
+            <h4>岗位信息</h4>
+            <p><strong>岗位ID:</strong> {{ selectedNode.jobId }}</p>
+            <p v-if="selectedNode.category"><strong>所属类别:</strong> {{ selectedNode.category }}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 路径/边详情 -->
+      <div v-if="selectedEdge" class="edge-detail">
+        <div class="panel-header">
+          <h3>{{ selectedEdge.pathTitle }}</h3>
+          <el-tag :type="selectedEdge.pathType === 'vertical' ? 'danger' : 'warning'" size="small">
+            {{ selectedEdge.pathType === 'vertical' ? '垂直晋升' : '横向转岗' }}
+          </el-tag>
+        </div>
+
+        <div class="panel-content">
+          <div class="summary-section">
+            <h4>路径概述</h4>
+            <p class="summary-text">{{ selectedEdge.overallSummary }}</p>
+          </div>
+
+          <div class="metrics-section">
+            <h4>路径指标</h4>
+            <div class="metrics-grid">
+              <div class="metric-item">
+                <span class="metric-label">演化阻力</span>
+                <el-progress 
+                  :percentage="selectedEdge.totalRoutingCost * 100" 
+                  :color="getCostColor(selectedEdge.totalRoutingCost)"
+                  :format="() => selectedEdge.totalRoutingCost.toFixed(2)"
+                />
+              </div>
+              <div class="metric-item">
+                <span class="metric-label">步骤数</span>
+                <el-tag type="info">{{ selectedEdge.totalSteps }} 步</el-tag>
               </div>
             </div>
           </div>
 
-          <!-- 路径/边详情 -->
-          <div v-if="selectedEdge" class="edge-detail">
-            <div class="panel-header">
-              <h3>{{ selectedEdge.pathTitle }}</h3>
-              <el-tag :type="selectedEdge.pathType === 'vertical' ? 'danger' : 'warning'" size="small">
-                {{ selectedEdge.pathType === 'vertical' ? '垂直晋升' : '横向转岗' }}
-              </el-tag>
-              <el-button 
-                circle 
-                size="small" 
-                class="close-btn"
-                @click="selectedEdge = null"
-              >
-                <el-icon><Close /></el-icon>
-              </el-button>
+          <div class="transition-section">
+            <h4>转换详情</h4>
+            <div class="transition-flow">
+              <div class="flow-node">{{ selectedEdge.fromJobName }}</div>
+              <div class="flow-arrow">
+                <el-icon><Right /></el-icon>
+              </div>
+              <div class="flow-node target">{{ selectedEdge.toJobName }}</div>
+            </div>
+            
+            <div class="transition-reason">
+              <el-alert
+                :title="'转换分析'"
+                :description="selectedEdge.transitionReason"
+                type="info"
+                :closable="false"
+                show-icon
+              />
             </div>
 
-            <div class="panel-content">
-              <div class="summary-section">
-                <h4>路径概述</h4>
-                <p class="summary-text">{{ selectedEdge.overallSummary }}</p>
-              </div>
-
-              <div class="metrics-section">
-                <h4>路径指标</h4>
-                <div class="metrics-grid">
-                  <div class="metric-item">
-                    <span class="metric-label">演化阻力</span>
-                    <el-progress 
-                      :percentage="selectedEdge.totalRoutingCost * 100" 
-                      :color="getCostColor(selectedEdge.totalRoutingCost)"
-                      :format="() => selectedEdge.totalRoutingCost.toFixed(2)"
-                    />
-                  </div>
-                  <div class="metric-item">
-                    <span class="metric-label">步骤数</span>
-                    <el-tag type="info">{{ selectedEdge.totalSteps }} 步</el-tag>
-                  </div>
+            <div class="skills-section">
+              <h4>技能缺口与建议</h4>
+              <div 
+                v-for="(gap, index) in selectedEdge.skillGaps" 
+                :key="index"
+                class="skill-gap-item"
+              >
+                <div class="skill-header">
+                  <span class="skill-name">{{ gap.competencyName }}</span>
+                  <el-tag size="small" type="warning">{{ gap.category }}</el-tag>
                 </div>
-              </div>
-
-              <div class="transition-section">
-                <h4>转换详情</h4>
-                <div class="transition-flow">
-                  <div class="flow-node">{{ selectedEdge.fromJobName }}</div>
-                  <div class="flow-arrow">
-                    <el-icon><Right /></el-icon>
-                  </div>
-                  <div class="flow-node target">{{ selectedEdge.toJobName }}</div>
+                <div class="skill-context" v-if="gap.originalContext">
+                  <el-text type="info" size="small">要求: {{ gap.originalContext }}</el-text>
                 </div>
-                
-                <div class="transition-reason">
-                  <el-alert
-                    :title="'转换分析'"
-                    :description="selectedEdge.transitionReason"
-                    type="info"
-                    :closable="false"
-                    show-icon
-                  />
+                <div class="skill-advice">
+                  <el-icon><InfoFilled /></el-icon>
+                  <span>{{ gap.actionableAdvice }}</span>
                 </div>
-
-                <div class="skills-section">
-                  <h4>技能缺口与建议</h4>
-                  <div 
-                    v-for="(gap, index) in selectedEdge.skillGaps" 
-                    :key="index"
-                    class="skill-gap-item"
-                  >
-                    <div class="skill-header">
-                      <span class="skill-name">{{ gap.competencyName }}</span>
-                      <el-tag size="small" type="warning">{{ gap.category }}</el-tag>
-                    </div>
-                    <div class="skill-context" v-if="gap.originalContext">
-                      <el-text type="info" size="small">要求: {{ gap.originalContext }}</el-text>
-                    </div>
-                    <div class="skill-advice">
-                      <el-icon><InfoFilled /></el-icon>
-                      <span>{{ gap.actionableAdvice }}</span>
-                    </div>
-                    <el-divider v-if="selectedEdge.skillGaps && (index as number) < selectedEdge.skillGaps.length - 1" />
-                  </div>
-                </div>
+                <el-divider v-if="selectedEdge.skillGaps && (index as number) < selectedEdge.skillGaps.length - 1" />
               </div>
             </div>
           </div>
         </div>
-      </transition>
-    </div>
+      </div>
+    </el-dialog>
 
     <!-- 统计信息区 -->
     <div class="stats-section" v-if="currentStats">
@@ -267,6 +255,8 @@ const loading = ref(false)
 const searchKeyword = ref('')
 const selectedNode = ref<any>(null)
 const selectedEdge = ref<any>(null)
+const dialogVisible = ref(false)
+const dialogTitle = ref('')
 
 // 模拟数据 - 垂直晋升路径
 const verticalData = ref<CareerData>({
@@ -806,18 +796,23 @@ const convertDataToGraph = (data: CareerData) => {
 const handleNodeClick = (nodeData: any) => {
   selectedNode.value = nodeData
   selectedEdge.value = null
+  dialogTitle.value = nodeData.name
+  dialogVisible.value = true
 }
 
 // 边点击
 const handleEdgeClick = (edgeData: any) => {
   selectedEdge.value = edgeData
   selectedNode.value = null
+  dialogTitle.value = edgeData.pathTitle
+  dialogVisible.value = true
 }
 
 // 视图切换
 const handleViewChange = () => {
   selectedNode.value = null
   selectedEdge.value = null
+  dialogVisible.value = false
   nextTick(() => {
     renderGraph()
   })
@@ -1016,14 +1011,13 @@ onUnmounted(() => {
       }
     }
 
-    .detail-panel {
-      width: 420px;
-      background: rgba(255, 255, 255, 0.98);
-      border-left: 1px solid #e4e7ed;
-      box-shadow: -4px 0 20px rgba(0, 0, 0, 0.08);
-      overflow-y: auto;
-      padding: 24px;
-      
+    .detail-dialog {
+      .el-dialog__body {
+        padding: 24px;
+        overflow-y: auto;
+        max-height: 70vh;
+      }
+
       .panel-header {
         display: flex;
         justify-content: space-between;
@@ -1037,10 +1031,6 @@ onUnmounted(() => {
           font-size: 18px;
           color: #303133;
           flex: 1;
-        }
-        
-        .close-btn {
-          margin-left: 10px;
         }
       }
 
