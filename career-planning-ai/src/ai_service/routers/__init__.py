@@ -5,4 +5,8 @@ __all__ = [
     "code_ability",
     "convert",
     "report",
+<<<<<<< HEAD
+=======
+    "chat",
+>>>>>>> origin/master
 ]

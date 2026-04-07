@@ -11,6 +11,35 @@ from langgraph.types import Command
 
 from ai_service.agents import log
 
+__all__ = [
+    "monitor_tool",
+    "log_before_model",
+    "track_token_usage",
+    "reset_token_stats",
+    "get_token_stats",
+]
+
+@dataclass
+class TokenStats:
+    """Token 统计信息"""
+    input_tokens: int = 0
+    output_tokens: int = 0
+    total_tokens: int = 0
+    call_count: int = 0  # 模型调用次数
+
+
+_token_stats: ContextVar[TokenStats] = ContextVar("token_stats", default=TokenStats())
+
+
+def reset_token_stats() -> None:
+    """重置 Token 统计（每次生成计划前调用）"""
+    _token_stats.set(TokenStats())
+
+
+def get_token_stats() -> TokenStats:
+    """获取当前 Token 统计"""
+    return _token_stats.get()
+
 
 @dataclass
 class TokenStats:

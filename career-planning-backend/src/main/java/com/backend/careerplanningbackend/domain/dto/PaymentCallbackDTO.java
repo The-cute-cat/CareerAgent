@@ -13,9 +13,6 @@ public class PaymentCallbackDTO {
     @NotBlank(message = "订单号不能为空")
     private String orderNo;
 
-    @NotBlank(message = "第三方流水号不能为空")
-    private String transactionId;
-
     /**
      * 回调状态: SUCCESS / FAIL
      */

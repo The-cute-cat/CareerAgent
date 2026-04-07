@@ -12,8 +12,8 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class FileUpload {
     @TableId(type = IdType.ASSIGN_UUID)
-    private Long id;
+    private String id;
     private Long userId;
     private String fileUrl;
-    private String filename;
+    private String fileName;
 }

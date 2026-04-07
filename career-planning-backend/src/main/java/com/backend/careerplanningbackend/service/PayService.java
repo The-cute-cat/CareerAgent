@@ -21,7 +21,7 @@ public interface PayService {
     
     void pagePay(Long orderNumber, HttpServletResponse response) throws AlipayApiException, IOException;
 
-    void pagePayByUserId(Long orderNumber, HttpServletResponse response) throws AlipayApiException, IOException;
+//    void pagePayByUserId(Long orderNumber, HttpServletResponse response) throws AlipayApiException, IOException;
     /**
      * 支付成功异步通知
      */

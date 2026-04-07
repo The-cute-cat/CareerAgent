@@ -19,7 +19,7 @@ public class WebConfig implements WebMvcConfigurer {
                  .excludePathPatterns("/user/login","/user/register","/user/forget",
                          "/user/send-code-register", "/user/send-code-forget",
                          "/user/refreshToken",
-                         "/user/forget-password"
+                         "/user/forget-password","/alipay/pay/{id}"
                  );//设置不拦截的请求路径
     }
 //    @Override

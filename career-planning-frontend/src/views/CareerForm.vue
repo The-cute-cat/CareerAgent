@@ -2409,10 +2409,9 @@ const resetForm = () => {
           </el-menu>
 
           <div class="resume-upload-section">
-            <div class="upload-label"></div>
             <el-button class="upload-btn" :type="hasUploadedResume ? 'info' : 'primary'" @click="showUploadDialog = true"
-              :icon="Upload">
-              {{ hasUploadedResume ? '重新上传简历' : '上传简历' }}
+              :icon="Upload" size="large">
+              {{ hasUploadedResume ? '重新上传简历' : '智能解析简历' }}
             </el-button>
             <el-button
               v-if="showResumeContinueButton"
@@ -2461,7 +2460,13 @@ const resetForm = () => {
                 <div class="dash-stat-item">
                   <div class="stat-info">
                     <span class="stat-label">当前阶段</span>
+<<<<<<< HEAD
                     <span class="stat-value">{{ currentSectionTitle }}</span>
+=======
+                    <div class="stat-value-row">
+                      <span class="stat-value">{{ currentSectionTitle }}</span>
+                    </div>
+>>>>>>> origin/master
                     <span class="stat-desc">{{ currentSectionDescription }}</span>
                   </div>
                 </div>
@@ -2469,7 +2474,13 @@ const resetForm = () => {
                 <div class="dash-stat-item">
                   <div class="stat-info">
                     <span class="stat-label">已完成步骤</span>
+<<<<<<< HEAD
                     <span class="stat-value">{{ completedStepCount }}/5</span>
+=======
+                    <div class="stat-value-row">
+                      <span class="stat-value">{{ completedStepCount }}/5</span>
+                    </div>
+>>>>>>> origin/master
                     <span class="stat-desc">每完成一步都会提升画像可用性</span>
                   </div>
                 </div>
@@ -2477,7 +2488,13 @@ const resetForm = () => {
                 <div class="dash-stat-item">
                   <div class="stat-info">
                     <span class="stat-label">评估准备度</span>
+<<<<<<< HEAD
                     <span class="stat-value">{{ readinessText }}</span>
+=======
+                    <div class="stat-value-row">
+                      <span class="stat-value">{{ readinessText }}</span>
+                    </div>
+>>>>>>> origin/master
                     <span class="stat-desc">{{ readinessHint }}</span>
                   </div>
                 </div>
@@ -3870,43 +3887,24 @@ const resetForm = () => {
   flex: 1;
 }
 
-.sidebar {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(246, 250, 255, 0.92));
-  padding: 20px 0;
+.premium-sidebar {
+  background: #fff;
+  border-right: 1px solid rgba(226, 232, 240, 0.8);
   display: flex;
   flex-direction: column;
-  width: 200px !important;
-  min-width: 200px !important;
-  max-width: 200px !important;
-  height: 100%;
-  position: relative;
-  flex-shrink: 0;
-  border-right: 1px solid rgba(212, 224, 238, 0.9);
-  overflow-y: auto;
-  overflow-x: hidden;
-  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.7);
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 
 .sidebar-brand {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 0 20px 24px;
+  padding: 20px 20px 24px;
   border-bottom: 1px solid rgba(222, 232, 244, 0.9);
   margin-bottom: 16px;
-}
-
-.brand-icon {
-  width: 44px;
-  height: 44px;
-  background: linear-gradient(135deg, #2f7df6 0%, #63b7ff 100%);
-  border-radius: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  flex-shrink: 0;
-  box-shadow: 0 12px 24px rgba(47, 125, 246, 0.22);
 }
 
 .brand-info {
@@ -4639,6 +4637,12 @@ const resetForm = () => {
   font-size: 18px;
   font-weight: 800;
   color: #1e293b;
+}
+
+.stat-value-row {
+  display: flex;
+  align-items: center;
+  height: 32px; /* 固定高度确保对齐 */
 }
 
 .stat-glass-glow {

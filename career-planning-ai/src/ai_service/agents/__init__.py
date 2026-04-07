@@ -5,6 +5,12 @@ __all__ = [
     "growth_plan_agent",
     "tools",
     "user_job_match_analyzer",
+<<<<<<< HEAD
+=======
+    "middleware",
+    "memory",
+    "conversation_agent",
+>>>>>>> origin/master
 ]
 
 from ai_service.utils.logger_handler import get_logger

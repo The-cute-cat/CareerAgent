@@ -6,7 +6,13 @@ import { ArrowLeft } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/modules/user'
 import { logout as userLogoutService } from '@/api/user'
 import { getAccountPointsService } from '@/api/points'
+<<<<<<< HEAD
 import type { AccountPointsData } from '@/api/points'
+=======
+import { getInviteCodeService } from '@/api/points/invite'
+import type { AccountPointsData } from '@/api/points'
+import { getUserInfo } from '@/api/user'
+>>>>>>> origin/master
 
 import ProfileInfoPanel from '../components/CProfile_Component/ProfileInfoPanel.vue'
 import ProfileSidebar from '../components/CProfile_Component/ProfileSidebar.vue'
@@ -87,6 +93,7 @@ const pointRecords = computed(() => {
   if (!accountPoints.value) {
     return []
   }
+<<<<<<< HEAD
 
   return [
     {
@@ -112,15 +119,56 @@ const pointRecords = computed(() => {
     }
   ]
 })
+=======
+>>>>>>> origin/master
 
-const inviteCode = ref('ZHILU2026')
+  return [
+    {
+      id: 1,
+      type: '当前可用积分',
+      remain: accountPoints.value.pointsBalance,
+      total: accountPoints.value.pointsBalance,
+      expireText: '账户当前可用余额 ' + accountPoints.value.pointsBalance
+    },
+    {
+      id: 2,
+      type: '累计消耗积分',
+      remain: accountPoints.value.totalConsumed || 0,
+      total: accountPoints.value.totalConsumed || 0,
+      expireText: '历史累计消耗 ' + (accountPoints.value.totalConsumed || 0)
+    },
+    ...(accountPoints.value.referralCount > 0 ? [{
+      id: 3,
+      type: '邀请奖励积分',
+      remain: accountPoints.value.referralRewardTotal || 0,
+      total: accountPoints.value.referralRewardTotal || 0,
+      expireText: `已邀请 ${accountPoints.value.referralCount} 人`
+    }] : [])
+  ]
+})
 
+<<<<<<< HEAD
+=======
+const inviteCode = ref<string | null>(null)
+
+const fetchInviteCode = async () => {
+  try {
+    const res = await getInviteCodeService()
+    if (res.data.code === 200) {
+      inviteCode.value = res.data.data || null
+    }
+  } catch (error) {
+    console.error('获取邀请码失败:', error)
+  }
+}
+
+>>>>>>> origin/master
 const panelTitleMap: Record<string, string> = {
   dashboard: '我的主页',
   profile: '个人资料',
   member: '会员计划',
   invite: '邀请好友',
-  feedback: '反馈建议',
+  feedback: '反馈建议--(采纳后赠送 200 积分)',
   setting: '更多设置'
 }
 
@@ -170,6 +218,10 @@ onMounted(() => {
   }
 
   fetchAccountPoints()
+<<<<<<< HEAD
+=======
+  fetchInviteCode()
+>>>>>>> origin/master
 
   if (isSettingsCenter.value) {
     activeMenu.value = 'setting'
@@ -276,6 +328,89 @@ const handleSettingAction = (key: string) => {
     duration: 1800
   })
 }
+
+// ==================== 支付成功后刷新用户信息 ====================
+
+// 刷新用户信息（积分和会员状态）
+const refreshUserInfoAfterPurchase = async () => {
+  const userId = Number(userStore.userInfo?.id)
+  if (!userId) {
+    ElMessage.warning('无法获取用户信息，请重新登录')
+    return
+  }
+
+  ElMessage.info('正在刷新账户信息...')
+
+  try {
+    // 并行获取积分账户信息和用户信息
+    const [pointsResult, userResult] = await Promise.all([
+      getAccountPointsService(userId).catch(err => {
+        console.error('获取积分信息失败:', err)
+        return null
+      }),
+      getUserInfo().catch(err => {
+        console.error('获取用户信息失败:', err)
+        return null
+      })
+    ])
+
+    // 更新积分信息
+    if (pointsResult?.data?.code === 200 && pointsResult.data.data) {
+      accountPoints.value = pointsResult.data.data
+
+      if (userStore.userInfo) {
+        userStore.userInfo = {
+          ...userStore.userInfo,
+          points: pointsResult.data.data.pointsBalance,
+          pointsBalance: pointsResult.data.data.pointsBalance
+        } as any
+      }
+    }
+
+    // 更新用户信息（会员状态等）
+    if (userResult?.data?.code === 200 && userResult.data.data) {
+      const newUserInfo = userResult.data.data
+
+      // 更新本地 userInfo
+      userInfo.value = {
+        ...userInfo.value,
+        name: (newUserInfo as any).name || (newUserInfo as any).nickname || userInfo.value.name,
+        avatar: (newUserInfo as any).avatar || userInfo.value.avatar,
+        signature: (newUserInfo as any).signature || (newUserInfo as any).info || userInfo.value.signature,
+        gender: (newUserInfo as any).gender || userInfo.value.gender,
+        education: (newUserInfo as any).education || userInfo.value.education,
+        experience: (newUserInfo as any).experience || userInfo.value.experience,
+        industries: (newUserInfo as any).industries || userInfo.value.industries,
+        jobs: (newUserInfo as any).jobs || userInfo.value.jobs
+      }
+
+      // 更新全局 store
+      userStore.userInfo = {
+        ...userStore.userInfo,
+        ...newUserInfo,
+        memberType: (newUserInfo as any).memberType,
+        memberExpireAt: (newUserInfo as any).memberExpireAt
+      } as any
+
+      // 显示成功提示
+      const memberType = String((newUserInfo as any).memberType || 'normal').toLowerCase()
+      const memberText = memberType === 'normal' ? '基础会员' :
+                        memberType === 'monthly' ? '月度会员' :
+                        memberType === 'quarterly' || memberType === 'quarter' ? '季度会员' :
+                        memberType === 'yearly' || memberType === 'annual' ? '年度会员' : '基础会员'
+
+      ElMessage.success({
+        message: `账户信息已更新！当前会员：${memberText}，积分余额：${accountPoints.value?.pointsBalance || 0}`,
+        duration: 3000
+      })
+    } else {
+      ElMessage.success('账户信息已更新')
+    }
+  } catch (error) {
+    console.error('刷新用户信息失败:', error)
+    ElMessage.warning('支付成功，但刷新账户信息失败，请手动刷新页面')
+  }
+}
 </script>
 
 <template>
@@ -310,9 +445,15 @@ const handleSettingAction = (key: string) => {
               @update-user="updateUserInfo" />
 
             <MemberPlanPanel v-else-if="activeMenu === 'member'" :points="displayPoints" :records="pointRecords"
+<<<<<<< HEAD
               :account-points="accountPoints" :loading="pointsLoading" />
+=======
+              :account-points="accountPoints" :loading="pointsLoading" :invite-code="inviteCode"
+              @open-invite="activeMenu = 'invite'" />
+>>>>>>> origin/master
 
-            <InviteFriendsPanel v-else-if="activeMenu === 'invite'" :invite-code="inviteCode" />
+            <InviteFriendsPanel v-else-if="activeMenu === 'invite'" :invite-code="inviteCode"
+              @refresh-invite="fetchInviteCode" />
 
             <FeedbackPanel v-else-if="activeMenu === 'feedback'" />
 
@@ -408,20 +549,7 @@ const handleSettingAction = (key: string) => {
 
 .content-intro {
   margin-bottom: 32px;
-  padding-bottom: 28px;
-  border-bottom: 1px solid rgba(226, 236, 248, 0.7);
   position: relative;
-}
-
-.content-intro::after {
-  content: '';
-  position: absolute;
-  bottom: -1px;
-  left: 0;
-  width: 60px;
-  height: 2px;
-  background: linear-gradient(90deg, #94a3b8, transparent);
-  border-radius: 2px;
 }
 
 .content-intro h1 {

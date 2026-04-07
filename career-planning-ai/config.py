@@ -25,17 +25,21 @@ class _Database(BaseModel):
     database: str = ""
     user: str = ""
     password: str = ""
+    pool_size: int = 10
+    max_overflow: int = 20
+    pool_pre_ping: bool = True
+    pool_recycle: int = 3600
 
     @field_validator("user")  # 这两个装饰器不能调换位置，否则验证逻辑失效!!!
     @classmethod
-    def validate_user(cls, v):
+    def _validate_user(cls, v):
         if v == "<USER>":
             raise ValueError("请在.env文件中配置数据库用户名")
         return v
 
     @field_validator("password")
     @classmethod
-    def validate_password(cls, v):
+    def _validate_password(cls, v):
         if v == "<PASSWORD>":
             raise ValueError("请在.env文件中配置数据库密码")
         return v
@@ -44,18 +48,18 @@ class _Database(BaseModel):
 class _Communication(BaseModel):
     """通信配置嵌套类"""
 
-    class Token(BaseModel):
+    class _Token(BaseModel):
         secret: str = ""
         expire: int = 1800
 
         @field_validator("secret")
         @classmethod
-        def validate_secret(cls, v):
+        def _validate_secret(cls, v):
             if v == "<SECRET>" or v == "<secret>" or not v:
                 raise ValueError("请在.env文件中配置通信密钥")
             return v
 
-    token: Token = Token()
+    token: _Token = _Token()
 
 
 class _LLMModelBase(BaseModel):
@@ -76,12 +80,12 @@ class _LLMModelBase(BaseModel):
     def __str__(self):
         return self.__repr__()
 
-    def set_skip_verify(self, skip_verify: bool):
+    def _set_skip_verify(self, skip_verify: bool):
         self._skip_verify = skip_verify
         return self
 
     @model_validator(mode="after")
-    def validate_default_value(self) -> "_LLMModelBase":
+    def _validate_default_value(self) -> "_LLMModelBase":
         if self._skip_verify:
             return self
         if not self.api_key.get_secret_value() or self.api_key.get_secret_value() == "<api_key>":
@@ -115,7 +119,7 @@ class _LLM(_LLMModelBase):
     """大模型通用配置"""
     _skip_verify: bool = PrivateAttr(default=True)
 
-    def set_default_value(self, llm: _LLMModelBase):
+    def _set_default_value(self, llm: _LLMModelBase):
         if self.api_key.get_secret_value() == "<api_key>":
             raise ValueError(f"{self.__class__.__name__} api_key 应该是需要配置的但现在未配置")
         if not self.api_key.get_secret_value():
@@ -138,29 +142,41 @@ class _LiteLLM(_LLM):
     _name: str = "LiteLLM"
     model_name: str = ""
 
+<<<<<<< HEAD
     class Qwen(_LLM):
+=======
+    class _Qwen(_LLM):
+>>>>>>> origin/master
         _name: str = "LLM_Qwen"
         model_name: str = ""
 
-    qwen: Qwen = Field(default_factory=Qwen)
+    qwen: _Qwen = Field(default_factory=_Qwen)
 
+<<<<<<< HEAD
     class Deepseek(_LLM):
+=======
+    class _Deepseek(_LLM):
+>>>>>>> origin/master
         _name: str = "LLM_Deepseek"
         model_name: str = ""
 
-    deepseek: Deepseek = Field(default_factory=Deepseek)
+    deepseek: _Deepseek = Field(default_factory=_Deepseek)
 
+<<<<<<< HEAD
     class Image(_LLM):
+=======
+    class _Image(_LLM):
+>>>>>>> origin/master
         _name: str = "LLM_Image"
         model_name: str = ""
 
-    image: Image = Field(default_factory=Image)
+    image: _Image = Field(default_factory=_Image)
 
-    def set_default_value(self, llm: _LLMModelBase):
-        super().set_default_value(llm)
+    def _set_default_value(self, llm: _LLMModelBase):
+        super()._set_default_value(llm)
         for key, value in self.__dict__.items():
             if isinstance(value, _LLM):
-                value.set_default_value(llm)
+                value._set_default_value(llm)
 
 
 class _PDF(_LLM):
@@ -196,7 +212,7 @@ class _PathConfig(BaseModel):
 
     @field_validator("temp")
     @classmethod
-    def validate_temp(cls, v):
+    def _validate_temp(cls, v):
         if v == "<TEMP_PATH>" or not v or not Path(v).exists():
             v = tempfile.gettempdir()
         path = os.path.join(v, "career_agent", "ai_service", "temp")
@@ -205,7 +221,7 @@ class _PathConfig(BaseModel):
 
     @field_validator("log")
     @classmethod
-    def validate_log(cls, v):
+    def _validate_log(cls, v):
         if v == "<LOG_PATH>" or not v or not Path(v).exists():
             v = get_project_root()
         path = os.path.join(v, "logs")
@@ -214,7 +230,7 @@ class _PathConfig(BaseModel):
 
     @field_validator("prompt")
     @classmethod
-    def validate_prompt(cls, v):
+    def _validate_prompt(cls, v):
         if v == "<PROMPT_PATH>" or not v or not Path(v).exists():
             v = get_abs_path("")
         path = os.path.join(v, "prompts")
@@ -223,7 +239,7 @@ class _PathConfig(BaseModel):
 
     @field_validator("data")
     @classmethod
-    def validate_data(cls, v):
+    def _validate_data(cls, v):
         if v == "<DATA_PATH>" or not v or not Path(v).exists():
             v = get_project_root()
         path = os.path.join(v, "data")
@@ -237,16 +253,16 @@ class _Vector(BaseModel):
 
 
 class _Milvus(BaseModel):
-    class Local(BaseModel):
+    class _Local(BaseModel):
         host: str = ""
         port: int = 19530
 
-    class Cloud(BaseModel):
+    class _Cloud(BaseModel):
         url: str = ""
         token: SecretStr = SecretStr("")
 
-    local: Local = Field(default_factory=Local)
-    cloud: Cloud = Field(default_factory=Cloud)
+    local: _Local = Field(default_factory=_Local)
+    cloud: _Cloud = Field(default_factory=_Cloud)
 
 
 class _ChromaConfig(_LLM):
@@ -256,16 +272,16 @@ class _ChromaConfig(_LLM):
     save_path: str = ""
     k: int = 5
 
-    class Collection(BaseModel):
+    class _Collection(BaseModel):
         default: str = "default_collection"
         project_collection: str = "open_source_projects"
         book_collection: str = "books"
         intern_collection: str = "internships"
         video_collection: str = "videos"
 
-    collection_name: Collection = Field(default_factory=Collection)
+    collection_name: _Collection = Field(default_factory=_Collection)
 
-    def set_default_path(self, path: str):
+    def _set_default_path(self, path: str):
         if self.save_path == "<SAVE_PATH>" or not self.save_path or not Path(self.save_path).exists():
             if path and path != "" and Path(path).exists():
                 save_path = os.path.join(path, "chroma")
@@ -284,7 +300,7 @@ class _CodeAbility(_LLM):
 
     @field_validator("github_token")
     @classmethod
-    def validate_secret(cls, v):
+    def _validate_secret(cls, v):
         if v.get_secret_value() in ("<GITHUB_TOKEN>", "<token>", "", None):
             print(
                 "⚠️警告：请在.env文件中配置github个人访问令牌，否则可能因github访问速率限制，导致无法获取github仓库信息。")
@@ -293,7 +309,11 @@ class _CodeAbility(_LLM):
 
     @field_validator("gitee_token")
     @classmethod
+<<<<<<< HEAD
     def validate_gitee_token(cls, v):
+=======
+    def _validate_gitee_token(cls, v):
+>>>>>>> origin/master
         if v.get_secret_value() in ("<GITEE_TOKEN>", "<token>", "", None):
             print(
                 "⚠️警告：请在.env文件中配置gitee个人访问令牌，否则可能因gitee访问速率限制，导致无法获取gitee仓库信息。")
@@ -313,17 +333,17 @@ class _RedisConfig(BaseModel):
     password: SecretStr = SecretStr("")
     connect_timeout: int = 2000
 
-    class CacheTimeout(BaseModel):
+    class _CacheTimeout(BaseModel):
         default: int = 3600
         file_parse: int = 3600
         code_ability: int = 3600
         report: int = 3600
         question: int = 3600
 
-    cache_timeout: CacheTimeout = Field(default_factory=CacheTimeout)
+    cache_timeout: _CacheTimeout = Field(default_factory=_CacheTimeout)
 
     @model_validator(mode="after")
-    def validate_availability(self):
+    def _validate_availability(self):
         if self.host in ("<HOST>", "<host>", "", None) or self.port <= 0:
             self.is_can_use = False
             print("⚠️警告：请在.env文件中配置redis相关配置，否则导致无法使用redis缓存。")
@@ -337,7 +357,11 @@ class _Neo4jConfig(BaseModel):
 
     @field_validator("password")
     @classmethod
+<<<<<<< HEAD
     def validate_password(cls, v):
+=======
+    def _validate_password(cls, v):
+>>>>>>> origin/master
         if v.get_secret_value() in ("<PASSWORD>", "<password>", "", None):
             print("⚠️警告：请在.env文件中配置neo4j密码，否则无法使用图数据库功能。")
             return SecretStr("")
@@ -354,6 +378,48 @@ class _Other(BaseModel):
         return self
 
 
+class _Conversation(BaseModel):
+    class _Memory(BaseModel):
+        class _Short(_LLM):
+            max_messages: int = 20
+            max_tokens: int = 5000
+            compression_trigger_raito: float = 0.8
+            keep_recent_messages: int = 8
+            extra: dict[str, Any] = {}
+
+        class _Long(_LLM):
+            max_memory_count: int = 50
+            min_score: float = 0.6
+            collection_name: str = "user_memories"
+            extra: dict[str, Any] = {}
+
+        class _Extraction(_LLM):
+            extra: dict[str, Any] = {}
+
+        class _Compression(_LLM):
+            extra: dict[str, Any] = {}
+
+        short: _Short = Field(default_factory=_Short)
+        long: _Long = Field(default_factory=_Long)
+        extraction: _Extraction = Field(default_factory=_Extraction)
+        compression: _Compression = Field(default_factory=_Compression)
+
+    class _Agent(_LLM):
+        model_name: str = ""
+        extra: dict[str, Any] = {}
+
+    save_path: str = ""
+    memory: _Memory = Field(default_factory=_Memory)
+    agent: _Agent = Field(default_factory=_Agent)
+
+    @model_validator(mode="after")
+    def _set_default_values(self):
+        if self.save_path == "<SAVE_PATH>" or not self.save_path or not Path(self.save_path).exists():
+            self.save_path = os.path.join(get_project_root(), "data", "conversation")
+            os.makedirs(self.save_path, exist_ok=True)
+        return self
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=abs_path(".env"),
@@ -361,6 +427,7 @@ class Settings(BaseSettings):
         env_nested_delimiter="__",
         extra="ignore",
     )
+    debug: bool = False
     database: _Database = Field(default_factory=_Database)
     communication: _Communication = Field(default_factory=_Communication)
     lite_llm: _LiteLLM = Field(default_factory=_LiteLLM)
@@ -377,16 +444,30 @@ class Settings(BaseSettings):
     code_ability: _CodeAbility = Field(default_factory=_CodeAbility)
     redis: _RedisConfig = Field(default_factory=_RedisConfig)
     neo4j: _Neo4jConfig = Field(default_factory=_Neo4jConfig)
+<<<<<<< HEAD
+=======
+    neo4j: _Neo4jConfig = Field(default_factory=_Neo4jConfig)
+>>>>>>> origin/master
     other: _Other = Field(default_factory=_Other)
+    conversation: _Conversation = Field(default_factory=_Conversation)
 
+    # noinspection PyProtectedMember
     @model_validator(mode="after")
-    def set_default_values(self) -> "Settings":
+    def _set_default_values(self) -> "Settings":
         """设置默认值"""
-        self.chroma_config.set_default_path(self.path_config.data)
-        for key, value in self.__dict__.items():
-            if isinstance(value, _LLM):
-                value.set_default_value(self.llm)
+        self.chroma_config._set_default_path(self.path_config.data)
+        self._set_llm_default_values(self)
         return self
+
+    # noinspection PyProtectedMember
+    def _set_llm_default_values(self, obj):
+        """递归设置所有_LLM类型字段的默认值"""
+        if hasattr(obj, '__dict__'):
+            for key, value in obj.__dict__.items():
+                if isinstance(value, _LLM):
+                    value._set_default_value(self.llm)
+                elif hasattr(value, '__dict__'):
+                    self._set_llm_default_values(value)
 
     @classmethod
     def settings_customise_sources(
@@ -440,4 +521,5 @@ if __name__ == "__main__":
     # print(settings.lite_llm.qwen)
     # print(settings.milvus.cloud.token.get_secret_value())
     # print(settings.chroma_config.save_path)
+    # print(settings.conversation.memory.long.model_name)
     pass

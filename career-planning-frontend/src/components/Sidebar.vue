@@ -98,6 +98,7 @@ defineExpose({ collapsed })
       <transition name="text-fade">
         <span v-if="!collapsed" class="logo-text">职路 Agent</span>
       </transition>
+<<<<<<< HEAD
       <el-button
         class="collapse-toggle"
         circle
@@ -108,6 +109,8 @@ defineExpose({ collapsed })
           <component :is="collapsed ? Expand : Fold" />
         </el-icon>
       </el-button>
+=======
+>>>>>>> origin/master
     </div>
     
     <!-- 菜单区域 -->
@@ -168,6 +171,20 @@ defineExpose({ collapsed })
         </template>
       </el-menu>
     </div>
+
+    <!-- 底部操作区域 -->
+    <div class="sidebar-footer">
+      <el-button
+        class="collapse-toggle"
+        circle
+        size="small"
+        @click="toggleCollapse"
+      >
+        <el-icon :size="14">
+          <component :is="collapsed ? Expand : Fold" />
+        </el-icon>
+      </el-button>
+    </div>
   </div>
 </template>
 
@@ -179,8 +196,26 @@ defineExpose({ collapsed })
   flex-direction: column;
   position: relative;
   z-index: 100;
+  overflow-x: hidden !important; /* 强制锁定横向滚动 */
 }
 
+<<<<<<< HEAD
+=======
+/* 隐藏所有可能的滚动条图标（用户提到的“滑轮”） */
+.sidebar-container::-webkit-scrollbar,
+.menu-wrapper::-webkit-scrollbar,
+.el-menu::-webkit-scrollbar {
+  display: none !important;
+}
+
+.sidebar-container,
+.menu-wrapper,
+.el-menu {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+>>>>>>> origin/master
 /* ========== Logo 区域 ========== */
 .logo-section {
   display: flex;
@@ -240,9 +275,26 @@ defineExpose({ collapsed })
   opacity: 0;
 }
 
+<<<<<<< HEAD
+=======
+/* ========== 底部区域 ========== */
+.sidebar-footer {
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+  overflow-x: hidden; /* 核心修改：防止底部区域因为按钮尺寸出现微小的横向滚动 */
+}
+
+.sidebar-container.collapsed .sidebar-footer {
+  justify-content: center;
+  padding: 16px 8px;
+}
+
+>>>>>>> origin/master
 /* ========== 折叠按钮 ========== */
 .collapse-toggle {
-  margin-left: auto;
   border: 1px solid #e2e8f0;
   background: rgba(255, 255, 255, 0.8);
   color: #64748b;
@@ -251,10 +303,6 @@ defineExpose({ collapsed })
   transition: all 0.25s ease;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
   flex-shrink: 0;
-}
-
-.sidebar-container.collapsed .collapse-toggle {
-  margin-left: 0;
 }
 
 .collapse-toggle:hover {
