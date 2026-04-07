@@ -48,12 +48,6 @@ const toggleCollapse = () => {
         <div class="sidebar-title">个人中心</div>
         <div class="sidebar-subtitle">Profile Hub</div>
       </div>
-
-      <el-button circle class="collapse-btn" @click="toggleCollapse">
-        <el-icon>
-          <component :is="collapsed ? Expand : Fold" />
-        </el-icon>
-      </el-button>
     </div>
 
     <div class="user-card" :class="{ collapsed: collapsed }">
@@ -92,6 +86,13 @@ const toggleCollapse = () => {
         <el-icon v-if="!collapsed" class="arrow-icon"><ArrowRight /></el-icon>
       </div>
     </div>
+    <div class="sidebar-footer">
+      <el-button circle class="collapse-btn" @click="toggleCollapse">
+        <el-icon>
+          <component :is="collapsed ? Expand : Fold" />
+        </el-icon>
+      </el-button>
+    </div>
   </aside>
 </template>
 
@@ -102,7 +103,22 @@ const toggleCollapse = () => {
   flex: 0 0 32%;
   min-width: 300px;
   max-width: 420px;
+  display: flex;
+  flex-direction: column;
   transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow-x: hidden !important; /* 物理锁定横向溢出 */
+}
+
+/* 隐藏所有可能的滚动条（滑轮） */
+.left-panel::-webkit-scrollbar,
+.menu-card::-webkit-scrollbar {
+  display: none !important;
+}
+
+.left-panel,
+.menu-card {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
 }
 
 .left-panel.collapsed {
@@ -111,33 +127,33 @@ const toggleCollapse = () => {
   max-width: 88px;
 }
 
-.sidebar-top {
+/* ========== 底部区域 ========== */
+.sidebar-footer {
+  margin-top: auto;
+  padding: 16px 4px 4px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 14px;
-  padding: 0 4px;
 }
 
-.sidebar-title {
-  font-size: 22px;
-  font-weight: 800;
-  color: #173a5d;
-}
-
-.sidebar-subtitle {
-  margin-top: 4px;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  color: #86a0bd;
-  text-transform: uppercase;
+.left-panel.collapsed .sidebar-footer {
+  justify-content: center;
+  padding: 16px 0 0;
 }
 
 .collapse-btn {
   flex-shrink: 0;
   border: 1px solid #dce6f2;
   box-shadow: 0 8px 20px rgba(16, 42, 67, 0.05);
+  background: white;
+  color: #3b5068;
+  transition: all 0.3s ease;
+}
+
+.collapse-btn:hover {
+  background: #f8fafc;
+  color: #165bcf;
+  border-color: #165bcf;
+  transform: scale(1.05);
 }
 
 .user-card {
@@ -400,7 +416,7 @@ const toggleCollapse = () => {
     max-width: none;
     flex: none;
   }
-  
+
   .sidebar-top .collapse-btn {
     display: none;
   }
