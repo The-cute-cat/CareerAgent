@@ -46,4 +46,10 @@ public interface IFeedbackService {
      * 查询指定类型的反馈列表
      */
     Result<List<Feedback>> getFeedbackByType(String type);
+    /**
+     * 更新反馈
+     * @param feedback 反馈信息
+     * @return 操作结果
+     */
+    Result<Boolean> updateFeedback(Feedback feedback);
 }

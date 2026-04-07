@@ -129,4 +129,17 @@ public class FeedbackController {
         log.info("查询类型为 {} 的反馈", type);
         return feedbackService.getFeedbackByType(type);
     }
+
+    /**
+     * 更新反馈
+     * 仅允许更新状态为“待处理”的反馈
+     *
+     * @param feedback 反馈信息
+     * @return 操作结果
+     */
+    @PutMapping("/update")
+    public Result<Boolean> updateFeedback(@RequestBody Feedback feedback) {
+        log.info("更新反馈: {}", feedback);
+        return feedbackService.updateFeedback(feedback);
+    }
 }
