@@ -14,13 +14,16 @@ from pymilvus import (
     Collection,
     utility,
 )
+
+from ai_service.services.database_manage import get_db_url
+
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 from sentence_transformers import SentenceTransformer
 from huggingface_hub import snapshot_download
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 
 from ai_service.models.job_info import JobInfo
-from ai_service.repository.connection_session import get_db_url
+
 from ai_service.repository.job_info_repository import JobRepository
 from ai_service.utils.logger_handler import log
 from config import settings

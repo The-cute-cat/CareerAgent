@@ -11,6 +11,8 @@ package-lock.json
 *.pyc
 __pycache__/
 *_reference.*
+*.http
+conversation/
 
 # 环境变量文件
 .env

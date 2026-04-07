@@ -52,8 +52,8 @@ public class PayController {
      * @param response HTTP 响应对象
      * @throws Exception 支付异常
      */
-    @GetMapping("/pay/order")
-    public void orderNoPay(PaymentOrder paymentOrder, HttpServletResponse response) throws Exception {
+    @PostMapping("/pay/order")
+    public void orderNoPay(@RequestBody PaymentOrder paymentOrder, HttpServletResponse response) throws Exception {
         log.info("paymentOrder: {}", paymentOrder);
         payService.orderNoPay(paymentOrder,response);
     }

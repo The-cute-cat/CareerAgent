@@ -1,0 +1,507 @@
+"""
+对话智能体 - ConversationAgent
+
+主智能体，负责协调所有记忆子智能体：
+1. 管理对话流程
+2. 协调短期和长期记忆
+3. 流式输出生成
+4. 自动提取和存储记忆
+5. 会话持久化管理
+"""
+import asyncio
+from typing import AsyncGenerator
+
+from langchain_core.messages import HumanMessage, SystemMessage, BaseMessage
+from langchain_openai import ChatOpenAI
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ai_service.agents import log as logger
+from ai_service.agents.memory import LongMemoryAgent
+
+from ai_service.agents.memory.memory_compression_agent import memory_compression_agent
+from ai_service.agents.memory.memory_extraction_agent import memory_extraction_agent
+from ai_service.agents.memory.short_memory_agent import short_memory_agent
+from ai_service.repository.session_repository import SessionRepository
+from ai_service.services.database_manage import AsyncSessionLocal
+from ai_service.services.prompt_loader import prompt_loader
+from config import settings
+
+
+class ConversationAgent:
+    """
+    对话智能体
+    
+    主控制器，负责：
+    - 协调短期记忆和长期记忆
+    - 管理对话流程
+    - 自动提取记忆点
+    - 流式输出响应
+    - 会话持久化管理
+    """
+
+    def __init__(self, db_session: AsyncSession | None = None):
+        """
+        初始化对话智能体
+        
+        Args:
+            db_session: 数据库会话
+        """
+        self.llm = ChatOpenAI(
+            base_url=settings.conversation.agent.base_url,
+            model=settings.conversation.agent.model_name,
+            api_key=settings.conversation.agent.api_key.get_secret_value(),
+            temperature=settings.conversation.agent.extra.get("temperature", 0.7),
+            timeout=settings.conversation.agent.timeout,
+            max_retries=settings.conversation.agent.max_retries,
+        )
+        # 初始化记忆子智能体
+        self.short_memory = short_memory_agent
+        self.extraction_agent = memory_extraction_agent
+        self.compression_agent = memory_compression_agent
+        # 长期记忆需要数据库会话
+        self.db_session = db_session
+        self.long_memory: LongMemoryAgent | None = None
+        # 会话持久化管理
+        self.session_repo: SessionRepository | None = None
+        logger.info("ConversationAgent 初始化完成")
+
+    def _ensure_long_memory(self, db_session: AsyncSession | None = None):
+        """确保长期记忆智能体已初始化"""
+        session = db_session or self.db_session
+        if session and not self.long_memory:
+            self.long_memory = LongMemoryAgent(session=session)
+        return self.long_memory
+
+    def _ensure_session_repo(self, db_session: AsyncSession | None = None):
+        """确保会话 Repository 已初始化"""
+        session = db_session or self.db_session
+        if session and not self.session_repo:
+            self.session_repo = SessionRepository(session)
+        return self.session_repo
+
+    async def chat(
+            self,
+            user_id: str,
+            session_id: str,
+            user_message: str,
+            db_session: AsyncSession | None = None,
+            auto_extract_memory: bool = True
+    ) -> str:
+        """
+        处理用户消息并返回响应
+        
+        Args:
+            user_id: 用户 ID
+            session_id: 会话 ID
+            user_message: 用户消息
+            db_session: 数据库会话（可选）
+            auto_extract_memory: 是否自动提取记忆点
+            
+        Returns:
+            AI 响应文本
+        """
+        # 确保会话持久化记录存在
+        await self._ensure_session_persisted(user_id, session_id, db_session)
+
+        # 添加用户消息到短期记忆
+        await self.short_memory.add_message(
+            session_id=session_id,
+            role="user",
+            content=user_message,
+            auto_compress=True
+        )
+        # 构建上下文
+        context = await self._build_context(user_id, session_id, db_session)
+        # 生成响应
+        messages = await self._build_messages(context, user_message)
+        response = await self.llm.ainvoke(messages)
+        ai_message = response.content
+        # 添加 AI 响应到短期记忆
+        await self.short_memory.add_message(
+            session_id=session_id,
+            role="assistant",
+            content=ai_message,
+            auto_compress=False
+        )
+        # 更新会话消息计数
+        await self._update_session_message_count(session_id, increment=2, db_session=db_session)
+
+        # 异步提取记忆点（后台任务）
+        if auto_extract_memory and db_session:
+            asyncio.create_task(
+                self._extract_and_store_memory_async(user_id, session_id)
+            )
+        return ai_message
+
+    async def chat_stream(
+            self,
+            user_id: str,
+            session_id: str,
+            user_message: str,
+            db_session: AsyncSession | None = None,
+            auto_extract_memory: bool = True
+    ) -> AsyncGenerator[str, None]:
+        """
+        流式处理用户消息并返回响应
+        
+        Args:
+            user_id: 用户 ID
+            session_id: 会话 ID
+            user_message: 用户消息
+            db_session: 数据库会话（可选）
+            auto_extract_memory: 是否自动提取记忆点
+            
+        Yields:
+            AI 响应的文本片段
+        """
+        # 确保会话持久化记录存在
+        await self._ensure_session_persisted(user_id, session_id, db_session)
+
+        # 添加用户消息到短期记忆
+        await self.short_memory.add_message(
+            session_id=session_id,
+            role="user",
+            content=user_message,
+            auto_compress=True
+        )
+        context = await self._build_context(user_id, session_id, db_session)
+        # 流式生成响应
+        messages = await self._build_messages(context, user_message)
+        full_response = ""
+        try:
+            async for chunk in self.llm.astream(messages):
+                if chunk.content:
+                    full_response += chunk.content
+                    yield chunk.content
+        except Exception as e:
+            logger.error(f"流式生成失败: {e}")
+            yield f"抱歉，生成响应时出现错误：{str(e)}"
+            return
+        # 添加完整响应到短期记忆
+        await self.short_memory.add_message(
+            session_id=session_id,
+            role="assistant",
+            content=full_response,
+            auto_compress=False
+        )
+        # 更新会话消息计数
+        await self._update_session_message_count(session_id, increment=2, db_session=db_session)
+
+        # 异步提取记忆点（后台任务）
+        if auto_extract_memory and db_session:
+            asyncio.create_task(
+                self._extract_and_store_memory_async(user_id, session_id)
+            )
+
+    async def _build_context(
+            self,
+            user_id: str,
+            session_id: str,
+            db_session: AsyncSession | None
+    ) -> str:
+        """
+        构建对话上下文
+        
+        Args:
+            user_id: 用户 ID
+            session_id: 会话 ID
+            db_session: 数据库会话
+            
+        Returns:
+            格式化的上下文字符串
+        """
+        parts = []
+        short_memories = await self.short_memory.get_context_messages(session_id)
+        if short_memories:
+            parts.append("[对话历史]")
+            for msg in short_memories:
+                role = "用户" if isinstance(msg, HumanMessage) else "助手"
+                parts.append(f"{role}: {msg.content}")
+        long_memory = self._ensure_long_memory(db_session)
+        if long_memory:
+            memory_summary = await long_memory.get_context_summary(
+                user_id=user_id,
+                max_memories=10,
+                db_session=db_session
+            )
+            if memory_summary:
+                parts.append("\n" + memory_summary)
+        return "\n".join(parts)
+
+    @staticmethod
+    async def _build_messages(
+            context: str,
+            user_message: str
+    ) -> list[BaseMessage]:
+        """
+        构建消息列表
+
+        Args:
+            context: 上下文
+            user_message: 用户消息
+
+        Returns:
+            LangChain 消息列表
+        """
+        system_prompt = prompt_loader.small_prompts.get("conversation_agent_system_prompt").format(context=context)
+        messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=user_message)
+        ]
+        return messages
+
+    async def _extract_and_store_memory_async(
+            self,
+            user_id: str,
+            session_id: str
+    ) -> None:
+        """
+        异步提取并存储记忆点（后台任务）
+        
+        注意：此方法会在后台异步执行，不会阻塞主流程。
+        使用单独的数据库会话来避免会话冲突。
+        
+        Args:
+            user_id: 用户 ID
+            session_id: 会话 ID
+        """
+        try:
+            # 创建新的数据库会话（避免与主会话冲突）
+            async with AsyncSessionLocal() as new_session:
+                # 获取最近的对话消息
+                messages = await self.short_memory.get_messages(session_id)
+                if not messages:
+                    return
+                # 提取记忆点
+                memory_points = await self.extraction_agent.extract(
+                    messages=messages,
+                    min_score=0.6
+                )
+                if not memory_points:
+                    logger.debug(f"会话 {session_id} 未提取到有效记忆点")
+                    return
+                # 存储到长期记忆
+                long_memory = LongMemoryAgent(session=new_session)
+                added_count = await long_memory.add_memories(
+                    user_id=user_id,
+                    session_id=session_id,
+                    memory_points=memory_points,
+                    db_session=new_session
+                )
+                # 提交事务
+                await new_session.commit()
+                logger.info(
+                    f"✅ 异步提取并存储了 {len(added_count)} 个记忆点 "
+                    f"(用户: {user_id}, 会话: {session_id})"
+                )
+        except Exception as e:
+            logger.error(f"❌ 异步提取记忆失败: {e}", exc_info=True)
+
+    async def _ensure_session_persisted(
+            self,
+            user_id: str,
+            session_id: str,
+            db_session: AsyncSession | None
+    ) -> None:
+        """
+        确保会话在数据库中持久化
+        
+        Args:
+            user_id: 用户 ID
+            session_id: 会话 ID
+            db_session: 数据库会话
+        """
+        session_repo = self._ensure_session_repo(db_session)
+        if session_repo:
+            await session_repo.get_or_create(session_id, user_id)
+            await db_session.flush()
+
+    async def _update_session_message_count(
+            self,
+            session_id: str,
+            increment: int = 1,
+            db_session: AsyncSession | None = None
+    ) -> None:
+        """
+        更新会话消息计数
+        
+        Args:
+            session_id: 会话 ID
+            increment: 增量
+            db_session: 数据库会话
+        """
+        session_repo = self._ensure_session_repo(db_session)
+        if session_repo:
+            await session_repo.update_message_count(session_id, increment)
+
+    async def extract_memory_manually(
+            self,
+            user_id: str,
+            session_id: str,
+            db_session: AsyncSession
+    ) -> int:
+        """
+        手动触发记忆提取（同步等待）
+        
+        Args:
+            user_id: 用户 ID
+            session_id: 会话 ID
+            db_session: 数据库会话
+            
+        Returns:
+            提取并存储的记忆点数量
+        """
+        try:
+            # 获取对话消息
+            messages = await self.short_memory.get_messages(session_id)
+            if not messages:
+                logger.warning(f"会话 {session_id} 没有消息可提取")
+                return 0
+            # 提取记忆点
+            memory_points = await self.extraction_agent.extract(
+                messages=messages,
+                min_score=0.6
+            )
+            if not memory_points:
+                logger.info(f"会话 {session_id} 未提取到有效记忆点")
+                return 0
+            # 存储到长期记忆
+            long_memory = self._ensure_long_memory(db_session)
+            if long_memory:
+                added_memories = await long_memory.add_memories(
+                    user_id=user_id,
+                    session_id=session_id,
+                    memory_points=memory_points,
+                    db_session=db_session
+                )
+                logger.info(f"手动提取并存储了 {len(added_memories)} 个记忆点")
+                return len(added_memories)
+            return 0
+        except Exception as e:
+            logger.error(f"手动提取记忆失败: {e}", exc_info=True)
+            return 0
+
+    async def clear_session(
+            self,
+            session_id: str,
+            db_session: AsyncSession | None = None
+    ) -> bool:
+        """
+        清除会话的短期记忆并软删除持久化记录
+        
+        Args:
+            session_id: 会话 ID
+            db_session: 数据库会话
+            
+        Returns:
+            是否成功
+        """
+        # 清除 Redis 短期记忆
+        redis_cleared = await self.short_memory.clear(session_id)
+
+        # 软删除数据库会话记录
+        if db_session:
+            session_repo = self._ensure_session_repo(db_session)
+            if session_repo:
+                db_cleared = await session_repo.soft_delete(session_id)
+                await db_session.commit()
+                return redis_cleared and db_cleared
+
+        return redis_cleared
+
+    async def get_session_history(
+            self,
+            session_id: str,
+            limit: int | None = None
+    ) -> list[dict]:
+        """
+        获取会话历史记录
+        
+        Args:
+            session_id: 会话 ID
+            limit: 限制返回数量
+            
+        Returns:
+            消息字典列表
+        """
+        messages = await self.short_memory.get_messages(session_id)
+        if limit:
+            messages = messages[-limit:]
+        return [msg.model_dump() for msg in messages]
+
+    async def get_user_sessions(
+            self,
+            user_id: str,
+            page: int = 1,
+            page_size: int = 20,
+            db_session: AsyncSession | None = None
+    ) -> dict:
+        """
+        获取用户的会话列表
+        
+        Args:
+            user_id: 用户 ID
+            page: 页码
+            page_size: 每页数量
+            db_session: 数据库会话
+            
+        Returns:
+            { "total": int, "items": List[dict], "page": int, "page_size": int }
+        """
+        session_repo = self._ensure_session_repo(db_session)
+        if not session_repo:
+            return {"total": 0, "items": [], "page": page, "page_size": page_size}
+
+        result = await session_repo.get_list_by_user(
+            user_id=user_id,
+            page=page,
+            page_size=page_size
+        )
+
+        # 转换为字典格式
+        items = [
+            {
+                "id": item.id,
+                "sessionId": item.session_id,
+                "userId": item.user_id,
+                "title": item.title,
+                "messageCount": item.message_count,
+                "createdAt": item.created_at.isoformat() if item.created_at else None,
+                "updatedAt": item.updated_at.isoformat() if item.updated_at else None,
+            }
+            for item in result["items"]
+        ]
+
+        return {
+            "total": result["total"],
+            "items": items,
+            "page": result["page"],
+            "page_size": result["page_size"]
+        }
+
+    async def update_session_title(
+            self,
+            session_id: str,
+            title: str,
+            db_session: AsyncSession | None = None
+    ) -> bool:
+        """
+        更新会话标题
+        
+        Args:
+            session_id: 会话 ID
+            title: 新标题
+            db_session: 数据库会话
+            
+        Returns:
+            是否成功
+        """
+        session_repo = self._ensure_session_repo(db_session)
+        if not session_repo:
+            return False
+
+        result = await session_repo.update_title(session_id, title)
+        return result is not None
+
+
+conversation_agent = ConversationAgent()

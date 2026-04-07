@@ -8,6 +8,7 @@ import { logout as userLogoutService } from '@/api/user'
 import { getAccountPointsService } from '@/api/points'
 import { getInviteCodeService } from '@/api/points/invite'
 import type { AccountPointsData } from '@/api/points'
+import { getUserInfo } from '@/api/user'
 
 import ProfileInfoPanel from '../components/CProfile_Component/ProfileInfoPanel.vue'
 import ProfileSidebar from '../components/CProfile_Component/ProfileSidebar.vue'
@@ -288,6 +289,89 @@ const handleSettingAction = (key: string) => {
     type: 'info',
     duration: 1800
   })
+}
+
+// ==================== 支付成功后刷新用户信息 ====================
+
+// 刷新用户信息（积分和会员状态）
+const refreshUserInfoAfterPurchase = async () => {
+  const userId = Number(userStore.userInfo?.id)
+  if (!userId) {
+    ElMessage.warning('无法获取用户信息，请重新登录')
+    return
+  }
+
+  ElMessage.info('正在刷新账户信息...')
+
+  try {
+    // 并行获取积分账户信息和用户信息
+    const [pointsResult, userResult] = await Promise.all([
+      getAccountPointsService(userId).catch(err => {
+        console.error('获取积分信息失败:', err)
+        return null
+      }),
+      getUserInfo().catch(err => {
+        console.error('获取用户信息失败:', err)
+        return null
+      })
+    ])
+
+    // 更新积分信息
+    if (pointsResult?.data?.code === 200 && pointsResult.data.data) {
+      accountPoints.value = pointsResult.data.data
+
+      if (userStore.userInfo) {
+        userStore.userInfo = {
+          ...userStore.userInfo,
+          points: pointsResult.data.data.pointsBalance,
+          pointsBalance: pointsResult.data.data.pointsBalance
+        } as any
+      }
+    }
+
+    // 更新用户信息（会员状态等）
+    if (userResult?.data?.code === 200 && userResult.data.data) {
+      const newUserInfo = userResult.data.data
+
+      // 更新本地 userInfo
+      userInfo.value = {
+        ...userInfo.value,
+        name: (newUserInfo as any).name || (newUserInfo as any).nickname || userInfo.value.name,
+        avatar: (newUserInfo as any).avatar || userInfo.value.avatar,
+        signature: (newUserInfo as any).signature || (newUserInfo as any).info || userInfo.value.signature,
+        gender: (newUserInfo as any).gender || userInfo.value.gender,
+        education: (newUserInfo as any).education || userInfo.value.education,
+        experience: (newUserInfo as any).experience || userInfo.value.experience,
+        industries: (newUserInfo as any).industries || userInfo.value.industries,
+        jobs: (newUserInfo as any).jobs || userInfo.value.jobs
+      }
+
+      // 更新全局 store
+      userStore.userInfo = {
+        ...userStore.userInfo,
+        ...newUserInfo,
+        memberType: (newUserInfo as any).memberType,
+        memberExpireAt: (newUserInfo as any).memberExpireAt
+      } as any
+
+      // 显示成功提示
+      const memberType = String((newUserInfo as any).memberType || 'normal').toLowerCase()
+      const memberText = memberType === 'normal' ? '基础会员' :
+                        memberType === 'monthly' ? '月度会员' :
+                        memberType === 'quarterly' || memberType === 'quarter' ? '季度会员' :
+                        memberType === 'yearly' || memberType === 'annual' ? '年度会员' : '基础会员'
+
+      ElMessage.success({
+        message: `账户信息已更新！当前会员：${memberText}，积分余额：${accountPoints.value?.pointsBalance || 0}`,
+        duration: 3000
+      })
+    } else {
+      ElMessage.success('账户信息已更新')
+    }
+  } catch (error) {
+    console.error('刷新用户信息失败:', error)
+    ElMessage.warning('支付成功，但刷新账户信息失败，请手动刷新页面')
+  }
 }
 </script>
 

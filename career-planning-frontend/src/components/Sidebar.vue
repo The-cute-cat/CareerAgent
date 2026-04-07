@@ -8,7 +8,7 @@ import {
   Star,Collection,Position,
   Fold,Expand,Guide,Connection,Calendar,
   Memo,Timer,Finished,Reading,
-  Promotion,MagicStick
+  Promotion,MagicStick,Notebook
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
@@ -69,6 +69,7 @@ const menuItems = [
   { index: '/job-matching', icon: DataAnalysis, text: '人岗匹配' },
   { index: '/development-map', icon: Promotion, text: '发展图谱' },
   { index: '/report', icon: TrendCharts, text: '生涯报告' },
+  { index: '/knowledge-base', icon: Notebook, text: '岗位知识库' },
   {
     index: '/interviews',
     icon: Calendar,

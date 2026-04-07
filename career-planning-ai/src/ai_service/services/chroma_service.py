@@ -147,18 +147,23 @@ class ChromaService:
             search_type=search_type, search_kwargs=search_kwargs
         )
 
-    def add_content(self, content: str, metadata: dict[str, Any] | None = None) -> list[str]:
+    def add_content(
+            self,
+            content: str,
+            metadata: dict[str, Any] | None = None,
+            id_str: str | None = None
+    ) -> list[str]:
         """
         添加单个文档
 
         Args:
             content: 文档内容
             metadata: 元数据
-
+            id_str: 可选的文档 ID
         Returns:
             添加的文档 ID 列表
         """
-        return self.add_documents([Document(page_content=content, metadata=metadata or {})])
+        return self.add_documents([Document(page_content=content, metadata=metadata or {})], [id_str])
 
     def add_documents(
             self,

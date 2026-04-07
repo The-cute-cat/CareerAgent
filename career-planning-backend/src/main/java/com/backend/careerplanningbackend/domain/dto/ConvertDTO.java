@@ -17,7 +17,7 @@ public class ConvertDTO {
     private String[] certificates;
     private SkillTool[] skills;
     private SkillTool[] tools;
-    private String codeLinks = null;
+    private String[] codeLinks = null;
     private Project[] projects;
     private Internship[] internships;
     private QuizDetailItem[] quizDetail = null;

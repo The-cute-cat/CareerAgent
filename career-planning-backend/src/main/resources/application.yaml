@@ -75,7 +75,7 @@ mybatis-plus:
 
 communication:
   token:
-    secret: ${JWT_SECRET}
+    secret: ${SECRET}
     expire: 1800
 ai:
   service:
