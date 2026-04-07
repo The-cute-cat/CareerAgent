@@ -27,7 +27,7 @@
     </update>
     <update id="updateAvatar">
         update user_stu
-        set avatar=#{avatar}
+        set avatar=#{upload}
         <where>
             id = #{id}
         </where>

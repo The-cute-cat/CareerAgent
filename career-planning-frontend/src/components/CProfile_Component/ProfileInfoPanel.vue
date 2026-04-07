@@ -1,7 +1,9 @@
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
-import { Picture, EditPen, Check, Close } from '@element-plus/icons-vue'
+import { Picture, EditPen, Check, Close, Loading } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import { updateAvatar } from '@/api/user/index'
+import { useUserStore } from '@/stores/index'
 
 const props = defineProps({
   userInfo: {
@@ -11,6 +13,9 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['update-user'])
+
+const userStore = useUserStore()
+const isUploading = ref(false)
 
 const isEditing = ref(false)
 const editingInterestKey = ref('')
@@ -131,7 +136,7 @@ const saveInterestEdit = () => {
   editingInterestKey.value = ''
 }
 
-const handleAvatarUpload = (event) => {
+const handleAvatarUpload = async (event) => {
   const file = event.target.files?.[0]
   if (!file) return
 
@@ -140,12 +145,46 @@ const handleAvatarUpload = (event) => {
     return
   }
 
+  // 文件大小限制 5MB
+  const maxSize = 5 * 1024 * 1024
+  if (file.size > maxSize) {
+    ElMessage.warning('图片大小不能超过5MB')
+    return
+  }
+
+  // 本地预览
   const reader = new FileReader()
   reader.onload = (e) => {
     formData.avatar = e.target?.result
-    ElMessage.success('头像预览已更新')
   }
   reader.readAsDataURL(file)
+
+  // 上传到后端
+  isUploading.value = true
+  try {
+    const res = await updateAvatar(file)
+    if (res.data.code === 200) {
+      const avatarUrl = res.data.data
+      // 更新本地表单数据
+      formData.avatar = avatarUrl
+      // 实时更新用户信息（全局状态）
+      if (userStore.userInfo) {
+        userStore.userInfo.avatar = avatarUrl
+      }
+      // 通知父组件更新
+      emit('update-user', { ...formData, avatar: avatarUrl })
+      ElMessage.success('头像更换成功')
+    } else {
+      ElMessage.error(res.data.msg || '头像上传失败')
+    }
+  } catch (error) {
+    console.error('头像上传失败:', error)
+    ElMessage.error('头像上传失败，请稍后重试')
+  } finally {
+    isUploading.value = false
+    // 清空input，允许重复选择同一文件
+    event.target.value = ''
+  }
 }
 </script>
 
@@ -180,12 +219,15 @@ const handleAvatarUpload = (event) => {
 
     <div class="hero-card">
       <div class="hero-main">
-        <label class="avatar-box">
+        <label class="avatar-box" :class="{ uploading: isUploading }">
           <img :src="formData.avatar" class="big-avatar" alt="avatar" />
-          <div class="camera-badge">
+          <div v-if="isUploading" class="upload-overlay">
+            <el-icon class="upload-spinner"><Loading /></el-icon>
+          </div>
+          <div v-else class="camera-badge">
             <el-icon><Picture /></el-icon>
           </div>
-          <input type="file" accept="image/*" class="hidden-input" @change="handleAvatarUpload" />
+          <input type="file" accept="image/*" class="hidden-input" @change="handleAvatarUpload" :disabled="isUploading" />
         </label>
 
         <div class="hero-copy">
@@ -400,6 +442,38 @@ const handleAvatarUpload = (event) => {
 
 .hidden-input {
   display: none;
+}
+
+.upload-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 30px;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.upload-spinner {
+  font-size: 24px;
+  color: #fff;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.avatar-box.uploading {
+  cursor: not-allowed;
 }
 
 .hero-copy {

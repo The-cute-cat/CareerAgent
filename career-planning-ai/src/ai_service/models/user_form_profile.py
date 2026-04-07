@@ -45,8 +45,8 @@ class InternshipExperience(BaseModel):
     role: str = Field(
         description="实习岗位名称，如'数据分析实习生'、'产品经理实习生'。"
     )
-    date: List[datetime.date] = Field(
-        ...,
+    date: Optional[List[datetime.date]] = Field(
+        None,
         min_length=2,
         max_length=2,
         description="""实习日期范围，必须包含两个元素：[开始日期, 结束日期]。格式统一为 YYYY-MM-DD, 如果是类似"至今"这样描述当前时间日期，直接输出"至今"。"""
@@ -121,7 +121,7 @@ class ToolDetail(BaseModel):
 
 class LanguageDetail(BaseModel):
     type: Literal["英语", "日语", "其他"] = Field(description="语种：英语/日语/其他")
-    level: Literal["四级", "六级", "托福", "雅思", "其他"] = Field(description="水平：四级/六级/托福/雅思/其他")
+    level: str = Field(description="水平，如 CET-6、JLPT N2、其他水平描述等")
     other: str = Field(description="其他相关信息")
 
 
@@ -198,10 +198,10 @@ class StudentFormProfile(BaseModel):
 
     # 3. 实践与产出 (这里是 AI 提取的“工作区”)
     # 修改：别名不与计算属性冲突，使用内部标识符
-    code_ability: Optional[str] = Field(
+    codeLinks: Optional[List[str]] = Field(
         None,
-        alias="codeAbility",
-        description="代码仓库链接。仅提取明确 URL(如 GitHub/Gitee), 不同链接用逗号分隔；无链接时返回 null。",
+        alias="codeLinks",
+        description="代码仓库链接列表。仅提取明确 URL(如 GitHub/Gitee), 不同链接用逗号分隔；无链接时返回 null。",
     )
 
     # AI 会根据 description 填充这两个列表

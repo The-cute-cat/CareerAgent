@@ -1,10 +1,15 @@
 #file: noinspection SpellCheckingInspection
+debug: true
 database:
   host: mysql6.sqlpub.com
   port: 3311
   database: career_backend
   user: <USER>
   password: <PASSWORD>
+  pool_size: 10 # 连接池基础大小
+  max_overflow: 20 # 连接池最大溢出量
+  pool_pre_ping: true # 连接池预检查
+  pool_recycle: 3600 # 连接池回收时间，单位秒
 communication:
   token:
     secret: <SECRET>
@@ -93,3 +98,29 @@ neo4j:
   password: <PASSWORD>
 other:
   ssl_verify: false
+conversation:
+  memory:
+    save_path: <SAVE_PATH>
+    short:
+      max_messages: 20 # 最大消息数量
+      max_tokens: 10000 # 最大token数量
+      compression_trigger_raito: 0.8 # 压缩触发比例
+      keep_recent_messages: 8 # 压缩时保留最近的消息数量
+      extra:
+        temperature: 0.2
+    long:
+      max_memory_count: 50 # 最多50条记忆
+      min_score: 0.6 # 最低记忆分数
+      collection_name: user_memories # ChromaDB 集合名称
+      extra:
+        temperature: 0.2
+    extraction:
+      extra:
+        temperature: 0.2
+    compression:
+      extra:
+        temperature: 0.2
+  agent:
+    model_name: glm-5
+    extra:
+      temperature: 0.7

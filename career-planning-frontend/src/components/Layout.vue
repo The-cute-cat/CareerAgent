@@ -86,7 +86,7 @@ provide('isMobileLayout', isMobile)
     </el-container>
 
     <!-- AI 助手悬浮窗 -->
-    <!-- <ChatBot /> -->
+     <ChatBot />
 
     <!-- 移动端底部导航 -->
     <MobileTabBar v-if="isMobile" />

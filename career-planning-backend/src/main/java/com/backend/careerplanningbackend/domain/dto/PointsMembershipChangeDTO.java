@@ -16,7 +16,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class PointsMembershipChangeDTO {
     
-    @NotNull(message = "用户ID不能为空")
+//    @NotNull(message = "用户ID不能为空")
     private Long userId;
     
     @NotNull(message = "变动积分不能为空")
@@ -26,11 +26,14 @@ public class PointsMembershipChangeDTO {
     @NotNull(message = "变动类型不能为空")
     private Integer type;
 
+    private Integer points;
     
     /** 会员等级，0:非会员, 1:普通会员, 2:高级会员, 3:至尊会员 */
     private Integer vip;
     
     private Integer status;
-    
+
     private String description;
+
+    private Integer payType;
 }

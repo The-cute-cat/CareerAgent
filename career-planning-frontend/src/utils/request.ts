@@ -16,14 +16,14 @@ const instance = axios.create({
 
 // 请求拦截器，自动添加token
 instance.interceptors.request.use((config) => {
-  console.log("sadasd");
+
 
   const userStore = useUserStore()
   const accessToken = userStore.accessToken
   if (accessToken) {
     config.headers.Authorization = `Bearer ${accessToken}`
   }
-  console.log("222s2adasssssd");
+ 
 
   /* else{
     const refreshToken = localStorage.getItem('refreshToken');
@@ -39,11 +39,11 @@ instance.interceptors.request.use((config) => {
     ['post', 'put', 'patch'].includes(config.method || '') &&
     !(config.data instanceof FormData)
   ) {
-    console.log(656)
+    
 
     config.headers['Content-Type'] = 'application/json'
   }
-  console.log(44);
+  
 
   return config
 })
@@ -56,7 +56,7 @@ instance.interceptors.response.use(
   },
   async (err) => {
     console.log('登录错误', err.response)
-    if (err.response.status === 401) {
+    if (err.response?.status === 401) {
       // 短token过期，尝试刷新
       const userStore = useUserStore()
       const refreshToken = userStore.refreshToken

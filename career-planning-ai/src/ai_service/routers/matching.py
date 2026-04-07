@@ -1,13 +1,11 @@
 from fastapi import APIRouter, Body, Depends
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 
 from ai_service.models.struct_txt import StudentProfile
-from ai_service.repository.connection_session import get_db_url
 from ai_service.response.result import success
 from ai_service.schemas.auth import validate_token
 from ai_service.services import log
 from ai_service.services.job_merger import job_merger
-from ai_service.services.career_analyst_agent import CareerAnalystAgent
+from ai_service.agents.career_analyst_agent import CareerAnalystAgent
 from ai_service.utils.vector_store.job_vector_store import JobVectorStore
 
 __all__ = ["router"]

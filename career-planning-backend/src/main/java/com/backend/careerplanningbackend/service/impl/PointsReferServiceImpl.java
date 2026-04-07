@@ -2,17 +2,10 @@ package com.backend.careerplanningbackend.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
-import com.alipay.api.AlipayApiException;
-import com.backend.careerplanningbackend.domain.dto.AiChatResponse;
-import com.backend.careerplanningbackend.domain.dto.PointsMembershipChangeDTO;
-import com.backend.careerplanningbackend.domain.dto.ReferralDTO;
-import com.backend.careerplanningbackend.domain.dto.StudentTrueDTO;
+import com.backend.careerplanningbackend.domain.dto.*;
 import com.backend.careerplanningbackend.domain.po.*;
 import com.backend.careerplanningbackend.domain.vo.UserPointsVO;
-import com.backend.careerplanningbackend.mapper.PointsTransactionMapper;
-import com.backend.careerplanningbackend.mapper.UserMapper;
-import com.backend.careerplanningbackend.mapper.UserPointsMapper;
-import com.backend.careerplanningbackend.mapper.UserReferralMapper;
+import com.backend.careerplanningbackend.mapper.*;
 import com.backend.careerplanningbackend.service.PayService;
 import com.backend.careerplanningbackend.service.PointsReferService;
 import com.backend.careerplanningbackend.util.AiServiceClient;
@@ -32,7 +25,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.RequestBody;
 
-import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
@@ -55,7 +47,8 @@ public class PointsReferServiceImpl implements PointsReferService {
     private final RabbitTemplate rabbitTemplate;
     private final AiServiceClient aiServiceClient;
     private final PayService payService;
-    
+    private final PaymentOrderMapper paymentOrderMapper;
+
     /**
      * getAccountPoints 
      * 获取账户积分接口
@@ -73,7 +66,9 @@ public class PointsReferServiceImpl implements PointsReferService {
 //        UserPoints accountPoints = userpointsMapper.getAccountPoints(id);
         Long currentUserId = ThreadLocalUtil.getCurrentUserId();
         UserPoints accountPoints = userpointsMapper.selectOne(
-                new LambdaQueryWrapper<UserPoints>().eq(UserPoints::getUserId, currentUserId)
+
+                new LambdaQueryWrapper<UserPoints>().eq(UserPoints::getUserId, userId)
+
         );
         if(accountPoints == null) {
             log.error("用户 {} 的积分信息不存在", userId);
@@ -138,7 +133,7 @@ public class PointsReferServiceImpl implements PointsReferService {
         PointsTransaction pointsTransaction = new PointsTransaction();
         pointsTransaction.setUserId(userId);
         /* POINTS_FOR_REGISTRATION-新用户注册获得的积分-赠送积分 */
-        pointsTransaction.setAmount(POINTS_FOR_REGISTRATION);
+        pointsTransaction.setPoints(POINTS_FOR_REGISTRATION);
         /* 5-系统赠送 */
         pointsTransaction.setType(5);
         /* 新用户注册赠送积分 */
@@ -422,8 +417,8 @@ public class PointsReferServiceImpl implements PointsReferService {
 
     /**
      * 充值积分接口
-     * @return
-     * 1. 获取当前用户ID
+     *
+     * @return 1. 获取当前用户ID
      * 2. 根据用户ID查询UserPoints表，获取当前积分账户信息
      * 3. 如果用户积分账户不存在，返回错误提示
      * 4. 根据传入的积分变动值，计算新的积分余额，并更新UserPoints表中的积分余额和更新时间
@@ -431,55 +426,32 @@ public class PointsReferServiceImpl implements PointsReferService {
      * 6. 返回充值成功的积分信息
      */
     @Override
-    @Transactional(rollbackFor = Exception.class)
-    public Result<UserPoints> recharge(@RequestBody @Valid PointsMembershipChangeDTO pointsMembershipChangeDTO, HttpServletResponse response) {
+    @Transactional
+    public Result<Long> recharge(@RequestBody @Valid PaymentCreateDTO paymentCreateDTO){
         
-        UserPoints account = userpointsMapper.selectOne(
-                new LambdaQueryWrapper<UserPoints>()
-                        .eq(UserPoints::getUserId, ThreadLocalUtil.getCurrentUserId())
-        );
+        PointsTransaction pointsTransaction = new PointsTransaction();
+        pointsTransaction.setPoints(paymentCreateDTO.getPoints());
+        pointsTransaction.setType(1);
+        pointsTransaction.setUserId(ThreadLocalUtil.getCurrentUserId());
+        pointsTransaction.setAmount(paymentCreateDTO.getAmount());
+        pointsTransaction.setPackageId(paymentCreateDTO.getPackageId());
         
-        if(account == null) {
-            return Result.fail("用户积分信息不存在,可能是有人发起攻击来了,或者系统故障");
-        }
+        pointsTransaction.setDescription("充值积分");
 
-        Integer amount = pointsMembershipChangeDTO.getAmount();
-        int newAmount = account.getPointsBalance() + amount;
-        account.setPointsBalance(newAmount);
-
-        int updated = userpointsMapper.update(null, new LambdaUpdateWrapper<UserPoints>()
-                .eq(UserPoints::getUserId, ThreadLocalUtil.getCurrentUserId())
-                .set(UserPoints::getPointsBalance, newAmount)
-        );
-        if(updated == 0) {
-            return Result.fail("更新用户积分信息失败");
-        }
-
-        PointsTransaction paymentOrder = BeanUtil.copyProperties(pointsMembershipChangeDTO, PointsTransaction.class);
-        paymentOrder.setAmount(newAmount);
-        paymentOrder.setType(1);
-        
-//        redisIdWorker.nextId(POINTS_RECHARGE_KEY_PREFIX);
-        paymentOrder.setDescription("充值积分");
-        
-        int insert = pointsTransactionMapper.insert(paymentOrder);
+        int insert = pointsTransactionMapper.insert(pointsTransaction);
         if (insert == 0) {
+            log.error("recharge 记录积分变动失败");
             return Result.fail("记录积分变动失败");
         }
+        log.info("recharge 记录积分插入成功");
+        PaymentOrder paymentOrder = BeanUtil.copyProperties(paymentCreateDTO, PaymentOrder.class);
 
-        try {
-            payService.pagePay(paymentOrder.getId(), response);
-        } catch (AlipayApiException e) {
-            log.info("支付宝支付失败{}", e.getMessage());
-            throw new RuntimeException(e);
-        } catch (IOException e) {
-            log.info("支付宝支付失败{}", e.getMessage());
-            throw new RuntimeException(e);
-        }
-
-        // todo 支付宝
-        return Result.ok(account);
+        paymentOrderMapper.insert(paymentOrder);
+        log.info("recharge 支付订单插入成功");
+        
+        return Result.ok(paymentOrder.getId());
     }
+    
 
     /**
      * consumePoints 消耗积分接口
@@ -518,7 +490,7 @@ public class PointsReferServiceImpl implements PointsReferService {
         }
 
         PointsTransaction entity = BeanUtil.copyProperties(pointsMembershipChangeDTO, PointsTransaction.class);
-        entity.setAmount(newAmount);
+        entity.setPoints(newAmount);
         entity.setType(1);
         
         redisIdWorker.nextId(POINTS_CONSUME_KEY_PREFIX);
