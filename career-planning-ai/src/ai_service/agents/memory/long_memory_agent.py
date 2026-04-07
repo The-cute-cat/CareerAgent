@@ -69,7 +69,8 @@ class LongMemoryAgent:
             user_id: str,
             session_id: str,
             memory_point: MemoryPoint,
-            db_session: AsyncSession | None = None
+            db_session: AsyncSession | None = None,
+            similarity_threshold: float = 0.85
     ) -> Memory | None:
         """
         添加记忆到长期存储
@@ -79,6 +80,7 @@ class LongMemoryAgent:
             session_id: 会话 ID
             memory_point: 记忆点
             db_session: 数据库会话（如果未在初始化时提供）
+            similarity_threshold: 语义相似度阈值（0-1），超过此值视为重复
             
         Returns:
             创建的记忆对象，如果失败返回 None
@@ -100,13 +102,16 @@ class LongMemoryAgent:
             # 需要移除低分记忆
             await self._remove_low_score_memory(user_id, session, total_score)
 
-        # 检查是否有重复记忆
-        is_duplicate = await self._check_duplicate(
-            user_id, memory_point.content, session
+        # 检查是否有语义相似的记忆（使用向量相似度）
+        similar_memory = await self._find_similar_memory(
+            user_id, memory_point.content, session, similarity_threshold
         )
-        if is_duplicate:
-            logger.info(f"跳过重复记忆: {memory_point.content[:50]}...")
-            return None
+        if similar_memory:
+            # 更新已有记忆而不是跳过
+            logger.info(f"发现相似记忆，更新: {memory_point.content[:50]}...")
+            return await self._update_memory(
+                similar_memory, memory_point, total_score, session
+            )
 
         vector_id = str(uuid4())
         try:
@@ -114,6 +119,7 @@ class LongMemoryAgent:
                 content=memory_point.content,
                 metadata={
                     "user_id": user_id,
+                    "vector_id": vector_id,
                     "memory_type": memory_point.memory_type,
                     "total_score": total_score,
                     "created_at": datetime.now().isoformat()
@@ -293,6 +299,7 @@ class LongMemoryAgent:
     async def delete_memory(
             self,
             memory_id: int,
+            user_id: str,
             db_session: Optional[AsyncSession] = None
     ) -> bool:
         """
@@ -300,6 +307,7 @@ class LongMemoryAgent:
         
         Args:
             memory_id: 记忆 ID
+            user_id: 用户 ID（用于权限校验）
             db_session: 数据库会话
             
         Returns:
@@ -309,7 +317,13 @@ class LongMemoryAgent:
         if not session:
             raise ValueError("数据库会话未提供")
         try:
-            query = select(Memory).where(Memory.id == memory_id)
+            query = select(Memory).where(
+                and_(
+                    Memory.id == memory_id,
+                    Memory.user_id == user_id,
+                    Memory.is_active == True
+                )
+            )
             result = await session.execute(query)
             memory = result.scalar_one_or_none()
             if not memory:
@@ -365,7 +379,7 @@ class LongMemoryAgent:
             db_session: AsyncSession
     ) -> bool:
         """
-        检查是否存在重复记忆
+        检查是否存在完全相同的记忆
         
         Args:
             user_id: 用户 ID
@@ -385,6 +399,170 @@ class LongMemoryAgent:
         result = await db_session.execute(query)
         existing = result.scalar_one_or_none()
         return existing is not None
+
+    async def _check_semantic_duplicate(
+            self,
+            user_id: str,
+            content: str,
+            db_session: AsyncSession,
+            threshold: float = 0.85
+    ) -> bool:
+        """
+        检查是否存在语义相似的记忆（使用向量相似度）
+        
+        Args:
+            user_id: 用户 ID
+            content: 记忆内容
+            db_session: 数据库会话
+            threshold: 相似度阈值（0-1），超过此值视为重复
+            
+        Returns:
+            是否语义重复
+        """
+        try:
+            # 使用 ChromaDB 进行向量相似度搜索
+            results = self.chroma.similarity_search_with_score(
+                query=content,
+                k=3,
+                filter_dict={"user_id": user_id}
+            )
+            
+            for doc, score in results:
+                # ChromaDB 返回的是距离，距离越小越相似
+                # 对于 cosine 距离，score 范围通常是 0-2
+                # 转换为相似度：similarity = 1 - distance/2
+                similarity = 1 - score / 2
+                if similarity >= threshold:
+                    logger.debug(
+                        f"发现语义相似记忆: 相似度={similarity:.2f}, "
+                        f"新内容={content[:30]}..., 已有内容={doc.page_content[:30]}..."
+                    )
+                    return True
+            return False
+        except Exception as e:
+            logger.warning(f"语义相似度检查失败，回退到精确匹配: {e}")
+            return await self._check_duplicate(user_id, content, db_session)
+
+    async def _find_similar_memory(
+            self,
+            user_id: str,
+            content: str,
+            db_session: AsyncSession,
+            threshold: float = 0.85
+    ) -> Memory | None:
+        """
+        查找语义相似的记忆
+        
+        Args:
+            user_id: 用户 ID
+            content: 记忆内容
+            db_session: 数据库会话
+            threshold: 相似度阈值（0-1），超过此值视为相似
+            
+        Returns:
+            相似的记忆对象，如果没有返回 None
+        """
+        try:
+            results = self.chroma.similarity_search_with_score(
+                query=content,
+                k=3,
+                filter_dict={"user_id": user_id}
+            )
+            
+            for doc, score in results:
+                similarity = 1 - score / 2
+                if similarity >= threshold:
+                    # 优先从 metadata 获取 vector_id
+                    vector_id = doc.metadata.get("vector_id")
+                    
+                    # 如果 metadata 中没有 vector_id，尝试通过内容匹配
+                    if not vector_id:
+                        query_stmt = select(Memory).where(
+                            and_(
+                                Memory.user_id == user_id,
+                                Memory.content == doc.page_content,
+                                Memory.is_active == True
+                            )
+                        )
+                    else:
+                        query_stmt = select(Memory).where(
+                            and_(
+                                Memory.vector_id == vector_id,
+                                Memory.is_active == True
+                            )
+                        )
+                    
+                    result = await db_session.execute(query_stmt)
+                    memory = result.scalar_one_or_none()
+                    if memory:
+                        logger.debug(
+                            f"找到相似记忆: id={memory.id}, 相似度={similarity:.2f}"
+                        )
+                        return memory
+            return None
+        except Exception as e:
+            logger.warning(f"查找相似记忆失败: {e}")
+            return None
+
+    async def _update_memory(
+            self,
+            existing_memory: Memory,
+            memory_point: MemoryPoint,
+            new_score: float,
+            db_session: AsyncSession
+    ) -> Memory | None:
+        """
+        更新已有记忆
+        
+        Args:
+            existing_memory: 已存在的记忆对象
+            memory_point: 新的记忆点数据
+            new_score: 新的综合评分
+            db_session: 数据库会话
+            
+        Returns:
+            更新后的记忆对象
+        """
+        try:
+            # 删除旧的向量
+            if existing_memory.vector_id:
+                self.chroma.delete_by_ids([existing_memory.vector_id])
+            
+            # 创建新的向量
+            vector_id = str(uuid4())
+            self.chroma.add_content(
+                content=memory_point.content,
+                metadata={
+                    "user_id": existing_memory.user_id,
+                    "vector_id": vector_id,
+                    "memory_type": memory_point.memory_type,
+                    "total_score": new_score,
+                    "created_at": datetime.now().isoformat()
+                },
+                id_str=vector_id
+            )
+            
+            # 更新数据库记录
+            existing_memory.content = memory_point.content
+            existing_memory.memory_type = memory_point.memory_type
+            existing_memory.importance_score = memory_point.importance_score
+            existing_memory.relevance_score = memory_point.relevance_score
+            existing_memory.recency_score = memory_point.recency_score
+            existing_memory.uniqueness_score = memory_point.uniqueness_score
+            existing_memory.total_score = new_score
+            existing_memory.metadata_json = json.dumps({"reason": memory_point.reason})
+            existing_memory.vector_id = vector_id
+            existing_memory.updated_at = datetime.now()
+            
+            await db_session.flush()
+            logger.info(
+                f"更新长期记忆成功: id={existing_memory.id}, "
+                f"score={new_score:.2f}, content={memory_point.content[:50]}..."
+            )
+            return existing_memory
+        except Exception as e:
+            logger.error(f"更新记忆失败: {e}")
+            return None
 
     async def get_context_summary(
             self,
