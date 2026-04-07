@@ -14,14 +14,6 @@ communication:
   token:
     secret: <SECRET>
     expire: 1800
-lite_llm:
-  model_name: dashscope/qwen-max
-  qwen:
-    model_name: dashscope/qwen3.5-plus
-  deepseek:
-    model_name: dashscope/deepseek-v3-plus
-  image:
-    model_name: dashscope/qwen-vl-plus
 vector:
   model_name: text-embedding-v4
   llm_model_name: qwen-max
