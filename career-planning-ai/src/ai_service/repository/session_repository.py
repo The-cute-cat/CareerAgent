@@ -2,6 +2,7 @@
 会话持久化 Repository
 
 管理 ConversationSession 表的 CRUD 操作
+注意：session_id 不再全局唯一，而是 (user_id, session_id) 联合唯一
 """
 from datetime import datetime
 from typing import Optional, List, Dict, Any
@@ -52,7 +53,7 @@ class SessionRepository:
             self,
             session_id: str,
             user_id: str,
-            title: Optional[str] = None
+            title: str | None = None
     ) -> ConversationSession:
         """
         获取或创建会话（Upsert）
@@ -65,7 +66,7 @@ class SessionRepository:
         Returns:
             会话对象
         """
-        existing = await self.get_by_session_id(session_id)
+        existing = await self.get_by_user_and_session_id(user_id, session_id)
         if existing:
             return existing
         return await self.create(session_id, user_id, title)
@@ -78,13 +79,17 @@ class SessionRepository:
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def get_by_session_id(
+    async def get_by_user_and_session_id(
             self,
+            user_id: str,
             session_id: str
     ) -> Optional[ConversationSession]:
-        """根据会话 ID 获取会话"""
+        """根据用户ID和会话ID获取会话（联合唯一）"""
         stmt = select(ConversationSession).where(
-            ConversationSession.session_id == session_id
+            and_(
+                ConversationSession.user_id == user_id,
+                ConversationSession.session_id == session_id
+            )
         )
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
@@ -145,6 +150,7 @@ class SessionRepository:
 
     async def update_message_count(
             self,
+            user_id: str,
             session_id: str,
             increment: int = 1
     ) -> Optional[ConversationSession]:
@@ -152,13 +158,14 @@ class SessionRepository:
         更新会话消息计数
 
         Args:
+            user_id: 用户 ID
             session_id: 会话 ID
             increment: 增量（默认 1）
 
         Returns:
             更新后的会话对象
         """
-        conversation = await self.get_by_session_id(session_id)
+        conversation = await self.get_by_user_and_session_id(user_id, session_id)
         if not conversation:
             return None
         conversation.message_count += increment
@@ -168,6 +175,7 @@ class SessionRepository:
 
     async def update_title(
             self,
+            user_id: str,
             session_id: str,
             title: str
     ) -> Optional[ConversationSession]:
@@ -175,13 +183,14 @@ class SessionRepository:
         更新会话标题
 
         Args:
+            user_id: 用户 ID
             session_id: 会话 ID
             title: 新标题
 
         Returns:
             更新后的会话对象
         """
-        conversation = await self.get_by_session_id(session_id)
+        conversation = await self.get_by_user_and_session_id(user_id, session_id)
         if not conversation:
             return None
         conversation.title = title
@@ -191,6 +200,7 @@ class SessionRepository:
 
     async def update_summary(
             self,
+            user_id: str,
             session_id: str,
             summary: str
     ) -> Optional[ConversationSession]:
@@ -198,13 +208,14 @@ class SessionRepository:
         更新会话压缩摘要
 
         Args:
+            user_id: 用户 ID
             session_id: 会话 ID
             summary: 压缩后的摘要
 
         Returns:
             更新后的会话对象
         """
-        conversation = await self.get_by_session_id(session_id)
+        conversation = await self.get_by_user_and_session_id(user_id, session_id)
         if not conversation:
             return None
         conversation.compressed_summary = summary
@@ -214,6 +225,7 @@ class SessionRepository:
 
     async def update(
             self,
+            user_id: str,
             session_id: str,
             update_data: Dict[str, Any]
     ) -> Optional[ConversationSession]:
@@ -221,13 +233,14 @@ class SessionRepository:
         通用更新方法
 
         Args:
+            user_id: 用户 ID
             session_id: 会话 ID
             update_data: 更新数据字典
 
         Returns:
             更新后的会话对象
         """
-        conversation = await self.get_by_session_id(session_id)
+        conversation = await self.get_by_user_and_session_id(user_id, session_id)
         if not conversation:
             return None
         for key, value in update_data.items():
@@ -237,43 +250,53 @@ class SessionRepository:
         await self.session.flush()
         return conversation
 
-    async def soft_delete(self, session_id: str) -> bool:
+    async def soft_delete(
+            self,
+            user_id: str,
+            session_id: str
+    ) -> bool:
         """
         软删除会话（标记为非激活）
 
         Args:
+            user_id: 用户 ID
             session_id: 会话 ID
 
         Returns:
             是否成功
         """
-        conversation = await self.get_by_session_id(session_id)
+        conversation = await self.get_by_user_and_session_id(user_id, session_id)
         if not conversation:
             return False
 
         conversation.is_active = False
         conversation.updated_at = datetime.now()
         await self.session.flush()
-        logger.info(f"软删除会话: session_id={session_id}")
+        logger.info(f"软删除会话: user_id={user_id}, session_id={session_id}")
         return True
 
-    async def hard_delete(self, session_id: str) -> bool:
+    async def hard_delete(
+            self,
+            user_id: str,
+            session_id: str
+    ) -> bool:
         """
         硬删除会话（从数据库删除）
 
         Args:
+            user_id: 用户 ID
             session_id: 会话 ID
 
         Returns:
             是否成功
         """
-        conversation = await self.get_by_session_id(session_id)
+        conversation = await self.get_by_user_and_session_id(user_id, session_id)
         if not conversation:
             return False
 
         await self.session.delete(conversation)
         await self.session.flush()
-        logger.info(f"硬删除会话: session_id={session_id}")
+        logger.info(f"硬删除会话: user_id={user_id}, session_id={session_id}")
         return True
 
     async def delete_by_user(self, user_id: str, soft: bool = True) -> int:

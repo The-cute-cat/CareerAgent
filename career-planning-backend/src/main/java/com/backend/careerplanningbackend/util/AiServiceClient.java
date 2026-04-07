@@ -107,11 +107,11 @@ public class AiServiceClient {
     /**
      * 带重试机制的通用执行方法
      *
-     * @param url              请求的 API 路径
-     * @param requestExecutor  请求执行函数
-     * @param bodySupplier     请求体构建函数
-     * @param serviceName      服务名称（用于日志）
-     * @param enableRetry      是否启用重试机制
+     * @param url             请求的 API 路径
+     * @param requestExecutor 请求执行函数
+     * @param bodySupplier    请求体构建函数
+     * @param serviceName     服务名称（用于日志）
+     * @param enableRetry     是否启用重试机制
      * @return AI 响应结果
      * @throws RuntimeException 当所有重试都失败时抛出
      */
@@ -128,7 +128,7 @@ public class AiServiceClient {
             log.info("调用{}结束，耗时：{}ms", serviceName, time);
             return response;
         }
-        
+
         int tryCount = 0;
         while (tryCount < properties.getRetry().getMaxAttempts()) {
             tryCount++;
@@ -250,7 +250,7 @@ public class AiServiceClient {
     /**
      * 添加 MultipartFile 到多部分表单构建器
      *
-     * @param builder         多部分表单构建器
+     * @param builder        多部分表单构建器
      * @param multipartFiles MultipartFile 文件列表
      */
     private void addMultipartFilesToBuilder(MultipartBodyBuilder builder, List<MultipartFile> multipartFiles) {
@@ -561,58 +561,4 @@ public class AiServiceClient {
         }, () -> null, serviceName, enableRetry);
     }
 
-
-//    /**
-//     * 获取会话历史记录（GET 请求）
-//     *
-//     * @param sessionId 会话 ID
-//     * @param limit     限制返回数量（可选）
-//     * @return AI 响应结果，包含会话历史记录
-//     */
-//    public AiChatResponse getChatHistory(String sessionId, Integer limit) {
-//        Map<String, Object> queryParams = limit != null ? Map.of("limit", limit) : null;
-//        return getRequest("/chat/history/" + sessionId, queryParams, "获取会话历史", false);
-//    }
-//
-//    /**
-//     * 获取用户的会话列表（GET 请求）
-//     *
-//     * @param userId   用户 ID
-//     * @param page     页码
-//     * @param pageSize 每页数量
-//     * @return AI 响应结果，包含会话列表
-//     */
-//    public AiChatResponse getUserSessions(String userId, Integer page, Integer pageSize) {
-//        Map<String, Object> queryParams = new java.util.HashMap<>();
-//        queryParams.put("user_id", userId);
-//        if (page != null) {
-//            queryParams.put("page", page);
-//        }
-//        if (pageSize != null) {
-//            queryParams.put("page_size", pageSize);
-//        }
-//        return getRequest("/chat/sessions", queryParams, "获取会话列表", false);
-//    }
-//
-//    /**
-//     * 清除会话（DELETE 请求）
-//     *
-//     * @param sessionId 会话 ID
-//     * @return AI 响应结果
-//     */
-//    public AiChatResponse clearSession(String sessionId) {
-//        return deleteRequest("/chat/session/" + sessionId, "清除会话", false);
-//    }
-//
-//    /**
-//     * 更新会话标题（PUT 请求）
-//     *
-//     * @param sessionId 会话 ID
-//     * @param title     新标题
-//     * @return AI 响应结果
-//     */
-//    public AiChatResponse updateSessionTitle(String sessionId, String title) {
-//        Map<String, Object> params = Map.of("title", title);
-//        return putRequest("/chat/session/" + sessionId + "/title", params, "更新会话标题", false);
-//    }
 }

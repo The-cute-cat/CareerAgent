@@ -6,7 +6,7 @@ from typing import Optional
 
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
 from pydantic import BaseModel, Field
-from sqlalchemy import String, Text, Float, Integer, DateTime, ForeignKey, Index
+from sqlalchemy import String, Text, Float, Integer, DateTime, ForeignKey, Index, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ai_service.models.base import Base
@@ -63,7 +63,7 @@ class ConversationSession(Base):
     __tablename__ = "conversation_sessions"
     
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    session_id: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True, comment="会话ID")
+    session_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True, comment="会话ID")
     user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True, comment="用户ID")
     title: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, comment="会话标题")
     compressed_summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True, comment="压缩后的摘要")
@@ -71,6 +71,11 @@ class ConversationSession(Base):
     is_active: Mapped[bool] = mapped_column(Integer, nullable=False, default=1, comment="是否激活")
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.now, comment="创建时间")
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.now, onupdate=datetime.now, comment="更新时间")
+    
+    __table_args__ = (
+        UniqueConstraint('user_id', 'session_id', name='uq_user_session'),
+        Index('idx_user_session', 'user_id', 'session_id'),
+    )
     
     def __repr__(self) -> str:
         return f"<ConversationSession(id={self.id}, session_id={self.session_id}, user_id={self.user_id})>"
