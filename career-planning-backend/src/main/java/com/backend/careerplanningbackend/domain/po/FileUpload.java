@@ -15,5 +15,5 @@ public class FileUpload {
     private Long id;
     private Long userId;
     private String fileUrl;
-    private String filename;
+    private String fileName;
 }

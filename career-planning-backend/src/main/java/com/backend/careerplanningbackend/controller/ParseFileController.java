@@ -61,7 +61,7 @@ public class ParseFileController {
         String upload = aliOSSUtils.upload(file);
         FileUpload fileUpload = new FileUpload();
         fileUpload.setUserId(userId);
-        fileUpload.setFilename(file.getOriginalFilename());
+        fileUpload.setFileName(file.getOriginalFilename());
         fileUpload.setFileUrl(upload);
         fileUploadMapper.insert(fileUpload);
 

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { Picture, InfoFilled, Delete, ChatDotSquare, Timer, List, Promotion, Check } from '@element-plus/icons-vue'
+import { Picture, InfoFilled, Delete, ChatDotSquare, Timer, List, Promotion, Check, Edit, Close } from '@element-plus/icons-vue'
 import { ElMessage, ElLoading } from 'element-plus'
-import { submitFeedbackService, getUserFeedbackHistoryService, type Feedback } from '@/api/feedback'
+import { submitFeedbackService, getUserFeedbackHistoryService, updateFeedbackService, uploadImageService, type Feedback } from '@/api/feedback'
 import { useUserStore } from '@/stores/modules/user'
 
 const userStore = useUserStore()
@@ -14,6 +14,10 @@ const feedbackContent = ref('')
 const feedbackContact = ref('')
 const imageList = ref<any[]>([])
 const isSubmitting = ref(false)
+
+// 编辑相关状态
+const isEditing = ref(false)
+const editingId = ref<number | null>(null)
 
 // 反馈历史相关状态
 const feedbackHistory = ref<Feedback[]>([])
@@ -46,19 +50,25 @@ const handleUpload = (event: any) => {
       return
     }
 
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      imageList.value.push({
-        name: file.name,
-        url: (e.target as FileReader).result as string,
-        file: file
-      })
-    }
-    reader.readAsDataURL(file)
+    // 使用 URL.createObjectURL 生成预览链接，性能优于 Base64
+    const blobUrl = URL.createObjectURL(file)
+    imageList.value.push({
+      name: file.name,
+      url: blobUrl,
+      file: file // 保存原始文件对象用于后续上传
+    })
   })
+  
+  // 清空 input 允许重复选择
+  event.target.value = ''
 }
 
 const removeImage = (index: number) => {
+  const removedImg = imageList.value[index]
+  // 如果是本地生成的 blob url，删除时释放内存
+  if (removedImg.url.startsWith('blob:')) {
+    URL.revokeObjectURL(removedImg.url)
+  }
   imageList.value.splice(index, 1)
 }
 
@@ -74,29 +84,56 @@ const submitFeedback = async () => {
   }
 
   isSubmitting.value = true
-  const loading = ElLoading.service({ text: '正在提交您的宝贵建议...' })
+  const loading = ElLoading.service({ text: isEditing.value ? '正在保存修改...' : '正在提交您的宝贵建议...' })
 
   try {
+    // 采用“并行快速上传”方案 (Promise.all)
+    const uploadTasks = imageList.value.map(async (img) => {
+      if (img.file) {
+        // 快递员出发：并行发送上传请求
+        const res = await uploadImageService(img.file)
+        if (res.data.code === 200 || res.data.code === 0) {
+          return res.data.data?.url || '' // 从 Result 中提取服务端生成的 URL
+        } else {
+          throw new Error(`图片 ${img.name} 上传失败: ${res.data.msg}`)
+        }
+      }
+      return img.url // 已经是远程 URL 的直接保留
+    })
+
+    // 大管家统一收货：等待所有图片上传完成
+    const finalImageUrls = await Promise.all(uploadTasks)
+    
+    // 过滤掉可能的空值并拼接
+    const imageUrlsString = finalImageUrls.filter(url => !!url).join(',')
+
     const data: Feedback = {
       userId: userStore.userInfo.id,
       type: feedbackType.value,
       content: feedbackContent.value,
       contact: feedbackContact.value,
-      images: imageList.value.map(img => img.url).join(',')
+      images: imageUrlsString
     }
 
-    const res = await submitFeedbackService(data)
+    let res;
+    if (isEditing.value && editingId.value) {
+      data.id = editingId.value
+      res = await updateFeedbackService(data)
+    } else {
+      res = await submitFeedbackService(data)
+    }
+
     if (res.data.code === 200 || res.data.code === 0) {
-      ElMessage.success('反馈提交成功，感谢您的宝贵建议！')
+      ElMessage.success(isEditing.value ? '修改保存成功！' : '反馈提交成功，感谢您的宝贵建议！')
       resetForm()
       fetchHistory()
       activeTab.value = 'history'
     } else {
-      ElMessage.error(res.data.msg || '提交失败，请稍后重试')
+      ElMessage.error(res.data.msg || '操作失败，请稍后重试')
     }
-  } catch (error) {
-    console.error('提交反馈失败:', error)
-    ElMessage.error('提交失败，网络连接异常')
+  } catch (error: any) {
+    console.error('提交/更新反馈失败:', error)
+    ElMessage.error(error.message || '操作失败，网络连接异常')
   } finally {
     isSubmitting.value = false
     loading.close()
@@ -104,10 +141,50 @@ const submitFeedback = async () => {
 }
 
 const resetForm = () => {
+  // 清理所有产生的 blob urls 释放内存
+  imageList.value.forEach(img => {
+    if (img.url.startsWith('blob:')) {
+      URL.revokeObjectURL(img.url)
+    }
+  })
+  
   feedbackContent.value = ''
   feedbackContact.value = ''
   imageList.value = []
   feedbackType.value = '功能建议'
+  isEditing.value = false
+  editingId.value = null
+}
+
+const cancelEdit = () => {
+  resetForm()
+  activeTab.value = 'history'
+}
+
+const enterEditMode = (item: Feedback) => {
+  if (item.status !== 0) {
+    ElMessage.warning('该反馈已在处理中，无法修改')
+    return
+  }
+  
+  feedbackType.value = item.type
+  feedbackContent.value = item.content
+  feedbackContact.value = item.contact || ''
+  editingId.value = item.id || null
+  isEditing.value = true
+  
+  // 处理图片回填
+  imageList.value = []
+  if (item.images) {
+    item.images.split(',').forEach(url => {
+      imageList.value.push({
+        url: url,
+        name: 'image'
+      })
+    })
+  }
+  
+  activeTab.value = 'submit'
 }
 
 const fetchHistory = async () => {
@@ -168,8 +245,9 @@ onMounted(() => {
         :class="{ active: activeTab === 'submit' }" 
         @click="activeTab = 'submit'"
       >
-        <el-icon><ChatDotSquare /></el-icon>
-        提交反馈
+        <el-icon v-if="!isEditing"><ChatDotSquare /></el-icon>
+        <el-icon v-else><Edit /></el-icon>
+        {{ isEditing ? '编辑反馈' : '提交反馈' }}
       </div>
       <div 
         class="tab-btn" 
@@ -187,7 +265,8 @@ onMounted(() => {
         <el-icon class="tip-icon">
           <Check />
         </el-icon>
-        <span>您的意见是我们的动力，中肯建议采纳后最高奖励 <strong>200 积分</strong>！</span>
+        <span v-if="!isEditing">您的意见是我们的动力，中肯建议采纳后最高奖励 <strong>200 积分</strong>！</span>
+        <span v-else>正在编辑您的建议，完善后点击下方保存按钮即可同步修改。</span>
       </div>
 
       <div class="form-card">
@@ -250,15 +329,25 @@ onMounted(() => {
         </div>
       </div>
 
-      <el-button 
-        type="primary" 
-        class="submit-btn" 
-        @click="submitFeedback" 
-        :loading="isSubmitting"
-      >
-        <el-icon v-if="!isSubmitting"><Promotion /></el-icon>
-        立即提交反馈
-      </el-button>
+      <div class="button-group">
+        <el-button 
+          v-if="isEditing"
+          class="cancel-btn"
+          @click="cancelEdit"
+        >
+          取消编辑
+        </el-button>
+        <el-button 
+          type="primary" 
+          class="submit-btn" 
+          @click="submitFeedback" 
+          :loading="isSubmitting"
+          :class="{ 'is-editing': isEditing }"
+        >
+          <el-icon v-if="!isSubmitting"><Promotion /></el-icon>
+          {{ isEditing ? '保存修改内容' : '立即提交反馈' }}
+        </el-button>
+      </div>
     </div>
 
     <!-- 历史记录视图 -->
@@ -277,6 +366,18 @@ onMounted(() => {
             </el-tag>
             <span class="hi-type">{{ item.type }}</span>
             <span class="hi-date">{{ formatDate(item.createTime) }}</span>
+            
+            <!-- 编辑按钮 - 仅待处理可见 -->
+            <el-button 
+              v-if="item.status === 0"
+              link 
+              type="primary" 
+              class="edit-link"
+              @click="enterEditMode(item)"
+              :icon="Edit"
+            >
+              编辑
+            </el-button>
           </div>
           <div class="hi-content">{{ item.content }}</div>
           
@@ -519,7 +620,32 @@ onMounted(() => {
   &:hover { transform: scale(1.1); }
 }
 
+.button-group {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+}
+
+.cancel-btn {
+  flex: 1;
+  height: 52px;
+  border-radius: 18px;
+  font-size: 16px;
+  font-weight: 700;
+  border: 2px solid #e2e8f0;
+  color: #64748b;
+  background: #fff;
+  transition: all 0.3s;
+
+  &:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+    color: #334155;
+  }
+}
+
 .submit-btn {
+  flex: 2;
   height: 52px;
   border-radius: 18px;
   font-size: 16px;
@@ -533,9 +659,18 @@ onMounted(() => {
   align-items: center;
   gap: 8px;
 
+  &.is-editing {
+    background: linear-gradient(135deg, #059669, #10b981);
+    box-shadow: 0 8px 24px rgba(16, 185, 129, 0.25);
+  }
+
   &:hover {
     transform: translateY(-3px) scale(1.02);
     box-shadow: 0 12px 30px rgba(37, 99, 235, 0.35);
+  }
+
+  &.is-editing:hover {
+    box-shadow: 0 12px 30px rgba(16, 185, 129, 0.35);
   }
   
   &:active { transform: translateY(0) scale(1); }
@@ -579,7 +714,13 @@ onMounted(() => {
 }
 
 .hi-type { font-weight: 700; color: #1e293b; font-size: 14px; }
-.hi-date { margin-left: auto; color: #94a3b8; font-size: 12px; }
+.hi-date { margin-left: 10px; color: #94a3b8; font-size: 12px; }
+
+.edit-link {
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: 700;
+}
 
 .hi-content {
   font-size: 14px;

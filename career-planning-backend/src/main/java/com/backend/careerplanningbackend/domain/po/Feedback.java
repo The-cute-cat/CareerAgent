@@ -7,6 +7,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
+
 /**
  * Feedback
  * 用户反馈信息PO类
@@ -31,5 +33,11 @@ public class Feedback {
 
     private String type;
     
-    private String urlList;
+    private String imagesList;
+    
+    private Integer status; 
+    
+    private LocalDateTime createTime;
+    
+    private LocalDateTime updateTime;
 }

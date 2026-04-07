@@ -1,4 +1,4 @@
-﻿import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHistory } from 'vue-router'
 import { useUserStore } from '@/stores/modules/user'
 import { userGetUserInfoService } from '@/api/user/user'
 
@@ -98,6 +98,12 @@ const routes = [
         name: 'interviews',
         component: () => import('../views/CInterviews.vue'),
         meta: { title: '我的面试' }
+      },
+      {
+        path: 'admin',
+        name: 'admin',
+        component: () => import('../components/AdminManager/AdminPanel.vue'),
+        meta: { title: '管理后台' }
       },
     ],
   },
