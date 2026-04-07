@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, onUnmounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   Calendar, Back, Close, Coin, Medal, TrendCharts,
@@ -7,7 +7,10 @@ import {
   Loading, CircleCheckFilled, CircleCloseFilled
 } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/modules/user'
+import { rechargePointsService, getPackagesByTypeService, type PointsMembershipChangeDTO, getAlipayService } from '@/api/points'
 import type { AccountPointsData } from '@/api/points'
+import alipayIcon from '@/assets/images/alipay.png'
+import wechatIcon from '@/assets/images/wechat.png'
 import {
   createPaymentService,
   buildAlipayPagePayUrl,
@@ -47,119 +50,181 @@ const props = defineProps({
   points: { type: Number, default: 0 },
   records: { type: Array, default: () => [] },
   accountPoints: { type: Object as () => AccountPointsData | null, default: null },
-  loading: { type: Boolean, default: false }
+  loading: { type: Boolean, default: false },
+  inviteCode: { type: String as () => string | null, default: null }
 })
+
+const emit = defineEmits(['open-invite'])
 
 const userStore = useUserStore()
 
 // Purchase Center Dialog
 const purchaseCenterVisible = ref(false)
 const activePurchaseTab = ref<'points' | 'member'>('points')
-const selectedMemberPlan = ref('quarterly')
-const selectedPointsPlan = ref('basic')
+const selectedMemberPlan = ref<number | string>('quarterly')
+const selectedPointsPlan = ref<number | string>('invite')
+const payMethodVisible = ref(false)
+const currentPayMethod = ref<'alipay' | 'wechat'>('alipay')
 
-// 支付相关状态
-const payDialogVisible = ref(false)
-const payLoading = ref(false)
-const currentOrderId = ref('')
-const currentPlan = ref<MemberPlan | PointsPlan | null>(null)
-const payStatus = ref<'pending' | 'paid' | 'expired' | 'cancelled'>('pending')
-const payCountdown = ref(300)
-const pollingTimer = ref<ReturnType<typeof setInterval> | null>(null)
-const countdownTimer = ref<ReturnType<typeof setInterval> | null>(null)
-
-const memberType = computed(() => String((userStore.userInfo as any)?.memberType || 'normal').toLowerCase())
-const displayPoints = computed(() => Number(props.points || (userStore.userInfo as any)?.points || 0))
-
-const memberPlans = [
+const DEFAULT_MEMBER_PLANS = [
   {
     key: 'monthly',
+    packageId: 'monthly',
     title: '月度会员',
     duration: '1 个月',
     price: '15',
+    points: 10800,
     unit: '/月',
-    dailyCost: '相当于每日 0.50 元',
-    dailyPoints: 360,
-    totalPoints: 10800,
     tag: '尝鲜首选',
-    badgeClass: 'is-monthly',
     color: '#3b82f6',
     gradient: 'linear-gradient(135deg, #60a5fa, #3b82f6)'
   },
   {
     key: 'quarterly',
+    packageId: 'quarterly',
     title: '季度会员',
     duration: '3 个月',
     price: '36',
+    points: 10800,
     unit: '/季',
-    dailyCost: '相当于每日 0.40 元',
-    dailyPoints: 120, // Strict adherence to user's requirement
-    totalPoints: 10800,
     tag: '性价比之选',
-    badgeClass: 'is-quarterly',
     color: '#6366f1',
     gradient: 'linear-gradient(135deg, #818cf8, #4f46e5)'
   },
   {
     key: 'yearly',
+    packageId: 'yearly',
     title: '年度会员',
     duration: '12 个月',
     price: '128',
+    points: 131400,
     unit: '/年',
-    dailyCost: '相当于每日 0.35 元',
-    dailyPoints: 360,
-    totalPoints: 131400,
     tag: '最大优惠',
-    badgeClass: 'is-yearly',
     color: '#a855f7',
     gradient: 'linear-gradient(135deg, #c084fc, #9333ea)'
   }
 ]
 
-const pointsPurchasePlans = [
+const DEFAULT_POINTS_PLANS = [
   {
     key: 'invite',
+    packageId: 'invite',
     title: '免费获取',
-    points: 500, // Explicitly specified by user requirement (好友500积分一个)
+    points: 500,
     price: '0.00',
-    unit: '',
     tag: '免费获取',
-    badgeClass: 'is-free',
     color: '#f59e0b',
     gradient: 'linear-gradient(135deg, #fbbf24, #f59e0b)'
   },
   {
     key: 'basic',
+    packageId: 'basic',
     title: '尝鲜首选',
     points: 1000,
     price: '9.90',
-    unit: '',
     tag: '尝鲜首选',
-    badgeClass: 'is-basic',
     color: '#3b82f6',
     gradient: 'linear-gradient(135deg, #60a5fa, #3b82f6)'
   },
   {
     key: 'value',
+    packageId: 'value',
     title: '高性价比',
     points: 3000,
-    price: '16.60', // Explicitly specified by user requirement (3000积分16.6元)
-    unit: '',
+    price: '16.60',
     tag: '高性价比',
-    badgeClass: 'is-value',
     color: '#8b5cf6',
     gradient: 'linear-gradient(135deg, #a78bfa, #7c3aed)'
   }
 ]
 
+const memberPlans = ref<any[]>(DEFAULT_MEMBER_PLANS)
+const pointsPurchasePlans = ref<any[]>(DEFAULT_POINTS_PLANS)
+
+const memberType = computed(() => String((userStore.userInfo as any)?.memberType || 'normal').toLowerCase())
+const displayPoints = computed(() => Number(props.points || (userStore.userInfo as any)?.points || 0))
+
+const fetchPackages = async () => {
+  try {
+    const [pointsRes, memberRes] = await Promise.all([
+      getPackagesByTypeService(1),
+      getPackagesByTypeService(2)
+    ])
+
+    if (pointsRes.data.code === 200 && pointsRes.data.data) {
+      interface ColorTheme { color: string; gradient: string }
+      const themes: ColorTheme[] = [
+        { color: '#8b5cf6', gradient: 'linear-gradient(135deg, #a78bfa, #7c3aed)' },
+        { color: '#3b82f6', gradient: 'linear-gradient(135deg, #60a5fa, #3b82f6)' },
+        { color: '#ec4899', gradient: 'linear-gradient(135deg, #f472b6, #db2777)' },
+        { color: '#06b6d4', gradient: 'linear-gradient(135deg, #22d3ee, #0891b2)' }
+      ]
+
+      const backendPoints = pointsRes.data.data.map((pkg: any, index: number) => {
+        const theme = themes[index % themes.length] as ColorTheme
+        return {
+          packageId: pkg.id,
+          key: pkg.id,
+          title: pkg.name || pkg.description || `积分方案 ${pkg.id}`,
+          points: pkg.points || 0,
+          price: (pkg.price || pkg.amount || 0).toFixed(2),
+          tag: pkg.description || '推荐',
+          color: theme.color,
+          gradient: theme.gradient
+        }
+      })
+
+      pointsPurchasePlans.value = [
+        {
+          key: 'invite',
+          packageId: 'invite',
+          title: '免费获取',
+          points: 500,
+          price: '0.00',
+          tag: '免费获取',
+          color: '#f59e0b',
+          gradient: 'linear-gradient(135deg, #fbbf24, #f59e0b)'
+        },
+        ...backendPoints
+      ]
+    }
+
+    if (memberRes.data.code === 200 && memberRes.data.data) {
+      memberPlans.value = memberRes.data.data.map((pkg: any) => ({
+        packageId: pkg.id,
+        key: pkg.id,
+        title: pkg.name || pkg.description || '会员套餐',
+        duration: pkg.description || '会员',
+        price: (pkg.price || pkg.amount || 0).toString(),
+        points: pkg.points || 0,
+        unit: pkg.description?.includes('年') ? '/年' : pkg.description?.includes('季') ? '/季' : '/月',
+        tag: pkg?.status === 1 ? '热门' : '推荐',
+        color: pkg?.id === 1 ? '#3b82f6' : pkg?.id === 2 ? '#6366f1' : '#a855f7',
+        gradient: 'linear-gradient(135deg, #60a5fa, #3b82f6)'
+      }))
+
+      if (memberPlans.value.length > 0) {
+        selectedMemberPlan.value = memberPlans.value[0].packageId
+      }
+    }
+  } catch (error) {
+    console.error('获取套餐失败:', error)
+    ElMessage.error('获取套餐列表失败，请稍后重试')
+  }
+}
+
+onMounted(() => {
+  fetchPackages()
+})
+
 const currentSelectedMemberObj = computed(() => {
-  const found = memberPlans.find(p => p.key === selectedMemberPlan.value)
-  return found || memberPlans[1]!
+  const found = memberPlans.value.find(p => p.packageId === selectedMemberPlan.value)
+  return found || memberPlans.value[0] || { packageId: 0, price: '0', points: 0, title: '' }
 })
 
 const currentSelectedPointsObj = computed(() => {
-  const found = pointsPurchasePlans.find(p => p.key === selectedPointsPlan.value)
-  return found || pointsPurchasePlans[1]!
+  const found = pointsPurchasePlans.value.find(p => p.packageId === selectedPointsPlan.value)
+  return found || pointsPurchasePlans.value[0] || { packageId: 0, price: '0', points: 0, title: '' }
 })
 
 const inviteBenefits = [
@@ -173,8 +238,8 @@ const inviteBenefits = [
 const pointRecords = computed(() => {
   if ((props.records as any[]).length) return props.records as any[]
   return [
-    { id: 1, type: '每日积分', remain: 0, total: 100, expireText: '今日已领取' },
-    { id: 2, type: '邀请奖励', remain: 17, total: 200, expireText: '距离到期还有 19 天' }
+    { id: 1, type: '每日积分', remain: 0, total: 100, expireText: '今日积分已领取' },
+    { id: 2, type: '邀请奖励', remain: 0, total: 0, expireText: '暂无邀请奖励' }
   ]
 })
 
@@ -198,222 +263,50 @@ const openPurchaseCenter = (tab: 'points' | 'member') => {
   purchaseCenterVisible.value = true
 }
 
-const emit = defineEmits(['purchase-success'])
+const handlePay = async () => {
+  const pkg = activePurchaseTab.value === 'points' ? currentSelectedPointsObj.value : currentSelectedMemberObj.value
 
-// ==================== 支付流程 ====================
-
-// 开始支付流程
-const startPayment = async () => {
-  const userId = Number(userStore.userInfo?.id)
-  if (!userId) {
-    ElMessage.error('未获取到用户信息，请重新登录')
+  if (!pkg.packageId || pkg.packageId === 'invite') {
+    if (pkg.packageId === 'invite') handleInvite()
     return
   }
-
-  // 根据当前选中的tab确定支付参数
-  const isPointsTab = activePurchaseTab.value === 'points'
-  const pointsPlan = currentSelectedPointsObj.value
-  const memberPlan = currentSelectedMemberObj.value
-  const selectedPlan = isPointsTab ? pointsPlan : memberPlan
-
-  // 构建支付请求参数
-  const paymentRequest: PaymentOrderRequest = {
-    amount: parseFloat(selectedPlan.price),
-    pointsGranted: isPointsTab ? pointsPlan.points : memberPlan.totalPoints,
-    payType: 2, // 2: 支付宝
-    purpose: isPointsTab ? 1 : 2, // 1: 积分充值, 2: 会员购买
-    memberLevel: isPointsTab ? undefined : getMemberLevel(memberPlan.key)
-  }
-
-  // 价格校验
-  if (paymentRequest.amount <= 0 && selectedPlan.key !== 'invite') {
-    ElMessage.error('金额无效')
-    return
-  }
-
-  // 如果是免费邀请积分
-  if (selectedPlan.key === 'invite') {
-    handleInvite()
-    return
-  }
-
-  payLoading.value = true
-  currentPlan.value = selectedPlan
 
   try {
-    // 1. 创建支付订单（后端直接返回 HTML 表单并跳转）
-    const result = await createPaymentService(paymentRequest)
-
-    // 保存订单号（从 HTML 中提取或从响应中获取）
-    currentOrderId.value = result.orderId || ''
-
-    // 2. 打开支付弹窗
-    payDialogVisible.value = true
-    payStatus.value = 'pending'
-    payCountdown.value = 300 // 5分钟倒计时
-
-    // 3. 开始轮询支付状态（如果有订单号）
-    if (currentOrderId.value) {
-      startPolling(currentOrderId.value)
+    const payload: PointsMembershipChangeDTO = {
+      packageId: Number(pkg.packageId) || 0,
+      name: pkg.title,
+      amount: Number(pkg.price),
+      points: pkg.points || 0,
+      payType: currentPayMethod.value === 'wechat' ? 1 : 2, // 1:微信, 2:支付宝
     }
-    startCountdown()
 
-  } catch (err: any) {
-    ElMessage.error(err.message || '创建订单失败，请稍后重试')
-    payLoading.value = false
-  }
-}
+    // 处理会员等级：如果是会员购买，根据套餐类型设置等级
+    if (activePurchaseTab.value === 'member') {
+      const pid = String(pkg.packageId).toLowerCase()
+      if (pid.includes('monthly') || pkg.packageId === 1) payload.membershipLevel = 1
+      else if (pid.includes('quarterly') || pkg.packageId === 2) payload.membershipLevel = 2
+      else if (pid.includes('yearly') || pkg.packageId === 3) payload.membershipLevel = 3
+      else payload.membershipLevel = 1 // 默认
+    }
 
-// 获取会员等级
-const getMemberLevel = (planKey: string): number => {
-  const levelMap: Record<string, number> = {
-    'monthly': 1,
-    'quarterly': 2,
-    'quarter': 2,
-    'yearly': 3,
-    'annual': 3
-  }
-  return levelMap[planKey] || 2
-}
-
-// 轮询支付状态
-const startPolling = (orderId: string | number) => {
-  // 清除之前的定时器
-  if (pollingTimer.value) {
-    clearInterval(pollingTimer.value)
-    pollingTimer.value = null
-  }
-
-  // 每3秒轮询一次，最多轮询100次（5分钟）
-  let pollCount = 0
-  const maxPolls = 100
-
-  pollingTimer.value = setInterval(async () => {
-    pollCount++
-    if (pollCount > maxPolls) {
-      clearTimers()
-      payStatus.value = 'expired'
-      payLoading.value = false
+    if (!userStore.userInfo?.id) {
+      ElMessage.error('未获取到用户信息，请重新登录')
       return
     }
 
-    try {
-      const res = await queryPaymentStatusService(String(orderId))
-      if (res.data.code === 0 || res.data.code === 200) {
-        const statusData = res.data.data
-        if (!statusData) return
-
-        payStatus.value = statusData.status as any
-
-        // 支付成功
-        if (statusData.status === 'paid' || statusData.status === '1') {
-          handlePaymentSuccess()
-        }
-        // 支付取消或过期
-        else if (statusData.status === 'cancelled' || statusData.status === 'expired' ||
-                 statusData.status === '2' || statusData.status === '3') {
-          handlePaymentFail('支付已取消或已过期')
-        }
-      }
-    } catch (err) {
-      console.error('查询支付状态失败:', err)
-    }
-  }, 3000)
-}
-
-// 倒计时
-const startCountdown = () => {
-  // 清除之前的定时器
-  if (countdownTimer.value) {
-    clearInterval(countdownTimer.value)
-    countdownTimer.value = null
-  }
-
-  countdownTimer.value = setInterval(() => {
-    if (payCountdown.value > 0) {
-      payCountdown.value--
+    const res = await rechargePointsService(payload)
+    if (res.data.code === 200) {
+      ElMessage.success('下单成功')
+      console.log('下单成功', res.data.data)
+      const orderNo = res.data.data;
+      // 加上 /api 前缀，让跳转请求被 vite.config.ts 拦截并代理到后端
+      window.location.href = `/api/alipay/pay/${orderNo}`;
+      purchaseCenterVisible.value = false
     } else {
-      // 超时处理
-      handlePaymentTimeout()
+      ElMessage.error(res.data.msg || '提交支付失败')
     }
-  }, 1000)
-}
-
-// 支付成功处理
-const handlePaymentSuccess = () => {
-  clearTimers()
-  payStatus.value = 'paid'
-  payLoading.value = false
-
-  ElMessage.success(activePurchaseTab.value === 'points' ? '积分充值成功！' : '会员订阅成功！')
-
-  // 关闭支付弹窗和购买中心
-  setTimeout(() => {
-    payDialogVisible.value = false
-    purchaseCenterVisible.value = false
-
-    // 触发父组件刷新用户信息
-    emit('purchase-success')
-  }, 1500)
-}
-
-// 支付失败处理
-const handlePaymentFail = (message: string) => {
-  clearTimers()
-  payStatus.value = 'cancelled'
-  payLoading.value = false
-  ElMessage.warning(message)
-}
-
-// 支付超时处理
-const handlePaymentTimeout = () => {
-  clearTimers()
-  payStatus.value = 'expired'
-  payLoading.value = false
-  ElMessage.warning('支付超时，请重新下单')
-}
-
-// 清除定时器
-const clearTimers = () => {
-  if (pollingTimer.value) {
-    clearInterval(pollingTimer.value)
-    pollingTimer.value = null
-  }
-  if (countdownTimer.value) {
-    clearInterval(countdownTimer.value)
-    countdownTimer.value = null
-  }
-}
-
-// 用户主动取消支付
-const cancelPayment = () => {
-  clearTimers()
-  payDialogVisible.value = false
-  payStatus.value = 'cancelled'
-  payLoading.value = false
-  // 不清空订单号，保留用于后续查询或重试
-}
-
-// 重试支付
-const retryPayment = () => {
-  if (currentOrderId.value) {
-    const payUrl = buildAlipayPagePayUrl(currentOrderId.value)
-    window.open(payUrl, '_blank')
-    payStatus.value = 'pending'
-    // 清除旧定时器，重新开始轮询
-    if (pollingTimer.value) {
-      clearInterval(pollingTimer.value)
-    }
-    startPolling(currentOrderId.value)
-    // 重置倒计时
-    payCountdown.value = 300
-    if (countdownTimer.value) {
-      clearInterval(countdownTimer.value)
-    }
-    startCountdown()
-  } else {
-    ElMessage.warning('订单号丢失，请重新下单')
-    payDialogVisible.value = false
+  } catch (err: any) {
+    ElMessage.error(err.message || '网络或服务器错误，支付请求失败')
   }
 }
 
@@ -423,7 +316,18 @@ const handlePay = async () => {
 }
 
 const handleInvite = () => {
-  ElMessage.success("邀请链接已复制到剪贴板！")
+  if (props.inviteCode) {
+    const inviteLink = `${window.location.origin}/register?inviteCode=${props.inviteCode}`
+    navigator.clipboard.writeText(inviteLink).then(() => {
+      ElMessage.success("邀请链接已复制到剪贴板！")
+    }).catch(() => {
+      ElMessage.error("复制失败，请重试")
+    })
+  } else {
+    ElMessage.warning("您尚未注册为邀请大使，请先完成注册")
+    emit('open-invite')
+    purchaseCenterVisible.value = false
+  }
 }
 
 // 组件卸载时清理定时器
@@ -630,8 +534,8 @@ onUnmounted(() => {
         <div v-if="activePurchaseTab === 'points'" class="points-purchase-view">
           <div class="purchase-cards">
             <div v-for="plan in pointsPurchasePlans" :key="plan.key" class="p-card"
-              :class="{ 'active': selectedPointsPlan === plan.key }" @click="selectedPointsPlan = plan.key"
-              :style="{ '--theme-color': plan.color }">
+              :class="{ 'active': selectedPointsPlan === plan.packageId || selectedPointsPlan === plan.key }"
+              @click="selectedPointsPlan = plan.packageId || plan.key" :style="{ '--theme-color': plan.color }">
               <div class="p-card-tag" :style="{ backgroundColor: plan.color }">{{ plan.tag }}</div>
               <div class="p-card-points">{{ plan.points }} 积分</div>
               <div class="p-card-price">
@@ -640,8 +544,8 @@ onUnmounted(() => {
                 </template>
                 <template v-else>
                   <span class="currency">¥</span>
-                  <span class="amount">{{ plan.price.split('.')[0] }}</span>
-                  <span class="decimals">.{{ plan.price.split('.')[1] || '00' }}</span>
+                  <span class="amount">{{ String(plan.price).split('.')[0] }}</span>
+                  <span class="decimals">.{{ String(plan.price).split('.')[1] || '00' }}</span>
                 </template>
               </div>
             </div>
@@ -662,20 +566,37 @@ onUnmounted(() => {
                 <InfoFilled />
               </el-icon> 邀请好友免费获得积分
             </div>
-            <button class="primary-btn invite-btn" @click="handleInvite">邀请好友</button>
+            <button class="primary-btn invite-btn" @click="handleInvite">
+              <el-icon>
+                <Share />
+              </el-icon> 立即邀请好友领积分
+            </button>
           </div>
 
           <div v-else class="payment-section">
-            <div class="pay-info">
-              <el-icon>
-                <WarningFilled />
-              </el-icon> 您已选择：{{ currentSelectedPointsObj.title }}（¥ {{ currentSelectedPointsObj.price }}）
+            <div class="order-summary-card" :style="{ backgroundColor: currentSelectedPointsObj.color + '10' }">
+              <div class="os-header">订单摘要</div>
+              <div class="os-body">
+                <div class="os-item">
+                  <span class="os-label">充值内容:</span>
+                  <span class="os-value highlight" :style="{ color: currentSelectedPointsObj.color }">
+                    {{ currentSelectedPointsObj.points }} 积分
+                  </span>
+                </div>
+                <div class="os-item">
+                  <span class="os-label">应付金额:</span>
+                  <span class="os-value price">¥{{ currentSelectedPointsObj.price }}</span>
+                </div>
+              </div>
             </div>
             <div class="pay-method">
-              <div class="alipay">
-                <span class="alipay-icon">支</span> 支付宝支付
+              <div class="alipay" v-if="currentPayMethod === 'alipay'">
+                <img :src="alipayIcon" class="method-img-icon" alt="Alipay" /> 支付宝支付
               </div>
-              <div class="more-methods">
+              <div class="wechat" v-else>
+                <img :src="wechatIcon" class="method-img-icon" alt="WeChat" /> 微信支付
+              </div>
+              <div class="more-methods" @click="payMethodVisible = true">
                 更多支付方式 <el-icon>
                   <ArrowRight />
                 </el-icon>
@@ -683,7 +604,10 @@ onUnmounted(() => {
             </div>
             <button class="primary-btn subscribe-btn" @click="handlePay"
               :style="{ backgroundColor: currentSelectedPointsObj.color }">
-              立即充值
+              <el-icon>
+                <ShoppingCart />
+              </el-icon>
+              确认支付并充值 {{ currentSelectedPointsObj.points }} 积分
             </button>
           </div>
         </div>
@@ -691,12 +615,13 @@ onUnmounted(() => {
         <!-- =============== 订阅会员 Tab =============== -->
         <div v-else class="member-subscribe-view">
           <div class="purchase-cards member-cards">
-            <div v-for="plan in memberPlans" :key="plan.key" class="m-card"
-              :class="{ 'active': selectedMemberPlan === plan.key }" @click="selectedMemberPlan = plan.key"
+            <div v-for="plan in memberPlans" :key="plan.packageId" class="m-card"
+              :class="{ 'active': selectedMemberPlan === plan.packageId }" @click="selectedMemberPlan = plan.packageId"
               :style="{ '--theme-color': plan.color }">
               <div class="m-card-tag" :style="{ backgroundColor: plan.color }">{{ plan.tag }}</div>
               <div class="m-card-duration">{{ plan.title }}</div>
-              <div class="m-card-months" :style="{ color: selectedMemberPlan === plan.key ? plan.color : '#1e293b' }">
+              <div class="m-card-months"
+                :style="{ color: selectedMemberPlan === plan.packageId ? plan.color : '#1e293b' }">
                 {{ plan.duration }}
               </div>
               <div class="m-card-price">
@@ -704,28 +629,40 @@ onUnmounted(() => {
                 <span class="amount">{{ plan.price }}</span>
                 <span class="unit">{{ plan.unit }}</span>
               </div>
-              <div class="m-card-daily">{{ plan.dailyCost }}</div>
+              <div class="m-card-daily">包含 {{ plan.points }} 积分</div>
             </div>
           </div>
 
           <div class="member-summary">
             <el-icon>
               <Coin />
-            </el-icon> 每日 {{ currentSelectedMemberObj.dailyPoints }} 积分，总计 {{ currentSelectedMemberObj.totalPoints }} 积分
+            </el-icon> 总计包含 {{ currentSelectedMemberObj.points }} 积分 (购买后一次性发放)
           </div>
 
           <div class="payment-section">
-            <div class="pay-info">
-              <el-icon>
-                <WarningFilled />
-              </el-icon> 您已选择：{{ currentSelectedMemberObj.title }}（¥ {{ currentSelectedMemberObj.price }} {{
-                currentSelectedMemberObj.unit }}）
+            <div class="order-summary-card" :style="{ backgroundColor: currentSelectedMemberObj.color + '10' }">
+              <div class="os-header">会员订阅摘要</div>
+              <div class="os-body">
+                <div class="os-item">
+                  <span class="os-label">开通档位:</span>
+                  <span class="os-value highlight" :style="{ color: currentSelectedMemberObj.color }">
+                    {{ currentSelectedMemberObj.title }}
+                  </span>
+                </div>
+                <div class="os-item">
+                  <span class="os-label">应付金额:</span>
+                  <span class="os-value price">¥{{ currentSelectedMemberObj.price }}</span>
+                </div>
+              </div>
             </div>
             <div class="pay-method">
-              <div class="alipay">
-                <span class="alipay-icon">支</span> 支付宝支付
+              <div class="alipay" v-if="currentPayMethod === 'alipay'">
+                <img :src="alipayIcon" class="method-img-icon" alt="Alipay" /> 支付宝支付
               </div>
-              <div class="more-methods">
+              <div class="wechat" v-else>
+                <img :src="wechatIcon" class="method-img-icon" alt="WeChat" /> 微信支付
+              </div>
+              <div class="more-methods" @click="payMethodVisible = true">
                 更多支付方式 <el-icon>
                   <ArrowRight />
                 </el-icon>
@@ -733,7 +670,10 @@ onUnmounted(() => {
             </div>
             <button class="primary-btn subscribe-btn" @click="handlePay"
               :style="{ backgroundColor: currentSelectedMemberObj.color }">
-              立即订阅
+              <el-icon>
+                <Medal />
+              </el-icon>
+              确认并支付 ¥{{ currentSelectedMemberObj.price }}
             </button>
           </div>
         </div>
@@ -1112,8 +1052,40 @@ onUnmounted(() => {
 .p-card.active,
 .m-card.active {
   border-color: var(--theme-color, #3b82f6);
+  border-width: 2.5px;
   background: #fff;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.05);
+  transform: translateY(-6px) scale(1.03);
+  box-shadow:
+    0 12px 40px -8px rgba(var(--theme-color-rgb, 59, 130, 246), 0.25),
+    0 8px 16px -4px rgba(59, 130, 246, 0.15);
+  z-index: 10;
+}
+
+/* 选中时的对勾形状 (CSS绘制) */
+.p-card.active::before,
+.m-card.active::before {
+  content: '';
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 22px;
+  height: 22px;
+  background: var(--theme-color, #3b82f6);
+  border-radius: 50%;
+  z-index: 3;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.p-card.active::after,
+.m-card.active::after {
+  content: '✓';
+  position: absolute;
+  top: 9px;
+  right: 12px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 900;
+  z-index: 4;
 }
 
 .p-card-tag,
@@ -1280,6 +1252,53 @@ onUnmounted(() => {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
 }
 
+.order-summary-card {
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 20px;
+  border: 1px dashed rgba(0, 0, 0, 0.1);
+}
+
+.os-header {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #64748b;
+  margin-bottom: 12px;
+}
+
+.os-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.os-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.os-label {
+  font-size: 14px;
+  color: #475569;
+}
+
+.os-value {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.os-value.highlight {
+  font-size: 18px;
+}
+
+.os-value.price {
+  font-size: 20px;
+  color: #ef4444;
+}
+
 .pay-info {
   display: flex;
   align-items: center;
@@ -1339,127 +1358,11 @@ onUnmounted(() => {
   background: #4f46e5;
 }
 
-/* 支付状态弹窗样式 */
-::v-deep(.pay-status-dialog) {
-  border-radius: 20px;
-  overflow: hidden;
-}
-
-::v-deep(.pay-status-dialog .el-dialog__header) {
-  display: none;
-}
-
-::v-deep(.pay-status-dialog .el-dialog__body) {
-  padding: 40px 32px;
-  background: #fff;
-}
-
-.pay-status-content {
-  text-align: center;
-}
-
-.pay-status-icon {
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto 24px;
-  font-size: 40px;
-}
-
-.pay-status-icon.loading {
-  background: #eff6ff;
-  color: #3b82f6;
-  animation: pulse 2s infinite;
-}
-
-.pay-status-icon.success {
-  background: #ecfdf5;
-  color: #10b981;
-}
-
-.pay-status-icon.error {
-  background: #fef2f2;
-  color: #ef4444;
-}
-
-@keyframes pulse {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.7;
-  }
-}
-
-.pay-status-title {
-  font-size: 22px;
-  font-weight: 700;
-  color: #1e293b;
-  margin: 0 0 12px;
-}
-
-.pay-status-desc {
-  font-size: 14px;
-  color: #64748b;
-  line-height: 1.6;
-  margin: 0 0 20px;
-}
-
-.pay-status-order {
-  font-size: 13px;
-  color: #94a3b8;
-  background: #f8fafc;
-  padding: 8px 16px;
-  border-radius: 8px;
-  display: inline-block;
-  margin-bottom: 24px;
-}
-
-.pay-status-actions {
-  display: flex;
-  gap: 12px;
-  justify-content: center;
-}
-
-.pay-status-actions .el-button {
-  padding: 12px 24px;
-  font-weight: 600;
-}
-
-.pay-status-success-detail {
-  background: #f8fafc;
-  border-radius: 12px;
-  padding: 20px;
-  margin-bottom: 24px;
-}
-
-.success-item {
-  display: flex;
-  justify-content: space-between;
-  padding: 10px 0;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.success-item:last-child {
-  border-bottom: none;
-}
-
-.success-item .label {
-  font-size: 14px;
-  color: #64748b;
-}
-
-.success-item .value {
-  font-size: 14px;
-  font-weight: 600;
-  color: #1e293b;
-}
-
-.success-item .value.price {
-  color: #3b82f6;
-  font-size: 18px;
+.method-img-icon {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  margin-right: 8px;
+  border-radius: 4px;
 }
 </style>

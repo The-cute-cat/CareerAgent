@@ -32,7 +32,7 @@ async def handle_files(
         files: list[UploadFile] = File(...),
         _: bool = Depends(validate_token)
 ) -> list[dict[str, str]]:
-    """验证上传文件的安全性和类型，返回文件信息字典"""
+    """验证上传文件的安全性和类型，返回文件信息字典列表"""
     return [await _validate_file(file) for file in files]
 
 
@@ -40,10 +40,28 @@ async def handle_file(
         file: UploadFile = File(...),
         _: bool = Depends(validate_token)
 ) -> dict[str, str]:
+    """验证上传文件的安全性和类型，返回文件信息字典"""
     return await _validate_file(file)
 
 
 async def _validate_file(file: UploadFile) -> dict[str, str]:
+    """
+    验证单个上传文件的安全性和类型。
+
+    Returns:
+        dict[str, str]: 文件信息字典，包含以下字段：
+            - method: 检测方法，如 "magic_numbers", "puremagic", "ole2_deep", "zip_deep"
+            - mime_type: MIME 类型，如 "application/pdf"
+            - extension: 文件真实扩展名（基于魔数检测，非文件名扩展名）
+            - description: 文件类型描述，如 "Portable Document Format"
+            - file_name: 服务器保存的文件名（UUID格式）
+            - size: 文件大小，如 "1.50 MB"
+            - save_path: 服务器保存的完整路径
+            - original_name: 用户上传时的原始文件名
+
+    Raises:
+        FileValidationError: 文件类型不支持或验证失败
+    """
     save_path = os.path.join(settings.path_config.temp, uuid.uuid4().hex)
     try:
         os.makedirs(settings.path_config.temp, exist_ok=True)
@@ -52,6 +70,7 @@ async def _validate_file(file: UploadFile) -> dict[str, str]:
             f.write(bytes_data)
         result = await file_detector.is_safe_file(save_path)
         result[1]["save_path"] = save_path
+        result[1]["original_name"] = file.filename
         if result[0]:
             return result[1]
         os.remove(save_path)

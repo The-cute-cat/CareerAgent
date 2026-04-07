@@ -12,16 +12,13 @@ import java.math.BigDecimal;
 @Data
 public class PaymentCreateDTO {
 
-    @NotNull(message = "用户ID不能为空")
-    private Long userId;
-
     @NotNull(message = "支付金额不能为空")
     @Min(value = 0, message = "金额不能为负数")
     private BigDecimal amount;
 
     @NotNull(message = "积分数不能为空")
     @Min(value = 1, message = "积分数最少为1")
-    private Integer pointsGranted;
+    private Integer points;
 
     /**
      * 支付方式: 1微信, 2支付宝
@@ -30,13 +27,17 @@ public class PaymentCreateDTO {
     private Integer payType;
 
     /**
-     * 订单用途: 1积分充值, 2会员购买
+     * 套餐id
      */
-    @NotNull(message = "订单用途不能为空")
-    private Integer purpose;
+    @NotNull(message = "套餐id")
+    private Integer packageId;
+    
+    private Integer description;
 
     /**
      * 如果是会员购买，需要传会员等级
      */
-    private Integer memberLevel;
+    private Integer membershipLevel;
+    
+    private String name;
 }

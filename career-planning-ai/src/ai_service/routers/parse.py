@@ -3,14 +3,11 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, BackgroundTasks, Form
 
-from ai_service.exceptions import CommonHandleError
 from ai_service.response.result import success
 from ai_service.schemas.file import handle_file, handle_files
+from ai_service.services.extract_text import extract_from_file
 from ai_service.services.redis_service import RedisService
 from ai_service.services.struct_text_extractor import struct_text_extractor
-from ai_service.services.image_extractor import image_extractor
-from ai_service.services.pdf_extractor import pdf_extractor
-from ai_service.services.word_extractor import word_extractor
 from ai_service.utils.fingerprint_util import HashAlgorithm, file_fingerprint
 from ai_service.utils.logger_handler import log
 from config import settings
@@ -31,14 +28,14 @@ async def parse_file(
     cached_results, uncached_infos = [], [file_info]
     if cache_enabled:
         try:
-            cached_results, uncached_infos = await get_cache(file_info=file_info)
+            cached_results, uncached_infos = await _get_cache(file_info=file_info)
         except Exception as e:
             log.error(f"获取缓存失败: {e}", exc_info=True)
         if len(uncached_infos) == 0:
             return success(cached_results[0])
-    text = await _extract_text_from_file(file_info["save_path"], file_info["extension"])
+    text = await extract_from_file(file_info["save_path"], file_info["extension"])
     result = await struct_text_extractor.extract_from_text_to_user_form(text)
-    background_tasks.add_task(save_cache, [result], uncached_infos)
+    background_tasks.add_task(_save_cache, [result], uncached_infos)
     return success(result)
 
 
@@ -51,7 +48,7 @@ async def parse_files(
     cached_results, uncached_infos = [], file_infos
     if cache_enabled:
         try:
-            cached_results, uncached_infos = await get_cache(file_infos=file_infos)
+            cached_results, uncached_infos = await _get_cache(file_infos=file_infos)
         except Exception as e:
             log.error(f"获取缓存失败: {e}", exc_info=True)
         if len(uncached_infos) == 0:
@@ -59,49 +56,20 @@ async def parse_files(
     file_infos = uncached_infos
     async with semaphore:
         texts = await asyncio.gather(*[
-            _extract_text_from_file(info["save_path"], info["extension"])
+            extract_from_file(info["save_path"], info["extension"])
             for info in file_infos
         ])
     results = await asyncio.gather(*[
         struct_text_extractor.extract_from_text_to_user_form(text)
         for text in texts
     ])
-    background_tasks.add_task(save_cache, results, uncached_infos)
+    background_tasks.add_task(_save_cache, results, uncached_infos)
     return success(results + cached_results)
 
 
-async def _extract_text_from_file(file_path: str, extension: str) -> str:
-    """
-    从文件提取文本内容
-
-    Args:
-        file_path: 文件路径
-        extension: 文件扩展名
-
-    Returns:
-        提取的文本内容
-    """
-    if extension == "pdf":
-        content = await pdf_extractor.get_pdf_content(file_path)
-        if not content:
-            raise CommonHandleError("PDF 文件提取失败")
-        text = ""
-        for page in content:
-            if not page.get("error"):
-                text += f"第{page['page']}页：{page['content']}\n"
-        return text
-
-    elif extension in ["doc", "docx"]:
-        return await word_extractor.detect_word_to_enhance_text(file_path)
-
-    elif extension.lower() in [suffix.lower() for suffix in settings.image.suffix]:
-        return await image_extractor.extract_text(image_path=file_path)
-
-    else:
-        raise CommonHandleError(f"不支持的文件类型: {extension}")
 
 
-async def get_cache(file_info=None, file_infos=None) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
+async def _get_cache(file_info=None, file_infos=None) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
     if not file_info and not file_infos:
         raise ValueError("file_info和file_infos不能同时为空")
     if file_info and file_infos:
@@ -121,7 +89,7 @@ async def get_cache(file_info=None, file_infos=None) -> tuple[list[dict[str, Any
     return result, info_list
 
 
-def save_cache(results, info_list: list[dict[str, str]]):
+def _save_cache(results, info_list: list[dict[str, str]]):
     if len(results) == 0:
         return
     if not redis.is_available:

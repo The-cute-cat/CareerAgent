@@ -56,7 +56,7 @@ instance.interceptors.response.use(
   },
   async (err) => {
     console.log('登录错误', err.response)
-    if (err.response.status === 401) {
+    if (err.response?.status === 401) {
       // 短token过期，尝试刷新
       const userStore = useUserStore()
       const refreshToken = userStore.refreshToken

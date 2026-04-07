@@ -5,4 +5,5 @@ __all__ = [
     "code_ability",
     "convert",
     "report",
+    "chat",
 ]
