@@ -424,6 +424,7 @@ class Settings(BaseSettings):
     code_ability: _CodeAbility = Field(default_factory=_CodeAbility)
     redis: _RedisConfig = Field(default_factory=_RedisConfig)
     neo4j: _Neo4jConfig = Field(default_factory=_Neo4jConfig)
+    neo4j: _Neo4jConfig = Field(default_factory=_Neo4jConfig)
     other: _Other = Field(default_factory=_Other)
     conversation: _Conversation = Field(default_factory=_Conversation)
 
