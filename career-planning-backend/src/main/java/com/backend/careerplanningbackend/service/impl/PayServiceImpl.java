@@ -115,6 +115,9 @@ public class PayServiceImpl implements PayService {
         response.getWriter().flush();
         response.getWriter().close();
         System.out.println("沙箱支付展示订单展示，回调");
+        System.out.println("biz:"+biz);
+        System.out.println("body:"+body)
+        ;
     }
     
     @Override

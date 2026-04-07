@@ -17,7 +17,7 @@ class UserForm(BaseModel):
     weaknesses: list[str] | None = Field(None, description="劣势列表")
     skills: list[SkillDetail] | None = Field(None, description="技能列表")
     tools: list[ToolDetail] | None = Field(None, description="工具列表")
-    codeLinks: str | None = Field(None, description="代码仓库链接,如GitHub/Gitee,多个逗号分隔")
+    codeLinks:  list[str] | None = Field(None, description="代码仓库链接列表")
     projects: list[ProjectExperience] | None = Field(None, description="项目经历列表")
     internships: list[InternshipExperience] | None = Field(None, description="实习经历列表")
     quizDetail: list[QuizDetailItem] | None = Field(None,
@@ -48,7 +48,7 @@ class UserForm(BaseModel):
             - 外语能力: {fmt_list(self.languages)}
             - 证书: {fmt_list(self.certificates)}
             - 其他证书信息: {self.certificatesOther or "无"}
-            - 代码仓库: {self.codeLinks or "无"}
+            - 代码仓库: {fmt_list(self.codeLinks) or "无"}
 
             [实践经历]
             - 项目经历: {fmt_list([p.name for p in self.projects]) if self.projects else "无"}

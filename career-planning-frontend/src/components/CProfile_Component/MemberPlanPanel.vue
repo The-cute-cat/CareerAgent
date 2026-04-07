@@ -2,8 +2,9 @@
 import { computed, ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
-  Calendar, Opportunity, Back, Close, Coin, Medal, TrendCharts,
-  ArrowRight, Share, ShoppingCart, WarningFilled, Promotion, ChatLineRound, Reading, Setting, MoreFilled, Search, InfoFilled
+  Calendar, Back, Close, Coin, Medal, TrendCharts,
+  ArrowRight, Share, ShoppingCart, WarningFilled, Promotion, Reading, Setting, Search, InfoFilled,
+  Loading, CircleCheckFilled, CircleCloseFilled
 } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/modules/user'
 import { rechargePointsService, getPackagesByTypeService, type PointsMembershipChangeDTO, getAlipayService } from '@/api/points'
@@ -13,11 +14,37 @@ import wechatIcon from '@/assets/images/wechat.png'
 import {
   createPaymentService,
   buildAlipayPagePayUrl,
-  queryPaymentStatusService,
-  type PaymentOrderVO,
-  type PaymentStatusVO
+  queryPaymentStatusService
 } from '@/api/payment'
-import type { PaymentCreateRequest } from '@/api/payment'
+import type { PaymentOrderRequest } from '@/api/payment'
+
+// 计划类型定义
+interface MemberPlan {
+  key: string
+  title: string
+  duration: string
+  price: string
+  unit: string
+  dailyCost: string
+  dailyPoints: number
+  totalPoints: number
+  tag: string
+  badgeClass: string
+  color: string
+  gradient: string
+}
+
+interface PointsPlan {
+  key: string
+  title: string
+  points: number
+  price: string
+  unit: string
+  tag: string
+  badgeClass: string
+  color: string
+  gradient: string
+}
 
 const props = defineProps({
   points: { type: Number, default: 0 },
@@ -283,6 +310,11 @@ const handlePay = async () => {
   }
 }
 
+// 旧的处理函数，现在指向新的支付流程
+const handlePay = async () => {
+  await startPayment()
+}
+
 const handleInvite = () => {
   if (props.inviteCode) {
     const inviteLink = `${window.location.origin}/register?inviteCode=${props.inviteCode}`
@@ -297,6 +329,11 @@ const handleInvite = () => {
     purchaseCenterVisible.value = false
   }
 }
+
+// 组件卸载时清理定时器
+onUnmounted(() => {
+  clearTimers()
+})
 
 </script>
 
@@ -383,6 +420,77 @@ const handleInvite = () => {
         </div>
       </div>
     </div>
+
+    <!-- 支付状态弹窗 -->
+    <el-dialog v-model="payDialogVisible" :show-close="false" width="420px" class="pay-status-dialog" :close-on-click-modal="false"
+      append-to-body>
+      <div class="pay-status-content">
+        <!-- 支付中状态 -->
+        <template v-if="payStatus === 'pending'">
+          <div class="pay-status-icon loading">
+            <el-icon class="is-loading"><Loading /></el-icon>
+          </div>
+          <h3 class="pay-status-title">等待支付完成</h3>
+          <p class="pay-status-desc">
+            请在支付宝页面完成支付<br>
+            剩余时间：{{ Math.floor(payCountdown / 60) }}:{{ String(payCountdown % 60).padStart(2, '0') }}
+          </p>
+          <div class="pay-status-order" v-if="currentOrderId">
+            订单号：{{ currentOrderId }}
+          </div>
+          <div class="pay-status-actions">
+            <el-button @click="cancelPayment">取消支付</el-button>
+            <el-button type="primary" @click="retryPayment">重新打开支付宝</el-button>
+          </div>
+        </template>
+
+        <!-- 支付成功状态 -->
+        <template v-if="payStatus === 'paid'">
+          <div class="pay-status-icon success">
+            <el-icon><CircleCheckFilled /></el-icon>
+          </div>
+          <h3 class="pay-status-title">支付成功！</h3>
+          <p class="pay-status-desc">
+            {{ activePurchaseTab === 'points' ? '积分已充值到您的账户' : '会员权益已生效' }}
+          </p>
+          <div class="pay-status-success-detail" v-if="currentPlan">
+            <div class="success-item">
+              <span class="label">{{ activePurchaseTab === 'points' ? '充值积分' : '会员类型' }}</span>
+              <span class="value">
+                {{ activePurchaseTab === 'points'
+                  ? (currentPlan as PointsPlan).points + ' 积分'
+                  : (currentPlan as MemberPlan).title
+                }}
+              </span>
+            </div>
+            <div class="success-item">
+              <span class="label">支付金额</span>
+              <span class="value price">¥{{ currentPlan.price }}</span>
+            </div>
+          </div>
+        </template>
+
+        <!-- 支付失败/取消状态 -->
+        <template v-if="payStatus === 'cancelled' || payStatus === 'expired'">
+          <div class="pay-status-icon error">
+            <el-icon><CircleCloseFilled /></el-icon>
+          </div>
+          <h3 class="pay-status-title">{{ payStatus === 'expired' ? '支付超时' : '支付未成功' }}</h3>
+          <p class="pay-status-desc">
+            {{ payStatus === 'expired' ? '支付已超时，请重新下单' : '支付已取消，您可以重新下单' }}
+          </p>
+          <div class="pay-status-order" v-if="currentOrderId">
+            订单号：{{ currentOrderId }}
+          </div>
+          <div class="pay-status-actions">
+            <el-button @click="payDialogVisible = false">关闭</el-button>
+            <el-button type="primary" @click="retryPayment" :disabled="payStatus === 'expired'">
+              {{ payStatus === 'expired' ? '重新下单' : '重新支付' }}
+            </el-button>
+          </div>
+        </template>
+      </div>
+    </el-dialog>
 
     <!-- 统一购买中心弹窗 -->
     <el-dialog v-model="purchaseCenterVisible" :show-close="false" width="700px" class="purchase-dialog"

@@ -14,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -166,6 +167,7 @@ public class FeedbackServiceImpl extends ServiceImpl<FeedbackMapper, Feedback> i
     /**
      * 查询指定类型的反馈列表
      */
+    @Override
     public Result<List<Feedback>> getFeedbackByType(String type) {
         try {
             LambdaQueryWrapper<Feedback> queryWrapper = new LambdaQueryWrapper<>();
@@ -177,6 +179,38 @@ public class FeedbackServiceImpl extends ServiceImpl<FeedbackMapper, Feedback> i
         } catch (Exception e) {
             log.error("查询指定类型反馈异常: {}", e.getMessage());
             return Result.fail("查询失败");
+        }
+    }
+
+    @Override
+    public Result<Boolean> updateFeedback(Feedback feedback) {
+        if (feedback.getId() == null) {
+            return Result.fail("反馈ID不能为空");
+        }
+        
+        Feedback existing = feedbackMapper.selectById(feedback.getId());
+        if (existing == null) {
+            return Result.fail("反馈不存在");
+        }
+        
+        // 仅允许状态为 0 (待处理) 的反馈进行修改
+        if (existing.getStatus() != 0) {
+            return Result.fail("该反馈已由管理员处理，无法修改");
+        }
+        
+        try {
+            // 更新允许修改的字段
+            existing.setType(feedback.getType());
+            existing.setContent(feedback.getContent());
+            existing.setContact(feedback.getContact());
+            existing.setImagesList(feedback.getImagesList());
+            existing.setUpdateTime(LocalDateTime.now());
+            
+            int rows = feedbackMapper.updateById(existing);
+            return rows > 0 ? Result.ok(true) : Result.fail("更新失败");
+        } catch (Exception e) {
+            log.error("更新反馈异常: {}", e.getMessage());
+            return Result.fail("更新失败: " + e.getMessage());
         }
     }
 }
