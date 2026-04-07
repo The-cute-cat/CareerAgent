@@ -49,7 +49,7 @@ const loadJobData = () => {
     jobItem.value = props.jobData
     return
   }
-  
+
   const jobId = route.query.jobId as string
   if (jobId) {
     const stored = localStorage.getItem('jobMatchResult')
@@ -103,7 +103,7 @@ const getLiteracyOption = (literacy: any) => {
     literacyToNum(literacy.logic_thinking),
     literacyToNum(literacy.ethics)
   ]
-  
+
   return {
     radar: {
       indicator: [
@@ -120,7 +120,7 @@ const getLiteracyOption = (literacy: any) => {
         textStyle: { color: '#606266', fontSize: 12, fontWeight: 500 }
       },
       splitArea: {
-        areaStyle: { 
+        areaStyle: {
           color: ['rgba(64,158,255,0.05)', 'rgba(64,158,255,0.1)', 'rgba(64,158,255,0.15)', 'rgba(64,158,255,0.2)']
         }
       },
@@ -151,7 +151,7 @@ const getPotentialOption = (potential: any) => {
     literacyToNum(potential.career_orientation),
     literacyToNum(potential.adaptability)
   ]
-  
+
   return {
     radar: {
       indicator: [
@@ -168,7 +168,7 @@ const getPotentialOption = (potential: any) => {
         textStyle: { color: '#606266', fontSize: 12, fontWeight: 500 }
       },
       splitArea: {
-        areaStyle: { 
+        areaStyle: {
           color: ['rgba(103,194,58,0.05)', 'rgba(103,194,58,0.1)', 'rgba(103,194,58,0.15)', 'rgba(103,194,58,0.2)']
         }
       },
@@ -193,19 +193,19 @@ const getPotentialOption = (potential: any) => {
 /** 初始化雷达图 */
 const initCharts = () => {
   if (!jobItem.value) return
-  
+
   nextTick(() => {
     const item = jobItem.value
     if (!item) return
-    
+
     const literacyEl = document.getElementById('literacy-radar')
     const potentialEl = document.getElementById('potential-radar')
-    
+
     if (literacyEl) {
       literacyChart = echarts.init(literacyEl)
       literacyChart.setOption(getLiteracyOption(item.raw_data.profiles.professional_literacy))
     }
-    
+
     if (potentialEl) {
       potentialChart = echarts.init(potentialEl)
       potentialChart.setOption(getPotentialOption(item.raw_data.profiles.development_potential))
@@ -254,18 +254,24 @@ onBeforeUnmount(() => {
     <!-- 顶部导航 -->
     <div class="detail-header">
       <el-button type="primary" text @click="goBack">
-        <el-icon><ArrowLeft /></el-icon>
+        <el-icon>
+          <ArrowLeft />
+        </el-icon>
         返回岗位列表
       </el-button>
       <h1 class="detail-title">
-        <el-icon><TrendCharts /></el-icon>
+        <el-icon>
+          <TrendCharts />
+        </el-icon>
         岗位详情分析
       </h1>
     </div>
 
     <!-- 加载状态 -->
     <div v-if="loading" class="loading-container">
-      <el-icon class="loading-icon" :size="48"><DataAnalysis /></el-icon>
+      <el-icon class="loading-icon" :size="48">
+        <DataAnalysis />
+      </el-icon>
       <p>正在加载岗位详情...</p>
     </div>
 
@@ -276,23 +282,17 @@ onBeforeUnmount(() => {
         <div class="info-card main-info">
           <div class="job-header">
             <div class="job-icon">
-              <el-icon :size="32"><OfficeBuilding /></el-icon>
+              <el-icon :size="32">
+                <OfficeBuilding />
+              </el-icon>
             </div>
             <div class="job-title-section">
               <h2 class="job-name">{{ jobItem.raw_data.job_name }}</h2>
               <div class="job-tags">
-                <el-tag
-                  size="small"
-                  :color="getMatchScoreColor(Math.round((jobItem.score || 0) * 100))"
-                  effect="dark"
-                >
+                <el-tag size="small" :color="getMatchScoreColor(Math.round((jobItem.score || 0) * 100))" effect="dark">
                   {{ Math.round((jobItem.score || 0) * 100) }}分匹配
                 </el-tag>
-                <el-tag
-                  size="small"
-                  :type="jobItem.deep_analysis.can_apply ? 'success' : 'danger'"
-                  effect="light"
-                >
+                <el-tag size="small" :type="jobItem.deep_analysis.can_apply ? 'success' : 'danger'" effect="light">
                   <el-icon class="tag-icon">
                     <CircleCheck v-if="jobItem.deep_analysis.can_apply" />
                     <CircleClose v-else />
@@ -302,36 +302,48 @@ onBeforeUnmount(() => {
               </div>
             </div>
           </div>
-          
+
           <div class="basic-info-grid">
             <div class="info-item">
-              <el-icon><School /></el-icon>
+              <el-icon>
+                <School />
+              </el-icon>
               <span class="info-label">学历要求</span>
               <span class="info-value">{{ jobItem.raw_data.profiles.basic_requirements.degree }}</span>
             </div>
             <div class="info-item">
-              <el-icon><Document /></el-icon>
+              <el-icon>
+                <Document />
+              </el-icon>
               <span class="info-label">专业要求</span>
               <span class="info-value">{{ jobItem.raw_data.profiles.basic_requirements.major }}</span>
             </div>
             <div class="info-item">
-              <el-icon><Timer /></el-icon>
+              <el-icon>
+                <Timer />
+              </el-icon>
               <span class="info-label">经验要求</span>
               <span class="info-value">{{ jobItem.raw_data.profiles.basic_requirements.experience_years }}</span>
             </div>
             <div class="info-item">
-              <el-icon><Medal /></el-icon>
+              <el-icon>
+                <Medal />
+              </el-icon>
               <span class="info-label">证书要求</span>
               <span class="info-value">{{ jobItem.raw_data.profiles.basic_requirements.certificates }}</span>
             </div>
             <div class="info-item">
-              <el-icon><Briefcase /></el-icon>
+              <el-icon>
+                <Briefcase />
+              </el-icon>
               <span class="info-label">所属行业</span>
               <span class="info-value">{{ jobItem.raw_data.profiles.job_attributes.industry }}</span>
             </div>
             <div class="info-item">
-            <el-icon><Collection /></el-icon>
-            <span class="info-label">行业趋势</span>
+              <el-icon>
+                <Collection />
+              </el-icon>
+              <span class="info-label">行业趋势</span>
               <span class="info-value">{{ jobItem.raw_data.profiles.job_attributes.industry_trend }}</span>
             </div>
           </div>
@@ -340,12 +352,9 @@ onBeforeUnmount(() => {
         <!-- 中间：匹配分数大圆环 -->
         <div class="info-card score-ring-card">
           <div class="score-ring-container">
-            <div 
-              class="score-ring" 
-              :style="{ 
-                background: `conic-gradient(${getMatchScoreColor(Math.round((jobItem.score || 0) * 100))} ${Math.round((jobItem.score || 0) * 100) * 3.6}deg, #e4e7ed 0deg)`
-              }"
-            >
+            <div class="score-ring" :style="{
+              background: `conic-gradient(${getMatchScoreColor(Math.round((jobItem.score || 0) * 100))} ${Math.round((jobItem.score || 0) * 100) * 3.6}deg, #e4e7ed 0deg)`
+            }">
               <div class="score-inner">
                 <span class="score-num">{{ Math.round((jobItem.score || 0) * 100) }}</span>
                 <span class="score-unit">分</span>
@@ -363,19 +372,23 @@ onBeforeUnmount(() => {
         <!-- 右侧：岗位属性 -->
         <div class="info-card attributes-card">
           <h3 class="card-title">
-            <el-icon><Aim /></el-icon>
+            <el-icon>
+              <Aim />
+            </el-icon>
             岗位属性
           </h3>
           <div class="attributes-list">
             <div class="attr-item">
               <span class="attr-label">薪资竞争力</span>
-              <el-tag size="small" :type="jobItem.raw_data.profiles.job_attributes.salary_competitiveness === '高' ? 'danger' : 'info'">
+              <el-tag size="small"
+                :type="jobItem.raw_data.profiles.job_attributes.salary_competitiveness === '高' ? 'danger' : 'info'">
                 {{ jobItem.raw_data.profiles.job_attributes.salary_competitiveness }}
               </el-tag>
             </div>
             <div class="attr-item">
               <span class="attr-label">社会需求度</span>
-              <el-tag size="small" :type="jobItem.raw_data.profiles.job_attributes.social_demand === '高' ? 'success' : 'info'">
+              <el-tag size="small"
+                :type="jobItem.raw_data.profiles.job_attributes.social_demand === '高' ? 'success' : 'info'">
                 {{ jobItem.raw_data.profiles.job_attributes.social_demand }}
               </el-tag>
             </div>
@@ -402,19 +415,19 @@ onBeforeUnmount(() => {
           <!-- 职业素养雷达图 -->
           <div class="chart-card">
             <h3 class="chart-title">
-              <el-icon><User /></el-icon>
+              <el-icon>
+                <User />
+              </el-icon>
               职业素养评估
             </h3>
             <div id="literacy-radar" class="radar-chart"></div>
             <div class="radar-legend">
-              <div 
-                v-for="(val, key) in jobItem.raw_data.profiles.professional_literacy" 
-                :key="key"
-                class="legend-item"
-              >
-                <span class="legend-dot" :style="{ background: val === '高' ? '#67C23A' : val === '中' ? '#E6A23C' : '#909399' }"></span>
+              <div v-for="(val, key) in jobItem.raw_data.profiles.professional_literacy" :key="key" class="legend-item">
+                <span class="legend-dot"
+                  :style="{ background: val === '高' ? '#67C23A' : val === '中' ? '#E6A23C' : '#909399' }"></span>
                 <span class="legend-name">{{ formatLiteracyKey(key as string) }}</span>
-                <span class="legend-value" :class="val === '高' ? 'high' : val === '中' ? 'medium' : 'low'">{{ val }}</span>
+                <span class="legend-value" :class="val === '高' ? 'high' : val === '中' ? 'medium' : 'low'">{{ val
+                  }}</span>
               </div>
             </div>
           </div>
@@ -422,19 +435,19 @@ onBeforeUnmount(() => {
           <!-- 发展潜力雷达图 -->
           <div class="chart-card">
             <h3 class="chart-title">
-            <el-icon><Orange /></el-icon>
-            发展潜力评估
+              <el-icon>
+                <Orange />
+              </el-icon>
+              发展潜力评估
             </h3>
             <div id="potential-radar" class="radar-chart"></div>
             <div class="radar-legend">
-              <div 
-                v-for="(val, key) in jobItem.raw_data.profiles.development_potential" 
-                :key="key"
-                class="legend-item"
-              >
-                <span class="legend-dot" :style="{ background: val === '高' ? '#67C23A' : val === '中' ? '#E6A23C' : '#909399' }"></span>
+              <div v-for="(val, key) in jobItem.raw_data.profiles.development_potential" :key="key" class="legend-item">
+                <span class="legend-dot"
+                  :style="{ background: val === '高' ? '#67C23A' : val === '中' ? '#E6A23C' : '#909399' }"></span>
                 <span class="legend-name">{{ formatLiteracyKey(key as string) }}</span>
-                <span class="legend-value" :class="val === '高' ? 'high' : val === '中' ? 'medium' : 'low'">{{ val }}</span>
+                <span class="legend-value" :class="val === '高' ? 'high' : val === '中' ? 'medium' : 'low'">{{ val
+                  }}</span>
               </div>
             </div>
           </div>
@@ -445,20 +458,17 @@ onBeforeUnmount(() => {
           <!-- 专业技能 -->
           <div class="detail-card">
             <h3 class="card-title">
-              <el-icon><MagicStick /></el-icon>
+              <el-icon>
+                <MagicStick />
+              </el-icon>
               专业技能要求
             </h3>
             <div class="skills-section">
               <div class="skill-block">
                 <div class="skill-label">核心技能</div>
                 <div class="skill-tags">
-                  <el-tag
-                    v-for="skill in splitSkills(jobItem.raw_data.profiles.professional_skills.core_skills)"
-                    :key="skill"
-                    size="small"
-                    effect="dark"
-                    class="skill-tag-primary"
-                  >
+                  <el-tag v-for="skill in splitSkills(jobItem.raw_data.profiles.professional_skills.core_skills)"
+                    :key="skill" size="small" effect="dark" class="skill-tag-primary">
                     {{ skill }}
                   </el-tag>
                 </div>
@@ -466,13 +476,8 @@ onBeforeUnmount(() => {
               <div class="skill-block">
                 <div class="skill-label">工具能力</div>
                 <div class="skill-tags">
-                  <el-tag
-                    v-for="tool in splitSkills(jobItem.raw_data.profiles.professional_skills.tool_capabilities)"
-                    :key="tool"
-                    size="small"
-                    type="warning"
-                    effect="plain"
-                  >
+                  <el-tag v-for="tool in splitSkills(jobItem.raw_data.profiles.professional_skills.tool_capabilities)"
+                    :key="tool" size="small" type="warning" effect="plain">
                     {{ tool }}
                   </el-tag>
                 </div>
@@ -483,7 +488,8 @@ onBeforeUnmount(() => {
               </div>
               <div class="skill-block">
                 <div class="skill-label">语言要求</div>
-                <span class="skill-text">{{ jobItem.raw_data.profiles.professional_skills.language_requirements }}</span>
+                <span class="skill-text">{{ jobItem.raw_data.profiles.professional_skills.language_requirements
+                  }}</span>
               </div>
               <div class="skill-block">
                 <div class="skill-label">项目要求</div>
@@ -495,14 +501,18 @@ onBeforeUnmount(() => {
           <!-- 深度分析 -->
           <div class="detail-card">
             <h3 class="card-title">
-              <el-icon><DataAnalysis /></el-icon>
+              <el-icon>
+                <DataAnalysis />
+              </el-icon>
               深度匹配分析
             </h3>
-            
+
             <!-- 综合评语 -->
             <div class="analysis-section">
               <div class="section-label">
-                <el-icon color="#409EFF"><InfoFilled /></el-icon>
+                <el-icon color="#409EFF">
+                  <InfoFilled />
+                </el-icon>
                 综合评语
               </div>
               <p class="analysis-text">{{ jobItem.deep_analysis.all_analysis }}</p>
@@ -511,16 +521,16 @@ onBeforeUnmount(() => {
             <!-- 缺失技能 -->
             <div v-if="jobItem.deep_analysis.missing_key_skills.length > 0" class="analysis-section warning">
               <div class="section-label">
-                <el-icon color="#E6A23C"><Warning /></el-icon>
+                <el-icon color="#E6A23C">
+                  <Warning />
+                </el-icon>
                 缺失的关键技能
               </div>
               <div class="missing-skills">
-                <div
-                  v-for="(skill, i) in jobItem.deep_analysis.missing_key_skills"
-                  :key="i"
-                  class="missing-item"
-                >
-                  <el-icon color="#E6A23C"><Warning /></el-icon>
+                <div v-for="(skill, i) in jobItem.deep_analysis.missing_key_skills" :key="i" class="missing-item">
+                  <el-icon color="#E6A23C">
+                    <Warning />
+                  </el-icon>
                   <span>{{ skill }}</span>
                 </div>
               </div>
@@ -529,27 +539,35 @@ onBeforeUnmount(() => {
             <!-- 差距矩阵表格 -->
             <div class="analysis-section">
               <div class="section-label">
-                <el-icon color="#409EFF"><DataAnalysis /></el-icon>
+                <el-icon color="#409EFF">
+                  <DataAnalysis />
+                </el-icon>
                 差距矩阵
               </div>
-              <div class="gap-table">
-                <div class="gap-header">
-                  <span class="gap-col dim">维度</span>
-                  <span class="gap-col">岗位要求</span>
-                  <span class="gap-col">当前水平</span>
-                  <span class="gap-col analysis">差距分析</span>
-                </div>
-                <div
-                  v-for="(gap, i) in jobItem.deep_analysis.gap_matrix"
-                  :key="i"
-                  class="gap-row"
-                >
-                  <span class="gap-col dim">
-                    <el-tag size="small" type="primary" effect="plain">{{ gap.dimension }}</el-tag>
-                  </span>
-                  <span class="gap-col required">{{ gap.required }}</span>
-                  <span class="gap-col current">{{ gap.current }}</span>
-                  <span class="gap-col analysis">{{ gap.gap_analysis }}</span>
+              <div class="gap-cards-container">
+                <div v-for="(gap, i) in jobItem.deep_analysis.gap_matrix" :key="i" class="gap-card">
+                  <div class="gap-card-header">
+                    <el-tag :type="['primary', 'success', 'warning', 'danger'][i % 4]" effect="light" class="dim-tag"
+                      round>
+                      {{ gap.dimension }}
+                    </el-tag>
+                  </div>
+                  <div class="gap-card-body">
+                    <div class="compare-row">
+                      <div class="compare-item required">
+                        <div class="item-label">岗位要求</div>
+                        <div class="item-value">{{ gap.required }}</div>
+                      </div>
+                      <div class="compare-item current">
+                        <div class="item-label">当前水平</div>
+                        <div class="item-value">{{ gap.current }}</div>
+                      </div>
+                    </div>
+                    <div class="analysis-box">
+                      <div class="box-label">差距分析</div>
+                      <div class="box-value">{{ gap.gap_analysis }}</div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -557,7 +575,9 @@ onBeforeUnmount(() => {
             <!-- 可执行建议 -->
             <div class="analysis-section success">
               <div class="section-label">
-                <el-icon color="#67C23A"><SuccessFilled /></el-icon>
+                <el-icon color="#67C23A">
+                  <SuccessFilled />
+                </el-icon>
                 可执行建议
               </div>
               <p class="advice-text">{{ jobItem.deep_analysis.actionable_advice }}</p>
@@ -569,7 +589,9 @@ onBeforeUnmount(() => {
 
     <!-- 无数据状态 -->
     <div v-else class="empty-container">
-      <el-icon class="empty-icon" :size="64"><Document /></el-icon>
+      <el-icon class="empty-icon" :size="64">
+        <Document />
+      </el-icon>
       <h3>未找到岗位信息</h3>
       <p>请从岗位列表中选择要查看的岗位</p>
       <el-button type="primary" @click="goBack">返回岗位列表</el-button>
@@ -627,8 +649,13 @@ onBeforeUnmount(() => {
 }
 
 @keyframes rotate {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 // 顶部概览区
@@ -640,19 +667,25 @@ onBeforeUnmount(() => {
 
   @media (max-width: 1200px) {
     grid-template-columns: 1fr 1fr;
-    .main-info { grid-column: 1 / -1; }
+
+    .main-info {
+      grid-column: 1 / -1;
+    }
   }
 
   @media (max-width: 768px) {
     grid-template-columns: 1fr;
-    .main-info { grid-column: 1; }
+
+    .main-info {
+      grid-column: 1;
+    }
   }
 }
 
 .info-card {
   background: #fff;
   border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
   padding: 20px;
 }
 
@@ -865,7 +898,7 @@ onBeforeUnmount(() => {
 .chart-card {
   background: #fff;
   border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
   padding: 20px;
 
   .chart-title {
@@ -915,9 +948,17 @@ onBeforeUnmount(() => {
         font-weight: 500;
         margin-left: auto;
 
-        &.high { color: #67C23A; }
-        &.medium { color: #E6A23C; }
-        &.low { color: #909399; }
+        &.high {
+          color: #67C23A;
+        }
+
+        &.medium {
+          color: #E6A23C;
+        }
+
+        &.low {
+          color: #909399;
+        }
       }
     }
   }
@@ -933,7 +974,7 @@ onBeforeUnmount(() => {
 .detail-card {
   background: #fff;
   border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
   padding: 20px;
 
   .card-title {
@@ -1003,7 +1044,9 @@ onBeforeUnmount(() => {
   }
 
   &.warning {
-    .analysis-text, .missing-skills {
+
+    .analysis-text,
+    .missing-skills {
       background: #fdf6ec;
       border-left: 3px solid #E6A23C;
     }
@@ -1069,63 +1112,148 @@ onBeforeUnmount(() => {
   }
 }
 
-// 差距矩阵表格
-.gap-table {
-  border: 1px solid #ebeef5;
-  border-radius: 8px;
-  overflow: hidden;
+// 差距矩阵卡片式布局
+.gap-cards-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 
-  .gap-header {
-    display: grid;
-    grid-template-columns: 80px 1fr 1fr 1.5fr;
-    gap: 12px;
-    padding: 12px;
-    background: #f5f7fa;
-    font-size: 13px;
-    font-weight: 600;
-    color: #303133;
-  }
+  .gap-card {
+    background: #ffffff;
+    border: 1px solid #ebeef5;
+    border-radius: 10px;
+    padding: 16px;
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
 
-  .gap-row {
-    display: grid;
-    grid-template-columns: 80px 1fr 1fr 1.5fr;
-    gap: 12px;
-    padding: 12px;
-    border-top: 1px solid #ebeef5;
-    font-size: 13px;
-    line-height: 1.5;
-
-    &:nth-child(even) {
-      background: #fafbfc;
+    &:hover {
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+      border-color: #dcdfe6;
+      transform: translateY(-2px);
     }
 
-    .gap-col {
-      &.dim {
+    .gap-card-header {
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+
+      .dim-tag {
+        font-weight: 600;
+        font-size: 13px;
+        padding: 0 12px;
+      }
+    }
+
+    .gap-card-body {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+
+      // 左右对比区块（优化：强化左右协调与对比感）
+      .compare-row {
         display: flex;
-        align-items: center;
+        align-items: stretch; // 保证左右等高
+        border-radius: 8px;
+        border: 1px solid #ebeef5;
+        background: #fafbfc; // 整体底色
+        position: relative;
+        overflow: hidden;
+
+        @media (max-width: 600px) {
+          flex-direction: column; // 移动端自动转为上下布局
+        }
+
+        // 增加中间的 VS 对比徽章，提升左右联动感
+        &::after {
+          content: 'VS';
+          position: absolute;
+          left: 50%;
+          top: 50%;
+          transform: translate(-50%, -50%);
+          background: #fff;
+          color: #c0c4cc;
+          font-size: 12px;
+          font-weight: 900;
+          font-style: italic;
+          width: 26px;
+          height: 26px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 50%;
+          box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+          border: 1px solid #ebeef5;
+          z-index: 2;
+
+          @media (max-width: 600px) {
+            display: none; // 移动端隐藏
+          }
+        }
+
+        .compare-item {
+          flex: 1; // 左右平分宽度
+          padding: 16px;
+          position: relative;
+
+          &.required {
+            background-color: #fdf6ec; // 柔和的橙色背景
+            border-right: 1px dashed #e4e7ed; // 中间虚线分割
+            
+            .item-label { color: #e6a23c; }
+            .item-value { color: #606266; }
+
+            @media (max-width: 600px) {
+              border-right: none;
+              border-bottom: 1px dashed #e4e7ed;
+            }
+          }
+
+          &.current {
+            background-color: #f0f9eb; // 柔和的绿色背景
+            
+            .item-label { color: #67c23a; }
+            .item-value { color: #606266; }
+          }
+
+          .item-label {
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+          }
+
+          .item-value {
+            font-size: 14px;
+            line-height: 1.6;
+          }
+        }
       }
 
-      &.required {
-        color: #F56C6C;
-      }
+      // 底部结论分析区块（优化：使其与卡片整体更搭配）
+      .analysis-box {
+        background: #ecf5ff; // 采用主题蓝，突出总结性
+        border-radius: 8px;
+        padding: 12px 16px;
+        border-left: 4px solid #409eff;
 
-      &.current {
-        color: #67C23A;
-      }
+        .box-label {
+          font-size: 13px;
+          color: #409eff;
+          font-weight: 600;
+          margin-bottom: 6px;
+        }
 
-      &.analysis {
-        color: #606266;
+        .box-value {
+          font-size: 13px;
+          color: #303133;
+          line-height: 1.6;
+        }
       }
-    }
-  }
-
-  @media (max-width: 900px) {
-    .gap-header, .gap-row {
-      grid-template-columns: 70px 1fr 1fr;
-      .analysis { display: none; }
     }
   }
 }
+
 
 // 无数据状态
 .empty-container {
@@ -1136,7 +1264,7 @@ onBeforeUnmount(() => {
   padding: 80px 20px;
   background: #fff;
   border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
 
   .empty-icon {
     color: #dcdfe6;
