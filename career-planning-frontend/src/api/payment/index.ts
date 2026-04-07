@@ -2,40 +2,29 @@ import request from '@/utils/request'
 import type { Result } from '@/types/type'
 
 const ENABLE_MOCK = import.meta.env.VITE_ENABLE_MOCK === 'true'
-// 使用 /api 前缀走 vite 代理到后端
-const API_BASE_URL = ''
 
 // ==================== 类型定义 ====================
 
-/** 创建支付订单请求（发给后端，不含订单号） */
-export interface PaymentCreateRequest {
-  amount: number
-  pointsGranted: number
+/** 支付订单请求（创建订单 + 支付） */
+export interface PaymentOrderRequest {
+  amount: number            // 金额（元）
+  pointsGranted: number     // 赠送积分
   payType: number           // 1微信, 2支付宝
   purpose: number           // 1积分充值, 2会员购买
-  memberLevel?: number      // 会员购买时传：1月度, 2季度, 3年度
+  memberLevel?: number      // 会员等级：1月度, 2季度, 3年度
 }
 
-/** 后端返回的订单数据（对应 PaymentOrder 实体） */
-export interface PaymentOrderVO {
-  id: number                // 雪花算法生成的ID，这就是订单号
-  orderNo: string | null
-  userId: number
-  amount: number
-  pointsGranted: number
-  payType: number
-  status: number            // 0待支付, 1已支付, 2已取消, 3已退款
-  transactionId: string | null
-  payTime: string | null
-  createTime: string
+/** 创建订单响应 */
+export interface PaymentOrderResponse {
+  orderId: string           // 雪花算法订单号
+  payUrl?: string           // 支付宝支付URL（如后端返回）
 }
 
 /** 订单状态查询返回 */
 export interface PaymentStatusVO {
   orderId: string
-  status: 'pending' | 'paid' | 'expired' | 'cancelled' | string
+  status: 'pending' | 'paid' | 'expired' | 'cancelled'
   amount?: number
-  pointsGranted?: number
   paidAt?: string
 }
 
@@ -44,82 +33,118 @@ export interface PaymentStatusVO {
 /**
  * 1. 创建支付订单
  *
- * 前端传业务参数（金额、积分数、支付方式），不含订单号。
- * 后端创建 PaymentOrder 存入数据库，雪花算法自动生成 id，返回给前端。
- * 前端拿到 data.id 就是订单号，后续用它去支付和轮询。
- *
- * POST /member/order/create
- * 请求体：{ amount, pointsGranted, payType, purpose, memberLevel }
- * 响应体：{ code: 0, msg: "创建订单成功", data: { id: 1892738564231725057, ... } }
+ * POST /member/pay/order
+ * Content-Type: application/json
+ * 
+ * 后端接收 @RequestBody PaymentOrder，创建订单后：
+ * - 返回 HTML：直接在新窗口渲染跳转支付宝
+ * - 返回 JSON：包含 payUrl，前端 window.open 跳转
  */
-export const createPaymentService = (data: PaymentCreateRequest) => {
+export const createPaymentService = async (data: PaymentOrderRequest): Promise<PaymentOrderResponse> => {
   if (ENABLE_MOCK) {
-    // Mock 模式下模拟后端返回雪花ID
-    const snowflakeId = Date.now() * 10000 + Math.floor(Math.random() * 10000)
-    return Promise.resolve({
-      data: {
-        code: 0,
-        msg: '创建订单成功',
-        data: {
-          id: snowflakeId,
-          orderNo: null,
-          userId: 1,
-          amount: data.amount,
-          pointsGranted: data.pointsGranted,
-          payType: data.payType,
-          status: 0,
-          transactionId: null,
-          payTime: null,
-          createTime: new Date().toISOString()
-        }
-      },
-      status: 200,
-      statusText: 'OK',
-      headers: {},
-      config: {} as any
-    })
+    const mockOrderId = Date.now() * 10000 + Math.floor(Math.random() * 10000)
+    localStorage.setItem('currentPayOrderId', String(mockOrderId))
+    return { orderId: String(mockOrderId) }
   }
 
-  return request.post<Result<PaymentOrderVO>>('/api/member/order/create', data)
+  // 使用配置好的 axios 实例，自动带上 Token 等拦截器配置
+  // 后端可能返回 HTML 或 JSON，使用 responseType: 'text' 来统一处理
+  const response = await request.post('/member/pay/order', data, {
+    responseType: 'text',
+    transformResponse: [(data) => data] // 阻止 axios 自动解析 JSON
+  })
+
+  const content = response.data as string
+
+  // 情况1：后端返回 HTML（包含支付宝表单，直接渲染跳转）
+  if (content.trim().startsWith('<!DOCTYPE') || content.trim().startsWith('<html')) {
+    // 提取订单号（从 HTML 中的 out_trade_no）
+    const orderIdMatch = content.match(/out_trade_no['"]\s*[:=]\s*['"]([^'"]+)/)
+    const orderId = orderIdMatch?.[1] ?? ''
+
+    if (orderId) {
+      localStorage.setItem('currentPayOrderId', orderId)
+    }
+
+    // 在新窗口渲染 HTML
+    const payWindow = window.open('', '_blank', 'width=1200,height=800,menubar=no,toolbar=no')
+    if (payWindow) {
+      payWindow.document.write(content)
+      payWindow.document.close()
+    }
+
+    return { orderId }
+  }
+
+  // 情况2：后端返回 JSON（包含 orderId 和 payUrl）
+  try {
+    const result = JSON.parse(content)
+    if (result.code !== 0 && result.code !== 200) {
+      throw new Error(result.msg || '创建支付订单失败')
+    }
+
+    const orderId = result.data?.orderId || result.data?.id || result.data?.outTradeNo
+    const payUrl = result.data?.payUrl || result.data?.qrCode
+
+    if (orderId) {
+      localStorage.setItem('currentPayOrderId', String(orderId))
+    }
+
+    if (payUrl) {
+      window.open(payUrl, '_blank', 'width=1200,height=800,menubar=no,toolbar=no')
+    }
+
+    return { orderId: String(orderId), payUrl }
+  } catch {
+    throw new Error('解析支付响应失败')
+  }
 }
 
 /**
  * 2. 构建支付宝支付跳转 URL
- *
- * 注意：这不是 AJAX 请求，只是拼接 URL 字符串。
- * 最终用 window.open(url) 打开，后端返回 HTML 表单自动跳转到支付宝收银台。
- * 后端会根据 orderNo 去 payment_order 表查金额等信息，所以只需要传订单号。
- *
- * 对应后端：GET /member/pay/{orderNo}
- * 返回：text/html（不是 JSON，浏览器直接渲染）
+ * GET /member/pay/{orderNumber}
+ * 后端根据订单号查询，返回 HTML 跳转支付宝
  */
 export const buildAlipayPagePayUrl = (orderNo: string | number): string => {
-  // 使用完整后端地址直接跳转（不走前端代理，因为是 window.open）
+  if (ENABLE_MOCK) {
+    console.log('[Mock] 构建支付URL:', orderNo)
+    return `https://mock.alipay.com/pay?orderNo=${orderNo}`
+  }
+
   const serverURL = import.meta.env.VITE_SERVER || 'http://localhost:8080'
   return `${serverURL}/member/pay/${orderNo}`
 }
 
 /**
+ * 3. 根据订单号重新支付（重试用）
+ * 在新窗口打开支付页面
+ */
+export const payByOrderNo = (orderNo: string | number): void => {
+  if (ENABLE_MOCK) {
+    console.log('[Mock] 重新支付:', orderNo)
+    return
+  }
+
+  const serverURL = import.meta.env.VITE_SERVER || 'http://localhost:8080'
+  const payUrl = `${serverURL}/member/pay/${orderNo}`
+
+  window.open(payUrl, '_blank', 'width=1200,height=800,menubar=no,toolbar=no')
+}
+
+/**
  * 3. 查询订单支付状态（轮询用）
  *
- * 前端每 3 秒调一次，直到返回 paid / expired / cancelled 停止。
- *
- * 对应后端：GET /member/order/status/{orderNo}
- * 请求：无 body
- * 响应：{ code: 0, data: { orderId, status, paidAt } }
+ * GET /member/order/status/{orderNo}
  */
 export const queryPaymentStatusService = (orderNo: string) => {
   if (ENABLE_MOCK) {
-    const store: Record<string, string> = {}
-    store[orderNo] = 'pending'
-
     return Promise.resolve({
       data: {
         code: 0,
         msg: '查询成功',
         data: {
           orderId: orderNo,
-          status: store[orderNo] || 'pending',
+          status: 'pending',
           paidAt: null
         }
       },
@@ -133,12 +158,37 @@ export const queryPaymentStatusService = (orderNo: string) => {
   return request.get<Result<PaymentStatusVO>>(`/api/member/order/status/${orderNo}`)
 }
 
-// ==================== 不需要前端调用的接口 ====================
+/**
+ * 获取当前支付订单号
+ */
+export const getCurrentPayOrderId = (): string | null => {
+  return localStorage.getItem('currentPayOrderId')
+}
 
 /**
- * POST /member/notify — 支付宝异步回调
- *
- * 这个接口不需要前端调用，是支付宝服务器在用户支付成功后主动回调后端的。
- * 前端通过 queryPaymentStatusService 轮询间接感知支付结果。
- * 列在这里仅作说明。
+ * 清除当前支付订单号
+ */
+export const clearCurrentPayOrderId = (): void => {
+  localStorage.removeItem('currentPayOrderId')
+}
+
+// ==================== 后端接口说明 ====================
+
+/**
+ * 后端 PayController 接口：
+ * 
+ * 1. POST /member/pay/order
+ *    - 接收：@RequestBody PaymentOrder (JSON)
+ *    - 功能：创建订单 + 调用支付宝生成支付表单
+ *    - 返回：HTML 表单（自动跳转）或 JSON { orderId, payUrl }
+ * 
+ * 2. GET /member/pay/{orderNumber}
+ *    - 接收：@PathVariable Long orderNumber
+ *    - 功能：根据订单号重新发起支付
+ *    - 返回：HTML 表单（自动跳转）
+ * 
+ * 3. POST /member/notify
+ *    - 接收：支付宝异步回调参数
+ *    - 功能：验签 + 更新订单状态 + 加积分
+ *    - 返回："success" 或 "fail"
  */

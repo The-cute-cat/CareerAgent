@@ -2,20 +2,46 @@
 import { computed, ref, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
-  Calendar, Opportunity, Back, Close, Coin, Medal, TrendCharts,
-  ArrowRight, Share, ShoppingCart, WarningFilled, Promotion, ChatLineRound, Reading, Setting, MoreFilled, Search, InfoFilled
+  Calendar, Back, Close, Coin, Medal, TrendCharts,
+  ArrowRight, Share, ShoppingCart, WarningFilled, Promotion, Reading, Setting, Search, InfoFilled,
+  Loading, CircleCheckFilled, CircleCloseFilled
 } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/modules/user'
-import { rechargePointsService, type PointsMembershipChangeDTO } from '@/api/points'
 import type { AccountPointsData } from '@/api/points'
 import {
   createPaymentService,
   buildAlipayPagePayUrl,
-  queryPaymentStatusService,
-  type PaymentOrderVO,
-  type PaymentStatusVO
+  queryPaymentStatusService
 } from '@/api/payment'
-import type { PaymentCreateRequest } from '@/api/payment'
+import type { PaymentOrderRequest } from '@/api/payment'
+
+// 计划类型定义
+interface MemberPlan {
+  key: string
+  title: string
+  duration: string
+  price: string
+  unit: string
+  dailyCost: string
+  dailyPoints: number
+  totalPoints: number
+  tag: string
+  badgeClass: string
+  color: string
+  gradient: string
+}
+
+interface PointsPlan {
+  key: string
+  title: string
+  points: number
+  price: string
+  unit: string
+  tag: string
+  badgeClass: string
+  color: string
+  gradient: string
+}
 
 const props = defineProps({
   points: { type: Number, default: 0 },
@@ -35,9 +61,8 @@ const selectedPointsPlan = ref('basic')
 // 支付相关状态
 const payDialogVisible = ref(false)
 const payLoading = ref(false)
-const payQRCode = ref('')
 const currentOrderId = ref('')
-const currentPlan = ref<typeof memberPlans[0] | null>(null)
+const currentPlan = ref<MemberPlan | PointsPlan | null>(null)
 const payStatus = ref<'pending' | 'paid' | 'expired' | 'cancelled'>('pending')
 const payCountdown = ref(300)
 const pollingTimer = ref<ReturnType<typeof setInterval> | null>(null)
@@ -173,40 +198,238 @@ const openPurchaseCenter = (tab: 'points' | 'member') => {
   purchaseCenterVisible.value = true
 }
 
-const handlePay = async () => {
-  if (activePurchaseTab.value === 'points') {
-    try {
-      const payload: PointsMembershipChangeDTO = {
-        userId: Number(userStore.userInfo?.id),
-        amount: currentSelectedPointsObj.value.points,
-        type: 1 // 1:充值
-      }
-      if (!payload.userId) {
-        ElMessage.error('未获取到用户信息')
-        return
-      }
+const emit = defineEmits(['purchase-success'])
 
-      // 临时显示loading效果可以通过封装或其他方式，这里先简单调用
-      const res = await rechargePointsService(payload)
-      if (res.data.code === 200) {
-        ElMessage.success('充值成功')
-        purchaseCenterVisible.value = false
-        // TODO: 可在此处触发父组件刷新积分余额的事件
-      } else {
-        ElMessage.error(res.data.msg || '充值失败')
-      }
-    } catch (err: any) {
-      ElMessage.error(err.message || '网络或服务器错误，充值请求失败')
-    }
-  } else {
-    // 处理会员购买逻辑
-    ElMessage.success(`支付请求已提交（会员）`)
+// ==================== 支付流程 ====================
+
+// 开始支付流程
+const startPayment = async () => {
+  const userId = Number(userStore.userInfo?.id)
+  if (!userId) {
+    ElMessage.error('未获取到用户信息，请重新登录')
+    return
   }
+
+  // 根据当前选中的tab确定支付参数
+  const isPointsTab = activePurchaseTab.value === 'points'
+  const pointsPlan = currentSelectedPointsObj.value
+  const memberPlan = currentSelectedMemberObj.value
+  const selectedPlan = isPointsTab ? pointsPlan : memberPlan
+
+  // 构建支付请求参数
+  const paymentRequest: PaymentOrderRequest = {
+    amount: parseFloat(selectedPlan.price),
+    pointsGranted: isPointsTab ? pointsPlan.points : memberPlan.totalPoints,
+    payType: 2, // 2: 支付宝
+    purpose: isPointsTab ? 1 : 2, // 1: 积分充值, 2: 会员购买
+    memberLevel: isPointsTab ? undefined : getMemberLevel(memberPlan.key)
+  }
+
+  // 价格校验
+  if (paymentRequest.amount <= 0 && selectedPlan.key !== 'invite') {
+    ElMessage.error('金额无效')
+    return
+  }
+
+  // 如果是免费邀请积分
+  if (selectedPlan.key === 'invite') {
+    handleInvite()
+    return
+  }
+
+  payLoading.value = true
+  currentPlan.value = selectedPlan
+
+  try {
+    // 1. 创建支付订单（后端直接返回 HTML 表单并跳转）
+    const result = await createPaymentService(paymentRequest)
+
+    // 保存订单号（从 HTML 中提取或从响应中获取）
+    currentOrderId.value = result.orderId || ''
+
+    // 2. 打开支付弹窗
+    payDialogVisible.value = true
+    payStatus.value = 'pending'
+    payCountdown.value = 300 // 5分钟倒计时
+
+    // 3. 开始轮询支付状态（如果有订单号）
+    if (currentOrderId.value) {
+      startPolling(currentOrderId.value)
+    }
+    startCountdown()
+
+  } catch (err: any) {
+    ElMessage.error(err.message || '创建订单失败，请稍后重试')
+    payLoading.value = false
+  }
+}
+
+// 获取会员等级
+const getMemberLevel = (planKey: string): number => {
+  const levelMap: Record<string, number> = {
+    'monthly': 1,
+    'quarterly': 2,
+    'quarter': 2,
+    'yearly': 3,
+    'annual': 3
+  }
+  return levelMap[planKey] || 2
+}
+
+// 轮询支付状态
+const startPolling = (orderId: string | number) => {
+  // 清除之前的定时器
+  if (pollingTimer.value) {
+    clearInterval(pollingTimer.value)
+    pollingTimer.value = null
+  }
+
+  // 每3秒轮询一次，最多轮询100次（5分钟）
+  let pollCount = 0
+  const maxPolls = 100
+
+  pollingTimer.value = setInterval(async () => {
+    pollCount++
+    if (pollCount > maxPolls) {
+      clearTimers()
+      payStatus.value = 'expired'
+      payLoading.value = false
+      return
+    }
+
+    try {
+      const res = await queryPaymentStatusService(String(orderId))
+      if (res.data.code === 0 || res.data.code === 200) {
+        const statusData = res.data.data
+        if (!statusData) return
+
+        payStatus.value = statusData.status as any
+
+        // 支付成功
+        if (statusData.status === 'paid' || statusData.status === '1') {
+          handlePaymentSuccess()
+        }
+        // 支付取消或过期
+        else if (statusData.status === 'cancelled' || statusData.status === 'expired' ||
+                 statusData.status === '2' || statusData.status === '3') {
+          handlePaymentFail('支付已取消或已过期')
+        }
+      }
+    } catch (err) {
+      console.error('查询支付状态失败:', err)
+    }
+  }, 3000)
+}
+
+// 倒计时
+const startCountdown = () => {
+  // 清除之前的定时器
+  if (countdownTimer.value) {
+    clearInterval(countdownTimer.value)
+    countdownTimer.value = null
+  }
+
+  countdownTimer.value = setInterval(() => {
+    if (payCountdown.value > 0) {
+      payCountdown.value--
+    } else {
+      // 超时处理
+      handlePaymentTimeout()
+    }
+  }, 1000)
+}
+
+// 支付成功处理
+const handlePaymentSuccess = () => {
+  clearTimers()
+  payStatus.value = 'paid'
+  payLoading.value = false
+
+  ElMessage.success(activePurchaseTab.value === 'points' ? '积分充值成功！' : '会员订阅成功！')
+
+  // 关闭支付弹窗和购买中心
+  setTimeout(() => {
+    payDialogVisible.value = false
+    purchaseCenterVisible.value = false
+
+    // 触发父组件刷新用户信息
+    emit('purchase-success')
+  }, 1500)
+}
+
+// 支付失败处理
+const handlePaymentFail = (message: string) => {
+  clearTimers()
+  payStatus.value = 'cancelled'
+  payLoading.value = false
+  ElMessage.warning(message)
+}
+
+// 支付超时处理
+const handlePaymentTimeout = () => {
+  clearTimers()
+  payStatus.value = 'expired'
+  payLoading.value = false
+  ElMessage.warning('支付超时，请重新下单')
+}
+
+// 清除定时器
+const clearTimers = () => {
+  if (pollingTimer.value) {
+    clearInterval(pollingTimer.value)
+    pollingTimer.value = null
+  }
+  if (countdownTimer.value) {
+    clearInterval(countdownTimer.value)
+    countdownTimer.value = null
+  }
+}
+
+// 用户主动取消支付
+const cancelPayment = () => {
+  clearTimers()
+  payDialogVisible.value = false
+  payStatus.value = 'cancelled'
+  payLoading.value = false
+  // 不清空订单号，保留用于后续查询或重试
+}
+
+// 重试支付
+const retryPayment = () => {
+  if (currentOrderId.value) {
+    const payUrl = buildAlipayPagePayUrl(currentOrderId.value)
+    window.open(payUrl, '_blank')
+    payStatus.value = 'pending'
+    // 清除旧定时器，重新开始轮询
+    if (pollingTimer.value) {
+      clearInterval(pollingTimer.value)
+    }
+    startPolling(currentOrderId.value)
+    // 重置倒计时
+    payCountdown.value = 300
+    if (countdownTimer.value) {
+      clearInterval(countdownTimer.value)
+    }
+    startCountdown()
+  } else {
+    ElMessage.warning('订单号丢失，请重新下单')
+    payDialogVisible.value = false
+  }
+}
+
+// 旧的处理函数，现在指向新的支付流程
+const handlePay = async () => {
+  await startPayment()
 }
 
 const handleInvite = () => {
   ElMessage.success("邀请链接已复制到剪贴板！")
 }
+
+// 组件卸载时清理定时器
+onUnmounted(() => {
+  clearTimers()
+})
 
 </script>
 
@@ -293,6 +516,77 @@ const handleInvite = () => {
         </div>
       </div>
     </div>
+
+    <!-- 支付状态弹窗 -->
+    <el-dialog v-model="payDialogVisible" :show-close="false" width="420px" class="pay-status-dialog" :close-on-click-modal="false"
+      append-to-body>
+      <div class="pay-status-content">
+        <!-- 支付中状态 -->
+        <template v-if="payStatus === 'pending'">
+          <div class="pay-status-icon loading">
+            <el-icon class="is-loading"><Loading /></el-icon>
+          </div>
+          <h3 class="pay-status-title">等待支付完成</h3>
+          <p class="pay-status-desc">
+            请在支付宝页面完成支付<br>
+            剩余时间：{{ Math.floor(payCountdown / 60) }}:{{ String(payCountdown % 60).padStart(2, '0') }}
+          </p>
+          <div class="pay-status-order" v-if="currentOrderId">
+            订单号：{{ currentOrderId }}
+          </div>
+          <div class="pay-status-actions">
+            <el-button @click="cancelPayment">取消支付</el-button>
+            <el-button type="primary" @click="retryPayment">重新打开支付宝</el-button>
+          </div>
+        </template>
+
+        <!-- 支付成功状态 -->
+        <template v-if="payStatus === 'paid'">
+          <div class="pay-status-icon success">
+            <el-icon><CircleCheckFilled /></el-icon>
+          </div>
+          <h3 class="pay-status-title">支付成功！</h3>
+          <p class="pay-status-desc">
+            {{ activePurchaseTab === 'points' ? '积分已充值到您的账户' : '会员权益已生效' }}
+          </p>
+          <div class="pay-status-success-detail" v-if="currentPlan">
+            <div class="success-item">
+              <span class="label">{{ activePurchaseTab === 'points' ? '充值积分' : '会员类型' }}</span>
+              <span class="value">
+                {{ activePurchaseTab === 'points'
+                  ? (currentPlan as PointsPlan).points + ' 积分'
+                  : (currentPlan as MemberPlan).title
+                }}
+              </span>
+            </div>
+            <div class="success-item">
+              <span class="label">支付金额</span>
+              <span class="value price">¥{{ currentPlan.price }}</span>
+            </div>
+          </div>
+        </template>
+
+        <!-- 支付失败/取消状态 -->
+        <template v-if="payStatus === 'cancelled' || payStatus === 'expired'">
+          <div class="pay-status-icon error">
+            <el-icon><CircleCloseFilled /></el-icon>
+          </div>
+          <h3 class="pay-status-title">{{ payStatus === 'expired' ? '支付超时' : '支付未成功' }}</h3>
+          <p class="pay-status-desc">
+            {{ payStatus === 'expired' ? '支付已超时，请重新下单' : '支付已取消，您可以重新下单' }}
+          </p>
+          <div class="pay-status-order" v-if="currentOrderId">
+            订单号：{{ currentOrderId }}
+          </div>
+          <div class="pay-status-actions">
+            <el-button @click="payDialogVisible = false">关闭</el-button>
+            <el-button type="primary" @click="retryPayment" :disabled="payStatus === 'expired'">
+              {{ payStatus === 'expired' ? '重新下单' : '重新支付' }}
+            </el-button>
+          </div>
+        </template>
+      </div>
+    </el-dialog>
 
     <!-- 统一购买中心弹窗 -->
     <el-dialog v-model="purchaseCenterVisible" :show-close="false" width="700px" class="purchase-dialog"
@@ -1043,5 +1337,129 @@ const handleInvite = () => {
 
 .subscribe-btn {
   background: #4f46e5;
+}
+
+/* 支付状态弹窗样式 */
+::v-deep(.pay-status-dialog) {
+  border-radius: 20px;
+  overflow: hidden;
+}
+
+::v-deep(.pay-status-dialog .el-dialog__header) {
+  display: none;
+}
+
+::v-deep(.pay-status-dialog .el-dialog__body) {
+  padding: 40px 32px;
+  background: #fff;
+}
+
+.pay-status-content {
+  text-align: center;
+}
+
+.pay-status-icon {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 24px;
+  font-size: 40px;
+}
+
+.pay-status-icon.loading {
+  background: #eff6ff;
+  color: #3b82f6;
+  animation: pulse 2s infinite;
+}
+
+.pay-status-icon.success {
+  background: #ecfdf5;
+  color: #10b981;
+}
+
+.pay-status-icon.error {
+  background: #fef2f2;
+  color: #ef4444;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.pay-status-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0 0 12px;
+}
+
+.pay-status-desc {
+  font-size: 14px;
+  color: #64748b;
+  line-height: 1.6;
+  margin: 0 0 20px;
+}
+
+.pay-status-order {
+  font-size: 13px;
+  color: #94a3b8;
+  background: #f8fafc;
+  padding: 8px 16px;
+  border-radius: 8px;
+  display: inline-block;
+  margin-bottom: 24px;
+}
+
+.pay-status-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.pay-status-actions .el-button {
+  padding: 12px 24px;
+  font-weight: 600;
+}
+
+.pay-status-success-detail {
+  background: #f8fafc;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+.success-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.success-item:last-child {
+  border-bottom: none;
+}
+
+.success-item .label {
+  font-size: 14px;
+  color: #64748b;
+}
+
+.success-item .value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.success-item .value.price {
+  color: #3b82f6;
+  font-size: 18px;
 }
 </style>
