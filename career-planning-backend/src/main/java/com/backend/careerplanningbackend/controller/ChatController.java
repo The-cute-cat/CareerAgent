@@ -97,7 +97,7 @@ public class ChatController {
      */
     @PostMapping(value = "/message/stream", produces = "text/event-stream")
     public Flux<String> chatWithMessageStream(
-            @RequestParam(required = false) String message,
+            @RequestParam(required = false) String message,：::
             @RequestParam(required = false) String conversationId,
             @RequestParam(required = false) MultipartFile[] files
     ) {

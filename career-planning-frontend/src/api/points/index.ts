@@ -57,8 +57,14 @@ export const consumePointsService = (data: PointsConsumeRequest) => {
   return request.post<Result<PointsConsumeData>>('/points/consume', data)
 }
 
-import type { PointsMembershipChangeDTO } from '@/types/pointsMembershipChangeDTO'
-export type { PointsMembershipChangeDTO }
+export interface PointsMembershipChangeDTO {
+  userId: number
+  amount: number
+  type: number
+  vip?: number
+  status?: number
+  description?: string
+}
 
 export const rechargePointsService = (data: PointsMembershipChangeDTO) => {
   return request.post<Result<any>>('/points/recharge', data)
@@ -77,8 +83,4 @@ export interface PackageData {
 
 export const getPackagesByTypeService = (type: number) => {
   return request.get<Result<PackageData[]>>(`/package/list/type/${type}`)
-}
-
-export const getAlipayService = (orderNo: number) => {
-  return request.get(`/alipay/pay/${orderNo}`)
 }

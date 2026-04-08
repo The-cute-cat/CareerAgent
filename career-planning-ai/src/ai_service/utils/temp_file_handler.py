@@ -34,7 +34,7 @@ def create_temp_file(data: bytes):
         Exception: 文件创建或写入失败时抛出异常
     """
     filename = f"{uuid.uuid4()}"
-    save_path = os.path.join(settings.path_config.temp, filename)
+    save_path = os.path.join(settings.path_config.temp.path, filename)
 
     try:
         with open(save_path, "wb") as file:

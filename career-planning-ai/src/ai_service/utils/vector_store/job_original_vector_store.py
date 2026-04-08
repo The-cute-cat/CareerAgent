@@ -322,6 +322,7 @@ class JobOriginalVectorStore:
                 "total": 0,
                 "errors": [],
             }
+        log.info(f"✅ 向量库数量({vector_count}) 与数据库数量({db_count})")
 
         if vector_count == db_count:
             log.info(f"✅ 向量库数量({vector_count}) 与数据库数量({db_count})一致，跳过向量化")
@@ -379,66 +380,126 @@ class JobOriginalVectorStore:
             "skipped_ids": skipped_ids,
         }
 
+
+
+    # 一次性拉取整个集合的数据
     async def query_embeddings_by_job_ids(
-        self,
-        job_ids: List[int],
-        batch_size: int = 1000,
-        max_workers: int = 10,
+            self,
+            job_ids: List[int],
+            batch_size: int = 1000,  # 这里的 batch_size 转变为迭代器单次拉取的数据量，可适当调大
+            max_workers: int = 5,  # 保留参数签名，防止外部调用时传参报错
     ) -> Dict[int, np.ndarray]:
         """
-        优化版：按 job_id 批量读取向量，返回 {job_id: embedding}。
-        使用内存索引 + 大批量获取 + 异步并行查询。
-
-        Args:
-            job_ids: 待查询 job_id 列表
-            batch_size: 每个批次查询大小
-            max_workers: 最大并发协程数，限制并发压力
-
-        Returns:
-            Dict[job_id, np.ndarray]: job_id 对应的向量
+        优化版（全量读取）：
+        已知数据库的 id 和 job_ids 数量及内容完全一致。
+        直接全量读取数据库中的所有向量，避免拼接超长的 IN 表达式。
         """
-        if not job_ids:
-            return {}
 
-        self.collection.load()
+        loop = asyncio.get_event_loop()
 
-        # 使用信号量控制并发数，防止瞬间压力过大
-        semaphore = asyncio.Semaphore(max_workers)
+        def fetch_all_data() -> List[Dict[str, Any]]:
+            # 因为 job_id 是主键且通常为正整数，使用 >= 0 即可匹配全量数据
+            expr = "job_id >= 0"
 
-        async def fetch_batch(batch_ids: List[int]) -> Dict[int, np.ndarray]:
-            async with semaphore:
-                result = {}
-                ids_str = ", ".join(map(str, batch_ids))
-                expr = f"job_id in [{ids_str}]"
-                
-                # 在 IO 密集型操作中使用 loop.run_in_executor 或直接异步调用（pymilvus query 是同步阻塞的）
-                loop = asyncio.get_event_loop()
-                rows = await loop.run_in_executor(
-                    None, 
-                    lambda: self.collection.query(
-                        expr=expr, 
-                        output_fields=["job_id", "embedding"]
-                    )
+            # 优先使用 query_iterator，避免全量数据过大直接撑爆 gRPC 的 64MB 限制
+            if hasattr(self.collection, "query_iterator"):
+                log.info(f"使用 query_iterator 游标安全拉取全量数据，单批次 {batch_size} 条")
+                iterator = self.collection.query_iterator(
+                    expr=expr,
+                    output_fields=["job_id", "embedding"],
+                    batch_size=batch_size
                 )
-                
-                for row in rows:
-                    jid = int(row["job_id"])
-                    result[jid] = np.array(row["embedding"], dtype=np.float32)
-                return result
+                all_rows = []
+                while True:
+                    res = iterator.next()
+                    if not res:
+                        break
+                    all_rows.extend(res)
+                return all_rows
+            else:
+                # 兼容非常旧版本的 pymilvus（万一不支持游标）
+                log.warning("当前 pymilvus 不支持 query_iterator，降级使用常规全量 query")
+                return self.collection.query(
+                    expr=expr,
+                    output_fields=["job_id", "embedding"]
+                )
 
-        tasks = [
-            fetch_batch(job_ids[i:i + batch_size])
-            for i in range(0, len(job_ids), batch_size)
-        ]
+        # 在异步 executor 中执行同步的 I/O 密集型拉取操作
+        rows = await loop.run_in_executor(None, fetch_all_data)
+        log.info(f"全量查询完成，共成功读取到 {len(rows)} 条岗位向量")
 
-        results = await asyncio.gather(*tasks)
-
-        # 合并结果
+        # 将结果合并为映射字典
         embedding_map: Dict[int, np.ndarray] = {}
-        for r in results:
-            embedding_map.update(r)
+        for row in rows:
+            jid = int(row["job_id"])
+            embedding_map[jid] = np.array(row["embedding"], dtype=np.float32)
 
         return embedding_map
+        
+    # 正规的函数
+    # async def query_embeddings_by_job_ids(
+    #     self,
+    #     job_ids: List[int],
+    #     batch_size: int = 1000,
+    #     max_workers: int = 10,
+    # ) -> Dict[int, np.ndarray]:
+    #     """
+    #     优化版：按 job_id 批量读取向量，返回 {job_id: embedding}。
+    #     使用内存索引 + 大批量获取 + 异步并行查询。
+    #
+    #     Args:
+    #         job_ids: 待查询 job_id 列表
+    #         batch_size: 每个批次查询大小
+    #         max_workers: 最大并发协程数，限制并发压力
+    #
+    #     Returns:
+    #         Dict[job_id, np.ndarray]: job_id 对应的向量
+    #     """
+    #     if not job_ids:
+    #         return {}
+    #
+    #     self.collection.load()
+    #
+    #     # 使用信号量控制并发数，防止瞬间压力过大
+    #     semaphore = asyncio.Semaphore(max_workers)
+    #     log.info(f"开始查询 {len(job_ids)} 条向量，batch_size={batch_size}")
+    #     async def fetch_batch(batch_ids: List[int]) -> Dict[int, np.ndarray]:
+    #         log.info(f"查询任务已提交，共 {len(batch_ids)} 个批次")
+    #         async with semaphore:
+    #             result = {}
+    #             ids_str = ",".join(map(str, batch_ids))
+    #             expr = f"job_id in [{ids_str}]"
+    #             log.info(f"查询任务已提交，expr={expr}")
+    #
+    #             # 在 IO 密集型操作中使用 loop.run_in_executor 或直接异步调用（pymilvus query 是同步阻塞的）
+    #             loop = asyncio.get_event_loop()
+    #             rows = await loop.run_in_executor(
+    #                 None,
+    #                 lambda: self.collection.query(
+    #                     expr=expr,
+    #                     output_fields=["embedding"]
+    #                 )
+    #             )
+    #             log.info(f"查询任务已完成")
+    #             for row in rows:
+    #                 jid = int(row["job_id"])
+    #                 result[jid] = np.array(row["embedding"], dtype=np.float32)
+    #             return result
+    #
+    #     tasks = [
+    #         fetch_batch(job_ids[i:i + batch_size])
+    #         for i in range(0, len(job_ids), batch_size)
+    #     ]
+    #     log.info(f"查询任务已提交，共 {len(tasks)} 个批次")
+    #
+    #     results = await asyncio.gather(*tasks)
+    #
+    #     # 合并结果
+    #     embedding_map: Dict[int, np.ndarray] = {}
+    #     for r in results:
+    #         embedding_map.update(r)
+    #
+    #     return embedding_map
 
     async def get_jobs_and_embeddings_for_hdbscan(
         self,

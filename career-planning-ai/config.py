@@ -192,20 +192,26 @@ class _GrowthPlanAgent(_LLM):
 
 
 class _PathConfig(BaseModel):
-    temp: str = ""
-    is_clean: bool = True
+    class _Temp(BaseModel):
+        path: str = ""
+        exit_is_clean: bool = True
+        run_is_clean: bool = True
+        expire: int = 900
+        cleanup_interval: int = 60
+
+        @field_validator("path")
+        @classmethod
+        def _validate_temp(cls, v):
+            if v == "<TEMP_PATH>" or not v or not Path(v).exists():
+                v = tempfile.gettempdir()
+            path = os.path.join(v, "career_agent", "ai_service", "temp")
+            os.makedirs(path, exist_ok=True)
+            return str(Path(path))
+
+    temp: _Temp = _Temp()
     log: str = ""
     prompt: str = ""
     data: str = ""
-
-    @field_validator("temp")
-    @classmethod
-    def _validate_temp(cls, v):
-        if v == "<TEMP_PATH>" or not v or not Path(v).exists():
-            v = tempfile.gettempdir()
-        path = os.path.join(v, "career_agent", "ai_service", "temp")
-        os.makedirs(path, exist_ok=True)
-        return str(Path(path))
 
     @field_validator("log")
     @classmethod
@@ -238,6 +244,7 @@ class _PathConfig(BaseModel):
 class _Vector(BaseModel):
     model_name: str = ""
     llm_model_name: str = ""
+    llm_long_model_name: str = ""
 
 
 class _Milvus(BaseModel):
@@ -478,8 +485,8 @@ def get_settings() -> Settings:
 
 def _program_exit():
     """程序退出前执行的操作"""
-    if settings.path_config.is_clean:  # 是否清理临时文件
-        temp_path = os.path.join(settings.path_config.temp, "../../")
+    if settings.path_config.temp.exit_is_clean:  # 是否清理临时文件
+        temp_path = os.path.join(settings.path_config.temp.path, "../../")
         if Path(temp_path).exists():
             shutil.rmtree(temp_path, ignore_errors=True)
 
