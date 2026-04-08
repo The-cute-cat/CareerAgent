@@ -71,7 +71,7 @@ public class UserController {
     
     /**
      * sendCodeForget
-     * 发送注册验证码
+     * 发送忘记密码验证码
      */
     @PostMapping("/send-code-forget")
     public Result<String> sendCodeForget(@RequestBody LoginFormDTO user) {

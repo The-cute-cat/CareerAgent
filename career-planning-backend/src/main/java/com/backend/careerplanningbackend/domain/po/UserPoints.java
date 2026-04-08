@@ -23,7 +23,7 @@ public class UserPoints {
     private Integer status;
     private Integer totalConsumed;
     private LocalDateTime endTime;
-    private LocalDateTime ActivityEndTime;
+    private LocalDateTime activityEndTime;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 }
