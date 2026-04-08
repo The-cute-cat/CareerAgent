@@ -17,6 +17,8 @@ communication:
 vector:
   model_name: text-embedding-v4
   llm_model_name: qwen-max
+  llm_long_model_name: qwen-long
+
 llm:
   model_name: qwen-max
   base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
