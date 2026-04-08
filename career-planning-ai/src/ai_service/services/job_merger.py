@@ -10,8 +10,15 @@ from ai_service.models.job_portrait import JobPortrait
 from ai_service.repository.job_info_repository import JobRepository
 from ai_service.repository.job_portrait_repository import JobPortraitRepository
 from ai_service.response.result import error_msg, success
+<<<<<<< HEAD
+<<<<<<< HEAD
+from ai_service.agents.job_profile_builder import analyze_job_description
+=======
+=======
+>>>>>>> origin/master
 from ai_service.services.database_manage import get_db_url
 from ai_service.services.job_profile_builder import analyze_job_description
+>>>>>>> origin/master
 from ai_service.utils.HDBSCAN import cluster_standard_jobs_with_hdbscan
 from ai_service.utils.logger_handler import log
 
@@ -100,9 +107,11 @@ async def job_merger(max_concurrency: int = 5) -> Dict[str, Any]:
             # 批量更新 job_profile_id
             for idx, (cluster_id, jobs) in enumerate(job_updates):
                 portrait_id = portrait_ids[idx]
+
+                analysis_results[idx][2]["job_id"] = portrait_id
                 await portrait_repo.update(portrait_id, {"skills_req": analysis_results[idx][2]})
                 for job in jobs:
-                    await job_repo.update(job.id, {"job_profile_id": portrait_id})
+                    await job_repo.update(job.id, {"job_id": portrait_id})
                     total_jobs_processed += 1
 
             log.info(f"岗位合并完成，创建 {len(portrait_ids)} 个岗位画像，处理 {total_jobs_processed} 个岗位")
