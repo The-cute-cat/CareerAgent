@@ -9,6 +9,7 @@
 5. 会话持久化管理
 """
 import asyncio
+import json
 from typing import AsyncGenerator
 
 from langchain_core.messages import HumanMessage, SystemMessage, BaseMessage
@@ -98,20 +99,9 @@ class ConversationAgent:
         Returns:
             AI 响应文本
         """
-        # 确保会话持久化记录存在
-        await self._ensure_session_persisted(user_id, session_id, db_session)
-        # 添加用户消息到短期记忆
-        await self.short_memory.add_message(
-            user_id=user_id,
-            session_id=session_id,
-            role="user",
-            content=user_message,
-            auto_compress=True
-        )
-        # 构建上下文
-        context = await self._build_context(user_id, session_id, db_session)
+        # 前置准备
+        messages = await self._prepare_chat(user_id, session_id, user_message, db_session)
         # 生成响应
-        messages = await self._build_messages(context, user_message)
         response = await self.llm.ainvoke(messages)
         ai_message = response.content
         # 添加 AI 响应到短期记忆
@@ -122,13 +112,10 @@ class ConversationAgent:
             content=ai_message,
             auto_compress=False
         )
-        # 更新会话消息计数
-        await self._update_session_message_count(user_id, session_id, increment=2, db_session=db_session)
-        # 异步提取记忆点（后台任务）
-        if auto_extract_memory and db_session:
-            asyncio.create_task(
-                self._extract_and_store_memory_async(user_id, session_id)
-            )
+        # 对话后置处理（更新计数、生成标题、提取记忆）
+        await self._post_chat_process(
+            user_id, session_id, user_message, ai_message, db_session, auto_extract_memory
+        )
         return ai_message
 
     async def chat_stream(
@@ -137,7 +124,8 @@ class ConversationAgent:
             session_id: str,
             user_message: str,
             db_session: AsyncSession | None = None,
-            auto_extract_memory: bool = True
+            auto_extract_memory: bool = True,
+            show_thinking: bool = False
     ) -> AsyncGenerator[str, None]:
         """
         流式处理用户消息并返回响应
@@ -148,35 +136,48 @@ class ConversationAgent:
             user_message: 用户消息
             db_session: 数据库会话（可选）
             auto_extract_memory: 是否自动提取记忆点
+            show_thinking: 是否显示思考过程
             
         Yields:
-            AI 响应的文本片段
+            AI 响应的文本片段（JSON 格式，包含 type 和 content）
         """
-        # 确保会话持久化记录存在
-        await self._ensure_session_persisted(user_id, session_id, db_session)
-        # 添加用户消息到短期记忆
-        await self.short_memory.add_message(
-            user_id=user_id,
-            session_id=session_id,
-            role="user",
-            content=user_message,
-            auto_compress=True
-        )
-        context = await self._build_context(user_id, session_id, db_session)
+        # 前置准备
+        messages = await self._prepare_chat(user_id, session_id, user_message, db_session)
         # 流式生成响应
-        messages = await self._build_messages(context, user_message)
         full_response = ""
+        thinking_content = ""
+        
         try:
             async for chunk in self.llm.astream(messages):
+                # 处理思考过程（DeepSeek R1 特有）
+                if show_thinking and hasattr(chunk, 'reasoning_content') and chunk.reasoning_content:
+                    thinking_content += chunk.reasoning_content
+                    yield json.dumps({
+                        "type": "thinking",
+                        "content": chunk.reasoning_content
+                    }, ensure_ascii=False)
+                
+                # 处理正式回复内容
                 if chunk.content:
                     full_response += chunk.content
-                    yield chunk.content
+                    yield json.dumps({
+                        "type": "content",
+                        "content": chunk.content
+                    }, ensure_ascii=False)
+                
+                # 主动让出控制权，确保数据立即发送
+                await asyncio.sleep(0)
+                    
         except Exception as e:
             logger.error(f"流式生成失败: {e}")
             # 回滚：移除已写入的孤儿用户消息，保持数据一致性
             await self.short_memory.remove_last_message(user_id, session_id)
-            yield f"抱歉，生成响应时出现错误：{str(e)}"
+            yield json.dumps({
+                "type": "error",
+                "content": f"抱歉，生成响应时出现错误：{str(e)}"
+            }, ensure_ascii=False)
             return
+            
         # 添加完整响应到短期记忆
         await self.short_memory.add_message(
             user_id=user_id,
@@ -185,13 +186,11 @@ class ConversationAgent:
             content=full_response,
             auto_compress=False
         )
-        # 更新会话消息计数
-        await self._update_session_message_count(user_id, session_id, increment=2, db_session=db_session)
-        # 异步提取记忆点（后台任务）
-        if auto_extract_memory and db_session:
-            asyncio.create_task(
-                self._extract_and_store_memory_async(user_id, session_id)
-            )
+        
+        # 对话后置处理（更新计数、生成标题、提取记忆）
+        await self._post_chat_process(
+            user_id, session_id, user_message, full_response, db_session, auto_extract_memory
+        )
 
     async def _build_context(
             self,
@@ -250,6 +249,116 @@ class ConversationAgent:
         ]
         return messages
 
+    async def _prepare_chat(
+            self,
+            user_id: str,
+            session_id: str,
+            user_message: str,
+            db_session: AsyncSession | None = None
+    ) -> list[BaseMessage]:
+        """
+        对话前置准备：确保会话持久化、添加用户消息、构建消息列表
+
+        Args:
+            user_id: 用户 ID
+            session_id: 会话 ID
+            user_message: 用户消息
+            db_session: 数据库会话
+
+        Returns:
+            构建好的消息列表
+        """
+        # 确保会话持久化记录存在
+        await self._ensure_session_persisted(user_id, session_id, db_session)
+        # 添加用户消息到短期记忆
+        await self.short_memory.add_message(
+            user_id=user_id,
+            session_id=session_id,
+            role="user",
+            content=user_message,
+            auto_compress=True
+        )
+        # 构建上下文
+        context = await self._build_context(user_id, session_id, db_session)
+        # 构建消息列表
+        return await self._build_messages(context, user_message)
+
+    async def _post_chat_process(
+            self,
+            user_id: str,
+            session_id: str,
+            user_message: str,
+            ai_response: str,
+            db_session: AsyncSession | None = None,
+            auto_extract_memory: bool = True
+    ) -> None:
+        """
+        对话后置处理：更新消息计数、自动生成标题、异步提取记忆
+
+        Args:
+            user_id: 用户 ID
+            session_id: 会话 ID
+            user_message: 用户消息
+            ai_response: AI 回复
+            db_session: 数据库会话
+            auto_extract_memory: 是否自动提取记忆点
+        """
+        # 更新会话消息计数
+        session_repo = self._ensure_session_repo(db_session)
+        if session_repo:
+            conversation = await session_repo.update_message_count(user_id, session_id, increment=2)
+            # 首轮对话完成后（消息数=2），自动生成会话标题
+            if conversation and conversation.message_count == 2:
+                asyncio.create_task(
+                    self._generate_title_async(user_id, session_id, user_message, ai_response)
+                )
+        # 异步提取记忆点（后台任务）
+        if auto_extract_memory and db_session:
+            asyncio.create_task(
+                self._extract_and_store_memory_async(user_id, session_id)
+            )
+
+    async def _generate_title_async(
+            self,
+            user_id: str,
+            session_id: str,
+            user_message: str,
+            ai_response: str
+    ) -> None:
+        """
+        异步生成并更新会话标题（后台任务）
+
+        基于首轮对话内容调用 LLM 生成简洁的会话标题。
+
+        Args:
+            user_id: 用户 ID
+            session_id: 会话 ID
+            user_message: 用户的首条消息
+            ai_response: AI 的首条回复
+        """
+        try:
+            async with AsyncSessionLocal() as new_session:
+                title_messages = [
+                    SystemMessage(
+                        content="你是一个会话标题生成器。根据用户和AI的对话内容，生成一个简洁的会话标题。"
+                                "要求：不超过20个字，直接输出标题内容，不要加引号、不要加任何前缀后缀。"
+                    ),
+                    HumanMessage(
+                        content=f"用户: {user_message}\n助手: {ai_response}"
+                    )
+                ]
+                result = await self.llm.ainvoke(title_messages)
+                title = result.content.strip()
+                # 清理可能的引号或多余字符
+                title = title.strip('"\'').strip()
+
+                session_repo = SessionRepository(new_session)
+                await session_repo.update_title(user_id, session_id, title)
+                await new_session.commit()
+                logger.info(f"✅ 自动生成会话标题: \"{title}\" (用户: {user_id}, 会话: {session_id})")
+        except Exception as e:
+            logger.error(f"❌ 自动生成会话标题失败: {e}", exc_info=True)
+
     async def _extract_and_store_memory_async(
             self,
             user_id: str,
@@ -274,7 +383,6 @@ class ConversationAgent:
                     return
                 # 只取最近 4 条消息（2 轮对话）
                 recent_messages = all_messages[-4:] if len(all_messages) > 4 else all_messages
-                
                 # 获取已有记忆（用于避免重复）
                 long_memory = LongMemoryAgent(session=new_session)
                 existing_memories = await long_memory.get_memories(
