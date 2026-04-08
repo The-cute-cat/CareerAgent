@@ -16,25 +16,27 @@ import java.util.List;
 @AllArgsConstructor
 @NoArgsConstructor
 public class AiChatRequest {
+    private String userId;
     private String conversationId;
     private String message;
     private List<File> files;
     private List<MultipartFile> multipartFiles;
 
-    public AiChatRequest(String conversationId, String message) {
+    public AiChatRequest(String userId, String conversationId, String message) {
+        this.userId = userId;
         this.conversationId = conversationId;
         this.message = message;
     }
 
 
-    public static AiChatRequest ofFiles(String conversationId, String message, List<File> files) {
-        AiChatRequest request = new AiChatRequest(conversationId, message);
+    public static AiChatRequest ofFiles(String userId, String conversationId, String message, List<File> files) {
+        AiChatRequest request = new AiChatRequest(userId, conversationId, message);
         request.setFiles(files);
         return request;
     }
 
-    public static AiChatRequest ofMultipartFiles(String conversationId, String message, List<MultipartFile> multipartFiles) {
-        AiChatRequest request = new AiChatRequest(conversationId, message);
+    public static AiChatRequest ofMultipartFiles(String userId, String conversationId, String message, List<MultipartFile> multipartFiles) {
+        AiChatRequest request = new AiChatRequest(userId, conversationId, message);
         request.setMultipartFiles(multipartFiles);
         return request;
     }
