@@ -10,6 +10,8 @@ from ai_service.models.job_portrait import JobPortrait
 from ai_service.repository.job_info_repository import JobRepository
 from ai_service.repository.job_portrait_repository import JobPortraitRepository
 from ai_service.response.result import error_msg, success
+from ai_service.services.database_manage import get_db_url
+from ai_service.services.job_profile_builder import analyze_job_description
 from ai_service.utils.HDBSCAN import cluster_standard_jobs_with_hdbscan
 from ai_service.utils.logger_handler import log
 

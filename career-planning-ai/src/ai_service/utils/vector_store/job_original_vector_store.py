@@ -393,6 +393,7 @@ class JobOriginalVectorStore:
         优化版（全量读取）：
         已知数据库的 id 和 job_ids 数量及内容完全一致。
         直接全量读取数据库中的所有向量，避免拼接超长的 IN 表达式。
+        """
 
         loop = asyncio.get_event_loop()
 

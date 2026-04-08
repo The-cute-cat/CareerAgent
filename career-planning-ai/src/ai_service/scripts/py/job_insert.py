@@ -112,15 +112,8 @@ async def main(max_concurrent: int = 5):
         await asyncio.gather(*(safe_process(p) for p in excel_file_paths))
     finally:
         await engine.dispose()
-<<<<<<< HEAD
-<<<<<<< HEAD
         print("数据库连接池已安全关闭")
-=======
-        print("🔌 数据库连接池已安全关闭")
->>>>>>> origin/master
-=======
-        print("🔌 数据库连接池已安全关闭")
->>>>>>> origin/master
+
 
 
 if __name__ == "__main__":
