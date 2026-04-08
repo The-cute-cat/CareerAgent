@@ -84,3 +84,6 @@ ai:
     retry:
       max-attempts: 3
       delay: 1000
+      
+jwt:
+  secret: ${JWT_SECRET}

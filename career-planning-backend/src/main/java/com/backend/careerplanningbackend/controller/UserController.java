@@ -45,7 +45,7 @@ public class UserController {
      */
     @PostMapping("/register")
     public Result<String> register(@RequestBody LoginFormDTO user) {
-        log.info("register接收到的注册参数: {}", user.toString()); 
+        log.info("register接收到的注册参数: {}", user.toString());
         return userService.register(user);
     }
     
