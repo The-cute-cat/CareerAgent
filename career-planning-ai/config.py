@@ -244,6 +244,7 @@ class _PathConfig(BaseModel):
 class _Vector(BaseModel):
     model_name: str = ""
     llm_model_name: str = ""
+    llm_long_model_name: str = ""
 
 
 class _Milvus(BaseModel):

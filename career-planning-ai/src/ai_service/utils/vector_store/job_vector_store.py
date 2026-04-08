@@ -361,18 +361,18 @@ if __name__ == "__main__":
 
     # 1. 初始化
     store = JobVectorStore()
-    # store.reset_collection()
+    store.reset_collection()
     # # 2. 模拟岗位入库
     # for jd in job_list:
     #     store.insert_job(jd)
-
-    # 3. 执行匹配
-    print("\n--- 正在为该学生匹配最合适的岗位 ---")
-    matches = store.match_jobs_for_student(student_test_data, top_k=20)
-    for match in matches:
-        print(f"匹配结果：{match['job_id']} (得分: {match['score']:.2f})")
-        print(f"岗位详情：{match['raw_data']}")
-        print("-" * 50)
+    #
+    # # 3. 执行匹配
+    # print("\n--- 正在为该学生匹配最合适的岗位 ---")
+    # matches = store.match_jobs_for_student(student_test_data, top_k=20)
+    # for match in matches:
+    #     print(f"匹配结果：{match['job_id']} (得分: {match['score']:.2f})")
+    #     print(f"岗位详情：{match['raw_data']}")
+    #     print("-" * 50)
 
 # async def main():
 #     file_path = r"E:\软件工程相关资料\项目比赛\服创2026\岗位.json"

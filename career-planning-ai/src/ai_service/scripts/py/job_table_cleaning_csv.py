@@ -200,11 +200,11 @@ def build_job_desc(
     prefix_parts = []
     prefix_parts.append("职位描述：")
     if exp:
-        prefix_parts.append(f"经验：{exp}")
+        prefix_parts.append(f"{exp}")
     if edu:
-        prefix_parts.append(f"学历：{edu}")
+        prefix_parts.append(f"{edu}")
     if skills:
-        prefix_parts.append(f"技能：{skills}")
+        prefix_parts.append(f"技能:{skills}")
 
     prefix = ";".join(prefix_parts)
 

@@ -56,12 +56,18 @@ class BasicRequirements(BaseModel):
     基础要求：字段名与学生画像 BasicRequirements 保持一致，便于直接匹配
     """
     model_config = ConfigDict(populate_by_name=True)
-    degree: DegreeEnum = Field(validation_alias="学历要求", default=DegreeEnum.UNLIMITED, description="岗位要求的最低学历层次，必须从枚举值中选择：不限/专科/本科/硕士/博士")
-    major: str = Field(validation_alias="专业背景", default="不限", description="岗位要求的专业背景，优先填写具体专业名称（如'计算机科学与技术'），若不限专业则填'不限'")
-    certificates: List[str] = Field(validation_alias="证书要求", default_factory=list, description="岗位明确要求的证书列表，如['英语六级', 'PMP证书', '注册会计师']，若无明确要求则返回空列表")
-    internship_requirement: str = Field(validation_alias="实习经历要求", default="", description="岗位对实习经历的具体要求，包括是否必需、最短时长、领域要求等，如'需有互联网公司3个月以上实习经历'，若无要求则填空字符串")
-    experience_years: str = Field(validation_alias="工作年限", default="不限", description="岗位要求的最低工作年限，优先填写具体年限范围（如'1-3年'、'5年以上'），应届生岗填'应届生'，不限则填'不限'")
-    special_requirements: str = Field(validation_alias="特殊要求", default="", description="岗位的其他特殊要求，如'能接受出差'、'需持有驾照'等，若无特殊要求则填空字符串")
+    degree: DegreeEnum = Field(validation_alias="学历要求", default=DegreeEnum.UNLIMITED,
+                               description="岗位要求的最低学历层次，必须从枚举值中选择：不限/专科/本科/硕士/博士")
+    major: str = Field(validation_alias="专业背景", default="不限",
+                       description="岗位要求的专业背景，优先填写具体专业名称（如'计算机科学与技术'），若不限专业则填'不限'")
+    certificates: List[str] = Field(validation_alias="证书要求", default_factory=list,
+                                    description="岗位明确要求的证书列表，如['英语六级', 'PMP证书', '注册会计师']，若无明确要求则返回空列表")
+    internship_requirement: str = Field(validation_alias="实习经历要求", default="",
+                                        description="岗位对实习经历的具体要求，包括是否必需、最短时长、领域要求等，如'需有互联网公司3个月以上实习经历'，若无要求则填空字符串")
+    experience_years: str = Field(validation_alias="工作年限", default="不限",
+                                  description="岗位要求的最低工作年限，优先填写具体年限范围（如'1-3年'、'5年以上'），应届生岗填'应届生'，不限则填'不限'")
+    special_requirements: str = Field(validation_alias="特殊要求", default="",
+                                      description="岗位的其他特殊要求，如'能接受出差'、'需持有驾照'等，若无特殊要求则填空字符串")
 
     @field_validator('degree', mode='before')
     @classmethod
@@ -81,11 +87,16 @@ class ProfessionalSkills(BaseModel):
     """
     职业技能：核心字段名与学生画像 ProfessionalSkills 保持语义对齐
     """
-    core_skills: List[str] = Field(validation_alias="核心专业技能", default_factory=list, description="岗位明确要求的核心专业技能，需提取具体技能名称，如['Python编程', '数据分析', '项目管理']，避免泛泛描述，若未明确则返回空列表")
-    tool_capabilities: List[str] = Field(validation_alias="工具与平台能力", default_factory=list, description="岗位要求的具体工具或平台，如['MySQL', 'Docker', 'Git', 'Excel']，需填写具体名称而非类别，若未明确则返回空列表")
-    language_requirements: List[str] = Field(validation_alias="语言能力", default_factory=list, description="岗位要求的语言能力及熟练度，如['英语-流利', '日语-读写']，若未明确要求则返回空列表")
-    domain_knowledge: str = Field(validation_alias="行业_Domain_知识", default="", description="岗位所需的行业领域知识深度要求，如'熟悉金融风控流程'、'了解电商运营模式'，若未明确则填空字符串")
-    project_requirements: str = Field(validation_alias="项目经验", default="", description="岗位对项目经验的具体要求，包括项目类型、规模、角色等，如'有完整的电商系统开发经验'，若未明确则填空字符串")
+    core_skills: List[str] = Field(validation_alias="核心专业技能", default_factory=list,
+                                   description="岗位明确要求的核心专业技能，需提取具体技能名称，如['Python编程', '数据分析', '项目管理']，避免泛泛描述，若未明确则返回空列表")
+    tool_capabilities: List[str] = Field(validation_alias="工具与平台能力", default_factory=list,
+                                         description="岗位要求的具体工具或平台，如['MySQL', 'Docker', 'Git', 'Excel']，需填写具体名称而非类别，若未明确则返回空列表")
+    language_requirements: List[str] = Field(validation_alias="语言能力", default_factory=list,
+                                             description="岗位要求的语言能力及熟练度，如['英语-流利', '日语-读写']，若未明确要求则返回空列表")
+    domain_knowledge: str = Field(validation_alias="行业_Domain_知识", default="",
+                                  description="岗位所需的行业领域知识深度要求，如'熟悉金融风控流程'、'了解电商运营模式'，若未明确则填空字符串")
+    project_requirements: str = Field(validation_alias="项目经验", default="",
+                                      description="岗位对项目经验的具体要求，包括项目类型、规模、角色等，如'有完整的电商系统开发经验'，若未明确则填空字符串")
 
     @field_validator('core_skills', 'tool_capabilities', 'language_requirements', mode='before')
     @classmethod
@@ -99,11 +110,16 @@ class ProfessionalLiteracy(BaseModel):
     注意：JD 中通常为文本描述，学生画像中为评分，匹配时需做转换
     """
     model_config = ConfigDict(populate_by_name=True)
-    communication: str = Field(validation_alias="沟通能力", default="", description="岗位对沟通能力的具体要求，包括沟通场景和程度，如'跨部门协调沟通能力'、'能撰写专业文档'，若未明确则填空字符串")
-    teamwork: str = Field(validation_alias="团队协作", default="", description="岗位对团队协作的具体要求，包括团队规模、协作方式等，如'能带领5人以上团队'、'具备跨团队协作经验'，若未明确则填空字符串")
-    stress_management: str = Field(validation_alias="抗压能力", default="", description="岗位对抗压能力的具体要求，包括压力来源和应对方式，如'能适应项目上线前的高强度工作'，若未明确则填空字符串")
-    logic_thinking: str = Field(validation_alias="逻辑思维", default="", description="岗位对逻辑思维能力的具体要求，如'具备系统性分析问题的能力'、'能独立完成业务逻辑设计'，若未明确则填空字符串")
-    ethics: str = Field(validation_alias="责任心与职业道德", default="", description="岗位对责任心和职业道德的具体要求，如'严格遵守数据保密规定'、'对代码质量负责'，若未明确则填空字符串")
+    communication: str = Field(validation_alias="沟通能力", default="",
+                               description="岗位对沟通能力的具体要求，包括沟通场景和程度，如'跨部门协调沟通能力'、'能撰写专业文档'，若未明确则填空字符串")
+    teamwork: str = Field(validation_alias="团队协作", default="",
+                          description="岗位对团队协作的具体要求，包括团队规模、协作方式等，如'能带领5人以上团队'、'具备跨团队协作经验'，若未明确则填空字符串")
+    stress_management: str = Field(validation_alias="抗压能力", default="",
+                                   description="岗位对抗压能力的具体要求，包括压力来源和应对方式，如'能适应项目上线前的高强度工作'，若未明确则填空字符串")
+    logic_thinking: str = Field(validation_alias="逻辑思维", default="",
+                                description="岗位对逻辑思维能力的具体要求，如'具备系统性分析问题的能力'、'能独立完成业务逻辑设计'，若未明确则填空字符串")
+    ethics: str = Field(validation_alias="责任心与职业道德", default="",
+                        description="岗位对责任心和职业道德的具体要求，如'严格遵守数据保密规定'、'对代码质量负责'，若未明确则填空字符串")
 
 
 class DevelopmentPotential(BaseModel):
@@ -111,11 +127,17 @@ class DevelopmentPotential(BaseModel):
     发展潜力：字段名与学生画像 DevelopmentPotential 完全一致
     """
     model_config = ConfigDict(populate_by_name=True)
-    learning_ability: str = Field(validation_alias="学习能力", default="", description="岗位对学习能力的具体要求，如'能快速掌握新技术'、'具备自主学习能力'，若未明确则填空字符串")
-    innovation: str = Field(validation_alias="创新能力", default="", description="岗位对创新能力的具体要求，如'有技术创新成果优先'、'能提出改进方案'，若未明确则填空字符串")
-    leadership: str = Field(validation_alias="领导力潜质", default="", description="岗位对领导力潜质的具体要求，如'有团队管理潜力'、'能培养新人'，若未明确则填空字符串")
-    adaptability: str = Field(validation_alias="适应性", default="", description="岗位对适应性的具体要求，如'能快速适应业务变化'、'接受岗位轮换'，若未明确则填空字符串")
-    career_orientation: CareerOrientationEnum = Field(validation_alias="职业倾向性", default=CareerOrientationEnum.UNLIMITED, description="岗位的职业发展倾向，必须从枚举值中选择：管理型/技术型/业务型/研究型/综合型/不限")
+    learning_ability: str = Field(validation_alias="学习能力", default="",
+                                  description="岗位对学习能力的具体要求，如'能快速掌握新技术'、'具备自主学习能力'，若未明确则填空字符串")
+    innovation: str = Field(validation_alias="创新能力", default="",
+                            description="岗位对创新能力的具体要求，如'有技术创新成果优先'、'能提出改进方案'，若未明确则填空字符串")
+    leadership: str = Field(validation_alias="领导力潜质", default="",
+                            description="岗位对领导力潜质的具体要求，如'有团队管理潜力'、'能培养新人'，若未明确则填空字符串")
+    adaptability: str = Field(validation_alias="适应性", default="",
+                              description="岗位对适应性的具体要求，如'能快速适应业务变化'、'接受岗位轮换'，若未明确则填空字符串")
+    career_orientation: CareerOrientationEnum = Field(validation_alias="职业倾向性",
+                                                      default=CareerOrientationEnum.UNLIMITED,
+                                                      description="岗位的职业发展倾向，必须从枚举值中选择：管理型/技术型/业务型/研究型/综合型/不限")
 
 
 class JobAttributes(BaseModel):
@@ -123,13 +145,20 @@ class JobAttributes(BaseModel):
     岗位属性：英文命名
     """
     model_config = ConfigDict(populate_by_name=True)
-    salary_competitiveness: LevelEnum = Field(validation_alias="薪资竞争力", default=LevelEnum.MEDIUM, description="该岗位在行业内的薪资竞争力水平，必须从枚举值中选择：低/中/高，需结合市场数据和岗位级别判断")
-    social_demand: LevelEnum = Field(validation_alias="社会需求度", default=LevelEnum.MEDIUM, description="该岗位在当前就业市场中的需求程度，必须从枚举值中选择：低/中/高，需参考招聘网站数据和行业报告")
-    industry_trend: IndustryTrendEnum = Field(validation_alias="行业发展趋势", default=IndustryTrendEnum.STABLE, description="该岗位所属行业的发展趋势，必须从枚举值中选择：萎缩/平稳/朝阳")
-    industry: str = Field(validation_alias="所属行业", default="不限", description="岗位所属的具体行业领域，优先填写细分类别（如'互联网金融'、'新零售'、'SaaS软件'），若无法判断则填'不限'")
-    vertical_promotion_path: str = Field(validation_alias="垂直晋升路径", default="", description="岗位的垂直晋升路径，需填写具体职位序列，如'初级工程师→中级工程师→高级工程师→技术专家'，若无法判断则填空字符串")
-    prerequisite_roles: str = Field(validation_alias="前置岗位要求", default="", description="担任该岗位通常需要的前置职位，如'需有产品助理或运营专员经验'，若未明确则填空字符串")
-    lateral_transfer_directions: str = Field(validation_alias="横向转岗方向", default="", description="从该岗位可以横向转岗的方向，如'产品经理可转向项目管理或运营管理'，若无法判断则填空字符串")
+    salary_competitiveness: LevelEnum = Field(validation_alias="薪资竞争力", default=LevelEnum.MEDIUM,
+                                              description="该岗位在行业内的薪资竞争力水平，必须从枚举值中选择：低/中/高，需结合市场数据和岗位级别判断")
+    social_demand: LevelEnum = Field(validation_alias="社会需求度", default=LevelEnum.MEDIUM,
+                                     description="该岗位在当前就业市场中的需求程度，必须从枚举值中选择：低/中/高，需参考招聘网站数据和行业报告")
+    industry_trend: IndustryTrendEnum = Field(validation_alias="行业发展趋势", default=IndustryTrendEnum.STABLE,
+                                              description="该岗位所属行业的发展趋势，必须从枚举值中选择：萎缩/平稳/朝阳")
+    industry: str = Field(validation_alias="所属行业", default="不限",
+                          description="岗位所属的具体行业领域，优先填写细分类别（如'互联网金融'、'新零售'、'SaaS软件'），若无法判断则填'不限'")
+    vertical_promotion_path: str = Field(validation_alias="垂直晋升路径", default="",
+                                         description="岗位的垂直晋升路径，需填写具体职位序列，如'初级工程师→中级工程师→高级工程师→技术专家'，若无法判断则填空字符串")
+    prerequisite_roles: str = Field(validation_alias="前置岗位要求", default="",
+                                    description="担任该岗位通常需要的前置职位，如'需有产品助理或运营专员经验'，若未明确则填空字符串")
+    lateral_transfer_directions: str = Field(validation_alias="横向转岗方向", default="",
+                                             description="从该岗位可以横向转岗的方向，如'产品经理可转向项目管理或运营管理'，若无法判断则填空字符串")
 
     @field_validator('salary_competitiveness', 'social_demand', mode='before')
     @classmethod
@@ -339,7 +368,7 @@ def load_jd_to_pydantic(
 
 if __name__ == "__main__":
     import sys
-    
+
     # 示例 1: 转换单个文件
     print("\n" + "=" * 70)
     print("示例: 转换 JD 文件为 Pydantic 模型")

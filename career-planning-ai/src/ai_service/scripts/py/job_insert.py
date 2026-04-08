@@ -11,7 +11,7 @@ from ai_service.scripts.py.job_table_cleaning_csv import read_csv_to_jobinfo, cl
 from ai_service.scripts.py.job_table_cleaning_excel import clean_job_excel, read_excel_to_jobinfo
 from ai_service.utils.logger_handler import log
 from config import settings
-
+from ai_service.repository.job_info_repository import JobRepository
 
 # ==========================================
 # 数据库配置（从配置文件读取）
@@ -64,7 +64,6 @@ async def process_and_insert_jobs(file_path: str, max_process: int = None):
         log.info(f"⚠开启测试模式，截取前 {max_process} 条数据进行处理。")
 
     async with AsyncSessionLocal() as session:
-        from ai_service.repository.job_info_repository import JobRepository
         job_repo = JobRepository(session)
 
         # 2. 批量保存岗位信息到数据库
@@ -113,7 +112,8 @@ async def main(max_concurrent: int = 5):
         await asyncio.gather(*(safe_process(p) for p in excel_file_paths))
     finally:
         await engine.dispose()
-        print("🔌 数据库连接池已安全关闭")
+        print("数据库连接池已安全关闭")
+
 
 
 if __name__ == "__main__":

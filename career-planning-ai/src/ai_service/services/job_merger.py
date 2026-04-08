@@ -100,9 +100,11 @@ async def job_merger(max_concurrency: int = 5) -> Dict[str, Any]:
             # 批量更新 job_profile_id
             for idx, (cluster_id, jobs) in enumerate(job_updates):
                 portrait_id = portrait_ids[idx]
+
+                analysis_results[idx][2]["job_id"] = portrait_id
                 await portrait_repo.update(portrait_id, {"skills_req": analysis_results[idx][2]})
                 for job in jobs:
-                    await job_repo.update(job.id, {"job_profile_id": portrait_id})
+                    await job_repo.update(job.id, {"job_id": portrait_id})
                     total_jobs_processed += 1
 
             log.info(f"岗位合并完成，创建 {len(portrait_ids)} 个岗位画像，处理 {total_jobs_processed} 个岗位")
