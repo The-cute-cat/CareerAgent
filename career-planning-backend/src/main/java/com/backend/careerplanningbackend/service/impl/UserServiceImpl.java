@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessagePostProcessor;
+import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.mail.javamail.JavaMailSender;
 import cn.hutool.core.util.StrUtil;
@@ -176,6 +177,18 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
                     ReferralDTO referralDTO = new ReferralDTO();
                     referralDTO.setInviteCode(user.getInviteCode());
                     referralDTO.setUserId(newUser.getId()); // 注册没有推荐人，设置为0或null
+                    
+                    // 1.创建CorrelationData
+                    CorrelationData cd = new CorrelationData();
+
+                    // 2.设置ConfirmCallback（替代原来的Future回调）
+                    rabbitTemplate.setConfirmCallback((correlationData, ack, cause) -> {
+                        if (ack) {
+                            log.debug("发送消息成功，收到 ack!");
+                        } else {
+                            log.error("发送消息失败，收到 nack, reason : {}", cause);
+                        }
+                    });
 
                     rabbitTemplate.convertAndSend(exchange, routingKey, referralDTO, new MessagePostProcessor() {
                         @Override
@@ -184,7 +197,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
                                     .setExpiration("10000");
                             return message;
                         }
-                    });
+                    },cd);//开启生产者确认模式，发送消息时会等待 RabbitMQ 的确认回调
 
                     log.info("消息发送成功！");
                 }
