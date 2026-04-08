@@ -27,7 +27,7 @@ public class Feedback {
 
     private String response;
 
-    private Integer userId;
+    private Long userId;
 
     private String contact;
 

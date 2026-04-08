@@ -41,7 +41,7 @@ public class FeedbackServiceImpl extends ServiceImpl<FeedbackMapper, Feedback> i
     public Result<Boolean> submitFeedback(Feedback feedback) {
         try {
             Long currentUserId = ThreadLocalUtil.getCurrentUserId();
-            feedback.setUserId(currentUserId.intValue());
+            feedback.setUserId(currentUserId);
             
             boolean success = feedbackMapper.insert(feedback) > 0;
             if (success) {
@@ -86,7 +86,7 @@ public class FeedbackServiceImpl extends ServiceImpl<FeedbackMapper, Feedback> i
             Page<Feedback> page = new Page<>(pageNum, pageSize);
             
             LambdaQueryWrapper<Feedback> queryWrapper = new LambdaQueryWrapper<>();
-            queryWrapper.eq(Feedback::getUserId, userId.intValue())
+            queryWrapper.eq(Feedback::getUserId, userId)
                     .orderByDesc(Feedback::getId);
             
             IPage<Feedback> result = feedbackMapper.selectPage(page, queryWrapper);

@@ -19,11 +19,11 @@ public class UserPoints {
     private Long id;
     private Long userId;
     private Integer pointsBalance;
-    private Integer PointsRemainAmount;
+    private Integer pointsRemainAmount;
     private Integer status;
     private Integer totalConsumed;
     private LocalDateTime endTime;
-    private LocalDateTime ActivityEndTime;
+    private LocalDateTime activityEndTime;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 }
