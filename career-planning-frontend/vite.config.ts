@@ -27,18 +27,8 @@ export default defineConfig({
     open: true,
     proxy: {
       '/api': {
-<<<<<<< HEAD
-<<<<<<< HEAD
-        // target: 'http://49.235.164.243:8080',
-        target: 'http://localhost:8080',
-=======
         //target: 'http://49.235.164.243:8080',
         target: 'http://127.0.0.1:8080',
->>>>>>> origin/master
-=======
-        //target: 'http://49.235.164.243:8080',
-        target: 'http://127.0.0.1:8080',
->>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },

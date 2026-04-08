@@ -98,22 +98,6 @@ defineExpose({ collapsed })
       <transition name="text-fade">
         <span v-if="!collapsed" class="logo-text">职路 Agent</span>
       </transition>
-<<<<<<< HEAD
-<<<<<<< HEAD
-      <el-button
-        class="collapse-toggle"
-        circle
-        size="small"
-        @click="toggleCollapse"
-      >
-        <el-icon :size="14">
-          <component :is="collapsed ? Expand : Fold" />
-        </el-icon>
-      </el-button>
-=======
->>>>>>> origin/master
-=======
->>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
     </div>
     
     <!-- 菜单区域 -->
@@ -202,11 +186,6 @@ defineExpose({ collapsed })
   overflow-x: hidden !important; /* 强制锁定横向滚动 */
 }
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
-=======
->>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
 /* 隐藏所有可能的滚动条图标（用户提到的“滑轮”） */
 .sidebar-container::-webkit-scrollbar,
 .menu-wrapper::-webkit-scrollbar,
@@ -221,10 +200,6 @@ defineExpose({ collapsed })
   -ms-overflow-style: none !important;
 }
 
-<<<<<<< HEAD
->>>>>>> origin/master
-=======
->>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
 /* ========== Logo 区域 ========== */
 .logo-section {
   display: flex;
@@ -284,11 +259,6 @@ defineExpose({ collapsed })
   opacity: 0;
 }
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
-=======
->>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
 /* ========== 底部区域 ========== */
 .sidebar-footer {
   padding: 16px 20px;
@@ -304,10 +274,6 @@ defineExpose({ collapsed })
   padding: 16px 8px;
 }
 
-<<<<<<< HEAD
->>>>>>> origin/master
-=======
->>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
 /* ========== 折叠按钮 ========== */
 .collapse-toggle {
   border: 1px solid #e2e8f0;

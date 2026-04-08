@@ -142,43 +142,19 @@ class _LiteLLM(_LLM):
     _name: str = "LiteLLM"
     model_name: str = ""
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-    class Qwen(_LLM):
-=======
     class _Qwen(_LLM):
->>>>>>> origin/master
-=======
-    class _Qwen(_LLM):
->>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
         _name: str = "LLM_Qwen"
         model_name: str = ""
 
     qwen: _Qwen = Field(default_factory=_Qwen)
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-    class Deepseek(_LLM):
-=======
     class _Deepseek(_LLM):
->>>>>>> origin/master
-=======
-    class _Deepseek(_LLM):
->>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
         _name: str = "LLM_Deepseek"
         model_name: str = ""
 
     deepseek: _Deepseek = Field(default_factory=_Deepseek)
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-    class Image(_LLM):
-=======
     class _Image(_LLM):
->>>>>>> origin/master
-=======
-    class _Image(_LLM):
->>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
         _name: str = "LLM_Image"
         model_name: str = ""
 
@@ -216,20 +192,26 @@ class _GrowthPlanAgent(_LLM):
 
 
 class _PathConfig(BaseModel):
-    temp: str = ""
-    is_clean: bool = True
+    class _Temp(BaseModel):
+        path: str = ""
+        exit_is_clean: bool = True
+        run_is_clean: bool = True
+        expire: int = 900
+        cleanup_interval: int = 60
+
+        @field_validator("path")
+        @classmethod
+        def _validate_temp(cls, v):
+            if v == "<TEMP_PATH>" or not v or not Path(v).exists():
+                v = tempfile.gettempdir()
+            path = os.path.join(v, "career_agent", "ai_service", "temp")
+            os.makedirs(path, exist_ok=True)
+            return str(Path(path))
+
+    temp: _Temp = _Temp()
     log: str = ""
     prompt: str = ""
     data: str = ""
-
-    @field_validator("temp")
-    @classmethod
-    def _validate_temp(cls, v):
-        if v == "<TEMP_PATH>" or not v or not Path(v).exists():
-            v = tempfile.gettempdir()
-        path = os.path.join(v, "career_agent", "ai_service", "temp")
-        os.makedirs(path, exist_ok=True)
-        return str(Path(path))
 
     @field_validator("log")
     @classmethod
@@ -321,15 +303,7 @@ class _CodeAbility(_LLM):
 
     @field_validator("gitee_token")
     @classmethod
-<<<<<<< HEAD
-<<<<<<< HEAD
-    def validate_gitee_token(cls, v):
-=======
     def _validate_gitee_token(cls, v):
->>>>>>> origin/master
-=======
-    def _validate_gitee_token(cls, v):
->>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
         if v.get_secret_value() in ("<GITEE_TOKEN>", "<token>", "", None):
             print(
                 "⚠️警告：请在.env文件中配置gitee个人访问令牌，否则可能因gitee访问速率限制，导致无法获取gitee仓库信息。")
@@ -373,15 +347,7 @@ class _Neo4jConfig(BaseModel):
 
     @field_validator("password")
     @classmethod
-<<<<<<< HEAD
-<<<<<<< HEAD
-    def validate_password(cls, v):
-=======
     def _validate_password(cls, v):
->>>>>>> origin/master
-=======
-    def _validate_password(cls, v):
->>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
         if v.get_secret_value() in ("<PASSWORD>", "<password>", "", None):
             print("⚠️警告：请在.env文件中配置neo4j密码，否则无法使用图数据库功能。")
             return SecretStr("")
@@ -464,14 +430,7 @@ class Settings(BaseSettings):
     code_ability: _CodeAbility = Field(default_factory=_CodeAbility)
     redis: _RedisConfig = Field(default_factory=_RedisConfig)
     neo4j: _Neo4jConfig = Field(default_factory=_Neo4jConfig)
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
     neo4j: _Neo4jConfig = Field(default_factory=_Neo4jConfig)
->>>>>>> origin/master
-=======
-    neo4j: _Neo4jConfig = Field(default_factory=_Neo4jConfig)
->>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
     other: _Other = Field(default_factory=_Other)
     conversation: _Conversation = Field(default_factory=_Conversation)
 
@@ -525,8 +484,8 @@ def get_settings() -> Settings:
 
 def _program_exit():
     """程序退出前执行的操作"""
-    if settings.path_config.is_clean:  # 是否清理临时文件
-        temp_path = os.path.join(settings.path_config.temp, "../../")
+    if settings.path_config.temp.exit_is_clean:  # 是否清理临时文件
+        temp_path = os.path.join(settings.path_config.temp.path, "../../")
         if Path(temp_path).exists():
             shutil.rmtree(temp_path, ignore_errors=True)
 

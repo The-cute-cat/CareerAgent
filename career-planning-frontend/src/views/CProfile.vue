@@ -6,19 +6,9 @@ import { ArrowLeft } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/modules/user'
 import { logout as userLogoutService } from '@/api/user'
 import { getAccountPointsService } from '@/api/points'
-<<<<<<< HEAD
-<<<<<<< HEAD
-import type { AccountPointsData } from '@/api/points'
-=======
 import { getInviteCodeService } from '@/api/points/invite'
 import type { AccountPointsData } from '@/api/points'
 import { getUserInfo } from '@/api/user'
->>>>>>> origin/master
-=======
-import { getInviteCodeService } from '@/api/points/invite'
-import type { AccountPointsData } from '@/api/points'
-import { getUserInfo } from '@/api/user'
->>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
 
 import ProfileInfoPanel from '../components/CProfile_Component/ProfileInfoPanel.vue'
 import ProfileSidebar from '../components/CProfile_Component/ProfileSidebar.vue'
@@ -99,38 +89,6 @@ const pointRecords = computed(() => {
   if (!accountPoints.value) {
     return []
   }
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
-
-  return [
-    {
-      id: 1,
-      type: '当前可用积分',
-      remain: accountPoints.value.pointsBalance,
-      total: accountPoints.value.pointsBalance,
-      expireText: '账户当前可用余额 ' + accountPoints.value.pointsBalance
-    },
-    {
-      id: 2,
-      type: '累计消耗积分',
-<<<<<<< HEAD
-      remain: accountPoints.value.totalConsumed,
-      total: accountPoints.value.totalConsumed,
-      expireText: '历史累计消耗 ' + accountPoints.value.totalConsumed
-    },
-    {
-      id: 3,
-      type: '邀请奖励积分',
-      remain: accountPoints.value.referralRewardTotal,
-      total: accountPoints.value.referralRewardTotal,
-      expireText: `已邀请 ${accountPoints.value.referralCount == null ? 0 : accountPoints.value.referralCount} 人`
-    }
-  ]
-})
-=======
->>>>>>> origin/master
 
   return [
     {
@@ -157,24 +115,6 @@ const pointRecords = computed(() => {
   ]
 })
 
-<<<<<<< HEAD
-=======
-=======
-      remain: accountPoints.value.totalConsumed || 0,
-      total: accountPoints.value.totalConsumed || 0,
-      expireText: '历史累计消耗 ' + (accountPoints.value.totalConsumed || 0)
-    },
-    ...(accountPoints.value.referralCount > 0 ? [{
-      id: 3,
-      type: '邀请奖励积分',
-      remain: accountPoints.value.referralRewardTotal || 0,
-      total: accountPoints.value.referralRewardTotal || 0,
-      expireText: `已邀请 ${accountPoints.value.referralCount} 人`
-    }] : [])
-  ]
-})
-
->>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
 const inviteCode = ref<string | null>(null)
 
 const fetchInviteCode = async () => {
@@ -188,10 +128,6 @@ const fetchInviteCode = async () => {
   }
 }
 
-<<<<<<< HEAD
->>>>>>> origin/master
-=======
->>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
 const panelTitleMap: Record<string, string> = {
   dashboard: '我的主页',
   profile: '个人资料',
@@ -247,14 +183,7 @@ onMounted(() => {
   }
 
   fetchAccountPoints()
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
   fetchInviteCode()
->>>>>>> origin/master
-=======
-  fetchInviteCode()
->>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
 
   if (isSettingsCenter.value) {
     activeMenu.value = 'setting'
@@ -478,17 +407,8 @@ const refreshUserInfoAfterPurchase = async () => {
               @update-user="updateUserInfo" />
 
             <MemberPlanPanel v-else-if="activeMenu === 'member'" :points="displayPoints" :records="pointRecords"
-<<<<<<< HEAD
-<<<<<<< HEAD
-              :account-points="accountPoints" :loading="pointsLoading" />
-=======
               :account-points="accountPoints" :loading="pointsLoading" :invite-code="inviteCode"
               @open-invite="activeMenu = 'invite'" />
->>>>>>> origin/master
-=======
-              :account-points="accountPoints" :loading="pointsLoading" :invite-code="inviteCode"
-              @open-invite="activeMenu = 'invite'" />
->>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
 
             <InviteFriendsPanel v-else-if="activeMenu === 'invite'" :invite-code="inviteCode"
               @refresh-invite="fetchInviteCode" />

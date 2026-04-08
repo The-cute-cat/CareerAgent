@@ -27,15 +27,7 @@
     </update>
     <update id="updateAvatar">
         update user_stu
-<<<<<<< HEAD
-<<<<<<< HEAD
-        set avatar=#{avatar}
-=======
         set avatar=#{upload}
->>>>>>> origin/master
-=======
-        set avatar=#{upload}
->>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
         <where>
             id = #{id}
         </where>

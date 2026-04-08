@@ -40,31 +40,6 @@ def get_token_stats() -> TokenStats:
     """获取当前 Token 统计"""
     return _token_stats.get()
 
-<<<<<<< HEAD
-
-@dataclass
-class TokenStats:
-    """Token 统计信息"""
-    input_tokens: int = 0
-    output_tokens: int = 0
-    total_tokens: int = 0
-    call_count: int = 0  # 模型调用次数
-
-
-_token_stats: ContextVar[TokenStats] = ContextVar("token_stats", default=TokenStats())
-
-
-def reset_token_stats() -> None:
-    """重置 Token 统计（每次生成计划前调用）"""
-    _token_stats.set(TokenStats())
-
-
-def get_token_stats() -> TokenStats:
-    """获取当前 Token 统计"""
-    return _token_stats.get()
-
-=======
->>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
 
 @wrap_tool_call
 def monitor_tool(

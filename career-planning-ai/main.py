@@ -1,5 +1,7 @@
 import time
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
@@ -9,18 +11,27 @@ from starlette.responses import JSONResponse
 
 from ai_service.exceptions import ApiException
 from ai_service.response.result import success
-<<<<<<< HEAD
-<<<<<<< HEAD
-from ai_service.routers import parse, question, matching, convert, code_ability, graph_path, report
-=======
 from ai_service.routers import parse, question, matching, convert, code_ability, graph_path, report, chat
->>>>>>> origin/master
-=======
-from ai_service.routers import parse, question, matching, convert, code_ability, graph_path, report, chat
->>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
+from ai_service.schemas.file import temp_file_queue
 from ai_service.utils.logger_handler import log
+from config import settings
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    """应用生命周期：启动时按配置开启临时文件清理任务，关闭时停止"""
+    if settings.path_config.temp.run_is_clean:
+        await temp_file_queue.start_cleanup_task()
+        log.info("应用启动完成，临时文件清理任务已开启")
+        yield
+        await temp_file_queue.stop_cleanup_task()
+        log.info("应用关闭，临时文件清理任务已停止")
+    else:
+        log.info("临时文件自动清理已关闭（run_is_clean=false）")
+        yield
+
+
+app = FastAPI(lifespan=lifespan)
 
 app.include_router(parse.router)
 app.include_router(question.router)
@@ -29,14 +40,7 @@ app.include_router(convert.router)
 app.include_router(code_ability.router)
 app.include_router(graph_path.router)
 app.include_router(report.router)
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
 app.include_router(chat.router)
->>>>>>> origin/master
-=======
-app.include_router(chat.router)
->>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
 
 
 @app.exception_handler(StarletteHTTPException)

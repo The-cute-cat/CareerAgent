@@ -66,19 +66,9 @@ public class PointsReferServiceImpl implements PointsReferService {
 //        UserPoints accountPoints = userpointsMapper.getAccountPoints(id);
         Long currentUserId = ThreadLocalUtil.getCurrentUserId();
         UserPoints accountPoints = userpointsMapper.selectOne(
-<<<<<<< HEAD
-<<<<<<< HEAD
-                new LambdaQueryWrapper<UserPoints>().eq(UserPoints::getUserId, currentUserId)
-=======
 
                 new LambdaQueryWrapper<UserPoints>().eq(UserPoints::getUserId, userId)
 
->>>>>>> origin/master
-=======
-
-                new LambdaQueryWrapper<UserPoints>().eq(UserPoints::getUserId, userId)
-
->>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
         );
         if(accountPoints == null) {
             log.error("用户 {} 的积分信息不存在", userId);

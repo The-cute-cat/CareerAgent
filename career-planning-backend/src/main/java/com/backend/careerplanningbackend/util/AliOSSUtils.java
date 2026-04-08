@@ -37,11 +37,6 @@ public class AliOSSUtils {
         Long currentUserId = ThreadLocalUtil.getCurrentUserId();
         String dir = "avatar/" +currentUserId + "/"; // 可以根据需要设置目录结构，例如按照用户 ID 分类存储
         String fileName = dir + UUID.randomUUID().toString() + originalFilename.substring(originalFilename.lastIndexOf("."));
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
-=======
->>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
 
         // 上传文件到 OSS
         OSS ossClient = new OSSClientBuilder().build(endpoint, accessKeyId, accessKeySecret);
@@ -75,10 +70,6 @@ public class AliOSSUtils {
         Long currentUserId = ThreadLocalUtil.getCurrentUserId();
         String dir = "feedback/" +currentUserId + "/"; // 可以根据需要设置目录结构，例如按照用户 ID 分类存储
         String fileName = dir + UUID.randomUUID().toString() + originalFilename.substring(originalFilename.lastIndexOf("."));
-<<<<<<< HEAD
->>>>>>> origin/master
-=======
->>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
 
         // 上传文件到 OSS
         OSS ossClient = new OSSClientBuilder().build(endpoint, accessKeyId, accessKeySecret);

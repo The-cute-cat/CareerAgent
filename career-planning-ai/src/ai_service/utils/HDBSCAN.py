@@ -2,16 +2,12 @@ import os
 
 from sklearn.decomposition import PCA
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
 from ai_service.services.database_manage import get_db_url
 
->>>>>>> origin/master
-=======
+from sklearn.decomposition import PCA
+
 from ai_service.services.database_manage import get_db_url
 
->>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
 # 配置 Hugging Face 镜像源
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 
@@ -33,18 +29,6 @@ except Exception:
 
 # 模型：BAAI/bge-base-zh-v1.5 或 BAAI/bge-small-zh-v1.5 或 BAAI/bge-tiny-zh-v1.5
 async def cluster_standard_jobs_with_hdbscan(
-<<<<<<< HEAD
-<<<<<<< HEAD
-    session: AsyncSession,
-    min_cluster_size: int = 5,# 1. 形成簇的最小样本数
-    batch_size: int = 64,
-    embedding_model: str = "BAAI/bge-base-zh-v1.5",
-    hdbscan_min_samples: int = 3,    # 2. 核心点的最小邻居数 (密度敏感度)
-    desc_max_len: int = 10000,
-    collection_name: str = "job_original_embeddings",
-=======
-=======
->>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
         session: AsyncSession,
         min_cluster_size: int = 5,  # 1. 形成簇的最小样本数
         batch_size: int = 64,
@@ -52,10 +36,6 @@ async def cluster_standard_jobs_with_hdbscan(
         hdbscan_min_samples: int = 3,  # 2. 核心点的最小邻居数 (密度敏感度)
         desc_max_len: int = 10000,
         collection_name: str = "job_original_embeddings",
-<<<<<<< HEAD
->>>>>>> origin/master
-=======
->>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
 ) -> Dict[int, List[JobInfo]]:
     """
     基于岗位标题 + 精简描述的 HDBSCAN 聚类版本。
@@ -111,17 +91,14 @@ async def cluster_standard_jobs_with_hdbscan(
         return {-1: valid_jobs}
 
     log.info(f"开始 HDBSCAN 聚类，样本数：{total}，向量形状：{embeddings.shape}")
-    # PCA 降维
-    if embeddings.shape[1] > 128:
-        embeddings = PCA(n_components=128).fit_transform(embeddings)
     clusterer = hdbscan.HDBSCAN(
-        min_cluster_size=min_cluster_size,  # 1. 形成簇的最小样本数
-        min_samples=hdbscan_min_samples,  # 2. 核心点的最小邻居数 (密度敏感度)
+        min_cluster_size=min_cluster_size,   # 1. 形成簇的最小样本数
+        min_samples=hdbscan_min_samples,# 2. 核心点的最小邻居数 (密度敏感度)
         metric="euclidean",  # 3. 距离度量方式 # 归一化向量后使用 euclidean 更稳
-        cluster_selection_method="eom",  # 4. 簇选择方法
-        cluster_selection_epsilon=0.0,  # 5. 簇选择的最大距离阈值
-        approx_min_span_tree=True,  # 6. 最小生成树近似优化
-        prediction_data=False,  # 7. 预测数据生成
+        cluster_selection_method="eom",# 4. 簇选择方法
+        cluster_selection_epsilon=0.0,# 5. 簇选择的最大距离阈值
+        approx_min_span_tree=True, # 6. 最小生成树近似优化
+        prediction_data=False, # 7. 预测数据生成
     )
 
     cluster_labels = clusterer.fit_predict(embeddings)
@@ -141,21 +118,22 @@ async def cluster_standard_jobs_with_hdbscan(
     log.info(f"标准岗位类别数：{num_clusters}")
     log.info(f"噪声点数量：{noise_count} ({noise_ratio:.2%})")
 
-<<<<<<< HEAD
-<<<<<<< HEAD
+    cluster_sizes = Counter([int(lbl) for lbl in cluster_labels if lbl != -1])
+    if cluster_sizes:
+        top_sizes = sorted(cluster_sizes.items(), key=lambda x: x[1], reverse=True)[:10]
+        log.info(f"Top 簇规模（前10）：{top_sizes}")
 
-
-
-=======
->>>>>>> origin/master
-=======
->>>>>>> 46c4c4915a8e69a1e650eca09eaaa76221b03829
     if silhouette_score and num_clusters > 1:
         try:
             mask = cluster_labels != -1
             masked_embeddings = embeddings[mask]
             masked_labels = cluster_labels[mask]
 
+            if len(masked_labels) >= 10 and len(set(masked_labels)) > 1:
+                sil = silhouette_score(masked_embeddings, masked_labels, metric="euclidean")
+                log.info(f"Silhouette（去噪后）：{sil:.4f}")
+            else:
+                log.info("Silhouette：去噪后样本/簇数不足，跳过计算")
         except Exception as e:
             log.warning(f"计算 Silhouette 失败：{e}")
     elif not silhouette_score:
@@ -167,16 +145,22 @@ async def cluster_standard_jobs_with_hdbscan(
 
 async def main():
     engine = create_async_engine(get_db_url(), echo=False)
-    async_session_local = async_sessionmaker(
+    AsyncSessionLocal = async_sessionmaker(
         engine,
         expire_on_commit=False,
         class_=AsyncSession,
     )
 
     try:
-        async with async_session_local() as session:
+        async with AsyncSessionLocal() as session:
             clustered_result = await cluster_standard_jobs_with_hdbscan(
-                session=session
+                session=session,
+                min_cluster_size=8,
+                hdbscan_min_samples=3,
+                batch_size=64,
+                embedding_model="BAAI/bge-base-zh-v1.5",
+                desc_max_len=150,
+                collection_name="job_original_embeddings",
             )
         return clustered_result
     finally:
@@ -185,6 +169,7 @@ async def main():
 
 if __name__ == "__main__":
     clustered_result = asyncio.run(main())
+
     for cluster_id, jobs in sorted(clustered_result.items(), key=lambda x: len(x[1]), reverse=True):
         print(f"cluster={cluster_id}, size={len(jobs)}")
 
