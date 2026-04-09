@@ -11,6 +11,7 @@ import org.springframework.web.multipart.MultipartFile;
 import reactor.core.publisher.Flux;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -36,6 +37,10 @@ public class ChatController {
 
     private final AiServiceClient aiServiceClient;
 
+    private boolean isEmpty(String str) {
+        return str == null || str.trim().isEmpty() || "null".equals(str) || ",".equals(str.trim());
+    }
+
     /**
      * chatWithMessage
      * 发送消息到 AI 服务（阻塞方式）
@@ -49,22 +54,24 @@ public class ChatController {
     public Result<Object> chatWithMessage(
             @RequestParam("message") String message,
             @RequestParam(required = false) String conversationId,
-            @RequestParam(required = false) MultipartFile[] files,
+            @RequestPart(value = "files", required = false) List<MultipartFile> files,
             @RequestParam(required = false) Boolean auto_extract_memory
     ) {
         try {
+            List<MultipartFile> validFiles = files != null
+                    ? files.stream().filter(f -> f != null && !f.isEmpty()).toList()
+                    : List.of();
+            log.info("收到文件上传请求，有效文件数量: {}", validFiles.size());
+            Long userId = ThreadLocalUtil.getCurrentUserId();
             Map<String, Object> params = new HashMap<>();
-            params.put("message", message);
-            params.put("conversation_id", conversationId == null ? UUID.randomUUID().toString() : conversationId);
             params.put("auto_extract_memory", auto_extract_memory);
-            params.put("user_id", ThreadLocalUtil.getCurrentUserId().toString());
-            log.info("params: {}", params);
+            conversationId = isEmpty(conversationId) ? UUID.randomUUID().toString() : conversationId;
+            System.out.println("conversationId: " + conversationId);
             AiChatResponse aiChatResponse;
-            if (files != null) {
-                params.put("files", files);
-                aiChatResponse = aiServiceClient.chatWithOther("/chat/message-and-files", params, false);
+            if (!validFiles.isEmpty()) {
+                aiChatResponse = aiServiceClient.chatWithMessageAndMultipartFiles("/chat/message-and-files", userId, message, validFiles, conversationId, params, false);
             } else {
-                aiChatResponse = aiServiceClient.chatWithOther("/chat/message", params, false);
+                aiChatResponse = aiServiceClient.chatWithMessage("/chat/message", userId, message, conversationId, params, true);
             }
             if (aiChatResponse.isState()) {
                 log.info("AI 响应成功，data: {}", aiChatResponse.getData());
@@ -89,23 +96,21 @@ public class ChatController {
      * @param files          上传的文件（可选）
      * @return 响应数据流
      */
-    @PostMapping(value = "/message/stream/message-and-files", produces = "text/event-stream")
+    @PostMapping(value = "/stream/message-and-files", produces = "text/event-stream")
     public Flux<String> chatWithMessageStream(
             @RequestParam("message") String message,
-            @RequestParam("files") MultipartFile[] files,
+            @RequestPart("files") List<MultipartFile> files,
             @RequestParam(required = false) String conversationId,
             @RequestParam(required = false) Boolean auto_extract_memory,
             @RequestParam(required = false) Boolean show_thinking
     ) {
         try {
+            Long userId = ThreadLocalUtil.getCurrentUserId();
+            conversationId = isEmpty(conversationId) ? UUID.randomUUID().toString() : conversationId;
             Map<String, Object> params = new HashMap<>();
-            params.put("message", message);
-            params.put("files", files);
-            params.put("conversation_id", conversationId == null ? UUID.randomUUID().toString() : conversationId);
             params.put("auto_extract_memory", auto_extract_memory);
             params.put("show_thinking", show_thinking);
-            params.put("user_id", ThreadLocalUtil.getCurrentUserId().toString());
-            return aiServiceClient.chatWithOtherStream("/chat/message-and-files", params)
+            return aiServiceClient.chatWithMessageAndMultipartFilesStream("/chat/message-and-files/stream", userId, message, files, conversationId, params)
                     .doOnComplete(() -> log.info("消息和文件流式响应完成"))
                     .doOnError(e -> log.error("消息和文件流式响应错误", e));
         } catch (Exception e) {
@@ -114,7 +119,7 @@ public class ChatController {
         }
     }
 
-    @PostMapping(value = "/message/stream/message", produces = "text/event-stream")
+    @PostMapping(value = "/stream/message", produces = "text/event-stream")
     public Flux<String> chatWithMessageStream(
             @RequestParam("message") String message,
             @RequestParam(required = false) String conversationId,
@@ -122,13 +127,13 @@ public class ChatController {
             @RequestParam(required = false) Boolean show_thinking
     ) {
         try {
+            conversationId = isEmpty(conversationId) ? UUID.randomUUID().toString() : conversationId;
+            System.out.println("conversationId: " + conversationId);
+            Long userId = ThreadLocalUtil.getCurrentUserId();
             Map<String, Object> params = new HashMap<>();
-            params.put("message", message);
-            params.put("conversation_id", conversationId == null ? UUID.randomUUID().toString() : conversationId);
             params.put("auto_extract_memory", auto_extract_memory);
             params.put("show_thinking", show_thinking);
-            params.put("user_id", ThreadLocalUtil.getCurrentUserId().toString());
-            return aiServiceClient.chatWithOtherStream("/chat/message/stream", params)
+            return aiServiceClient.chatWithMessageStream("/chat/message/stream", userId, message, conversationId, params)
                     .doOnComplete(() -> log.info("仅消息流式响应完成"))
                     .doOnError(e -> log.error("仅消息流式响应错误", e));
         } catch (Exception e) {
@@ -143,11 +148,17 @@ public class ChatController {
             @RequestParam("conversation_id") String conversation_id,
             @RequestParam(required = false) Integer limit
     ) {
-        Map<String, Object> params = new HashMap<>();
-        params.put("user_id", ThreadLocalUtil.getCurrentUserId().toString());
-        params.put("limit", limit);
-        AiChatResponse aiChatResponse = aiServiceClient.getRequest("/chat/history/" + conversation_id, params, "get-chat-history", true);
-        return Result.ok(aiChatResponse.getData());
+        try {
+            Map<String, Object> params = new HashMap<>();
+            params.put("user_id", ThreadLocalUtil.getCurrentUserId());
+            params.put("limit", limit);
+            AiChatResponse aiChatResponse = aiServiceClient.getRequest("/chat/history/" + conversation_id, params, "get-chat-history", true);
+            return Result.ok(aiChatResponse.getData());
+        } catch (Exception e) {
+            log.error("获取聊天历史失败", e);
+            return Result.fail("获取聊天历史失败: " + e.getMessage());
+        }
+
     }
 
     @GetMapping("/get-user-sessions")
@@ -155,68 +166,98 @@ public class ChatController {
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer page_size
     ) {
-        Map<String, Object> params = new HashMap<>();
-        params.put("user_id", ThreadLocalUtil.getCurrentUserId().toString());
-        params.put("page", page);
-        params.put("page_size", page_size);
-        AiChatResponse aiChatResponse = aiServiceClient.getRequest("/chat/sessions", params, "get-user-sessions", true);
-        return Result.ok(aiChatResponse.getData());
+        try {
+            Map<String, Object> params = new HashMap<>();
+            params.put("user_id", ThreadLocalUtil.getCurrentUserId());
+            params.put("page", page);
+            params.put("page_size", page_size);
+            AiChatResponse aiChatResponse = aiServiceClient.getRequest("/chat/sessions", params, "get-user-sessions", true);
+            return Result.ok(aiChatResponse.getData());
+        } catch (Exception e) {
+            log.error("获取用户对话列表失败", e);
+            return Result.fail("获取用户对话列表失败: " + e.getMessage());
+        }
+
     }
 
     @GetMapping("/get-session-title")
-    public Result<Object> get_session_title(
+    public Result<Object> getSessionTitle(
             @RequestParam("conversation_id") String conversation_id
     ) {
-        Map<String, Object> params = new HashMap<>();
-        params.put("user_id", ThreadLocalUtil.getCurrentUserId().toString());
-        AiChatResponse aiChatResponse = aiServiceClient.getRequest("/chat/session/" + conversation_id + "/title", params, "get-session-title", true);
-        return Result.ok(aiChatResponse.getData());
+        try {
+            Map<String, Object> params = new HashMap<>();
+            params.put("user_id", ThreadLocalUtil.getCurrentUserId());
+            AiChatResponse aiChatResponse = aiServiceClient.getRequest("/chat/session/" + conversation_id + "/title", params, "get-session-title", true);
+            return Result.ok(aiChatResponse.getData());
+        } catch (Exception e) {
+            log.error("获取对话标题失败", e);
+            return Result.fail("获取对话标题失败: " + e.getMessage());
+        }
     }
 
     @DeleteMapping("/clear-session")
-    public Result<Object> clear_session(
+    public Result<Object> clearSession(
             @RequestParam("conversation_id") String conversation_id
     ) {
-        Map<String, Object> params = new HashMap<>();
-        params.put("user_id", ThreadLocalUtil.getCurrentUserId().toString());
-        AiChatResponse aiChatResponse = aiServiceClient.deleteRequest("/chat/session/" + conversation_id, params, "clear-session", true);
-        return Result.ok(aiChatResponse.getData());
+        try {
+            Map<String, Object> params = new HashMap<>();
+            params.put("user_id", ThreadLocalUtil.getCurrentUserId());
+            AiChatResponse aiChatResponse = aiServiceClient.deleteRequest("/chat/session/" + conversation_id, params, "clear-session", true);
+            return Result.ok(aiChatResponse.getData());
+        } catch (Exception e) {
+            log.error("清除对话失败", e);
+            return Result.fail("清除对话失败: " + e.getMessage());
+        }
     }
 
 
     @PutMapping("/update-session-title")
-    public Result<Object> update_session_title(
+    public Result<Object> updateSessionTitle(
             @RequestParam("conversation_id") String conversation_id,
             @RequestParam("title") String title
-    ){
-        Map<String, Object> params = new HashMap<>();
-        params.put("user_id", ThreadLocalUtil.getCurrentUserId().toString());
-        params.put("title", title);
-        AiChatResponse aiChatResponse = aiServiceClient.putRequest("/chat/session/" + conversation_id + "/title", params, "update-session-title", true);
-        return Result.ok(aiChatResponse.getData());
+    ) {
+        try {
+            Map<String, Object> params = new HashMap<>();
+            params.put("user_id", ThreadLocalUtil.getCurrentUserId());
+            params.put("title", title);
+            AiChatResponse aiChatResponse = aiServiceClient.putRequest("/chat/session/" + conversation_id + "/title", params, "update-session-title", true);
+            return Result.ok(aiChatResponse.getData());
+        } catch (Exception e) {
+            log.error("更新对话标题失败", e);
+            return Result.fail("更新对话标题失败: " + e.getMessage());
+        }
     }
 
     @GetMapping("/get-user-memories")
-    public Result<Object> get_user_memories(
+    public Result<Object> getUserMemories(
             @RequestParam(required = false) Integer limit,
             @RequestParam(required = false) Double min_score
-    ){
-        Map<String, Object> params = new HashMap<>();
-        params.put("user_id", ThreadLocalUtil.getCurrentUserId().toString());
-        params.put("limit", limit);
-        params.put("min_score", min_score);
-        AiChatResponse aiChatResponse = aiServiceClient.getRequest("/chat/memories", params, "get-user-memories", true);
-        return Result.ok(aiChatResponse.getData());
+    ) {
+        try {
+            Map<String, Object> params = new HashMap<>();
+            params.put("user_id", ThreadLocalUtil.getCurrentUserId());
+            params.put("limit", limit);
+            params.put("min_score", min_score);
+            AiChatResponse aiChatResponse = aiServiceClient.getRequest("/chat/memories", params, "get-user-memories", true);
+            return Result.ok(aiChatResponse.getData());
+        } catch (Exception e) {
+            log.error("获取用户记忆失败", e);
+            return Result.fail("获取用户记忆失败: " + e.getMessage());
+        }
     }
 
     @DeleteMapping("/delete-memory")
-    public Result<Object> delete_memory(
+    public Result<Object> deleteMemory(
             @RequestParam("memory_id") Integer memory_id
-    ){
-        Map<String, Object> params = new HashMap<>();
-        params.put("user_id", ThreadLocalUtil.getCurrentUserId().toString());
-        AiChatResponse aiChatResponse = aiServiceClient.deleteRequest("/chat/memory/" + memory_id, params, "delete-memory", true);
-        return Result.ok(aiChatResponse.getData());
+    ) {
+        try {
+            Map<String, Object> params = new HashMap<>();
+            params.put("user_id", ThreadLocalUtil.getCurrentUserId());
+            AiChatResponse aiChatResponse = aiServiceClient.deleteRequest("/chat/memory/" + memory_id, params, "delete-memory", true);
+            return Result.ok(aiChatResponse.getData());
+        } catch (Exception e) {
+            log.error("删除记忆失败", e);
+            return Result.fail("删除记忆失败: " + e.getMessage());
+        }
     }
-
 }
