@@ -11,7 +11,7 @@
  Target Server Version : 80403 (8.4.3-SQLPub-0.0.1)
  File Encoding         : 65001
 
- Date: 09/04/2026 20:07:23
+ Date: 09/04/2026 21:07:58
 */
 
 SET NAMES utf8mb4;
@@ -45,9 +45,8 @@ CREATE TABLE `career_report`  (
   `target_job_id` bigint NOT NULL COMMENT '匹配的目标岗位ID',
   `match_score` decimal(5, 2) NULL DEFAULT NULL COMMENT '人岗匹配度综合得分',
   `path_plan` json NULL COMMENT '职业发展路径规划 (JSON)',
-  `action_plan` json NULL COMMENT '行动计划 (短期、中期的具体建议 JSON)',
   `report_content` text CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '完整报告的 Markdown 文本',
-  `creat_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '生成时间',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '生成时间',
   `update_time` datetime NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
   PRIMARY KEY (`id`) USING BTREE,
   INDEX `idx_student_id`(`student_id` ASC) USING BTREE,
@@ -61,7 +60,7 @@ DROP TABLE IF EXISTS `conversation_sessions`;
 CREATE TABLE `conversation_sessions`  (
   `id` int NOT NULL AUTO_INCREMENT,
   `session_id` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '会话ID',
-  `user_id` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '用户ID',
+  `user_id` bigint NOT NULL COMMENT '用户ID',
   `title` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '会话标题',
   `compressed_summary` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL COMMENT '压缩后的摘要',
   `message_count` int NOT NULL DEFAULT 0 COMMENT '消息数量',
@@ -99,11 +98,13 @@ CREATE TABLE `feedback`  (
 -- ----------------------------
 DROP TABLE IF EXISTS `file_upload`;
 CREATE TABLE `file_upload`  (
-  `id` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL,
-  `user_id` int NULL DEFAULT NULL,
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `new_file_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
+  `user_id` bigint NULL DEFAULT NULL,
   `file_url` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
   `file_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL,
-  PRIMARY KEY (`id`(4)) USING BTREE
+  PRIMARY KEY (`id`) USING BTREE,
+  INDEX `idx`(`new_file_name` ASC) USING BTREE
 ) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
@@ -141,6 +142,7 @@ CREATE TABLE `job_match_record`  (
   `is_deleted` tinyint NULL DEFAULT 0 COMMENT '逻辑删除',
   `create_time` datetime NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` datetime NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+  `match_reasoning` text CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '你已经存储了各种分数（基础分、技能分等），但评委更想看到 AI 为什么给出这个分数。将 AI 生成的匹配理由持久化，是满足“可解释性”指标  的关键',
   PRIMARY KEY (`id`) USING BTREE,
   INDEX `idx_stu_job`(`stu_id` ASC, `job_id` ASC) USING BTREE
 ) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '人岗匹配记录表' ROW_FORMAT = DYNAMIC;
@@ -151,7 +153,7 @@ CREATE TABLE `job_match_record`  (
 DROP TABLE IF EXISTS `job_original`;
 CREATE TABLE `job_original`  (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-  `job_profile_id` int NULL DEFAULT NULL COMMENT '指向合并后的岗位id，默认为空',
+  `job_profile_id` bigint NULL DEFAULT NULL COMMENT '指向合并后的岗位id，默认为空',
   `job_title` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '岗位名称',
   `location` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '地址',
   `salary_range` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '薪资范围',
@@ -223,6 +225,7 @@ CREATE TABLE `knowledge_base`  (
   `is_deleted` tinyint NULL DEFAULT 0 COMMENT '逻辑删除',
   `create_time` datetime NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `update_time` datetime NULL DEFAULT CURRENT_TIMESTAMP COMMENT '修改时间',
+  `sync_status` int NULL DEFAULT NULL COMMENT '0:待索引, 1:已向量化, 2:失败',
   PRIMARY KEY (`id`) USING BTREE
 ) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '本地知识库表' ROW_FORMAT = DYNAMIC;
 
@@ -248,7 +251,7 @@ CREATE TABLE `learning_node_analysis`  (
 DROP TABLE IF EXISTS `memories`;
 CREATE TABLE `memories`  (
   `id` int NOT NULL AUTO_INCREMENT,
-  `user_id` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '用户ID',
+  `user_id` bigint NOT NULL COMMENT '用户ID',
   `session_id` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '会话ID',
   `content` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '记忆内容',
   `memory_type` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '记忆类型：preference/decision/fact/goal',
@@ -281,7 +284,7 @@ CREATE TABLE `package`  (
   `amount` decimal(10, 2) NULL DEFAULT NULL COMMENT '金额',
   `description` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '套餐描述',
   `points` int NULL DEFAULT NULL COMMENT '积分',
-  `status` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '是否启用：0-禁用，1-启用',
+  `status` int NULL DEFAULT NULL COMMENT '是否启用：0-禁用，1-启用',
   PRIMARY KEY (`id`) USING BTREE
 ) ENGINE = InnoDB AUTO_INCREMENT = 7 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = DYNAMIC;
 
@@ -291,6 +294,7 @@ CREATE TABLE `package`  (
 DROP TABLE IF EXISTS `payment_order`;
 CREATE TABLE `payment_order`  (
   `id` bigint NOT NULL AUTO_INCREMENT,
+  `user_id` bigint NULL DEFAULT NULL COMMENT '用户id',
   `package_id` int NULL DEFAULT NULL COMMENT '积分或者套餐id',
   `amount` decimal(10, 2) NULL DEFAULT NULL COMMENT '金额',
   `points` int NULL DEFAULT NULL COMMENT '积分',
@@ -310,7 +314,9 @@ DROP TABLE IF EXISTS `points_transaction`;
 CREATE TABLE `points_transaction`  (
   `id` bigint NOT NULL COMMENT '积分交易订单',
   `user_id` bigint NOT NULL,
+  `before_amount` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT 'before_amount',
   `amount` decimal(10, 2) NULL DEFAULT NULL COMMENT '金额变动',
+  `after_amount` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT 'after_amount',
   `points` int NULL DEFAULT NULL COMMENT '积分变动值(正值为加，负值为减)',
   `package_id` int NULL DEFAULT NULL COMMENT '套餐id',
   `type` tinyint NOT NULL COMMENT '0:会员充值, 1:充值积分, 2:购买AI报告, 3:AI知识讲解消费, 4:推广奖励, 5:系统赠送,',
@@ -342,23 +348,6 @@ CREATE TABLE `question_answer`  (
   `updated_time` datetime NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`) USING BTREE
 ) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = DYNAMIC;
-
--- ----------------------------
--- Table structure for resume
--- ----------------------------
-DROP TABLE IF EXISTS `resume`;
-CREATE TABLE `resume`  (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '简历表',
-  `stu_id` bigint NOT NULL COMMENT '关联学生账号表',
-  `file_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '文件名',
-  `file_url` varchar(504) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT 'OSS或本地存储路径',
-  `raw_text` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL COMMENT '解析出的原始文本',
-  `is_deleted` tinyint NULL DEFAULT 0 COMMENT '逻辑删除',
-  `create_time` datetime NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `update_time` datetime NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
-  PRIMARY KEY (`id`) USING BTREE,
-  INDEX `idx_stu_id`(`stu_id` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci COMMENT = '简历表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Table structure for resume_template
@@ -441,7 +430,7 @@ DROP TABLE IF EXISTS `user_referral`;
 CREATE TABLE `user_referral`  (
   `id` bigint NOT NULL AUTO_INCREMENT,
   `referrer_id` bigint NULL DEFAULT NULL COMMENT '发出邀请人(大使)ID',
-  `user_id` bigint(20) UNSIGNED ZEROFILL NULL DEFAULT NULL COMMENT '接受邀请的新用户ID',
+  `user_id` bigint NULL DEFAULT NULL COMMENT '接受邀请的',
   `invite_code` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '用户的专属邀请码(注册成功后生成)',
   `reward_points` int NULL DEFAULT 50 COMMENT '该笔邀请获得的积分奖励',
   `status` int NULL DEFAULT 1 COMMENT '1-正常',
@@ -483,7 +472,6 @@ CREATE TABLE `user_stu`  (
 DROP TABLE IF EXISTS `user_stu_info`;
 CREATE TABLE `user_stu_info`  (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '学生学历信息表',
-  `membershipLevel` int NULL DEFAULT NULL COMMENT '会员等级字段',
   `user_id` bigint NOT NULL COMMENT '关联sys_user ID',
   `real_name` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT '真实姓名',
   `github_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL DEFAULT NULL COMMENT 'github_name',

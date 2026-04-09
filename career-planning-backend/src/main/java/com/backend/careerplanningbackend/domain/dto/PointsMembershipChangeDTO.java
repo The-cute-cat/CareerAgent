@@ -6,6 +6,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
+
 /**
  * PointsChangeDTO.java
  * 积分和会员变动DTO，用于记录用户积分和会员等级的变动信息

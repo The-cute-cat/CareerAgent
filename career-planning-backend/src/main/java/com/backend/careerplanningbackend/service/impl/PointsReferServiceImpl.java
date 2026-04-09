@@ -14,7 +14,6 @@ import com.backend.careerplanningbackend.util.RedisIdWorker;
 import com.backend.careerplanningbackend.util.ThreadLocalUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
-import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,13 +21,11 @@ import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessagePostProcessor;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.RequestBody;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
@@ -472,20 +469,20 @@ public class PointsReferServiceImpl implements PointsReferService {
             return Result.fail("用户积分信息不存在,可能是有人发起攻击来了,或者系统故障");
         }
 
-        Integer amount = pointsMembershipChangeDTO.getAmount();
-        int newAmount = account.getPointsBalance() - amount;
-        account.setPointsBalance(newAmount);
+        Integer points = pointsMembershipChangeDTO.getPoints();
+        int newPoints = account.getPointsBalance() - points;
+        account.setPointsBalance(newPoints);
 
         int updated = userpointsMapper.update(null, new LambdaUpdateWrapper<UserPoints>()
                 .eq(UserPoints::getUserId, ThreadLocalUtil.getCurrentUserId())
-                .set(UserPoints::getPointsBalance, newAmount)
+                .set(UserPoints::getPointsBalance, newPoints)
         );
         if(updated == 0) {
             return Result.fail("更新用户积分信息失败");
         }
 
         PointsTransaction entity = BeanUtil.copyProperties(pointsMembershipChangeDTO, PointsTransaction.class);
-        entity.setPoints(newAmount);
+        entity.setPoints(newPoints);
         entity.setType(1);
         
         redisIdWorker.nextId(POINTS_CONSUME_KEY_PREFIX);
@@ -539,13 +536,13 @@ public class PointsReferServiceImpl implements PointsReferService {
             return Result.fail("用户积分信息不存在,可能是有人发起攻击来了,或者系统故障");
         }
 
-        Integer amount = dto.getAmount();
-        int newAmount = account.getPointsBalance() - amount;
-        account.setPointsBalance(newAmount);
+        Integer points = dto.getPoints();
+        int newPoints = account.getPointsBalance() - points;
+        account.setPointsBalance(newPoints);
 
         int updated = userpointsMapper.update(null, new LambdaUpdateWrapper<UserPoints>()
                 .eq(UserPoints::getUserId, ThreadLocalUtil.getCurrentUserId())
-                .set(UserPoints::getPointsBalance, newAmount)
+                .set(UserPoints::getPointsBalance, newPoints)
                 .set(UserPoints::getUpdateTime, LocalDateTime.now())
                 .set(UserPoints::getStatus, 0)
         );
