@@ -1,4 +1,7 @@
 from neo4j import GraphDatabase
+import json
+import uuid
+from datetime import datetime
 import numpy as np
 from ai_service.models.struct_job_txt import (
     JDAnalysisResult,
@@ -42,7 +45,59 @@ class GraphRepository:
             session.run(
                 "CREATE CONSTRAINT IF NOT EXISTS FOR (c:Competency) REQUIRE c.name IS UNIQUE"
             )
+            # 3. 确保每次离线建图Run可被追溯
+            session.run(
+                "CREATE CONSTRAINT IF NOT EXISTS FOR (r:BuildRun) REQUIRE r.id IS UNIQUE"
+            )
             print("物理约束与索引创建完毕！")
+
+    def upsert_build_run(self, run_id: str, status: str, meta: Dict[str, Any], ts: str):
+        """将离线建图的全局参数/统计快照固化到 Neo4j，供在线推理回溯。"""
+        meta_json = json.dumps(meta, ensure_ascii=False)
+        cypher = """
+        MERGE (r:BuildRun {id: $run_id})
+        ON CREATE SET r.created_at = $ts
+        SET r.updated_at = $ts,
+            r.status = $status,
+            r.meta_json = $meta_json,
+            r.jaccard_threshold = coalesce($jaccard_threshold, r.jaccard_threshold),
+            r.coarse_resolution = coalesce($coarse_resolution, r.coarse_resolution),
+            r.fine_resolution = coalesce($fine_resolution, r.fine_resolution)
+        """
+
+        with self.driver.session() as session:
+            session.run(
+                cypher,
+                run_id=run_id,
+                status=status,
+                ts=ts,
+                meta_json=meta_json,
+                jaccard_threshold=meta.get("params", {}).get("jaccard_threshold"),
+                coarse_resolution=meta.get("params", {}).get("coarse_resolution"),
+                fine_resolution=meta.get("params", {}).get("fine_resolution"),
+            )
+
+    def cleanup_old_evolve_edges(self, keep_run_id: str) -> int:
+        """只保留指定 run_id 生成/更新过的 EVOLVE_TO，其余旧边全部删除。
+
+        目的：避免周期性重跑后图中残留旧边，导致在线寻路（Dijkstra）被历史路线污染。
+        """
+
+        cypher = """
+        MATCH ()-[e:EVOLVE_TO]->()
+        WHERE e.build_run_id IS NULL OR e.build_run_id <> $keep_run_id
+        DELETE e
+        """
+
+        with self.driver.session() as session:
+            result = session.run(cypher, keep_run_id=keep_run_id)
+            summary = result.consume()
+
+            # Neo4j Python Driver: summary.counters.relationships_deleted
+            deleted = getattr(
+                getattr(summary, "counters", None), "relationships_deleted", 0
+            )
+            return int(deleted or 0)
 
     # 输入数据类型安全校验
     @staticmethod
@@ -71,7 +126,13 @@ class GraphRepository:
                 """
             MATCH (j:Job)-[r:REQUIRES]->(c:Competency)
             RETURN j.id AS job_id, j.job_name AS job_name, c.name AS comp_name, c.category AS comp_category,
-                   r.weight AS weight, r.min_score AS min_score, r.context AS context
+                   r.weight AS weight,
+                   r.local_weight AS local_weight,
+                   r.idf_weight AS idf_weight,
+                   r.df AS df,
+                   r.total_jobs AS total_jobs,
+                   r.prevalence AS prevalence,
+                   r.min_score AS min_score, r.context AS context
             """
             )
             return result.data()
@@ -108,8 +169,10 @@ class GraphRepository:
                         RETURN j.id AS id,
                             j.id AS job_id,
                             coalesce(j.job_name, '') AS job_name,
-                            coalesce(j.macro_community_id, j.coarse_community_id, 0) AS macro_community_id,
-                            coalesce(j.micro_community_id, j.fine_community_id, 0) AS micro_community_id,
+                            coalesce(j.macro_community_id, 0) AS macro_community_id,
+                            coalesce(j.micro_community_id, 0) AS micro_community_id,
+                            j.last_build_run_id AS last_build_run_id,
+                            j.last_build_ts AS last_build_ts,
                             coalesce(j.salary_rank, 1) AS salary_rank,
                             coalesce(j.min_experience, 0) AS min_experience,
                             coalesce(j.min_degree, 0) AS min_degree,
@@ -192,7 +255,14 @@ class GraphRepository:
             e.final_routing_cost = data.edge_props.final_routing_cost,
             e.pareto_rank = coalesce(data.edge_props.pareto_rank, 0),
             e.is_cross_macro = coalesce(data.edge_props.is_cross_macro, false),
-            e.is_cross_micro = coalesce(data.edge_props.is_cross_micro, false)
+            e.is_cross_micro = coalesce(data.edge_props.is_cross_micro, false),
+            e.build_run_id = data.edge_props.build_run_id,
+            e.lineage_json = data.edge_props.lineage_json,
+            e.base_attraction = data.edge_props.base_attraction,
+            e.rank_penalty = data.edge_props.rank_penalty,
+            e.cross_penalty = data.edge_props.cross_penalty,
+            e.pareto_group_size = coalesce(data.edge_props.pareto_group_size, 0),
+            e.pareto_front_size = coalesce(data.edge_props.pareto_front_size, 0)
         """
 
         # 3. 执行 Cypher
@@ -209,30 +279,41 @@ class GraphRepository:
             ).single()["cnt"]
 
         log.info("🎉 ==============================================")
-        log.info(f"🎉 JobEvolution 批量写入完成！")
+        log.info("🎉 JobEvolution 批量写入完成！")
         log.info(f"✅ 总 Job 节点数：{node_count}")
         log.info(f"✅ 总 EVOLVE_TO 边数：{edge_count}")
         log.info("🎉 ==============================================")
 
     # 将list[JobCompetency]存进图数据库
-    def save_job_competencies(self, job_competencies: List[JobCompetency]):
+    def save_job_competencies(
+        self,
+        job_competencies: List[JobCompetency],
+        build_run_id: str | None = None,
+        build_ts: str | None = None,
+    ):
         # ==========================================
         # 1. 数据预处理：将 Pydantic 对象降维成字典列表
         # ==========================================
         batch_data = []
         for jc in job_competencies:
+            job_props = jc.from_job.model_dump(exclude={"id"}, exclude_none=True)
+            if build_run_id:
+                job_props["last_build_run_id"] = build_run_id
+            if build_ts:
+                job_props["last_build_ts"] = build_ts
+
             batch_data.append(
                 {
                     "job_id": jc.from_job.id,
                     # 使用 model_dump() 兼容 Pydantic V2，剔除 id 避免重复赋值
-                    "job_props": jc.from_job.model_dump(
-                        exclude={"id"}, exclude_none=True
-                    ),
+                    "job_props": job_props,
                     "comp_name": jc.to_competency.name,
                     "comp_category": jc.to_competency.category,
                     "weight": jc.edge.weight,
                     "min_score": jc.edge.min_score,
                     "context": jc.edge.context,
+                    "build_run_id": build_run_id,
+                    "build_ts": build_ts,
                 }
             )
 
@@ -249,13 +330,17 @@ class GraphRepository:
 
         // 2. MERGE 能力节点并设置二级维度标签
         MERGE (c:Competency {name: row.comp_name})
-        SET c.category = row.comp_category
+        SET c.category = row.comp_category,
+            c.last_build_run_id = coalesce(row.build_run_id, c.last_build_run_id),
+            c.last_build_ts = coalesce(row.build_ts, c.last_build_ts)
 
         // 3. MERGE 关系并写入长文本与权重
         MERGE (j)-[r:REQUIRES]->(c)
         SET r.weight = row.weight,
             r.min_score = row.min_score,
-            r.context = row.context
+            r.context = row.context,
+            r.build_run_id = row.build_run_id,
+            r.build_ts = row.build_ts
         """
 
         # ==========================================
@@ -294,21 +379,51 @@ class GraphRepository:
         return res == "y"
 
     # 将计算好的IDF权重更新回图数据库
-    def update_idf_weights(self, idf_weights: List[Dict]):
+    def update_idf_weights(
+        self,
+        idf_weights: List[Dict],
+        build_run_id: str | None = None,
+        build_ts: str | None = None,
+    ):
         # 批量回写到 Neo4j (将权重固化到 [:REQUIRES] 边上)
         # 注意：这里我们把全局 IDF 存到线上。
         # 如果边上原来有 AI 提取的 local_weight，你可以在 Cypher 里直接相乘！
         update_cypher = """
         UNWIND $batch AS row
         MATCH ()-[r:REQUIRES]->(c:Competency {name: row.comp_name})
-        // 假设原本没有权重，直接赋值；如果原来有 AI 权重，写成 r.weight = r.ai_weight * row.idf_weight
+        // 1) 尽量保留“局部权重”的血缘：只有当原 weight 非0 且 local_weight 为空时才缓存
+        SET r.local_weight = coalesce(
+                r.local_weight,
+                CASE WHEN r.weight IS NOT NULL AND r.weight <> 0 THEN r.weight END
+            )
+
+        // 2) 固化全局稀缺度证据（Agent 可直接引用：df/覆盖率/idf）
+        SET r.idf_weight = row.idf_weight,
+            r.df = row.df,
+            r.total_jobs = row.total_jobs,
+            r.prevalence = row.prevalence,
+            r.idf_run_id = $build_run_id,
+            r.idf_ts = $build_ts,
+            c.idf_weight = row.idf_weight,
+            c.df = row.df,
+            c.total_jobs = row.total_jobs,
+            c.prevalence = row.prevalence,
+            c.idf_run_id = $build_run_id,
+            c.idf_ts = $build_ts
+
+        // 3) 兼容现有计算：当前用于 Jaccard 的 weight 仍采用全局 IDF
         SET r.weight = row.idf_weight
         """
 
         # 批量执行更新
         with self.driver.session() as session:
             # 分批提交防止事务内存炸裂 (这里假设几千个技能，一次性提交也行)
-            session.run(update_cypher, batch=idf_weights)
+            session.run(
+                update_cypher,
+                batch=idf_weights,
+                build_run_id=build_run_id,
+                build_ts=build_ts,
+            )
 
         print("IDF weights successfully written back to Neo4j [:REQUIRES] edges!")
 
@@ -423,16 +538,38 @@ class GraphRepository:
         return complete_edges
 
     # 完成所有离线图谱构建的主函数，输入是JDAnalysisResult列表，输出是构建好的图数据库
-    def build_graph_from_jobs(self, jobs: list[JDAnalysisResult]):
+    def build_graph_from_jobs(
+        self,
+        jobs: list[JDAnalysisResult],
+        cleanup_old_evolve_edges: bool = True,
+    ):
+        build_run_id = uuid.uuid4().hex
+        build_started_at = datetime.now().isoformat(timespec="seconds")
+        self.upsert_build_run(
+            run_id=build_run_id,
+            status="running",
+            meta={
+                "run_id": build_run_id,
+                "started_at": build_started_at,
+                "stage": "save_job_competencies",
+            },
+            ts=build_started_at,
+        )
+
         # 1. 将JDAnalysisResult列表转为图数据库批量导入的 payload
         job_competencies = JobCompetency.transform_jobs_to_graph_payload(jobs)
 
         # 2. 将payload存进图数据库
-        self.save_job_competencies(job_competencies)
-        GraphRepository.manual_confirm(
+        self.save_job_competencies(
+            job_competencies,
+            build_run_id=build_run_id,
+            build_ts=build_started_at,
+        )
+        if not GraphRepository.manual_confirm(
             "原始关系构建完成",
             "是否开始计算Require边的IDF逆文档频率权重?（建议先人工确认样本数据是否正确，再继续后续计算）",
-        )
+        ):
+            return
 
         # 3. 从图数据库中取出已固化的岗位-能力关系，计算IDF权重，并更新回图数据库
         idf_data = self.fetch_counts_for_idf()
@@ -441,15 +578,21 @@ class GraphRepository:
         if not idf_weights:
             log.error("IDF权重计算失败,未获取到有效数据!")
             return
-        self.update_idf_weights(idf_weights)
-        GraphRepository.manual_confirm(
+        self.update_idf_weights(
+            idf_weights, build_run_id=build_run_id, build_ts=build_started_at
+        )
+        if not GraphRepository.manual_confirm(
             "IDF权重更新完成",
             "图数据库中的岗位-能力边已经更新了全局IDF权重，是否开始演化边构建？（建议先人工确认IDF权重是否合理，再继续后续计算）",
-        )
+        ):
+            return
 
         # 4. 计算加权杰卡德相似度，建立岗位间的候选EVOLVE关系(注入所有参数)
         data = self.fetch_all_for_jaccard()
-        jaccard_map = GraphAlgorithms.calculate_weighted_jaccard(data)
+        jaccard_threshold = 0.1
+        jaccard_map = GraphAlgorithms.calculate_weighted_jaccard(
+            data, threshold=jaccard_threshold
+        )
 
         # 准备岗位属性数据（包含软素质文本和结构化属性）用于后续的cos_low计算和聚类分析
         job_data = self.get_all_jobs()
@@ -476,17 +619,19 @@ class GraphRepository:
             "transfer_cost": 0,
         }
 
-        GraphRepository.manual_confirm(
+        if not GraphRepository.manual_confirm(
             "数据准备完成",
             "是否进行第一次粗聚类+帕累托前沿筛选？（建议先人工确认候选边的多维度相似度指标是否合理，再继续后续构建）",
-        )
+        ):
+            return
 
         # 5.用加权杰卡德跑第一次粗聚类
-        coarse_community_map = GraphAlgorithms.run_clustering(
+        coarse_community_map, coarse_cluster_stats = GraphAlgorithms.run_clustering(
             edge_score_map=jaccard_map,
             nodes=all_job_ids,
             resolution=clustering_data["coarse_resolution"],
             isolation_threshold=clustering_data["coarse_isolation_threshold"],
+            return_stats=True,
         )
 
         # 展示第一次粗聚类的社区划分结果
@@ -499,17 +644,19 @@ class GraphRepository:
         for community_id, count in community_counts.items():
             log.info(f"  社区 {community_id}: {count} 个岗位")
 
-        GraphRepository.manual_confirm(
+        if not GraphRepository.manual_confirm(
             "第一次粗聚类完成",
             "是否继续进行帕累托前沿筛选？（建议先人工确认社区划分结果是否合理，再继续后续构建）",
-        )
+        ):
+            return
 
         # 6.进行多目标计算+局部帕累托剪枝，得到第一、二层前沿边
-        pareto_skeleton_edges = GraphAlgorithms.run_pareto_sparsification(
+        pareto_skeleton_edges, pareto_stats = GraphAlgorithms.run_pareto_sparsification(
             community_map=coarse_community_map,
             multi_objective_dict=multi_objective_dict,
             edge_info_map=edge_info_map,
             keep_fronts=2,
+            return_stats=True,
         )
 
         # 展示帕累托筛选后的边数和之前的对比
@@ -545,16 +692,18 @@ class GraphRepository:
                 4,
             )
 
-        # 去掉 is_cross_community 字段, 兼容GraphEdgeEvolve类
-        for (a, b), m in pareto_skeleton_edges.items():
-            del m["is_cross_community"]
+            # 固化关键中间量（用于在线解释“这条边为什么被认为更优/更难走”）
+            m["base_attraction"] = round(float(base_attraction), 4)
+            m["rank_penalty"] = round(float(rank_penalty), 4)
+            m["cross_penalty"] = round(float(cross_penalty), 4)
+            m["build_run_id"] = build_run_id
 
         GraphRepository.manual_confirm(
             "帕累托筛选与权重更新完成",
             "是否开始第二次细聚类？（建议先人工确认社区划分结果是否合理，再继续后续构建）",
         )
         # 7.用final_routing_cost和帕累托剪枝后的边跑第二次细聚类（仅在第一层前沿边上跑)
-        fine_community_map = GraphAlgorithms.run_clustering(
+        fine_community_map, fine_cluster_stats = GraphAlgorithms.run_clustering(
             edge_score_map={
                 (a, b): v["final_routing_cost"]
                 for (a, b), v in pareto_skeleton_edges.items()
@@ -563,6 +712,7 @@ class GraphRepository:
             resolution=clustering_data["fine_resolution"],
             isolation_threshold=clustering_data["fine_isolation_threshold"],
             weight_transform_fn=lambda x: (1.0 / (max(x, 0) + 0.1)) ** 2,
+            return_stats=True,
         )
 
         # 8. 将最终的社区划分结果注入到岗位属性中（字段以 GraphNodeJob 为准）
@@ -581,6 +731,52 @@ class GraphRepository:
                 job_data[a]["micro_community_id"] != job_data[b]["micro_community_id"]
             )
 
+            # 生成“被选中理由”的决策快照（不可嵌套结构用 JSON 存在关系属性上）
+            lineage = {
+                "selected_by": "pareto_sparsification",
+                "thresholds": {"jaccard_threshold": jaccard_threshold},
+                "pareto": {
+                    "rank": m.get("pareto_rank"),
+                    "group_size": m.get("pareto_group_size"),
+                    "front_size": m.get("pareto_front_size"),
+                    "keep_fronts": pareto_stats.get("keep_fronts"),
+                    "objectives": {
+                        **{
+                            k: ("max" if v == 1 else "min")
+                            for k, v in multi_objective_dict.items()
+                        },
+                        "cross_community_penalty": "min",
+                    },
+                    "is_cross_community": bool(m.get("is_cross_community", False)),
+                    "cross_community_penalty": m.get("cross_community_penalty"),
+                },
+                "routing": {
+                    "base_attraction": m.get("base_attraction"),
+                    "components": {
+                        "jaccard_high": 0.5,
+                        "cos_low": 0.3,
+                        "salary_gain": 0.2,
+                    },
+                    "rank_penalty": m.get("rank_penalty"),
+                    "cross_penalty": m.get("cross_penalty"),
+                    "transfer_cost": m.get("transfer_cost"),
+                    "final_routing_cost": m.get("final_routing_cost"),
+                },
+                "communities": {
+                    "coarse": {
+                        "from": job_data[a]["macro_community_id"],
+                        "to": job_data[b]["macro_community_id"],
+                    },
+                    "fine": {
+                        "from": job_data[a]["micro_community_id"],
+                        "to": job_data[b]["micro_community_id"],
+                    },
+                },
+            }
+            m["lineage_json"] = json.dumps(
+                lineage, ensure_ascii=False, separators=(",", ":")
+            )
+
         # 展示最终的社区划分结果
         community_counts = defaultdict(int)
         for job_id in all_job_ids:
@@ -592,20 +788,65 @@ class GraphRepository:
         for (coarse_id, micro_id), count in community_counts.items():
             log.info(f"  社区 {coarse_id}-{micro_id}: {count} 个岗位")
 
-        GraphRepository.manual_confirm(
+        if not GraphRepository.manual_confirm(
             "演化边筛选完成",
             "是否继续将最终的演化边写入图数据库？（建议先人工确认候选边的多维度相似度指标是否合理，再继续后续构建）",
-        )
+        ):
+            return
 
         # 9. 将最终的数据包装成给规范的JobEvolution写回图数据库
         job_evolve_list = []
         for (a, b), metrics in pareto_skeleton_edges.items():
+            # 去掉 is_cross_community 字段, 兼容GraphEdgeEvolve类
+            metrics.pop("is_cross_community", None)
+            metrics.pop("cross_community_penalty", None)
             from_job: GraphNodeJob = GraphNodeJob(**job_data[a])
             to_job: GraphNodeJob = GraphNodeJob(**job_data[b])
             edge: GraphEdgeEvolve = GraphEdgeEvolve(**metrics)
             job_evolve = JobEvolution(from_job=from_job, to_job=to_job, edge=edge)
             job_evolve_list.append(job_evolve)
         self.save_job_evolve(job_evolve_list)
+
+        deleted_old_edges = 0
+        if cleanup_old_evolve_edges:
+            deleted_old_edges = self.cleanup_old_evolve_edges(build_run_id)
+            log.info(f"版本清理完成，已删除旧 EVOLVE_TO 边数：{deleted_old_edges}")
+
+        build_completed_at = datetime.now().isoformat(timespec="seconds")
+
+        # 将本次离线建图的全局运行快照固化到图上（Run级别，避免每条边重复存大对象）
+        run_meta = {
+            "run_id": build_run_id,
+            "started_at": build_started_at,
+            "completed_at": build_completed_at,
+            "params": {
+                "jaccard_threshold": jaccard_threshold,
+                "coarse_resolution": clustering_data["coarse_resolution"],
+                "coarse_isolation_threshold": clustering_data[
+                    "coarse_isolation_threshold"
+                ],
+                "fine_resolution": clustering_data["fine_resolution"],
+                "fine_isolation_threshold": clustering_data["fine_isolation_threshold"],
+                "multi_objective": multi_objective_dict,
+            },
+            "counts": {
+                "jobs": len(all_job_ids),
+                "candidate_edges": len(jaccard_map),
+                "kept_edges": len(pareto_skeleton_edges),
+                "deleted_old_evolve_edges": deleted_old_edges,
+            },
+            "stats": {
+                "coarse_cluster": coarse_cluster_stats,
+                "fine_cluster": fine_cluster_stats,
+                "pareto": pareto_stats,
+            },
+        }
+        self.upsert_build_run(
+            run_id=build_run_id,
+            status="completed",
+            meta=run_meta,
+            ts=build_completed_at,
+        )
 
     # 清空图数据库中的所有数据（慎用！）
     def clear_graph(self):

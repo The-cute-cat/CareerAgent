@@ -3,7 +3,7 @@ import os
 import json
 import requests
 import asyncio
-import aiohttp
+import aiohttp, Dict, Any, cast
 
 from dotenv import load_dotenv
 from langchain_community.chat_models import ChatTongyi
@@ -95,18 +95,18 @@ jd_template = JDAnalysisResult(
     job_name="",
     profiles=Profiles(
         basic_requirements=BasicRequirements(
-            degree="",
+            degree=cast(Any, "不限"),
             major="",
-            certificates="",
+            certificates=cast(Any, "不限"),
             internship_requirement="",
             experience_years="",
             special_requirements=""
         ),
         professional_skills=ProfessionalSkills(
-            core_skills="",
-            tool_capabilities="",
+            core_skills=cast(Any, "不限"),
+            tool_capabilities=cast(Any, "不限"),
             domain_knowledge="",
-            language_requirements="",
+            language_requirements=cast(Any, "不限"),
             project_requirements=""
         ),
         professional_literacy=ProfessionalLiteracy(
@@ -124,13 +124,13 @@ jd_template = JDAnalysisResult(
             adaptability=""
         ),
         job_attributes=JobAttributes(
-            salary_competitiveness="",
+            salary_competitiveness=cast(Any, "不限"),
             industry="",
             vertical_promotion_path="",
             prerequisite_roles="",
-            lateral_transfer_directions="",
-            social_demand="",
-            industry_trend=""
+            lateral_transfer_directions=cast(Any, []),
+            social_demand=cast(Any, "不限"),
+            industry_trend=cast(Any, "不限")
         )
     )
 )
