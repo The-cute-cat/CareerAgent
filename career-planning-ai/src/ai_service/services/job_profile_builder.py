@@ -1,18 +1,25 @@
 #通过岗位元信息构建岗位画像
 import os
 import json
-import re
+import requests
 import asyncio
-from typing import List, Optional, Dict, Any, cast
+import aiohttp, Dict, Any, cast
 
 from dotenv import load_dotenv
-from langchain_core.output_parsers import PydanticOutputParser
 from langchain_community.chat_models import ChatTongyi
 from ai_service.models.struct_job_txt import JDAnalysisResult, Profiles, BasicRequirements, ProfessionalSkills, ProfessionalLiteracy, DevelopmentPotential, JobAttributes
+from langchain_core.prompts import ChatPromptTemplate
+
+import asyncio
+import json
+import random
+from typing import List, Optional
+import requests
+from langchain_core.output_parsers import PydanticOutputParser
+from ai_service.models.struct_job_txt import JDAnalysisResult
 from ai_service.models.job_info import JobInfo
 from ai_service.services import log
 from config import settings
-from langchain_core.prompts import ChatPromptTemplate
 load_dotenv()
 
 
@@ -113,7 +120,7 @@ jd_template = JDAnalysisResult(
             learning_ability="",
             innovation="",
             leadership="",
-            career_orientation=cast(Any, "不限"),
+            career_orientation="不限",
             adaptability=""
         ),
         job_attributes=JobAttributes(
@@ -181,12 +188,49 @@ def _create_llm(api_key: str, model_name: str) -> ChatTongyi:
         api_key=api_key,
         model=model_name,
         temperature=0.1,
-        streaming=True,
+        streaming=False,
     )
 
 
 
-async def analyze_job_description(jobs: List[JobInfo], api_key: Optional[str] = None, model_name: str = settings.vector.llm_model_name) -> dict:
+
+# # 4. 主分析函数，优先使用 ainvoke，失败后回退到线程池 invoke
+# async def analyze_job_description(jobs: List[JobInfo], api_key: Optional[str] = None, model_name: str = settings.vector.llm_model_name) -> dict:
+#     jd_text = _build_jd_text(jobs)
+#     api_key = api_key or settings.llm.api_key.get_secret_value()
+#     if not api_key:
+#         raise ValueError("请提供 API Key")
+#
+#     llm = _create_llm(api_key, model_name)
+#     parser = PydanticOutputParser(pydantic_object=JDAnalysisResult)
+#
+#     prompt = ChatPromptTemplate.from_messages([
+#         ("system", SYSTEM_PROMPT+ "\n\n# 输出格式说明\n请严格按照以下 JSON 格式输出结果，不要包含任何其他文字或 Markdown 标记：\n"+json_template_str.replace("{", "{{").replace("}", "}}")),
+#         ("user", USER_PROMPT),
+#     ])
+#     chain = prompt | llm | parser
+#
+#     try:
+#         result = await chain.ainvoke({"jd_text": jd_text})
+#     except Exception as e:
+#         # 捕获 DashScope / KeyError 异常，返回占位信息
+#         log.error(f"LLM 调用失败，使用默认结果代替: {str(e)}")
+#         return {"job_name": "未命名岗位", "error": str(e)}
+#
+#     return result
+
+
+
+
+## 4. 主分析函数，优先使用 invoke
+async def analyze_job_description(
+    jobs: List[JobInfo],
+    api_key: Optional[str] = None,
+    model_name: str = settings.vector.llm_long_model_name,
+) -> dict:
+    """
+    异步接口，但内部使用同步 invoke 包装到线程池，避免 ainvoke 异步不兼容报错 'request'。
+    """
     jd_text = _build_jd_text(jobs)
     api_key = api_key or settings.llm.api_key.get_secret_value()
     if not api_key:
@@ -196,95 +240,40 @@ async def analyze_job_description(jobs: List[JobInfo], api_key: Optional[str] = 
     parser = PydanticOutputParser(pydantic_object=JDAnalysisResult)
 
     prompt = ChatPromptTemplate.from_messages([
-        ("system", SYSTEM_PROMPT+ "\n\n# 输出格式说明\n请严格按照以下 JSON 格式输出结果，不要包含任何其他文字或 Markdown 标记：\n"+json_template_str.replace("{", "{{").replace("}", "}}")),
+        ("system", SYSTEM_PROMPT + "\n\n# 输出格式说明\n请严格按照以下 JSON 格式输出结果，不要包含任何其他文字或 Markdown 标记：\n" + json_template_str.replace("{", "{{").replace("}", "}}")),
         ("user", USER_PROMPT),
     ])
     chain = prompt | llm | parser
 
     try:
-        result = await chain.ainvoke({"jd_text": jd_text})
+        # 将同步 invoke 包装到线程池中，兼容异步调用
+        # 添加简单的重试和随机延迟，降低被服务端墙掉或报SSL连接错误的概率
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                result = await asyncio.to_thread(chain.invoke, {"jd_text": jd_text})
+                break
+            except Exception as thread_e:
+                if attempt < max_retries - 1:
+                    wait_time = (attempt + 1) * 2 + random.uniform(0, 1)
+                    log.warning(f"LLM 调用出错，等待 {wait_time:.2f} 秒后重试... 错误: {str(thread_e)}")
+                else:
+                    raise thread_e
+
+        # 如果返回字符串，尝试解析 JSON
+        if isinstance(result, str):
+            try:
+                result_dict = json.loads(result)
+            except Exception:
+                log.warning("LLM 返回无法解析为 JSON，直接使用字符串")
+                result_dict = {"job_name": "未命名岗位", "raw_output": result}
+        elif hasattr(result, "model_dump"):
+            result_dict = result.model_dump(by_alias=True)
+        else:
+            result_dict = result or {"job_name": "未命名岗位"}
+
+        return result_dict
+
     except Exception as e:
-        # 捕获 DashScope / KeyError 异常，返回占位信息
-        log.error(f"LLM 调用失败，使用默认结果代替: {str(e)}")
+        log.error(f"LLM 调用失败（同步 invoke）: {str(e)}", exc_info=True)
         return {"job_name": "未命名岗位", "error": str(e)}
-
-    return result
-
-# async def analyze_job_description(
-#     jobs: List[JobInfo],
-#     api_key: Optional[str] = None,
-#     model_name: str = settings.vector.llm_model_name,
-# ) -> dict:
-#     """
-#     异步分析多个岗位信息并返回结构化 JSON 数据。
-#
-#     优先使用 LangChain 的 ainvoke；如果底层模型不支持真正异步，
-#     则自动回退到 asyncio.to_thread 包装同步 invoke，避免阻塞事件循环。
-#     """
-#     jd_text = _build_jd_text(jobs)
-#
-#     if not api_key:
-#         api_key = settings.llm.api_key.get_secret_value()
-#
-#     if not api_key:
-#         raise ValueError("请提供 API Key 或设置环境变量 LLM__API_KEY")
-#
-#     llm = _create_llm(api_key=api_key, model_name=model_name)
-#     parser = PydanticOutputParser(pydantic_object=JDAnalysisResult)
-#
-#     prompt = ChatPromptTemplate.from_messages([
-#         ("system", SYSTEM_PROMPT + "\n\n# 输出格式说明\n请严格按照以下 JSON 格式输出结果，不要包含任何其他文字或 Markdown 标记：\n"+json_template_str.replace("{", "{{").replace("}", "}}")),
-#         ("user", USER_PROMPT),
-#     ])
-#     chain = prompt | llm | parser
-#
-#     try:
-#         result = await chain.ainvoke({"jd_text": jd_text})
-#     except Exception as async_error:
-#         log.warning(f"ainvoke 调用失败，回退到线程池 invoke: {async_error}")
-#         result = await asyncio.to_thread(chain.invoke, {"jd_text": jd_text})
-#
-#     try:
-#         if isinstance(result, str):
-#             result_dict = json.loads(result)
-#         else:
-#             result_dict = result
-#
-#         # 转换为 JDAnalysisResult 对象
-#         jd_result = JDAnalysisResult.model_validate(result_dict)
-#         return jd_result
-#     except Exception as e:
-#         log.error(f"LLM 输出无法解析为 JDAnalysisResult: {e}", exc_info=True)
-#
-#     except Exception as e:
-#         log.error(f"解析错误:{e}", exc_info=True)
-#
-#         error_msg = str(e)
-#         if "行业_Domain_知识" in error_msg or "行业 Domain 知识" in error_msg:
-#             log.warning("检测到键名不匹配问题，尝试修复...")
-#
-#             try:
-#                 simple_prompt = ChatPromptTemplate.from_messages([
-#                     ("system", SYSTEM_PROMPT),
-#                     ("user", USER_PROMPT),
-#                 ])
-#                 simple_chain = simple_prompt | llm
-#
-#                 try:
-#                     raw_output = await simple_chain.ainvoke({"jd_text": jd_text})
-#                 except Exception as async_error:
-#                     log.warning(f"ainvoke 修复流程失败，回退到线程池 invoke: {async_error}")
-#                     raw_output = await asyncio.to_thread(simple_chain.invoke, {"jd_text": jd_text})
-#
-#                 json_match = re.search(r'\{.*\}', raw_output.content, re.DOTALL)
-#                 if json_match:
-#                     json_str = json_match.group(0)
-#                     parsed_data = json.loads(json_str)
-#                     fixed_data = fix_llm_json_keys(parsed_data)
-#                     result = JDAnalysisResult.model_validate(fixed_data)
-#                     return result.model_dump(by_alias=True)
-#
-#             except Exception as fix_error:
-#                 log.error(f"修复失败: {fix_error}", exc_info=True)
-#
-#         return {"error": str(e), "raw_text": jd_text}
