@@ -146,39 +146,16 @@ async def get_chat_history(
         limit: int | None = None,
         _: bool = Depends(validate_token)
 ):
-    """获取会话历史记录"""
-    try:
-        history = await conversation_agent.get_session_history(user_id, session_id, limit)
-        return success({
-            "sessionId": session_id,
-            "userId": user_id,
-            "history": history,
-            "count": len(history)
-        })
-    except Exception as e:
-        log.error(f"获取会话历史失败: {e}", exc_info=True)
-        return error_msg(f"获取会话历史失败: {str(e)}")
-
-
-@router.delete("/session/{session_id}")
-async def clear_session(
-        session_id: str,
-        user_id: str = Query(..., description="用户ID"),
-        _: bool = Depends(validate_token)
-):
-    """清除会话的短期记忆并软删除持久化记录"""
+    """获取会话历史记录（含标题）"""
     async with AsyncSessionLocal() as db_session:
         try:
-            success_flag = await conversation_agent.clear_session(user_id, session_id, db_session)
-            await db_session.commit()
-            if success_flag:
-                return success({"message": f"会话 {session_id} 已清除"})
-            else:
-                return error_msg(f"清除会话失败", 500)
+            result = await conversation_agent.get_session_history(
+                user_id, session_id, limit, db_session
+            )
+            return success(result)
         except Exception as e:
-            await db_session.rollback()
-            log.error(f"清除会话失败: {e}", exc_info=True)
-            return error_msg(f"清除会话失败: {str(e)}")
+            log.error(f"获取会话历史失败: {e}", exc_info=True)
+            return error_msg(f"获取会话历史失败: {str(e)}")
 
 
 @router.get("/sessions")
@@ -202,6 +179,46 @@ async def get_user_sessions(
             await db_session.rollback()
             log.error(f"获取会话列表失败: {e}", exc_info=True)
             return error_msg(f"获取会话列表失败: {str(e)}")
+
+
+@router.get("/session/{session_id}/title")
+async def get_session_title(
+        session_id: str,
+        user_id: str = Query(..., description="用户ID"),
+        _: bool = Depends(validate_token)
+):
+    """获取会话标题（返回为空表示还未生成）"""
+    async with AsyncSessionLocal() as db_session:
+        try:
+            title = await conversation_agent.get_session_title(user_id, session_id, db_session)
+            return success({
+                "sessionId": session_id,
+                "title": title
+            })
+        except Exception as e:
+            log.error(f"获取会话标题失败: {e}", exc_info=True)
+            return error_msg(f"获取会话标题失败: {str(e)}")
+
+
+@router.delete("/session/{session_id}")
+async def clear_session(
+        session_id: str,
+        user_id: str = Query(..., description="用户ID"),
+        _: bool = Depends(validate_token)
+):
+    """清除会话的短期记忆并软删除持久化记录"""
+    async with AsyncSessionLocal() as db_session:
+        try:
+            success_flag = await conversation_agent.clear_session(user_id, session_id, db_session)
+            await db_session.commit()
+            if success_flag:
+                return success({"message": f"会话 {session_id} 已清除"})
+            else:
+                return error_msg(f"清除会话失败", 500)
+        except Exception as e:
+            await db_session.rollback()
+            log.error(f"清除会话失败: {e}", exc_info=True)
+            return error_msg(f"清除会话失败: {str(e)}")
 
 
 @router.put("/session/{session_id}/title")
@@ -416,7 +433,7 @@ async def _create_sse_stream(
                 yield f"event: {chunk_type}\n"
                 yield f"data: {chunk}\n"
                 yield f"id: {event_id}\n\n"
-                
+
                 # 主动让出控制权，确保数据立即发送
                 await asyncio.sleep(0)
 

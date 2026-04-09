@@ -14,8 +14,9 @@
 | POST | `/chat/files` | 仅文件上传对话 | 阻塞 |
 | POST | `/chat/message-and-files` | 消息+文件对话 | 阻塞 |
 | POST | `/chat/message-and-files/stream` | 消息+文件流式对话 | SSE |
-| GET | `/chat/history/{session_id}` | 获取会话历史记录 | — |
+| GET | `/chat/history/{session_id}` | 获取会话历史记录（含标题） | — |
 | GET | `/chat/sessions` | 获取用户的会话列表 | — |
+| GET | `/chat/session/{session_id}/title` | 获取会话标题 | — |
 | PUT | `/chat/session/{session_id}/title` | 更新会话标题 | — |
 | DELETE | `/chat/session/{session_id}` | 删除会话（含短期记忆） | — |
 | GET | `/chat/memories` | 获取长期记忆列表 | — |
@@ -323,7 +324,7 @@ Authorization: Bearer <token>
   "state": true,
   "data": {
     "sessionId": "session_001",
-    "userId": "user_001",
+    "title": "职业规划咨询",
     "history": [
       { "role": "human", "content": "你好" },
       { "role": "ai", "content": "你好！有什么可以帮助你的？" }
@@ -332,6 +333,8 @@ Authorization: Bearer <token>
   }
 }
 ```
+
+> **注意:** `title` 字段可能为 `null`，表示会话标题尚未自动生成（通常在首轮对话后自动生成）。
 
 **Java 调用方式（通用方法）:**
 ```java
@@ -463,6 +466,54 @@ Authorization: Bearer <token>
 Map<String, Object> params = Map.of("user_id", userId);
 AiChatResponse resp = aiServiceClient.deleteRequest(
     "/chat/session/" + sessionId, params, "清除会话", false);
+```
+
+---
+
+### 4.5 获取会话标题
+
+```http
+GET /chat/session/{session_id}/title?user_id={user_id}
+Authorization: Bearer <token>
+```
+
+**查询参数:**
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| user_id | string | **是** | 用户 ID |
+
+**成功响应:**
+```json
+{
+  "code": 200,
+  "state": true,
+  "data": {
+    "sessionId": "session_001",
+    "title": "职业规划咨询"
+  }
+}
+```
+
+**标题为空时的响应:**
+```json
+{
+  "code": 200,
+  "state": true,
+  "data": {
+    "sessionId": "session_001",
+    "title": null
+  }
+}
+```
+
+> **说明:** `title` 为 `null` 表示会话标题尚未生成，通常在首轮对话完成后由系统自动生成。
+
+**Java 调用方式（通用方法）:**
+```java
+Map<String, Object> params = Map.of("user_id", userId);
+AiChatResponse resp = aiServiceClient.getRequest(
+    "/chat/session/" + sessionId + "/title", params, "获取会话标题", false);
 ```
 
 ---
@@ -627,6 +678,7 @@ AiChatResponse resp = aiServiceClient.deleteRequest(
 |-------------|-----------|----------|
 | `GET /chat/history/{sid}` | `getRequest(url, params, name, retry)` | queryParam 含 `user_id`, `limit` |
 | `GET /chat/sessions` | `getRequest(url, params, name, retry)` | queryParam 含 `user_id`, `page`, `page_size` |
+| `GET /chat/session/{sid}/title` | `getRequest(url, params, name, retry)` | queryParam 含 `user_id` |
 | `PUT /chat/session/{sid}/title` | `putRequest(url, params, name, retry)` | form 含 `user_id`, `title` |
 | `DELETE /chat/session/{sid}` | `deleteRequest(url, params, name, retry)` | params 含 `user_id` |
 | `GET /chat/memories` | `getRequest(url, params, name, retry)` | queryParam 含 `user_id`, `limit`, `min_score` |
