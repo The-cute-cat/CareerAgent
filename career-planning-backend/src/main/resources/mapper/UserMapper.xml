@@ -4,8 +4,8 @@
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.backend.careerplanningbackend.mapper.UserMapper">
     <insert id="register" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO user_stu (username, password, email)
-        VALUES (#{username}, #{password}, #{email})
+        INSERT INTO user_stu (username, password, email, avatar)
+        VALUES (#{username}, #{password}, #{email}, #{avatar})
     </insert>
     <update id="forget">
         update user_stu
