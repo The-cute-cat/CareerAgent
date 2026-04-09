@@ -129,7 +129,7 @@ class JobAttributes(BaseModel):
     industry: str = Field(validation_alias="所属行业", default="不限", description="岗位所属的具体行业领域，优先填写细分类别（如'互联网金融'、'新零售'、'SaaS软件'），若无法判断则填'不限'")
     vertical_promotion_path: str = Field(validation_alias="垂直晋升路径", default="", description="岗位的垂直晋升路径，需填写具体职位序列，如'初级工程师→中级工程师→高级工程师→技术专家'，若无法判断则填空字符串")
     prerequisite_roles: str = Field(validation_alias="前置岗位要求", default="", description="担任该岗位通常需要的前置职位，如'需有产品助理或运营专员经验'，若未明确则填空字符串")
-    lateral_transfer_directions: str = Field(validation_alias="横向转岗方向", default="", description="从该岗位可以横向转岗的方向，如'产品经理可转向项目管理或运营管理'，若无法判断则填空字符串")
+    lateral_transfer_directions: List[str] = Field(validation_alias="横向转岗方向", default=[], description="从该岗位可以横向转岗的方向，如'产品经理可转向项目管理或运营管理'，若无法判断则填空字符串")
 
     @field_validator('salary_competitiveness', 'social_demand', mode='before')
     @classmethod
