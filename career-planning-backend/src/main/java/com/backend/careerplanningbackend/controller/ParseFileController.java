@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -49,7 +50,7 @@ public class ParseFileController {
      */
     @PostMapping("/file")
     public Result<Object> parseFile(
-            @RequestParam("file") MultipartFile file,// 文件数据
+            @RequestPart("file") MultipartFile file,// 文件数据
             @RequestParam(value = "overwrite", defaultValue = "false") boolean overwrite //是否覆盖
     ) throws IOException {
         log.info("name: {}, size: {} bytes, leixing: {}",
@@ -83,7 +84,7 @@ public class ParseFileController {
      * @param file 文件数据
      */
     @PostMapping("/files")
-    public Result<Object> parseFiles(@RequestParam("file") MultipartFile file) {
+    public Result<Object> parseFiles(@RequestPart("file") MultipartFile file) {
         log.info("parse-resume接收到的参数: {}", file.toString());
         Map<String, Object> params = new HashMap<>();
         params.put("files", List.of(file));

@@ -1,25 +1,22 @@
 #通过岗位元信息构建岗位画像
-import os
-import json
-import requests
-import asyncio
-import aiohttp, Dict, Any, cast
-
-from dotenv import load_dotenv
-from langchain_community.chat_models import ChatTongyi
-from ai_service.models.struct_job_txt import JDAnalysisResult, Profiles, BasicRequirements, ProfessionalSkills, ProfessionalLiteracy, DevelopmentPotential, JobAttributes
-from langchain_core.prompts import ChatPromptTemplate
-
 import asyncio
 import json
 import random
+from typing import Any, cast
 from typing import List, Optional
-import requests
+
+from dotenv import load_dotenv
+from langchain_community.chat_models import ChatTongyi
 from langchain_core.output_parsers import PydanticOutputParser
-from ai_service.models.struct_job_txt import JDAnalysisResult
+from langchain_core.prompts import ChatPromptTemplate
+
 from ai_service.models.job_info import JobInfo
+from ai_service.models.struct_job_txt import JDAnalysisResult
+from ai_service.models.struct_job_txt import Profiles, BasicRequirements, ProfessionalSkills, ProfessionalLiteracy, \
+    DevelopmentPotential, JobAttributes
 from ai_service.services import log
 from config import settings
+
 load_dotenv()
 
 

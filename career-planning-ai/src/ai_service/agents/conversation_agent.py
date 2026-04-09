@@ -80,7 +80,7 @@ class ConversationAgent:
 
     async def chat(
             self,
-            user_id: str,
+            user_id: int,
             session_id: str,
             user_message: str,
             db_session: AsyncSession | None = None,
@@ -120,7 +120,7 @@ class ConversationAgent:
 
     async def chat_stream(
             self,
-            user_id: str,
+            user_id: int,
             session_id: str,
             user_message: str,
             db_session: AsyncSession | None = None,
@@ -194,7 +194,7 @@ class ConversationAgent:
 
     async def _build_context(
             self,
-            user_id: str,
+            user_id: int,
             session_id: str,
             db_session: AsyncSession | None
     ) -> str:
@@ -251,7 +251,7 @@ class ConversationAgent:
 
     async def _prepare_chat(
             self,
-            user_id: str,
+            user_id: int,
             session_id: str,
             user_message: str,
             db_session: AsyncSession | None = None
@@ -285,7 +285,7 @@ class ConversationAgent:
 
     async def _post_chat_process(
             self,
-            user_id: str,
+            user_id: int,
             session_id: str,
             user_message: str,
             ai_response: str,
@@ -320,7 +320,7 @@ class ConversationAgent:
 
     async def _generate_title_async(
             self,
-            user_id: str,
+            user_id: int,
             session_id: str,
             user_message: str,
             ai_response: str
@@ -361,7 +361,7 @@ class ConversationAgent:
 
     async def _extract_and_store_memory_async(
             self,
-            user_id: str,
+            user_id: int,
             session_id: str
     ) -> None:
         """
@@ -419,7 +419,7 @@ class ConversationAgent:
 
     async def _ensure_session_persisted(
             self,
-            user_id: str,
+            user_id: int,
             session_id: str,
             db_session: AsyncSession | None
     ) -> None:
@@ -438,7 +438,7 @@ class ConversationAgent:
 
     async def _update_session_message_count(
             self,
-            user_id: str,
+            user_id: int,
             session_id: str,
             increment: int = 1,
             db_session: AsyncSession | None = None
@@ -458,7 +458,7 @@ class ConversationAgent:
 
     async def extract_memory_manually(
             self,
-            user_id: str,
+            user_id: int,
             session_id: str,
             db_session: AsyncSession
     ) -> int:
@@ -515,7 +515,7 @@ class ConversationAgent:
 
     async def clear_session(
             self,
-            user_id: str,
+            user_id: int,
             session_id: str,
             db_session: AsyncSession | None = None
     ) -> bool:
@@ -544,7 +544,7 @@ class ConversationAgent:
 
     async def get_session_history(
             self,
-            user_id: str,
+            user_id: int,
             session_id: str,
             limit: int | None = None,
             db_session: AsyncSession | None = None
@@ -584,7 +584,7 @@ class ConversationAgent:
 
     async def get_session_title(
             self,
-            user_id: str,
+            user_id: int,
             session_id: str,
             db_session: AsyncSession | None = None
     ) -> str | None:
@@ -607,7 +607,7 @@ class ConversationAgent:
 
     async def get_user_sessions(
             self,
-            user_id: str,
+            user_id: int,
             page: int = 1,
             page_size: int = 20,
             db_session: AsyncSession | None = None
@@ -657,7 +657,7 @@ class ConversationAgent:
 
     async def update_session_title(
             self,
-            user_id: str,
+            user_id: int,
             session_id: str,
             title: str,
             db_session: AsyncSession | None = None

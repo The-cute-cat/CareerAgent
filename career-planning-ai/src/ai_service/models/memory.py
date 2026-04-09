@@ -6,8 +6,8 @@ from typing import Optional
 
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
 from pydantic import BaseModel, Field
-from sqlalchemy import String, Text, Float, Integer, DateTime, ForeignKey, Index, UniqueConstraint
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import String, Text, Float, Integer, BigInteger, DateTime, Index, UniqueConstraint
+from sqlalchemy.orm import Mapped, mapped_column
 
 from ai_service.models.base import Base
 
@@ -33,7 +33,7 @@ class Memory(Base):
     __tablename__ = "memories"
     
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True, comment="用户ID")
+    user_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True, comment="用户ID")
     session_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True, comment="会话ID")
     content: Mapped[str] = mapped_column(Text, nullable=False, comment="记忆内容")
     memory_type: Mapped[str] = mapped_column(String(32), nullable=False, comment="记忆类型：preference/decision/fact/goal")
@@ -64,7 +64,7 @@ class ConversationSession(Base):
     
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     session_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True, comment="会话ID")
-    user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True, comment="用户ID")
+    user_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True, comment="用户ID")
     title: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, comment="会话标题")
     compressed_summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True, comment="压缩后的摘要")
     message_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, comment="消息数量")
