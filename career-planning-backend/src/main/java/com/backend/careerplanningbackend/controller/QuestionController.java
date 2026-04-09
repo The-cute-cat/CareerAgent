@@ -40,19 +40,10 @@ public class QuestionController {
     public Result<Object> Generate(QuestionDTO questionDTO) {
         log.info("skill-generate接收到的参数: {}", questionDTO.toString());
         Map<String, Object> params = new HashMap<>();
-        AiChatResponse aiChatResponse = null;
-
-        System.out.println("questionDTO.getType():" + questionDTO.getType());
-        System.out.println("questionDTO.getName():" + questionDTO.getName());
-
-        if ("skill".equals(questionDTO.getType())) {
-            params.put("skill", questionDTO.getName());
-            aiChatResponse = aiServiceClient.chatWithOther("/question/generate", params, true);
-        } else if ("tool".equals(questionDTO.getType())) {
-            params.put("tool", questionDTO.getName());
-            aiChatResponse = aiServiceClient.chatWithOther("/question/tool_generate", params, true);
-        }
-
+        params.put("content", questionDTO.getName());
+        params.put("question_type", questionDTO.getType());
+        params.put("cache_enabled", true);
+        AiChatResponse aiChatResponse = aiServiceClient.chatWithOther("/question/generate", params, true);
         return Result.ok(aiChatResponse == null ? null : aiChatResponse.getData());
     }
 
