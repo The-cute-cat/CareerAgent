@@ -21,7 +21,6 @@ import java.util.Map;
  * 3. 返回结果给前端
  * 4. 记录日志，便于调试和监控
  *
- * @modeule QuestionController
  */
 @Slf4j
 @RestController
@@ -35,8 +34,7 @@ public class QuestionController {
      * Generate
      * 获取生成关于某个类型的能力的问题
      *
-     * @param questionDTO
-     * @return
+     * @param questionDTO 问题类型和名称
      */
     @GetMapping("/generate")
     public Result<Object> Generate(QuestionDTO questionDTO) {
@@ -55,15 +53,14 @@ public class QuestionController {
             aiChatResponse = aiServiceClient.chatWithOther("/question/tool_generate", params, true);
         }
 
-        return Result.ok(aiChatResponse.getData());
+        return Result.ok(aiChatResponse == null ? null : aiChatResponse.getData());
     }
 
     /**
      * checkStudentAnswer
      * 检查问答题的答案
      *
-     * @param questionDTO
-     * @return
+     * @param questionDTO 问题列表、学生答案、评估标准
      */
     @PostMapping("/check_student_answer")
     public Result<Object> checkStudentAnswer(@RequestBody QuestionDTO questionDTO) {

@@ -546,23 +546,64 @@ class ConversationAgent:
             self,
             user_id: str,
             session_id: str,
-            limit: int | None = None
-    ) -> list[dict]:
+            limit: int | None = None,
+            db_session: AsyncSession | None = None
+    ) -> dict:
         """
-        获取会话历史记录
+        获取会话历史记录（含标题）
 
         Args:
             user_id: 用户 ID
             session_id: 会话 ID
             limit: 限制返回数量
+            db_session: 数据库会话
 
         Returns:
-            消息字典列表
+            {"sessionId": str, "title": str | None, "history": list[dict], "count": int}
         """
+        # 获取消息历史
         messages = await self.short_memory.get_messages(user_id, session_id)
         if limit:
             messages = messages[-limit:]
-        return [msg.model_dump() for msg in messages]
+        history = [msg.model_dump() for msg in messages]
+
+        # 获取会话标题
+        title = None
+        session_repo = self._ensure_session_repo(db_session)
+        if session_repo:
+            conversation = await session_repo.get_by_user_and_session_id(user_id, session_id)
+            if conversation:
+                title = conversation.title
+
+        return {
+            "sessionId": session_id,
+            "title": title,
+            "history": history,
+            "count": len(history)
+        }
+
+    async def get_session_title(
+            self,
+            user_id: str,
+            session_id: str,
+            db_session: AsyncSession | None = None
+    ) -> str | None:
+        """
+        获取会话标题
+
+        Args:
+            user_id: 用户 ID
+            session_id: 会话 ID
+            db_session: 数据库会话
+
+        Returns:
+            会话标题，为空表示还未生成
+        """
+        session_repo = self._ensure_session_repo(db_session)
+        if not session_repo:
+            return None
+        conversation = await session_repo.get_by_user_and_session_id(user_id, session_id)
+        return conversation.title if conversation else None
 
     async def get_user_sessions(
             self,
