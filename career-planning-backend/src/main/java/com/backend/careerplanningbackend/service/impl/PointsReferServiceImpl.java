@@ -9,6 +9,7 @@ import com.backend.careerplanningbackend.mapper.*;
 import com.backend.careerplanningbackend.service.PayService;
 import com.backend.careerplanningbackend.service.PointsReferService;
 import com.backend.careerplanningbackend.util.AiServiceClient;
+import com.backend.careerplanningbackend.util.RedisConstant;
 import com.backend.careerplanningbackend.util.RedisIdWorker;
 import com.backend.careerplanningbackend.util.ThreadLocalUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -21,6 +22,8 @@ import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessagePostProcessor;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -29,11 +32,13 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import static com.backend.careerplanningbackend.util.PointsConstant.POINTS_FOR_REFERRAL;
 import static com.backend.careerplanningbackend.util.PointsConstant.POINTS_FOR_REGISTRATION;
 import static com.backend.careerplanningbackend.util.RedisConstant.*;
 import static com.backend.careerplanningbackend.util.SystemActivityConstant.Activity_End_Time;
+import static com.backend.careerplanningbackend.util.VerificationCode.generateVerificationCode;
 
 @Service
 @RequiredArgsConstructor
@@ -49,6 +54,7 @@ public class PointsReferServiceImpl implements PointsReferService {
     private final AiServiceClient aiServiceClient;
     private final PayService payService;
     private final PaymentOrderMapper paymentOrderMapper;
+    private final StringRedisTemplate stringRedisTemplate;
 
     /**
      * getAccountPoints 
@@ -64,12 +70,8 @@ public class PointsReferServiceImpl implements PointsReferService {
     
     @Override
     public Result<UserPointsVO> getAccountPoints(Long userId) {
-//        UserPoints accountPoints = userpointsMapper.getAccountPoints(id);
-        Long currentUserId = ThreadLocalUtil.getCurrentUserId();
         UserPoints accountPoints = userpointsMapper.selectOne(
-
                 new LambdaQueryWrapper<UserPoints>().eq(UserPoints::getUserId, userId)
-
         );
         if(accountPoints == null) {
             log.error("用户 {} 的积分信息不存在", userId);
@@ -163,6 +165,10 @@ public class PointsReferServiceImpl implements PointsReferService {
                 "userpointsMapper 表更新成功", userId, inviteCode);
 
         /** 3-UserReferral update */
+        if(StrUtil.isBlank(inviteCode)) {
+            log.info("用户 {} 注册成功，没有邀请码，直接创建积分账户", userId);
+            return Result.ok("注册的积分已返回");
+        }
         if(userReferral==null) {
             log.error("用户 {} 使用的邀请码 {} 无效", userId, inviteCode);
             return Result.fail("邀请码无效");
@@ -365,13 +371,22 @@ public class PointsReferServiceImpl implements PointsReferService {
     public Result<ReferralDTO> generateInvite(@RequestBody ReferralDTO referralDTO) {
         Long currentUserId = ThreadLocalUtil.getCurrentUserId();
 
-        long nextId = redisIdWorker.nextId(INVITE_CODE_KEY_PREFIX);
-
+//        long nextId = redisIdWorker.nextId(INVITE_CODE_KEY_PREFIX);
+        String nextId = generateVerificationCode();
         ReferralDTO data = new ReferralDTO();
-        data.setInviteCode(String.valueOf(nextId));
+        data.setInviteCode(nextId);
         
         // referral 表示邀请大使
         data.setReferrerId(currentUserId);
+        //存入验证码到 redis 里面
+        
+        String codeKey = RedisConstant.INVITE_CODE_KEY_PREFIX + ":" + currentUserId + ":" + nextId;
+
+        stringRedisTemplate.opsForValue().set(codeKey, nextId, INVITE_CODE_EXPIRE_TIME, TimeUnit.SECONDS);
+
+        UserReferral userReferral = BeanUtil.copyProperties(data, UserReferral.class);
+        userReferralMapper.insert(userReferral);
+        
         return Result.ok(data);
     }
 
@@ -423,20 +438,6 @@ public class PointsReferServiceImpl implements PointsReferService {
     @Transactional
     public Result<Long> recharge(@RequestBody @Valid PaymentCreateDTO paymentCreateDTO){
         
-        PointsTransaction pointsTransaction = new PointsTransaction();
-        pointsTransaction.setPoints(paymentCreateDTO.getPoints());
-        pointsTransaction.setType(1);
-        pointsTransaction.setUserId(ThreadLocalUtil.getCurrentUserId());
-        pointsTransaction.setAmount(paymentCreateDTO.getAmount());
-        pointsTransaction.setPackageId(paymentCreateDTO.getPackageId());
-        
-        pointsTransaction.setDescription("充值积分");
-
-        int insert = pointsTransactionMapper.insert(pointsTransaction);
-        if (insert == 0) {
-            log.error("recharge 记录积分变动失败");
-            return Result.fail("记录积分变动失败");
-        }
         log.info("recharge 记录积分插入成功");
         PaymentOrder paymentOrder = BeanUtil.copyProperties(paymentCreateDTO, PaymentOrder.class);
 

@@ -21,7 +21,7 @@ public class PointsTransaction {
     private Long userId;
     private BigDecimal amount; // 金额变动值(正值为加，负值为减)
     private Integer points;  // 积分变动值(正值为加，负值为减)
-    private Integer type; // 1:充值, 2:购买AI报告, 3:AI知识讲解消费, 4:推广奖励, 5:系统赠送
+    private Integer type; // 0:会员充值, 1:充值积分, 2:购买AI报告, 3:AI知识讲解消费, 4:推广奖励, 5:系统赠送
     private String description;
     private Integer packageId; // 购买套餐id，非购买行为可为null
     private LocalDateTime createTime;

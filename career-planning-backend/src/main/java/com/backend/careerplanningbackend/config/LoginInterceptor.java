@@ -53,12 +53,12 @@ public class LoginInterceptor implements HandlerInterceptor {
             return true;
 
         } catch (ExpiredJwtException e) {
-            log.error("Token已过期");
+            log.error("LoginInterceptor.preHandle Token已过期", e);
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.getWriter().write("短token已过期");
             return false;
         } catch (JwtException e) {
-            log.error("Token无效: {}", e.getMessage());
+            log.error("LoginInterceptor.preHandle Token无效", e);
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.getWriter().write("token无效");
             return false;

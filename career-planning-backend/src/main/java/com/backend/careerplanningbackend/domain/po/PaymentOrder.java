@@ -17,14 +17,11 @@ public class PaymentOrder {
     @TableId(type = IdType.ASSIGN_ID)
     /** 订单ID，使用数据库自增 */
     private Long id;
-
-    /**
-     * 订单id
-     */
-    @NotNull(message = "订单id")
+    
+    @NotNull(message = "套餐id")
     private Integer packageId;
     
-    private Integer amount;
+    private BigDecimal amount;
 
     /**
      * 1微信, 2支付宝
@@ -33,6 +30,7 @@ public class PaymentOrder {
     
     private Integer points;
 
+    private String description;
     /**
      * 0待支付, 1已支付, 2已取消, 3已退款
      */
@@ -41,4 +39,6 @@ public class PaymentOrder {
     private LocalDateTime payTime;
 
     private LocalDateTime createTime;
+
+    private LocalDateTime updateTime;
 }

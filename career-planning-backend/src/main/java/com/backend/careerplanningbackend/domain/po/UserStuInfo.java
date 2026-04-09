@@ -5,6 +5,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
+
 /**
  * UserStuInfo
  */
@@ -20,7 +22,7 @@ public class UserStuInfo {
     /**
      * 关联sys_user ID
      */
-    private Long userid;
+    private Long userId;
     /**
      * 真实姓名
      */
@@ -56,11 +58,11 @@ public class UserStuInfo {
     /**
      * 入学年份（如 2023）
      */
-    private Long startYear;
+    private Integer startYear;
     /**
      * 毕业年份
      */
-    private Long gradYear;
+    private Integer gradYear;
     /**
      * 就业意愿描述
      */
@@ -68,13 +70,13 @@ public class UserStuInfo {
     /**
      * 逻辑删除-1表示逻辑删除
      */
-    private Long isDeleted;
+    private Integer isDeleted;
     /**
      * 创建时间
      */
-    private String createTime;
+    private LocalDateTime createTime;
     /**
      * 修改时间
      */
-    private String updateTime;
+    private LocalDateTime updateTime;
 }

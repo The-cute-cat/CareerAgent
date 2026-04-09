@@ -14,7 +14,7 @@ public class TransactionQueryDTO {
      
      private Integer type;
      
-     private Integer amount;
+     private BigDecimal amount;
      
      private String description;
      
