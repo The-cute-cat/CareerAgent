@@ -23,11 +23,11 @@ public class RegexUtil {
     
     /**
      * 是否是无效密码格式
-     * @param email 要校验的验证码
+     * @param password 要校验的验证码
      * @return true:不符合规范，false：符合规范
      */
-    public static boolean isPasswordInvalid(String email){
-        return mismatch(email, RegexPatterns.PASSWORD_REGEX);
+    public static boolean isPasswordInvalid(String password){
+        return mismatch(password, RegexPatterns.PASSWORD_REGEX);
     }
     
     /**

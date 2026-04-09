@@ -3,6 +3,7 @@ package com.backend.careerplanningbackend.domain.dto;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 
 @Data
 @NoArgsConstructor
@@ -20,4 +21,10 @@ public class LoginFormDTO {
     private String code;
     // 邀请码
     private String inviteCode;
+    
+    @Override
+    public String toString() {
+        return "LoginFormDTO{username='" + username + "', email='" + email + "'}";
+    }
+
 }

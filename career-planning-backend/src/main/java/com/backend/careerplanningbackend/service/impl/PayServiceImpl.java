@@ -32,7 +32,7 @@ import java.util.Map;
 @Service
 @Slf4j
 public class PayServiceImpl implements PayService {
-    @Autowired
+    @Resource
     private AlipayClient alipayClient;   // 前面配好的 Bean
 
     private static final String FORMAT = "json";
@@ -42,13 +42,13 @@ public class PayServiceImpl implements PayService {
     private static final String SIGN_TYPE = "RSA2";
 
     @Resource
-    public AliPayConfig alipayConfig;
+    private AliPayConfig alipayConfig;
 
     @Resource
-    public PointsTransactionMapper pointsTransactionMapper;
+    private PointsTransactionMapper pointsTransactionMapper;
     
     @Resource
-    public PaymentOrderMapper paymentOrderMapper;
+    private PaymentOrderMapper paymentOrderMapper;
     
     
 //    @Override
@@ -106,18 +106,18 @@ public class PayServiceImpl implements PayService {
         String body=null;
         try {
             body = alipayClient.pageExecute(request).getBody();
+            // 直接返回一段带表单的 html，前端浏览器会自动提交跳转
+            response.setContentType("text/html;charset=UTF-8");
+            response.getWriter().write(body);   // 自动提交表单
+            response.getWriter().flush();
+            response.getWriter().close();
+            log.debug("沙箱支付展示订单展示，回调");
+            log.debug("biz:"+biz);
+            log.debug("body:"+body);
         } catch (AlipayApiException e) {
+            log.error("orderNoPay 支付宝支付失败: {}", e.getMessage());
             e.printStackTrace();
         }
-        // 直接返回一段带表单的 html，前端浏览器会自动提交跳转
-        response.setContentType("text/html;charset=UTF-8");
-        response.getWriter().write(body);   // 自动提交表单
-        response.getWriter().flush();
-        response.getWriter().close();
-        System.out.println("沙箱支付展示订单展示，回调");
-        System.out.println("biz:"+biz);
-        System.out.println("body:"+body)
-        ;
     }
     
     @Override
@@ -149,15 +149,16 @@ public class PayServiceImpl implements PayService {
         String body=null;
         try {
             body = alipayClient.pageExecute(request).getBody();
+            // 直接返回一段带表单的 html，前端浏览器会自动提交跳转
+            response.setContentType("text/html;charset=UTF-8");
+            response.getWriter().write(body);   // 自动提交表单
+            response.getWriter().flush();
+            response.getWriter().close();
+            log.debug("沙箱支付展示订单展示，回调");
         } catch (AlipayApiException e) {
+            log.error("pagePay 支付宝支付失败: {}", e.getMessage());
             e.printStackTrace();
         }
-        // 直接返回一段带表单的 html，前端浏览器会自动提交跳转
-        response.setContentType("text/html;charset=UTF-8");
-        response.getWriter().write(body);   // 自动提交表单
-        response.getWriter().flush();
-        response.getWriter().close();
-        System.out.println("沙箱支付展示订单展示，回调");
     }
 
 //    @Override
@@ -190,6 +191,7 @@ public class PayServiceImpl implements PayService {
 //        try {
 //            body = alipayClient.pageExecute(request).getBody();
 //        } catch (AlipayApiException e) {
+//            log.error("pagePayByUserId 支付宝支付失败: {}", e.getMessage());
 //            e.printStackTrace();
 //        }
 //        // 直接返回一段带表单的 html，前端浏览器会自动提交跳转

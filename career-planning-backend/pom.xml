@@ -157,12 +157,6 @@
         </dependency>
 
 
-        <!--hutool-->
-        <dependency>
-            <groupId>cn.hutool</groupId>
-            <artifactId>hutool-all</artifactId>
-        </dependency>
-
         <!-- 支付宝 SDK（已包含 json、commons-logging 等传递依赖） -->
         <dependency>
             <groupId>com.alipay.sdk</groupId>
@@ -195,8 +189,13 @@
             <artifactId>openhtmltopdf-pdfbox</artifactId>
             <version>1.0.10</version>
         </dependency>
-        
-        
+
+        <!-- logback -->
+        <dependency>
+            <groupId>net.logstash.logback</groupId>
+            <artifactId>logstash-logback-encoder</artifactId>
+            <version>7.4</version>
+        </dependency>
         
     </dependencies>
 

@@ -37,7 +37,7 @@
 <!--    </sql>-->
     
     <select id="selectByUsername" resultType="com.backend.careerplanningbackend.domain.po.User">
-        SELECT id, username, password, nickname, avatar, info, email, status
+        SELECT id, username, password, nickname, avatar, info, email, status, role
         FROM user_stu
         WHERE username = #{username}
     </select>

@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessagePostProcessor;
+import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.mail.javamail.JavaMailSender;
 import cn.hutool.core.util.StrUtil;
@@ -38,6 +39,7 @@ import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
 import static com.backend.careerplanningbackend.util.RedisConstant.*;
+import static com.backend.careerplanningbackend.util.SystemConstant.USER_DEFAULT_AVATAR;
 
 @Slf4j
 @Service
@@ -154,7 +156,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
         User newUser = new User();
         BeanUtil.copyProperties(user, newUser, "passwordConfirm", "code");
-        newUser.setAvatar("https://career-planning-backend.oss-cn-guangzhou.aliyuncs.com/avatar/1028/7d3ac68d73489daeb9194ef119235d84.jpg");
+        newUser.setAvatar(USER_DEFAULT_AVATAR);
         //注册功能点实现
         int rows = userMapper.register(newUser);
         if (rows == 0) {
@@ -176,6 +178,18 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
                     ReferralDTO referralDTO = new ReferralDTO();
                     referralDTO.setInviteCode(user.getInviteCode());
                     referralDTO.setUserId(newUser.getId()); // 注册没有推荐人，设置为0或null
+                    
+                    // 1.创建CorrelationData
+                    CorrelationData cd = new CorrelationData();
+
+                    // 2.设置ConfirmCallback（替代原来的Future回调）
+                    rabbitTemplate.setConfirmCallback((correlationData, ack, cause) -> {
+                        if (ack) {
+                            log.debug("发送消息成功，收到 ack!");
+                        } else {
+                            log.error("发送消息失败，收到 nack, reason : {}", cause);
+                        }
+                    });
 
                     rabbitTemplate.convertAndSend(exchange, routingKey, referralDTO, new MessagePostProcessor() {
                         @Override
@@ -184,7 +198,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
                                     .setExpiration("10000");
                             return message;
                         }
-                    });
+                    },cd);//开启生产者确认模式，发送消息时会等待 RabbitMQ 的确认回调
 
                     log.info("消息发送成功！");
                 }
@@ -270,7 +284,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         try {
             String code = VerificationCode.generateVerificationCode();
             log.info("code:{}", code);
-            System.out.println(code);
             //存入验证码到 redis 里面
             String codeKey = RedisConstant.EMAIL_CODE + ":" + username + ":" + toEmail;
 
@@ -328,7 +341,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         try {
             String code = VerificationCode.generateVerificationCode();
             log.info("code:{}", code);
-            System.out.println(code);
             //存入验证码到 redis 里面
             String codeKey = RedisConstant.EMAIL_CODE + ":" + username + ":" + toEmail;
 
@@ -390,7 +402,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         try {
             String code = VerificationCode.generateVerificationCode();
             log.info("code:{}", code);
-            System.out.println(code);
             //存入验证码到 redis 里面
             String codeKey = RedisConstant.EMAIL_CODE + ":" + username + ":" + toEmail;
 
@@ -458,10 +469,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         Claims claims = null;
         try {
             claims = JwtUtil.parseToken(refreshToken);
-            System.out.println(claims);
+            log.info("解析refreshToken成功, claims: {}", claims);
         } catch (Exception e) {
-            System.out.println(claims);
-            System.out.println("长token过期了,token expired");
+            log.error("解析refreshToken失败, e: {}", e.getMessage());
             return Result.fail(401, "长token过期了,token expired");
         }
         log.info("登录的账号为 : {}", claims.getId());
