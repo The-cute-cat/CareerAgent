@@ -34,6 +34,10 @@ public class RedisConstant {
      * 邀请好友生成验证码的redis key前缀
      */
     public static final String INVITE_CODE_KEY_PREFIX = "invite:code";
+
+    /**  邀请好友生成验证码的 有效期 365 天 = 一年 */
+    public static final long INVITE_CODE_EXPIRE_TIME = 365L *24*60*60*1000;
+    
     
     /**
      * 积分充值 key 前缀

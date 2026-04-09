@@ -338,9 +338,11 @@ const handleAvatarUpload = async (event) => {
 
 .panel-header {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
   gap: 16px;
+  margin-bottom: 8px;
 }
 
 .panel-title {
@@ -355,6 +357,8 @@ const handleAvatarUpload = async (event) => {
   font-size: 14px;
   line-height: 1.8;
   color: #66788f;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .action-group {

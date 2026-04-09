@@ -433,7 +433,7 @@ onMounted(() => {
   padding: 4px;
   border-radius: 12px;
   width: fit-content;
-  margin-bottom: 8px;
+  margin: 0 auto 16px auto;
 }
 
 .tab-btn {
@@ -468,6 +468,7 @@ onMounted(() => {
 .tip-banner {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 12px;
   padding: 16px 20px;
   border-radius: 20px;
@@ -476,6 +477,7 @@ onMounted(() => {
   font-size: 14px;
   color: #1e40af;
   line-height: 1.6;
+  text-align: center;
 
   strong {
     color: #ef4444;

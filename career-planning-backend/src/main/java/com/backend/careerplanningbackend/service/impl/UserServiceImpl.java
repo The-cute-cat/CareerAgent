@@ -300,7 +300,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             sender.send(msg);
             return Result.ok();
         } catch (MailException e) {
-            log.error("UserServiceImpl.sendCode 发送验证码邮件失败, 用户名: {}, 邮箱: {}, 错误信息: {}", username, toEmail, e.getMessage());
+            log.error("UserServiceImpl.sendCode 发送验证码邮件失败, 用户名: {}, 邮箱: {}", username, toEmail, e);
             return Result.fail("发送验证码失败");
         }
     }
@@ -357,7 +357,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             sender.send(msg);
             return Result.ok();
         } catch (MailException e) {
-            log.error("UserServiceImpl.sendCodeRegister 发送注册验证码邮件失败, 用户名: {}, 邮箱: {}, 错误信息: {}", username, toEmail, e.getMessage());
+            log.error("UserServiceImpl.sendCodeRegister 发送注册验证码邮件失败, 用户名: {}, 邮箱: {}", username, toEmail, e);
             return Result.fail("发送验证码失败");
         }
     }
@@ -418,7 +418,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             sender.send(msg);
             return Result.ok();
         } catch (MailException e) {
-            log.error("UserServiceImpl.sendCode 发送验证码邮件失败, 用户名: {}, 邮箱: {}, 错误信息: {}", username, toEmail, e.getMessage());
+            log.error("UserServiceImpl.sendCodeForget 发送忘记密码验证码邮件失败, 用户名: {}, 邮箱: {}", username, toEmail, e);
             return Result.fail("发送验证码失败");
         }
     }
