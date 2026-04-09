@@ -398,7 +398,7 @@ public class AiServiceClient {
      * @param conversationId 对话 ID
      * @return 响应数据流
      */
-    public Flux<String> chatWithMessageStream(String url, String message, String conversationId) {
+    public Flux<String> chatWithMessageStream(String url, String message, String userId,String conversationId) {
         AiChatRequest request = new AiChatRequest(conversationId, message);
         return callAiServiceStream(url, request);
     }
@@ -458,7 +458,7 @@ public class AiServiceClient {
      * @return 响应数据流
      */
     public Flux<String> chatWithMessageAndMultipartFilesStream(String url, String message, List<MultipartFile> files,
-                                                               String conversationId) {
+                                                               String userId,String conversationId) {
         AiChatRequest request = AiChatRequest.ofMultipartFiles(conversationId, message, files);
         return callAiServiceStream(url, request);
     }

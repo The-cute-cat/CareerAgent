@@ -1,606 +1,1124 @@
 <script setup lang="ts">
-import { ref, nextTick, onMounted, onUnmounted } from 'vue'
-import { ChatDotRound, Close, Promotion, Paperclip, Delete } from '@element-plus/icons-vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { ChatDotRound, Close, Promotion, Paperclip, Delete, FullScreen, Loading } from '@element-plus/icons-vue'
 import VueMarkdown from 'vue-markdown-render'
-import { chatBotWelcomeMessage, chatBotReplies } from '@/mock/data'
 import { ElMessage } from 'element-plus'
 
-// 获取当前时间
-function getCurrentTime(): string {
-  const now = new Date()
-  return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
-}
-
-// ============ 配置项 ============
 interface ChatConfig {
-  autoOpen?: boolean           // 页面加载时自动打开
-  autoOpenDelay?: number       // 自动打开延迟（毫秒）
-  openOnScroll?: boolean       // 滚动到特定位置时打开
-  scrollThreshold?: number     // 滚动阈值（像素）
-  openOnExit?: boolean         // 退出意图时打开
+  apiBaseUrl: string
+  token: string
+  userId: string
+  conversationId?: string
+  title?: string
+  subtitle?: string
+  welcomeMessage?: string
+  autoExtractMemory?: boolean
+  autoExtractMemoryWithFiles?: boolean
+  autoOpen?: boolean
+  autoOpenDelay?: number
+  openOnScroll?: boolean
+  scrollThreshold?: number
+  openOnExit?: boolean
+  defaultWidth?: number
+  defaultHeight?: number
+  minWidth?: number
+  minHeight?: number
+  maxFileSizeMB?: number
+  quickQuestions?: string[]
+  persistLayout?: boolean
+  layoutStorageKey?: string
 }
 
 const props = withDefaults(defineProps<ChatConfig>(), {
+  conversationId: '',
+  title: 'AI 智能助手',
+  subtitle: '支持流式回复 · 文件问答',
+  welcomeMessage: '你好，我是你的 AI 智能助手。你可以直接向我提问，也可以上传 PDF / DOCX / 图片让我帮你分析。',
+  autoExtractMemory: true,
+  autoExtractMemoryWithFiles: false,
   autoOpen: false,
-  autoOpenDelay: 3000,
+  autoOpenDelay: 1200,
   openOnScroll: false,
   scrollThreshold: 500,
-  openOnExit: false
+  openOnExit: false,
+  defaultWidth: 440,
+  defaultHeight: 680,
+  minWidth: 360,
+  minHeight: 480,
+  maxFileSizeMB: 10,
+  quickQuestions: () => ['帮我分析一下我的简历', '这个岗位适合我吗？', '给我一些职业规划建议'],
+  persistLayout: true,
+  layoutStorageKey: 'career-chatbot-layout'
 })
 
-// ============ 状态 ============
-const dialogVisible = ref(false)
-const userInput = ref('')
-const isTyping = ref(false)
-const isMinimized = ref(false)
-const isFullscreen = ref(false)
+const emit = defineEmits<{
+  (e: 'update:conversationId', value: string): void
+  (e: 'error', value: string): void
+  (e: 'opened'): void
+  (e: 'closed'): void
+}>()
 
-// 窗口尺寸
-const defaultSize = { width: 420, height: 600 }
-const currentSize = ref({ ...defaultSize })
+type MessageRole = 'user' | 'assistant'
+type ResizeDirection =
+  | 'top'
+  | 'right'
+  | 'bottom'
+  | 'left'
+  | 'top-left'
+  | 'top-right'
+  | 'bottom-left'
+  | 'bottom-right'
 
-// 文件上传相关
-interface UploadedFile {
+interface UploadedFileItem {
   id: string
   name: string
   size: number
   type: string
-  url?: string
+  file: File
 }
-const uploadedFiles = ref<UploadedFile[]>([])
-const fileInputRef = ref<HTMLInputElement | null>(null)
 
-// 聊天记录
-interface Message {
-  role: 'user' | 'ai'
+interface ChatMessage {
+  id: string
+  role: MessageRole
   content: string
   time: string
-  files?: UploadedFile[]
+  files?: UploadedFileItem[]
+  streaming?: boolean
+  error?: boolean
 }
 
-const messages = ref<Message[]>([
+interface LayoutState {
+  btnPosition: { x: number; y: number }
+  windowPosition: { x: number; y: number }
+  size: { width: number; height: number }
+}
+
+const EDGE_GAP = 12
+const HEADER_HEIGHT = 64
+const FLOAT_BTN_SIZE = 64
+
+const dialogVisible = ref(false)
+const isMinimized = ref(false)
+const isFullscreen = ref(false)
+const isStreaming = ref(false)
+const isHeaderDragging = ref(false)
+const isDraggingWindow = ref(false)
+const isDraggingBtn = ref(false)
+const isResizing = ref(false)
+const resizeDirection = ref<ResizeDirection | null>(null)
+const userInput = ref('')
+const uploadedFiles = ref<UploadedFileItem[]>([])
+const fileInputRef = ref<HTMLInputElement | null>(null)
+const chatWindowRef = ref<HTMLElement | null>(null)
+const floatBtnRef = ref<HTMLElement | null>(null)
+const messagesContainer = ref<HTMLElement | null>(null)
+const abortController = ref<AbortController | null>(null)
+const currentConversationId = ref(props.conversationId || '')
+
+const currentSize = ref({
+  width: props.defaultWidth,
+  height: props.defaultHeight
+})
+const windowPosition = ref({ x: 0, y: 0 })
+const btnPosition = ref({ x: 0, y: 0 })
+const dragOffset = ref({ x: 0, y: 0 })
+const btnDragOffset = ref({ x: 0, y: 0 })
+const dragStartPoint = ref({ x: 0, y: 0 })
+const resizeStartRect = ref({
+  x: 0,
+  y: 0,
+  width: props.defaultWidth,
+  height: props.defaultHeight,
+  pointX: 0,
+  pointY: 0
+})
+const restoreRect = ref({
+  x: 0,
+  y: 0,
+  width: props.defaultWidth,
+  height: props.defaultHeight
+})
+
+const messages = ref<ChatMessage[]>([
   {
-    role: 'ai',
-    content: chatBotWelcomeMessage,
+    id: createId(),
+    role: 'assistant',
+    content: props.welcomeMessage,
     time: getCurrentTime()
   }
 ])
 
-// ============ 窗口拖拽 ============
-const chatWindowRef = ref<HTMLElement | null>(null)
-const windowPosition = ref({ x: 0, y: 0 })
-const isDraggingWindow = ref(false)
-const dragOffset = ref({ x: 0, y: 0 })
-const isHeaderDragging = ref(false)
+const canSend = computed(() => {
+  return (!!userInput.value.trim() || uploadedFiles.value.length > 0) && !isStreaming.value
+})
 
-// 初始化窗口位置（右下角）
-const initWindowPosition = () => {
-  const padding = 20
-  if (isFullscreen.value) {
-    windowPosition.value = { x: 0, y: 0 }
-  } else {
-    windowPosition.value = {
-      x: window.innerWidth - currentSize.value.width - padding,
-      y: window.innerHeight - currentSize.value.height - padding - 80
-    }
+watch(
+  () => props.conversationId,
+  (value) => {
+    currentConversationId.value = value || ''
   }
+)
+
+function createId() {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID()
+  }
+  return `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
 }
 
-// 获取事件坐标
-const getClientPos = (e: MouseEvent | TouchEvent): { x: number; y: number } => {
-  const touchEvent = e as TouchEvent
+function getCurrentTime() {
+  const now = new Date()
+  return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+}
+
+function buildUrl(path: string) {
+  const base = props.apiBaseUrl.replace(/\/$/, '')
+  const cleanedPath = path.startsWith('/') ? path : `/${path}`
+  return `${base}${cleanedPath}`
+}
+
+function getEventPoint(e: MouseEvent | TouchEvent) {
+  const touch = 'touches' in e && e.touches?.length ? e.touches[0] : undefined
+  if (touch) {
+    return { x: touch.clientX, y: touch.clientY }
+  }
+  const changedTouch = 'changedTouches' in e && e.changedTouches?.length ? e.changedTouches[0] : undefined
+  if (changedTouch) {
+    return { x: changedTouch.clientX, y: changedTouch.clientY }
+  }
   const mouseEvent = e as MouseEvent
-  const touch = touchEvent.touches?.[0]
-  if (touch) return { x: touch.clientX, y: touch.clientY }
-  const changedTouch = touchEvent.changedTouches?.[0]
-  if (changedTouch) return { x: changedTouch.clientX, y: changedTouch.clientY }
   return { x: mouseEvent.clientX, y: mouseEvent.clientY }
 }
 
-// 开始拖拽窗口
-const startWindowDrag = (e: MouseEvent | TouchEvent) => {
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max)
+}
+
+function initBtnPosition() {
+  btnPosition.value = {
+    x: window.innerWidth - FLOAT_BTN_SIZE - EDGE_GAP,
+    y: window.innerHeight - FLOAT_BTN_SIZE - EDGE_GAP
+  }
+}
+
+function initWindowPosition() {
+  currentSize.value = {
+    width: clamp(props.defaultWidth, props.minWidth, window.innerWidth - EDGE_GAP * 2),
+    height: clamp(props.defaultHeight, props.minHeight, window.innerHeight - EDGE_GAP * 2)
+  }
+  windowPosition.value = {
+    x: window.innerWidth - currentSize.value.width - EDGE_GAP,
+    y: window.innerHeight - currentSize.value.height - EDGE_GAP - 12
+  }
+  restoreRect.value = {
+    x: windowPosition.value.x,
+    y: windowPosition.value.y,
+    width: currentSize.value.width,
+    height: currentSize.value.height
+  }
+}
+
+function saveLayout() {
+  if (!props.persistLayout) return
+  try {
+    const payload: LayoutState = {
+      btnPosition: btnPosition.value,
+      windowPosition: windowPosition.value,
+      size: currentSize.value
+    }
+    localStorage.setItem(props.layoutStorageKey, JSON.stringify(payload))
+  } catch {
+    // 静默处理存储异常（如存储空间已满）
+  }
+}
+
+function restoreLayout() {
+  if (!props.persistLayout) {
+    initBtnPosition()
+    initWindowPosition()
+    return
+  }
+
+  const raw = localStorage.getItem(props.layoutStorageKey)
+  if (!raw) {
+    initBtnPosition()
+    initWindowPosition()
+    return
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as LayoutState
+    btnPosition.value = parsed.btnPosition
+    currentSize.value = {
+      width: clamp(parsed.size.width, props.minWidth, window.innerWidth - EDGE_GAP * 2),
+      height: clamp(parsed.size.height, props.minHeight, window.innerHeight - EDGE_GAP * 2)
+    }
+    windowPosition.value = parsed.windowPosition
+    syncToViewport()
+  } catch {
+    initBtnPosition()
+    initWindowPosition()
+  }
+}
+
+function syncToViewport() {
+  if (isFullscreen.value) {
+    windowPosition.value = { x: 0, y: 0 }
+    currentSize.value = {
+      width: window.innerWidth,
+      height: window.innerHeight
+    }
+    return
+  }
+
+  currentSize.value.width = clamp(currentSize.value.width, props.minWidth, window.innerWidth - EDGE_GAP * 2)
+  currentSize.value.height = clamp(currentSize.value.height, props.minHeight, window.innerHeight - EDGE_GAP * 2)
+
+  const minimizedHeight = isMinimized.value ? HEADER_HEIGHT : currentSize.value.height
+  windowPosition.value.x = clamp(windowPosition.value.x, EDGE_GAP, window.innerWidth - currentSize.value.width - EDGE_GAP)
+  windowPosition.value.y = clamp(windowPosition.value.y, EDGE_GAP, window.innerHeight - minimizedHeight - EDGE_GAP)
+
+  btnPosition.value.x = clamp(btnPosition.value.x, EDGE_GAP, window.innerWidth - FLOAT_BTN_SIZE - EDGE_GAP)
+  btnPosition.value.y = clamp(btnPosition.value.y, EDGE_GAP, window.innerHeight - FLOAT_BTN_SIZE - EDGE_GAP)
+
+  saveLayout()
+}
+
+function openChat() {
+  dialogVisible.value = true
+  isMinimized.value = false
+  syncToViewport()
+  nextTick(() => scrollToBottom())
+  emit('opened')
+}
+
+function closeChat() {
+  stopStream(false)
+  dialogVisible.value = false
+  isMinimized.value = false
+  uploadedFiles.value = []
+  emit('closed')
+}
+
+function toggleMinimize() {
+  if (isFullscreen.value && isMinimized.value) {
+    isFullscreen.value = false
+  }
+  isMinimized.value = !isMinimized.value
+  syncToViewport()
+  saveLayout()
+}
+
+function toggleFullscreen() {
+  if (!isFullscreen.value) {
+    restoreRect.value = {
+      x: windowPosition.value.x,
+      y: windowPosition.value.y,
+      width: currentSize.value.width,
+      height: currentSize.value.height
+    }
+    isFullscreen.value = true
+    isMinimized.value = false
+    windowPosition.value = { x: 0, y: 0 }
+    currentSize.value = {
+      width: window.innerWidth,
+      height: window.innerHeight
+    }
+  } else {
+    isFullscreen.value = false
+    currentSize.value = {
+      width: clamp(restoreRect.value.width, props.minWidth, window.innerWidth - EDGE_GAP * 2),
+      height: clamp(restoreRect.value.height, props.minHeight, window.innerHeight - EDGE_GAP * 2)
+    }
+    windowPosition.value = {
+      x: clamp(restoreRect.value.x, EDGE_GAP, window.innerWidth - currentSize.value.width - EDGE_GAP),
+      y: clamp(restoreRect.value.y, EDGE_GAP, window.innerHeight - currentSize.value.height - EDGE_GAP)
+    }
+  }
+  saveLayout()
+}
+
+function startWindowDrag(e: MouseEvent | TouchEvent) {
+  if (isFullscreen.value) return
   isHeaderDragging.value = true
   isDraggingWindow.value = true
-  const pos = getClientPos(e)
+  const point = getEventPoint(e)
   dragOffset.value = {
-    x: pos.x - windowPosition.value.x,
-    y: pos.y - windowPosition.value.y
+    x: point.x - windowPosition.value.x,
+    y: point.y - windowPosition.value.y
   }
 }
 
-// 拖拽中
-const onWindowDrag = (e: MouseEvent | TouchEvent) => {
-  if (!isDraggingWindow.value || isFullscreen.value) return
-  e.preventDefault()
-  const pos = getClientPos(e)
-  
-  let newX = pos.x - dragOffset.value.x
-  let newY = pos.y - dragOffset.value.y
-  
-  // 边界限制
-  const windowWidth = isMinimized.value ? currentSize.value.width : currentSize.value.width
-  const windowHeight = isMinimized.value ? 60 : currentSize.value.height
-  newX = Math.max(0, Math.min(newX, window.innerWidth - windowWidth))
-  newY = Math.max(0, Math.min(newY, window.innerHeight - windowHeight))
-  
-  windowPosition.value = { x: newX, y: newY }
-}
-
-// 结束拖拽
-const endWindowDrag = () => {
-  isDraggingWindow.value = false
-  setTimeout(() => { isHeaderDragging.value = false }, 100)
-}
-
-// ============ 按钮拖拽（浮窗按钮） ============
-const floatBtnRef = ref<HTMLElement | null>(null)
-const btnPosition = ref({ x: 0, y: 0 })
-const isDraggingBtn = ref(false)
-const btnDragOffset = ref({ x: 0, y: 0 })
-
-const initBtnPosition = () => {
-  const padding = 20
-  btnPosition.value = {
-    x: window.innerWidth - 64 - padding,
-    y: window.innerHeight - 64 - padding
-  }
-}
-
-const startBtnDrag = (e: MouseEvent | TouchEvent) => {
+function startBtnDrag(e: MouseEvent | TouchEvent) {
   if (dialogVisible.value) return
   isDraggingBtn.value = true
-  const pos = getClientPos(e)
+  const point = getEventPoint(e)
+  dragOffset.value = { x: point.x, y: point.y }
   btnDragOffset.value = {
-    x: pos.x - btnPosition.value.x,
-    y: pos.y - btnPosition.value.y
+    x: point.x - btnPosition.value.x,
+    y: point.y - btnPosition.value.y
   }
 }
 
-const onBtnDrag = (e: MouseEvent | TouchEvent) => {
-  if (!isDraggingBtn.value) return
-  e.preventDefault()
-  const pos = getClientPos(e)
-  
-  let newX = pos.x - btnDragOffset.value.x
-  let newY = pos.y - btnDragOffset.value.y
-  
-  const btnSize = 64
-  newX = Math.max(0, Math.min(newX, window.innerWidth - btnSize))
-  newY = Math.max(0, Math.min(newY, window.innerHeight - btnSize))
-  
-  btnPosition.value = { x: newX, y: newY }
+function snapFloatButton() {
+  const midpoint = window.innerWidth / 2
+  btnPosition.value.x = btnPosition.value.x + FLOAT_BTN_SIZE / 2 < midpoint ? EDGE_GAP : window.innerWidth - FLOAT_BTN_SIZE - EDGE_GAP
+  btnPosition.value.y = clamp(btnPosition.value.y, EDGE_GAP, window.innerHeight - FLOAT_BTN_SIZE - EDGE_GAP)
+  saveLayout()
 }
 
-const endBtnDrag = () => {
-  isDraggingBtn.value = false
-}
-
-// 点击按钮（区分拖拽和点击）
 let btnDragStartTime = 0
-let btnDragStartPos = { x: 0, y: 0 }
-const onBtnMouseDown = (e: MouseEvent | TouchEvent) => {
+let btnDragStartPoint = { x: 0, y: 0 }
+
+function onFloatBtnDown(e: MouseEvent | TouchEvent) {
   btnDragStartTime = Date.now()
-  const pos = getClientPos(e)
-  btnDragStartPos = { x: pos.x, y: pos.y }
+  btnDragStartPoint = getEventPoint(e)
   startBtnDrag(e)
 }
 
-const onBtnMouseUp = (e: MouseEvent | TouchEvent) => {
-  const dragDuration = Date.now() - btnDragStartTime
-  const pos = getClientPos(e)
-  const moveDistance = Math.sqrt(
-    Math.pow(pos.x - btnDragStartPos.x, 2) + Math.pow(pos.y - btnDragStartPos.y, 2)
-  )
-  
-  endBtnDrag()
-  
-  if (dragDuration < 200 && moveDistance < 5) {
+function onFloatBtnUp(e: MouseEvent | TouchEvent) {
+  const point = getEventPoint(e)
+  const duration = Date.now() - btnDragStartTime
+  const distance = Math.hypot(point.x - btnDragStartPoint.x, point.y - btnDragStartPoint.y)
+
+  if (isDraggingBtn.value) {
+    isDraggingBtn.value = false
+    snapFloatButton()
+  }
+
+  if (duration < 180 && distance < 6) {
     openChat()
   }
 }
 
-// ============ 聊天窗口操作 ============
-const openChat = () => {
-  dialogVisible.value = true
-  isMinimized.value = false
-  nextTick(() => scrollToBottom())
-}
-
-const closeChat = () => {
-  dialogVisible.value = false
-  uploadedFiles.value = []
-}
-
-const toggleMinimize = () => {
-  isMinimized.value = !isMinimized.value
-}
-
-const toggleFullscreen = () => {
-  if (isMinimized.value) {
-    isMinimized.value = false
+function startResize(direction: ResizeDirection, e: MouseEvent | TouchEvent) {
+  if (isFullscreen.value || isMinimized.value) return
+  isResizing.value = true
+  resizeDirection.value = direction
+  const point = getEventPoint(e)
+  resizeStartRect.value = {
+    x: windowPosition.value.x,
+    y: windowPosition.value.y,
+    width: currentSize.value.width,
+    height: currentSize.value.height,
+    pointX: point.x,
+    pointY: point.y
   }
-  isFullscreen.value = !isFullscreen.value
-  
-  if (isFullscreen.value) {
-    // 进入全屏
-    const newFullscreenSize = {
-      width: window.innerWidth,
-      height: window.innerHeight
-    }
-    currentSize.value = { ...newFullscreenSize }
-    windowPosition.value = { x: 0, y: 0 }
-  } else {
-    // 退出全屏，恢复默认大小
-    currentSize.value = { ...defaultSize }
-    const padding = 20
+}
+
+function onGlobalMove(e: MouseEvent | TouchEvent) {
+  if (dragThrottleTimer) return
+  dragThrottleTimer = setTimeout(() => { dragThrottleTimer = null }, 16)
+
+  if (isDraggingWindow.value && !isFullscreen.value) {
+    e.preventDefault()
+    const point = getEventPoint(e)
+    const height = isMinimized.value ? HEADER_HEIGHT : currentSize.value.height
     windowPosition.value = {
-      x: window.innerWidth - currentSize.value.width - padding,
-      y: window.innerHeight - currentSize.value.height - padding - 80
+      x: clamp(point.x - dragOffset.value.x, EDGE_GAP, window.innerWidth - currentSize.value.width - EDGE_GAP),
+      y: clamp(point.y - dragOffset.value.y, EDGE_GAP, window.innerHeight - height - EDGE_GAP)
     }
+    return
+  }
+
+  if (isDraggingBtn.value) {
+    e.preventDefault()
+    const point = getEventPoint(e)
+    btnPosition.value = {
+      x: clamp(point.x - btnDragOffset.value.x, EDGE_GAP, window.innerWidth - FLOAT_BTN_SIZE - EDGE_GAP),
+      y: clamp(point.y - btnDragOffset.value.y, EDGE_GAP, window.innerHeight - FLOAT_BTN_SIZE - EDGE_GAP)
+    }
+    return
+  }
+
+  if (isResizing.value && resizeDirection.value) {
+    e.preventDefault()
+    const point = getEventPoint(e)
+    const dx = point.x - resizeStartRect.value.pointX
+    const dy = point.y - resizeStartRect.value.pointY
+
+    let nextX = resizeStartRect.value.x
+    let nextY = resizeStartRect.value.y
+    let nextWidth = resizeStartRect.value.width
+    let nextHeight = resizeStartRect.value.height
+
+    if (resizeDirection.value.includes('right')) {
+      nextWidth = resizeStartRect.value.width + dx
+    }
+    if (resizeDirection.value.includes('bottom')) {
+      nextHeight = resizeStartRect.value.height + dy
+    }
+    if (resizeDirection.value.includes('left')) {
+      nextWidth = resizeStartRect.value.width - dx
+      nextX = resizeStartRect.value.x + dx
+    }
+    if (resizeDirection.value.includes('top')) {
+      nextHeight = resizeStartRect.value.height - dy
+      nextY = resizeStartRect.value.y + dy
+    }
+
+    nextWidth = Math.max(nextWidth, props.minWidth)
+    nextHeight = Math.max(nextHeight, props.minHeight)
+
+    if (resizeDirection.value.includes('left')) {
+      nextX = resizeStartRect.value.x + (resizeStartRect.value.width - nextWidth)
+    }
+    if (resizeDirection.value.includes('top')) {
+      nextY = resizeStartRect.value.y + (resizeStartRect.value.height - nextHeight)
+    }
+
+    if (nextX < EDGE_GAP) {
+      nextWidth -= EDGE_GAP - nextX
+      nextX = EDGE_GAP
+    }
+    if (nextY < EDGE_GAP) {
+      nextHeight -= EDGE_GAP - nextY
+      nextY = EDGE_GAP
+    }
+    if (nextX + nextWidth > window.innerWidth - EDGE_GAP) {
+      nextWidth = window.innerWidth - EDGE_GAP - nextX
+    }
+    if (nextY + nextHeight > window.innerHeight - EDGE_GAP) {
+      nextHeight = window.innerHeight - EDGE_GAP - nextY
+    }
+
+    currentSize.value = {
+      width: Math.max(nextWidth, props.minWidth),
+      height: Math.max(nextHeight, props.minHeight)
+    }
+    windowPosition.value = { x: nextX, y: nextY }
   }
 }
 
-// ============ 消息发送 ============
-const sendMessage = () => {
-  if ((!userInput.value.trim() && uploadedFiles.value.length === 0) || isTyping.value) return
+function onGlobalUp() {
+  if (isDraggingWindow.value || isDraggingBtn.value || isResizing.value) {
+    saveLayout()
+  }
+  isDraggingWindow.value = false
+  isDraggingBtn.value = false
+  isResizing.value = false
+  resizeDirection.value = null
+  setTimeout(() => {
+    isHeaderDragging.value = false
+  }, 50)
+}
 
-  // 添加用户消息
-  messages.value.push({
-    role: 'user',
-    content: userInput.value,
-    time: getCurrentTime(),
-    files: uploadedFiles.value.length > 0 ? [...uploadedFiles.value] : undefined
+function triggerFileUpload() {
+  fileInputRef.value?.click()
+}
+
+function formatFileSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+}
+
+function removeFile(id: string) {
+  uploadedFiles.value = uploadedFiles.value.filter((item) => item.id !== id)
+}
+
+const MAX_UPLOAD_FILES = 5
+
+function handleFileChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  const files = Array.from(input.files || [])
+  if (!files.length) return
+
+  if (uploadedFiles.value.length + files.length > MAX_UPLOAD_FILES) {
+    ElMessage.warning(`最多只能上传 ${MAX_UPLOAD_FILES} 个文件`)
+    input.value = ''
+    return
+  }
+
+  const maxFileSize = props.maxFileSizeMB * 1024 * 1024
+  const allowedTypes = [
+    'application/pdf',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'image/png',
+    'image/jpeg',
+    'image/jpg'
+  ]
+
+  files.forEach((file) => {
+    if (file.size > maxFileSize) {
+      ElMessage.warning(`${file.name} 超过 ${props.maxFileSizeMB}MB 限制`)
+      return
+    }
+    if (!allowedTypes.includes(file.type)) {
+      ElMessage.warning(`${file.name} 类型不支持，仅支持 PDF / DOCX / PNG / JPG / JPEG`)
+      return
+    }
+    uploadedFiles.value.push({
+      id: createId(),
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      file
+    })
   })
 
-  const userQuestion = userInput.value
-  userInput.value = ''
-  uploadedFiles.value = []
-
-  nextTick(() => scrollToBottom())
-
-  // 模拟 AI 回复
-  isTyping.value = true
-  setTimeout(() => {
-    const reply = generateAIReply(userQuestion)
-    messages.value.push({
-      role: 'ai',
-      content: reply,
-      time: getCurrentTime()
-    })
-    isTyping.value = false
-    nextTick(() => scrollToBottom())
-  }, 1000)
+  input.value = ''
 }
 
-const generateAIReply = (question: string): string => {
-  const lowerQ = question.toLowerCase()
-  if (lowerQ.includes('简历') && (lowerQ.includes('不好') || lowerQ.includes('缺点'))) return chatBotReplies.resume
-  if (lowerQ.includes('岗位') && (lowerQ.includes('适合') || lowerQ.includes('匹配'))) return chatBotReplies.jobMatch
-  if (lowerQ.includes('发展') || lowerQ.includes('晋升') || lowerQ.includes('职业规划')) return chatBotReplies.careerPlan
-  if (lowerQ.includes('你好') || lowerQ.includes('在吗')) return chatBotReplies.greeting
-  return chatBotReplies.default
-}
-
-const handleKeydown = (e: KeyboardEvent) => {
+function handleKeydown(e: KeyboardEvent) {
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault()
     sendMessage()
   }
 }
 
-const scrollToBottom = () => {
-  if (messagesContainer.value) {
-    messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
+function scrollToBottom() {
+  if (!messagesContainer.value) return
+  if (scrollRafId) cancelAnimationFrame(scrollRafId)
+  scrollRafId = requestAnimationFrame(() => {
+    if (messagesContainer.value) {
+      messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
+    }
+    scrollRafId = null
+  })
+}
+
+function pushAssistantPlaceholder() {
+  const message: ChatMessage = {
+    id: createId(),
+    role: 'assistant',
+    content: '',
+    time: getCurrentTime(),
+    streaming: true
+  }
+  messages.value.push(message)
+  return message
+}
+
+function appendChunkToMessage(messageId: string, chunk: string) {
+  const target = messages.value.find((item) => item.id === messageId)
+  if (!target) return
+  target.content += chunk
+  nextTick(() => scrollToBottom())
+}
+
+function finishAssistantMessage(messageId: string) {
+  const target = messages.value.find((item) => item.id === messageId)
+  if (!target) return
+  target.streaming = false
+  if (!target.content.trim()) {
+    target.content = '已收到请求，但本次没有返回可展示内容。'
   }
 }
 
-const messagesContainer = ref<HTMLElement | null>(null)
-
-// ============ 文件上传 ============
-const triggerFileUpload = () => {
-  fileInputRef.value?.click()
+function markAssistantError(messageId: string, errorMessage: string) {
+  const target = messages.value.find((item) => item.id === messageId)
+  if (!target) return
+  target.streaming = false
+  target.error = true
+  target.content = errorMessage
 }
 
-const handleFileChange = (e: Event) => {
-  const target = e.target as HTMLInputElement
-  const files = target.files
-  if (!files) return
+function clearLocalMessages() {
+  stopStream(false)
+  messages.value = [
+    {
+      id: createId(),
+      role: 'assistant',
+      content: props.welcomeMessage,
+      time: getCurrentTime()
+    }
+  ]
+}
 
-  Array.from(files).forEach(file => {
-    // 文件大小限制 10MB
-    if (file.size > 10 * 1024 * 1024) {
-      ElMessage.warning(`文件 ${file.name} 超过10MB限制`)
+function parseSSEBuffer(buffer: string) {
+  const normalized = buffer.replace(/\r/g, '')
+  const rawEvents = normalized.split('\n\n')
+  if (rawEvents.length === 0) {
+    return { chunks: [], done: false, errorMessage: '', rest: buffer }
+  }
+  const completeEvents = rawEvents.slice(0, -1)
+  const tail = rawEvents[rawEvents.length - 1] || ''
+
+  const chunks: string[] = []
+  let done = false
+  let errorMessage = ''
+
+  completeEvents.forEach((eventBlock) => {
+    const dataLines = eventBlock
+      .split('\n')
+      .filter((line) => line.startsWith('data:'))
+      .map((line) => line.slice(5).trimStart())
+
+    if (!dataLines.length) return
+
+    const data = dataLines.join('\n')
+    if (data === '[DONE]') {
+      done = true
       return
     }
-    
-    // 支持的文件类型
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'application/pdf', 'text/plain', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
-    if (!allowedTypes.includes(file.type)) {
-      ElMessage.warning(`文件 ${file.name} 类型不支持`)
+    if (data.startsWith('[ERROR]')) {
+      errorMessage = data.replace('[ERROR]', '').trim() || '流式响应失败'
       return
     }
-
-    const reader = new FileReader()
-    reader.onload = () => {
-      uploadedFiles.value.push({
-        id: Date.now().toString() + Math.random().toString(36).substring(2, 11),
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        url: reader.result as string
-      })
-    }
-    reader.readAsDataURL(file)
+    chunks.push(data)
   })
 
-  // 清空 input 以便重复选择同一文件
-  target.value = ''
+  return {
+    chunks,
+    done,
+    errorMessage,
+    rest: tail
+  }
 }
 
-const removeFile = (id: string) => {
-  uploadedFiles.value = uploadedFiles.value.filter(f => f.id !== id)
+async function sendMessage() {
+  const text = userInput.value.trim()
+  const files = [...uploadedFiles.value]
+
+  if ((!text && files.length === 0) || isStreaming.value) return
+  if (!props.apiBaseUrl) {
+    ElMessage.error('缺少 apiBaseUrl 配置')
+    return
+  }
+  if (!props.userId) {
+    ElMessage.error('缺少 userId 配置')
+    return
+  }
+  if (!props.token) {
+    ElMessage.error('缺少 token 配置')
+    return
+  }
+
+  messages.value.push({
+    id: createId(),
+    role: 'user',
+    content: text || '请分析我上传的文件',
+    time: getCurrentTime(),
+    files: files.length ? files : undefined
+  })
+
+  userInput.value = ''
+  uploadedFiles.value = []
+  nextTick(() => scrollToBottom())
+
+    const assistantMessage = pushAssistantPlaceholder()
+  const messageId = assistantMessage.id
+  const controller = new AbortController()
+  abortController.value = controller
+  isStreaming.value = true
+  let reader: ReadableStreamDefaultReader<Uint8Array> | null = null
+  let streamClosed = false
+
+  const formData = new FormData()
+  formData.append('user_id', props.userId)
+  if (currentConversationId.value) {
+    formData.append('conversation_id', currentConversationId.value)
+  }
+  formData.append('auto_extract_memory', String(files.length > 0 ? props.autoExtractMemoryWithFiles : props.autoExtractMemory))
+
+  if (files.length > 0) {
+    formData.append('message', text || '请结合我上传的文件进行分析')
+    files.forEach((item) => formData.append('files', item.file))
+  } else {
+    formData.append('message', text)
+  }
+
+  const endpoint = files.length > 0 ? '/chat/message-and-files/stream' : '/chat/message/stream'
+
+  try {
+    const response = await fetch(buildUrl(endpoint), {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${props.token}`
+      },
+      body: formData,
+      signal: controller.signal
+    })
+
+    if (!response.ok || !response.body) {
+      throw new Error(`请求失败：${response.status}`)
+    }
+
+    const convIdFromHeader = response.headers.get('x-conversation-id')
+    if (convIdFromHeader) {
+      currentConversationId.value = convIdFromHeader
+      emit('update:conversationId', convIdFromHeader)
+    }
+
+    reader = response.body.getReader()
+    const decoder = new TextDecoder('utf-8')
+    let buffer = ''
+    let receivedAnyChunk = false
+
+    while (!streamClosed) {
+      const { done, value } = await reader.read()
+      if (done) {
+        streamClosed = true
+        break
+      }
+
+      buffer += decoder.decode(value, { stream: true })
+      const parsed = parseSSEBuffer(buffer)
+      buffer = parsed.rest
+
+      if (parsed.errorMessage) {
+        throw new Error(parsed.errorMessage)
+      }
+
+      if (parsed.chunks.length) {
+        receivedAnyChunk = true
+        parsed.chunks.forEach((chunk) => appendChunkToMessage(messageId, chunk))
+      }
+
+      if (parsed.done) {
+        break
+      }
+    }
+
+    if (!receivedAnyChunk && buffer.trim()) {
+      const maybeLine = buffer
+        .split(/\n/)
+        .find((line) => line.trim().startsWith('data:'))
+      if (maybeLine) {
+        const data = maybeLine.replace(/^\s*data:\s*/, '')
+        if (data && data !== '[DONE]') {
+          appendChunkToMessage(messageId, data)
+        }
+      }
+    }
+
+    finishAssistantMessage(messageId)
+  } catch (error) {
+    const message = error instanceof Error
+      ? error.name === 'AbortError'
+        ? '已停止生成'
+        : error.message
+      : '发送失败，请稍后重试'
+
+    if (message === '已停止生成') {
+      finishAssistantMessage(messageId)
+    } else {
+      markAssistantError(messageId, message)
+      ElMessage.error(message)
+      emit('error', message)
+    }
+  } finally {
+    streamClosed = true
+    isStreaming.value = false
+    abortController.value = null
+    if (reader) {
+      try { reader.releaseLock() } catch {}
+    }
+    nextTick(() => scrollToBottom())
+    saveLayout()
+  }
 }
 
-const formatFileSize = (bytes: number): string => {
-  if (bytes < 1024) return bytes + ' B'
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+function stopStream(showToast = true) {
+  if (!abortController.value) return
+  abortController.value.abort()
+  abortController.value = null
+  isStreaming.value = false
+    const lastIdx = messages.value.length - 1
+  for (let i = lastIdx; i >= 0; i--) {
+    const item = messages.value[i]
+    if (item && item.role === 'assistant' && item.streaming) {
+      item.streaming = false
+      if (!item.content.trim()) {
+        item.content = '生成已停止。'
+      }
+      break
+    }
+  }
+  if (showToast) {
+    ElMessage.info('已停止生成')
+  }
 }
 
-// ============ 快捷问题 ============
-const quickQuestions = [
-  '我的简历哪里写得不好？',
-  '这个岗位适合我吗？',
-  '职业发展建议'
-]
-
-const sendQuickQuestion = (question: string) => {
+function sendQuickQuestion(question: string) {
   userInput.value = question
   sendMessage()
 }
 
-// ============ 自动触发逻辑 ============
+function handleResize() {
+  syncToViewport()
+}
+
+let autoOpenTimer: ReturnType<typeof setTimeout> | null = null
 let scrollHandler: (() => void) | null = null
-let exitIntentHandler: ((e: MouseEvent) => void) | null = null
+let mouseLeaveHandler: ((e: MouseEvent) => void) | null = null
+let dragThrottleTimer: ReturnType<typeof setTimeout> | null = null
+let scrollRafId: number | null = null
+
+function setupAutoTriggers() {
+  if (props.autoOpen) {
+    autoOpenTimer = setTimeout(() => {
+      if (!dialogVisible.value) openChat()
+    }, props.autoOpenDelay)
+  }
+
+  if (props.openOnScroll) {
+    scrollHandler = () => {
+      if (!dialogVisible.value && window.scrollY >= props.scrollThreshold) {
+        openChat()
+        if (scrollHandler) {
+          window.removeEventListener('scroll', scrollHandler)
+          scrollHandler = null
+        }
+      }
+    }
+    window.addEventListener('scroll', scrollHandler, { passive: true })
+  }
+
+  if (props.openOnExit) {
+    mouseLeaveHandler = (e: MouseEvent) => {
+      if (!dialogVisible.value && e.clientY <= 0) {
+        openChat()
+      }
+    }
+    document.addEventListener('mouseout', mouseLeaveHandler)
+  }
+}
 
 onMounted(() => {
-  initWindowPosition()
-  initBtnPosition()
+  restoreLayout()
+  syncToViewport()
+  setupAutoTriggers()
 
-  // 全局拖拽事件
-  document.addEventListener('mousemove', onWindowDrag)
-  document.addEventListener('mouseup', endWindowDrag)
-  document.addEventListener('mousemove', onBtnDrag)
-  document.addEventListener('mouseup', endBtnDrag)
-  document.addEventListener('touchmove', onWindowDrag, { passive: false })
-  document.addEventListener('touchend', endWindowDrag)
-  document.addEventListener('touchmove', onBtnDrag, { passive: false })
-  document.addEventListener('touchend', endBtnDrag)
-  window.addEventListener('resize', () => {
-    initWindowPosition()
-    initBtnPosition()
-  })
-
-  // 自动打开
-  if (props.autoOpen) {
-    setTimeout(() => openChat(), props.autoOpenDelay)
-  }
-
-  // 滚动触发
-  if (props.openOnScroll) {
-    let hasTriggered = false
-    scrollHandler = () => {
-      if (hasTriggered || dialogVisible.value) return
-      if (window.scrollY > props.scrollThreshold) {
-        hasTriggered = true
-        openChat()
-      }
-    }
-    window.addEventListener('scroll', scrollHandler)
-  }
-
-  // 退出意图触发
-  if (props.openOnExit) {
-    let hasTriggered = false
-    exitIntentHandler = (e: MouseEvent) => {
-      if (hasTriggered || dialogVisible.value) return
-      if (e.clientY < 10) { // 鼠标移到顶部
-        hasTriggered = true
-        openChat()
-      }
-    }
-    document.addEventListener('mouseleave', exitIntentHandler)
-  }
+  window.addEventListener('resize', handleResize)
+  window.addEventListener('mousemove', onGlobalMove, { passive: false })
+  window.addEventListener('mouseup', onGlobalUp)
+  window.addEventListener('touchmove', onGlobalMove, { passive: false })
+  window.addEventListener('touchend', onGlobalUp)
 })
 
 onUnmounted(() => {
-  document.removeEventListener('mousemove', onWindowDrag)
-  document.removeEventListener('mouseup', endWindowDrag)
-  document.removeEventListener('mousemove', onBtnDrag)
-  document.removeEventListener('mouseup', endBtnDrag)
-  document.removeEventListener('touchmove', onWindowDrag)
-  document.removeEventListener('touchend', endWindowDrag)
-  document.removeEventListener('touchmove', onBtnDrag)
-  document.removeEventListener('touchend', endBtnDrag)
-  
+  stopStream(false)
+  if (autoOpenTimer) clearTimeout(autoOpenTimer)
+  if (dragThrottleTimer) clearTimeout(dragThrottleTimer)
+  if (scrollRafId) cancelAnimationFrame(scrollRafId)
   if (scrollHandler) window.removeEventListener('scroll', scrollHandler)
-  if (exitIntentHandler) document.removeEventListener('mouseleave', exitIntentHandler)
+  if (mouseLeaveHandler) document.removeEventListener('mouseout', mouseLeaveHandler)
+  window.removeEventListener('resize', handleResize)
+  window.removeEventListener('mousemove', onGlobalMove)
+  window.removeEventListener('mouseup', onGlobalUp)
+  window.removeEventListener('touchmove', onGlobalMove)
+  window.removeEventListener('touchend', onGlobalUp)
 })
 </script>
 
 <template>
   <div class="chatbot-wrapper">
-    <!-- 浮动聊天窗口 -->
-    <transition name="chat-window">
+    <transition name="assistant-window">
       <div
         v-show="dialogVisible"
         ref="chatWindowRef"
         class="chat-window"
-        :class="{ 'minimized': isMinimized, 'fullscreen': isFullscreen }"
-        :style="{ 
-          left: windowPosition.x + 'px', 
-          top: windowPosition.y + 'px',
-          width: currentSize.width + 'px',
-          height: isMinimized ? '60px' : currentSize.height + 'px'
+        :class="{
+          minimized: isMinimized,
+          fullscreen: isFullscreen,
+          dragging: isHeaderDragging,
+          resizing: isResizing
+        }"
+        :style="{
+          left: `${windowPosition.x}px`,
+          top: `${windowPosition.y}px`,
+          width: `${currentSize.width}px`,
+          height: `${isMinimized ? HEADER_HEIGHT : currentSize.height}px`
         }"
       >
-        <!-- 可拖拽头部 -->
-        <div 
+        <div
           class="chat-header"
           @mousedown="startWindowDrag"
           @touchstart="startWindowDrag"
         >
           <div class="header-left">
-            <div class="ai-avatar">
-              <el-icon :size="18"><ChatDotRound /></el-icon>
+            <div class="assistant-avatar">
+              <el-icon :size="20"><ChatDotRound /></el-icon>
             </div>
-            <div class="header-info">
-              <h4>AI 助手</h4>
-              <span class="status">
-                <span class="status-dot"></span>
-                在线
-              </span>
+            <div class="header-meta">
+              <div class="header-title-row">
+                <h4>{{ title }}</h4>
+                <span class="assistant-badge">AI</span>
+              </div>
+              <div class="header-status">
+                <span class="status-dot" :class="{ streaming: isStreaming }"></span>
+                <span>{{ isStreaming ? '正在流式回复…' : subtitle }}</span>
+              </div>
             </div>
           </div>
-          <div class="header-actions">
-            <el-icon class="action-icon" @click.stop="toggleFullscreen" :title="isFullscreen ? '退出全屏' : '全屏'">
-              <svg v-if="isFullscreen" viewBox="0 0 1024 1024" width="16" height="16">
-                <path fill="currentColor" d="M391 240.9c-.8-6.6-8.9-9.4-13.6-4.7l-43.7 43.7L200 146.3c-3.1-3.1-8.2-3.1-11.3 0l-42.4 42.3c-3.1 3.1-3.1 8.2 0 11.3L280 333.6l-43.7 43.7c-4.7 4.7-2 12.8 4.7 13.6l138.1 19.5 19.5 138.1c.9 6.6 9 9.4 13.6 4.7l43.7-43.7L644.7 754l43.7-43.7c4.7-4.7 2-12.8-4.7-13.6L545.6 677.2l-19.5-138.1c-.9-6.6-9-9.4-13.6-4.7L468.8 578.1 330.7 440l138.1-138.1L391 240.9z"/>
-              </svg>
-              <svg v-else viewBox="0 0 1024 1024" width="16" height="16">
-                <path fill="currentColor" d="M240.9 391l138.1 138.1 138.1-138.1-43.7-43.7c-4.7-4.7-2-12.8 4.7-13.6l138.1-19.5 19.5-138.1c.8-6.6 8.9-9.4 13.6-4.7l43.7 43.7L754 200c3.1-3.1 8.2-3.1 11.3 0l42.4 42.3c3.1 3.1 3.1 8.2 0 11.3L677.2 280l43.7 43.7c4.7 4.7 2 12.8-4.7 13.6l-138.1 19.5-19.5 138.1c-.9 6.6-9 9.4-13.6 4.7l-43.7-43.7L440 643.9l-43.7 43.7c-4.7 4.7-2 12.8 4.7 13.6l138.1 19.5 19.5 138.1c.9 6.6 9 9.4 13.6 4.7l43.7-43.7L754 823.7l43.7 43.7c4.7 4.7 12.8 2 13.6-4.7l19.5-138.1 138.1-19.5c6.6-.9 9.4-9 4.7-13.6l-43.7-43.7L823.7 514l43.7-43.7c3.1-3.1 3.1-8.2 0-11.3l-42.4-42.3c-3.1-3.1-8.2-3.1-11.3 0L754 460.4l-138.1-138.1 138.1-138.1c3.1-3.1 3.1-8.2 0-11.3l-42.4-42.3c-3.1-3.1-8.2-3.1-11.3 0L514 268.6 391 391z"/>
-              </svg>
-            </el-icon>
-            <el-icon class="action-icon" @click.stop="toggleMinimize" :title="isMinimized ? '展开' : '最小化'">
-              <span v-if="isMinimized" class="restore-icon">□</span>
-              <span v-else class="minimize-icon">−</span>
-            </el-icon>
-            <el-icon class="action-icon close" @click.stop="closeChat" title="关闭">
-              <Close />
-            </el-icon>
+
+          <div class="header-actions" @mousedown.stop @touchstart.stop>
+            <button class="action-btn" type="button" title="清空本地消息" @click="clearLocalMessages">
+              清空
+            </button>
+            <button
+              v-if="isStreaming"
+              class="action-btn danger"
+              type="button"
+              title="停止生成"
+              @click="stopStream()"
+            >
+              停止
+            </button>
+            <button class="icon-btn" type="button" :title="isMinimized ? '展开' : '最小化'" @click="toggleMinimize">
+              <span v-if="isMinimized">□</span>
+              <span v-else>—</span>
+            </button>
+            <button class="icon-btn" type="button" :title="isFullscreen ? '退出全屏' : '全屏'" @click="toggleFullscreen">
+              <el-icon><FullScreen /></el-icon>
+            </button>
+            <button class="icon-btn close" type="button" title="关闭" @click="closeChat">
+              <el-icon><Close /></el-icon>
+            </button>
           </div>
         </div>
 
-        <!-- 聊天内容区 -->
         <div v-show="!isMinimized" class="chat-body">
-          <!-- 消息区域 -->
           <div ref="messagesContainer" class="messages-container">
             <div
-              v-for="(msg, index) in messages"
-              :key="index"
-              class="message-item"
-              :class="msg.role"
+              v-for="message in messages"
+              :key="message.id"
+              class="message-row"
+              :class="message.role"
             >
               <div class="message-avatar">
-                <el-icon v-if="msg.role === 'ai'" :size="14"><ChatDotRound /></el-icon>
+                <el-icon v-if="message.role === 'assistant'"><ChatDotRound /></el-icon>
                 <span v-else>我</span>
               </div>
-              <div class="message-content">
-                <div class="message-bubble">
-                  <VueMarkdown :source="msg.content" />
-                  <!-- 文件附件 -->
-                  <div v-if="msg.files && msg.files.length > 0" class="file-attachments">
-                    <div v-for="file in msg.files" :key="file.id" class="file-item">
+
+              <div class="message-main">
+                <div class="message-bubble" :class="{ error: message.error }">
+                  <template v-if="message.content">
+                    <VueMarkdown :source="message.content" :options="{ html: false, linkify: true, typographer: true }" />
+                  </template>
+                  <template v-else>
+                    <div class="typing-placeholder">
+                      <el-icon class="spinning"><Loading /></el-icon>
+                      <span>正在思考中…</span>
+                    </div>
+                  </template>
+
+                  <div v-if="message.files?.length" class="message-files">
+                    <div v-for="file in message.files" :key="file.id" class="message-file-item">
                       <el-icon><Paperclip /></el-icon>
                       <span class="file-name">{{ file.name }}</span>
-                      <span class="file-size">({{ formatFileSize(file.size) }})</span>
+                      <span class="file-size">{{ formatFileSize(file.size) }}</span>
                     </div>
                   </div>
                 </div>
-                <span class="message-time">{{ msg.time }}</span>
-              </div>
-            </div>
-
-            <!-- 输入中提示 -->
-            <div v-if="isTyping" class="message-item ai typing">
-              <div class="message-avatar">
-                <el-icon :size="14"><ChatDotRound /></el-icon>
-              </div>
-              <div class="message-content">
-                <div class="message-bubble">
-                  <span class="typing-dots">
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                  </span>
+                <div class="message-meta">
+                  <span>{{ message.time }}</span>
+                  <span v-if="message.streaming" class="stream-tag">流式输出中</span>
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- 快捷问题 -->
-          <div class="quick-questions">
-            <span
+          <div v-if="quickQuestions.length" class="quick-questions">
+            <button
               v-for="question in quickQuestions"
               :key="question"
-              class="quick-tag"
+              type="button"
+              class="quick-chip"
               @click="sendQuickQuestion(question)"
             >
               {{ question }}
-            </span>
+            </button>
           </div>
 
-          <!-- 已上传文件预览 -->
-          <div v-if="uploadedFiles.length > 0" class="uploaded-files">
-            <div v-for="file in uploadedFiles" :key="file.id" class="uploaded-file-item">
-              <el-icon><Paperclip /></el-icon>
-              <span class="file-name">{{ file.name }}</span>
-              <el-icon class="delete-icon" @click="removeFile(file.id)"><Delete /></el-icon>
+          <div v-if="uploadedFiles.length" class="upload-preview">
+            <div v-for="file in uploadedFiles" :key="file.id" class="upload-chip">
+              <div class="upload-chip-left">
+                <el-icon><Paperclip /></el-icon>
+                <span class="file-name">{{ file.name }}</span>
+                <span class="file-size">{{ formatFileSize(file.size) }}</span>
+              </div>
+              <button class="delete-btn" type="button" @click="removeFile(file.id)">
+                <el-icon><Delete /></el-icon>
+              </button>
             </div>
           </div>
 
-          <!-- 输入区域 -->
-          <div class="input-area">
-            <div class="input-wrapper">
+          <div class="input-panel">
+            <div class="input-shell">
               <el-input
                 v-model="userInput"
                 type="textarea"
-                :rows="2"
-                placeholder="请输入你的问题..."
+                :rows="3"
                 resize="none"
+                placeholder="输入你的问题，Enter 发送，Shift + Enter 换行"
                 @keydown="handleKeydown"
               />
-              <div class="input-actions">
-                <el-icon class="attach-icon" @click="triggerFileUpload">
-                  <Paperclip />
-                </el-icon>
-                <el-button
-                  type="primary"
-                  size="small"
-                  :disabled="(!userInput.trim() && uploadedFiles.length === 0) || isTyping"
-                  @click="sendMessage"
-                >
-                  <el-icon><Promotion /></el-icon>
-                </el-button>
+
+              <div class="input-toolbar">
+                <div class="input-toolbar-left">
+                  <button class="tool-btn" type="button" title="上传文件" @click="triggerFileUpload">
+                    <el-icon><Paperclip /></el-icon>
+                    <span>附件</span>
+                  </button>
+                  <span class="hint-text">支持 PDF / DOCX / PNG / JPG / JPEG</span>
+                </div>
+
+                <div class="input-toolbar-right">
+                  <button
+                    v-if="isStreaming"
+                    class="send-btn stop"
+                    type="button"
+                    @click="stopStream()"
+                  >
+                    停止
+                  </button>
+                  <button
+                    v-else
+                    class="send-btn"
+                    type="button"
+                    :disabled="!canSend"
+                    @click="sendMessage"
+                  >
+                    <el-icon><Promotion /></el-icon>
+                    <span>发送</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         </div>
+
+        <template v-if="!isFullscreen && !isMinimized">
+          <span class="resize-handle top" @mousedown.prevent="startResize('top', $event)"></span>
+          <span class="resize-handle right" @mousedown.prevent="startResize('right', $event)"></span>
+          <span class="resize-handle bottom" @mousedown.prevent="startResize('bottom', $event)"></span>
+          <span class="resize-handle left" @mousedown.prevent="startResize('left', $event)"></span>
+          <span class="resize-handle top-left" @mousedown.prevent="startResize('top-left', $event)"></span>
+          <span class="resize-handle top-right" @mousedown.prevent="startResize('top-right', $event)"></span>
+          <span class="resize-handle bottom-left" @mousedown.prevent="startResize('bottom-left', $event)"></span>
+          <span class="resize-handle bottom-right" @mousedown.prevent="startResize('bottom-right', $event)"></span>
+        </template>
       </div>
     </transition>
 
-    <!-- 可拖拽悬浮按钮 -->
     <div
       v-show="!dialogVisible"
       ref="floatBtnRef"
       class="chatbot-float-btn"
-      :class="{ 'dragging': isDraggingBtn }"
-      :style="{ left: btnPosition.x + 'px', top: btnPosition.y + 'px' }"
-      @mousedown="onBtnMouseDown"
-      @mouseup="onBtnMouseUp"
-      @touchstart="onBtnMouseDown"
-      @touchend="onBtnMouseUp"
+      :class="{ dragging: isDraggingBtn }"
+      :style="{ left: `${btnPosition.x}px`, top: `${btnPosition.y}px` }"
+      @mousedown="onFloatBtnDown"
+      @mouseup="onFloatBtnUp"
+      @touchstart="onFloatBtnDown"
+      @touchend="onFloatBtnUp"
     >
-      <el-icon :size="24"><ChatDotRound /></el-icon>
-      <span class="btn-text">AI 助手</span>
+      <div class="float-btn-icon">
+        <el-icon :size="24"><ChatDotRound /></el-icon>
+      </div>
+      <div class="float-btn-text">
+        <span>AI 助手</span>
+        <small>点击咨询</small>
+      </div>
     </div>
 
-    <!-- 隐藏的文件输入 -->
     <input
       ref="fileInputRef"
       type="file"
       multiple
-      accept=".jpg,.jpeg,.png,.gif,.pdf,.txt,.doc,.docx"
+      accept=".pdf,.docx,.png,.jpg,.jpeg"
       style="display: none"
       @change="handleFileChange"
     />
@@ -610,51 +1128,49 @@ onUnmounted(() => {
 <style scoped>
 .chatbot-wrapper {
   position: fixed;
-  top: 0;
-  left: 0;
+  inset: 0;
   width: 0;
   height: 0;
   z-index: 9999;
+  pointer-events: none;
 }
 
-/* ========== 浮动聊天窗口 (420x600px) ========== */
 .chat-window {
   position: fixed;
-  width: 420px;
-  height: 600px;
-  background: white;
-  border-radius: 16px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(16px);
+  box-shadow:
+    0 24px 64px rgba(15, 23, 42, 0.16),
+    0 10px 24px rgba(15, 23, 42, 0.08);
   pointer-events: auto;
-  z-index: 10000;
-}
-
-.chat-window.minimized {
-  height: 60px !important;
+  user-select: none;
 }
 
 .chat-window.fullscreen {
   border-radius: 0;
+  border: none;
 }
 
-.chat-window.fullscreen .chat-header {
-  border-radius: 0;
+.chat-window.dragging,
+.chat-window.resizing {
+  transition: none;
 }
 
-/* 可拖拽头部 */
 .chat-header {
-  padding: 12px 16px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  height: 64px;
+  padding: 0 16px;
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(135deg, #3b82f6 0%, #7c3aed 52%, #0f172a 100%);
+  color: #fff;
   cursor: grab;
   flex-shrink: 0;
-  user-select: none;
 }
 
 .chat-header:active {
@@ -662,415 +1178,674 @@ onUnmounted(() => {
 }
 
 .header-left {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.ai-avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.header-info h4 {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.status {
-  font-size: 11px;
-  opacity: 0.9;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.status-dot {
-  width: 6px;
-  height: 6px;
-  background: #67c23a;
-  border-radius: 50%;
-  animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-
-.header-actions {
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
-.action-icon {
+.assistant-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+  flex-shrink: 0;
+}
+
+.header-meta {
+  min-width: 0;
+}
+
+.header-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.header-title-row h4 {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1;
+  font-weight: 700;
+}
+
+.assistant-badge {
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.header-status {
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  opacity: 0.95;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #86efac;
+  box-shadow: 0 0 0 4px rgba(134, 239, 172, 0.18);
+  flex-shrink: 0;
+}
+
+.status-dot.streaming {
+  animation: pulse 1.1s infinite ease-in-out;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 12px;
+}
+
+.action-btn,
+.icon-btn,
+.tool-btn,
+.send-btn,
+.quick-chip,
+.delete-btn {
+  border: none;
+  outline: none;
   cursor: pointer;
-  font-size: 18px;
-  opacity: 0.85;
-  transition: opacity 0.2s;
-  padding: 4px;
+  transition: all 0.2s ease;
 }
 
-.action-icon:hover {
-  opacity: 1;
+.action-btn {
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
 }
 
-.action-icon.close:hover {
-  color: #f56c6c;
+.action-btn:hover,
+.icon-btn:hover {
+  background: rgba(255, 255, 255, 0.24);
 }
 
-.minimize-icon {
-  font-size: 20px;
-  font-weight: bold;
-  line-height: 1;
+.action-btn.danger {
+  background: rgba(239, 68, 68, 0.18);
 }
 
-.restore-icon {
-  font-size: 14px;
-  font-weight: bold;
-  line-height: 1;
+.icon-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
 }
 
-/* 聊天内容区 */
+.icon-btn.close:hover {
+  background: rgba(239, 68, 68, 0.22);
+}
+
 .chat-body {
+  min-height: 0;
   flex: 1;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  background:
+    radial-gradient(circle at top, rgba(59, 130, 246, 0.08), transparent 28%),
+    linear-gradient(180deg, #f8fbff 0%, #f6f7fb 100%);
 }
 
-/* 消息区域 */
 .messages-container {
   flex: 1;
-  padding: 16px;
+  min-height: 0;
+  padding: 18px 16px 12px;
   overflow-y: auto;
-  background: #f8fafc;
 }
 
-.message-item {
+.message-row {
   display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
+  gap: 10px;
+  margin-bottom: 14px;
 }
 
-.message-item.user {
+.message-row.user {
   flex-direction: row-reverse;
 }
 
 .message-avatar {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  border-radius: 12px;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
-  font-size: 10px;
+  font-size: 12px;
+  font-weight: 700;
 }
 
-.message-item.ai .message-avatar {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+.message-row.assistant .message-avatar {
+  background: linear-gradient(135deg, #3b82f6 0%, #7c3aed 100%);
+  color: #fff;
 }
 
-.message-item.user .message-avatar {
-  background: #409eff;
-  color: white;
+.message-row.user .message-avatar {
+  background: #0f172a;
+  color: #fff;
 }
 
-.message-content {
-  max-width: 75%;
+.message-main {
+  max-width: min(82%, 680px);
+  display: flex;
+  flex-direction: column;
+}
+
+.message-row.user .message-main {
+  align-items: flex-end;
 }
 
 .message-bubble {
-  padding: 10px 14px;
-  border-radius: 12px;
+  padding: 12px 14px;
+  border-radius: 18px;
   font-size: 13px;
-  line-height: 1.6;
+  line-height: 1.7;
   word-break: break-word;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
 }
 
-.message-item.ai .message-bubble {
-  background: white;
-  color: #303133;
-  border-bottom-left-radius: 4px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+.message-row.assistant .message-bubble {
+  color: #1f2937;
+  background: rgba(255, 255, 255, 0.95);
+  border-bottom-left-radius: 6px;
 }
 
-.message-item.user .message-bubble {
-  background: #409eff;
-  color: white;
-  border-bottom-right-radius: 4px;
+.message-row.user .message-bubble {
+  color: #fff;
+  background: linear-gradient(135deg, #2563eb 0%, #4f46e5 100%);
+  border-bottom-right-radius: 6px;
 }
 
-.message-time {
-  font-size: 10px;
-  color: #909399;
-  margin-top: 4px;
-  display: block;
+.message-bubble.error {
+  background: #fff1f2 !important;
+  color: #b91c1c !important;
+  border: 1px solid #fecdd3;
 }
 
-.message-item.user .message-time {
-  text-align: right;
-}
-
-/* 输入中动画 */
-.typing-dots {
+.message-meta {
+  margin-top: 6px;
   display: flex;
-  gap: 4px;
-  padding: 4px 8px;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: #94a3b8;
 }
 
-.typing-dots span {
-  width: 6px;
-  height: 6px;
-  background: #909399;
-  border-radius: 50%;
-  animation: typing 1.4s infinite;
+.stream-tag {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.1);
+  color: #2563eb;
 }
 
-.typing-dots span:nth-child(2) { animation-delay: 0.2s; }
-.typing-dots span:nth-child(3) { animation-delay: 0.4s; }
-
-@keyframes typing {
-  0%, 60%, 100% { transform: translateY(0); }
-  30% { transform: translateY(-6px); }
+.typing-placeholder {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #64748b;
 }
 
-/* 文件附件 */
-.file-attachments {
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid rgba(0, 0, 0, 0.1);
+.spinning {
+  animation: rotate 1s linear infinite;
 }
 
-.file-item {
+.message-files {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(148, 163, 184, 0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.message-file-item,
+.upload-chip-left {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.9);
-}
-
-.message-item.ai .file-item {
-  color: #606266;
+  min-width: 0;
 }
 
 .file-name {
-  max-width: 120px;
+  max-width: 180px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .file-size {
+  color: inherit;
   opacity: 0.7;
+  flex-shrink: 0;
 }
 
-/* 快捷问题 */
 .quick-questions {
-  padding: 10px 12px;
-  background: white;
-  border-top: 1px solid #ebeef5;
+  padding: 0 14px 10px;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  flex-shrink: 0;
 }
 
-.quick-tag {
-  padding: 6px 12px;
-  background: #f0f7ff;
-  border-radius: 16px;
+.quick-chip {
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.85);
+  color: #334155;
   font-size: 12px;
-  color: #409eff;
-  cursor: pointer;
-  transition: all 0.2s;
-  white-space: nowrap;
-  border: 1px solid transparent;
+  border: 1px solid rgba(148, 163, 184, 0.18);
 }
 
-.quick-tag:hover {
-  background: #e6f2ff;
-  border-color: #409eff;
+.quick-chip:hover {
+  transform: translateY(-1px);
+  color: #1d4ed8;
+  border-color: rgba(59, 130, 246, 0.24);
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.12);
 }
 
-/* 已上传文件 */
-.uploaded-files {
-  padding: 8px 12px;
-  background: #f5f7fa;
-  border-top: 1px solid #ebeef5;
+.upload-preview {
+  padding: 0 14px 10px;
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 8px;
+}
+
+.upload-chip {
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.84);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.delete-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #64748b;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
 }
 
-.uploaded-file-item {
+.delete-btn:hover {
+  color: #dc2626;
+  background: #fee2e2;
+}
+
+.input-panel {
+  padding: 0 14px 14px;
+  flex-shrink: 0;
+}
+
+.input-shell {
+  padding: 12px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  box-shadow: 0 16px 30px rgba(148, 163, 184, 0.12);
+}
+
+.input-shell :deep(.el-textarea__inner) {
+  min-height: 78px !important;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border-color: rgba(148, 163, 184, 0.22);
+  box-shadow: none;
+  background: #f8fafc;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.input-shell :deep(.el-textarea__inner:focus) {
+  border-color: #60a5fa;
+  background: #fff;
+}
+
+.input-toolbar {
+  margin-top: 10px;
   display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.input-toolbar-left,
+.input-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tool-btn {
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 10px;
+  display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 10px;
-  background: white;
-  border-radius: 12px;
-  font-size: 11px;
-  color: #606266;
-  border: 1px solid #dcdfe6;
-}
-
-.uploaded-file-item .file-name {
-  max-width: 100px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.delete-icon {
-  cursor: pointer;
-  color: #909399;
+  background: #eff6ff;
+  color: #1d4ed8;
   font-size: 12px;
+  font-weight: 600;
 }
 
-.delete-icon:hover {
-  color: #f56c6c;
+.tool-btn:hover {
+  background: #dbeafe;
 }
 
-/* 输入区域 */
-.input-area {
-  padding: 10px 12px 12px;
-  background: white;
-  border-top: 1px solid #ebeef5;
-  flex-shrink: 0;
+.hint-text {
+  font-size: 11px;
+  color: #94a3b8;
 }
 
-.input-wrapper {
-  position: relative;
-}
-
-.input-wrapper :deep(.el-textarea__inner) {
-  border-radius: 10px;
-  resize: none;
-  padding: 10px 80px 10px 12px;
-  min-height: 60px !important;
-}
-
-.input-actions {
-  position: absolute;
-  right: 8px;
-  bottom: 8px;
-  display: flex;
+.send-btn {
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 12px;
+  display: inline-flex;
   align-items: center;
   gap: 8px;
+  background: linear-gradient(135deg, #2563eb 0%, #4f46e5 100%);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: 0 10px 20px rgba(59, 130, 246, 0.22);
 }
 
-.attach-icon {
-  cursor: pointer;
-  font-size: 18px;
-  color: #909399;
-  padding: 4px;
-  transition: color 0.2s;
+.send-btn:hover {
+  transform: translateY(-1px);
 }
 
-.attach-icon:hover {
-  color: #409eff;
+.send-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none;
+  box-shadow: none;
 }
 
-.input-actions .el-button {
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border-radius: 8px;
+.send-btn.stop {
+  background: linear-gradient(135deg, #f97316 0%, #ef4444 100%);
+  box-shadow: 0 10px 20px rgba(249, 115, 22, 0.22);
 }
 
-/* ========== 可拖拽悬浮按钮 ========== */
 .chatbot-float-btn {
   position: fixed;
   width: 64px;
   height: 64px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  border-radius: 22px;
+  background: linear-gradient(135deg, #2563eb 0%, #7c3aed 68%, #111827 100%);
+  color: #fff;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
+  box-shadow: 0 18px 36px rgba(37, 99, 235, 0.26);
   cursor: grab;
-  box-shadow: 0 6px 24px rgba(102, 126, 234, 0.4);
-  transition: transform 0.2s, box-shadow 0.2s;
   pointer-events: auto;
   user-select: none;
-  z-index: 10000;
+  overflow: hidden;
+  transition: width 0.22s ease, border-radius 0.22s ease, transform 0.18s ease, box-shadow 0.18s ease;
 }
 
-.chatbot-float-btn:active,
-.chatbot-float-btn.dragging {
+.chatbot-float-btn:hover {
+  width: 156px;
+  border-radius: 18px;
+}
+
+.chatbot-float-btn.dragging,
+.chatbot-float-btn:active {
   cursor: grabbing;
-  transform: scale(1.05);
-  box-shadow: 0 8px 32px rgba(102, 126, 234, 0.5);
+  transform: scale(1.04);
+  box-shadow: 0 20px 40px rgba(37, 99, 235, 0.32);
 }
 
-.btn-text {
-  font-size: 10px;
-  margin-top: 2px;
-  font-weight: 500;
+.float-btn-icon {
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
-/* ========== 动画 ========== */
-.chat-window-enter-active,
-.chat-window-leave-active {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.chat-window-enter-from,
-.chat-window-leave-to {
+.float-btn-text {
+  width: 88px;
+  padding-right: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  font-size: 12px;
+  font-weight: 700;
   opacity: 0;
-  transform: scale(0.9) translateY(20px);
+  transform: translateX(10px);
+  transition: all 0.22s ease;
 }
 
-/* 滚动条样式 */
+.float-btn-text small {
+  font-size: 10px;
+  opacity: 0.82;
+}
+
+.chatbot-float-btn:hover .float-btn-text {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.resize-handle {
+  position: absolute;
+  z-index: 3;
+}
+
+.resize-handle.top,
+.resize-handle.bottom {
+  left: 14px;
+  right: 14px;
+  height: 8px;
+}
+
+.resize-handle.left,
+.resize-handle.right {
+  top: 14px;
+  bottom: 14px;
+  width: 8px;
+}
+
+.resize-handle.top {
+  top: -4px;
+  cursor: ns-resize;
+}
+
+.resize-handle.right {
+  right: -4px;
+  cursor: ew-resize;
+}
+
+.resize-handle.bottom {
+  bottom: -4px;
+  cursor: ns-resize;
+}
+
+.resize-handle.left {
+  left: -4px;
+  cursor: ew-resize;
+}
+
+.resize-handle.top-left,
+.resize-handle.top-right,
+.resize-handle.bottom-left,
+.resize-handle.bottom-right {
+  width: 16px;
+  height: 16px;
+}
+
+.resize-handle.top-left {
+  left: -4px;
+  top: -4px;
+  cursor: nwse-resize;
+}
+
+.resize-handle.top-right {
+  right: -4px;
+  top: -4px;
+  cursor: nesw-resize;
+}
+
+.resize-handle.bottom-left {
+  left: -4px;
+  bottom: -4px;
+  cursor: nesw-resize;
+}
+
+.resize-handle.bottom-right {
+  right: -4px;
+  bottom: -4px;
+  cursor: nwse-resize;
+}
+
+.assistant-window-enter-active,
+.assistant-window-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.assistant-window-enter-from,
+.assistant-window-leave-to {
+  opacity: 0;
+  transform: translateY(16px) scale(0.98);
+}
+
 .messages-container::-webkit-scrollbar {
-  width: 4px;
+  width: 8px;
+}
+
+.messages-container::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.5);
+  border: 2px solid transparent;
+  background-clip: padding-box;
 }
 
 .messages-container::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.messages-container::-webkit-scrollbar-thumb {
-  background: #c0c4cc;
-  border-radius: 2px;
+:deep(p) {
+  margin: 0 0 8px;
 }
 
-.messages-container::-webkit-scrollbar-thumb:hover {
-  background: #909399;
+:deep(p:last-child) {
+  margin-bottom: 0;
 }
 
-/* 响应式 */
-@media (max-width: 480px) {
-  .chat-window {
-    width: calc(100vw - 40px) !important;
-    height: 500px !important;
-    left: 20px !important;
-    right: 20px;
-    top: auto !important;
-    bottom: 100px !important;
+:deep(pre) {
+  overflow-x: auto;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.06);
+}
+
+:deep(code) {
+  font-family: Consolas, Monaco, monospace;
+  font-size: 12px;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
   }
-  
-  .chat-window.fullscreen {
-    width: 100vw !important;
-    height: 100vh !important;
-    left: 0 !important;
-    right: 0 !important;
-    top: 0 !important;
-    bottom: 0 !important;
-    border-radius: 0;
+  50% {
+    transform: scale(1.12);
+    opacity: 0.72;
+  }
+}
+
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 768px) {
+  .chat-window {
+    border-radius: 18px;
+  }
+
+  .header-actions .action-btn {
+    display: none;
+  }
+
+  .chatbot-float-btn:hover {
+    width: 64px;
+    border-radius: 22px;
+  }
+
+  .float-btn-text {
+    display: none;
+  }
+
+  .message-main {
+    max-width: 88%;
+  }
+
+  .hint-text {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .chat-window:not(.fullscreen) {
+    width: calc(100vw - 16px) !important;
+    height: calc(100vh - 100px) !important;
+    left: 8px !important;
+    top: auto !important;
+    bottom: 80px !important;
+  }
+
+  .quick-questions {
+    padding-inline: 10px;
+  }
+
+  .upload-preview,
+  .input-panel {
+    padding-inline: 10px;
   }
 }
 </style>
