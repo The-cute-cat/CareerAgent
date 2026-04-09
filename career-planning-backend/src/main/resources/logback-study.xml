@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <!-- ==================== 变量定义区 ==================== -->
+
+    <!-- 日志文件存放目录：./ 表示当前项目根目录 -->
+    <property name="LOG_PATH" value="./logs" />
+
+    <!-- 应用名称：用于区分不同微服务的日志文件 -->
+    <property name="APP_NAME" value="my-career-agent" />
+
+    <!-- 控制台输出格式（带颜色，给人看的）
+         %clr(...){颜色} = 设置颜色
+         %d = 时间    %5p = 日志级别（5字符宽）    ${PID:- } = 进程ID
+         %t = 线程名  %logger = 类名    %m = 消息内容    %n = 换行    %wEx = 异常堆栈 -->
+    <property name="CONSOLE_LOG_PATTERN"
+              value="%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr(%5p) %clr(${PID:- }){magenta} %clr(---){faint} %clr([%15.15t]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %m%n%wEx"/>
+
+    <!-- 文件输出格式（纯文本，给机器/ELK采集用的，不能带颜色） -->
+    <property name="FILE_LOG_PATTERN"
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} %5p ${PID:- } --- [%t] %-40.40logger{39} : %m%n%wEx"/>
+
+    <!-- ==================== 文件输出配置 ==================== -->
+
+    <!-- 滚动文件 Appender：日志写入文件，自动切割 -->
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+
+        <!-- 当前正在写入的日志文件路径 -->
+        <file>${LOG_PATH}/${APP_NAME}.log</file>
+
+        <!-- 滚动策略：按时间+文件大小切割，自动压缩 -->
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <!-- 切割后的文件名：my-career-agent.2026-04-08.0.log.gz（gz表示压缩） -->
+            <fileNamePattern>${LOG_PATH}/${APP_NAME}.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+
+            <!-- 单个文件最大1GB，超过就切割 -->
+            <maxFileSize>1GB</maxFileSize>
+
+            <!-- 保留最近30天的日志，更早的自动删除 -->
+            <maxHistory>30</maxHistory>
+
+            <!-- 日志目录总大小不超过10GB，超过就删最老的 -->
+            <totalSizeCap>10GB</totalSizeCap>
+
+            <!-- 项目启动时自动清理过期日志，防止堆积 -->
+            <cleanHistoryOnStart>true</cleanHistoryOnStart>
+        </rollingPolicy>
+
+        <!-- 编码器：定义日志写入文件的格式 -->
+        <encoder>
+            <!-- 使用上面定义的纯文本格式变量 -->
+            <pattern>${FILE_LOG_PATTERN}</pattern>
+            <!-- 字符集UTF-8，确保中文不乱码 -->
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <!-- ==================== 控制台输出配置 ==================== -->
+
+    <!-- 控制台 Appender：日志打印到黑窗口/IDE控制台 -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <!-- 使用带颜色的格式，控制台看起来更好看 -->
+            <pattern>${CONSOLE_LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <!-- ==================== 异步输出配置 ==================== -->
+
+    <!-- 异步 Appender：先把日志放内存队列，后台线程慢慢写磁盘，不卡主程序 -->
+    <appender name="ASYNC_FILE" class="ch.qos.logback.classic.AsyncAppender">
+        <!-- 内存队列大小：最多缓存8192条日志 -->
+        <queueSize>8192</queueSize>
+
+        <!-- 队列满了不阻塞程序，直接丢弃新日志（保证性能） -->
+        <neverBlock>true</neverBlock>
+
+        <!-- 真正写磁盘的地方，指向上面定义的 FILE -->
+        <appender-ref ref="FILE"/>
+    </appender>
+
+    <!-- ==================== 根日志配置 ==================== -->
+
+    <!-- 根日志级别：DEBUG（记录DEBUG/INFO/WARN/ERROR），生产环境建议改成INFO -->
+    <root level="DEBUG">
+        <!-- 输出到异步文件（经过ASYNC_FILE → FILE最终写入磁盘） -->
+        <appender-ref ref="ASYNC_FILE"/>
+        <!-- 同时输出到控制台 -->
+        <appender-ref ref="CONSOLE"/>
+    </root>
+</configuration>

@@ -88,13 +88,13 @@ class _LLMModelBase(BaseModel):
     def _validate_default_value(self) -> "_LLMModelBase":
         if self._skip_verify:
             return self
-        if not self.api_key.get_secret_value() or self.api_key.get_secret_value() == "<api_key>":
-            raise ValueError(
-                f"请在 .env 文件中配置正确的 {self._name if self._name else self.__class__.__name__} API Key"
-            )
         if not self.base_url:
             raise ValueError(
                 f"请在 .env 文件中配置正确的 {self._name if self._name else self.__class__.__name__} Base URL"
+            )
+        if self.api_key.get_secret_value() in ("<API_KEY>", "<api_key>", "", None):
+            raise ValueError(
+                f"请在 .env 文件中配置正确的 {self._name if self._name else self.__class__.__name__} API Key"
             )
         if not self.model_name:
             raise ValueError(
@@ -122,10 +122,13 @@ class _LLM(_LLMModelBase):
     def _set_default_value(self, llm: _LLMModelBase):
         if self.api_key.get_secret_value() == "<api_key>":
             raise ValueError(f"{self.__class__.__name__} api_key 应该是需要配置的但现在未配置")
-        if not self.api_key.get_secret_value():
-            self.api_key = llm.api_key
         if not self.base_url:
             self.base_url = llm.base_url
+        else:
+            if self.base_url != llm.base_url and self.api_key.get_secret_value() in ("<API_KEY>", "<api_key>", "", None):
+                raise ValueError(f"❌️错误：{self.__class__.__name__} base_url 和 llm.base_url 不一致且 api_key 未配置，不能继承api_key！")
+        if not self.api_key.get_secret_value():
+            self.api_key = llm.api_key
         if not self.model_name:
             self.model_name = llm.model_name
         if self.timeout == -1:
@@ -192,20 +195,26 @@ class _GrowthPlanAgent(_LLM):
 
 
 class _PathConfig(BaseModel):
-    temp: str = ""
-    is_clean: bool = True
+    class _Temp(BaseModel):
+        path: str = ""
+        exit_is_clean: bool = True
+        run_is_clean: bool = True
+        expire: int = 900
+        cleanup_interval: int = 60
+
+        @field_validator("path")
+        @classmethod
+        def _validate_temp(cls, v):
+            if v == "<TEMP_PATH>" or not v or not Path(v).exists():
+                v = tempfile.gettempdir()
+            path = os.path.join(v, "career_agent", "ai_service", "temp")
+            os.makedirs(path, exist_ok=True)
+            return str(Path(path))
+
+    temp: _Temp = _Temp()
     log: str = ""
     prompt: str = ""
     data: str = ""
-
-    @field_validator("temp")
-    @classmethod
-    def _validate_temp(cls, v):
-        if v == "<TEMP_PATH>" or not v or not Path(v).exists():
-            v = tempfile.gettempdir()
-        path = os.path.join(v, "career_agent", "ai_service", "temp")
-        os.makedirs(path, exist_ok=True)
-        return str(Path(path))
 
     @field_validator("log")
     @classmethod
@@ -238,6 +247,7 @@ class _PathConfig(BaseModel):
 class _Vector(BaseModel):
     model_name: str = ""
     llm_model_name: str = ""
+    llm_long_model_name: str = ""
 
 
 class _Milvus(BaseModel):
@@ -424,7 +434,6 @@ class Settings(BaseSettings):
     code_ability: _CodeAbility = Field(default_factory=_CodeAbility)
     redis: _RedisConfig = Field(default_factory=_RedisConfig)
     neo4j: _Neo4jConfig = Field(default_factory=_Neo4jConfig)
-    neo4j: _Neo4jConfig = Field(default_factory=_Neo4jConfig)
     other: _Other = Field(default_factory=_Other)
     conversation: _Conversation = Field(default_factory=_Conversation)
 
@@ -478,8 +487,8 @@ def get_settings() -> Settings:
 
 def _program_exit():
     """程序退出前执行的操作"""
-    if settings.path_config.is_clean:  # 是否清理临时文件
-        temp_path = os.path.join(settings.path_config.temp, "../../")
+    if settings.path_config.temp.exit_is_clean:  # 是否清理临时文件
+        temp_path = os.path.join(settings.path_config.temp.path, "../../")
         if Path(temp_path).exists():
             shutil.rmtree(temp_path, ignore_errors=True)
 
@@ -499,4 +508,5 @@ if __name__ == "__main__":
     # print(settings.milvus.cloud.token.get_secret_value())
     # print(settings.chroma_config.save_path)
     # print(settings.conversation.memory.long.model_name)
+    print(settings.conversation.agent.api_key.get_secret_value())
     pass

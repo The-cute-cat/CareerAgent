@@ -107,11 +107,11 @@ public class AiServiceClient {
     /**
      * 带重试机制的通用执行方法
      *
-     * @param url              请求的 API 路径
-     * @param requestExecutor  请求执行函数
-     * @param bodySupplier     请求体构建函数
-     * @param serviceName      服务名称（用于日志）
-     * @param enableRetry      是否启用重试机制
+     * @param url             请求的 API 路径
+     * @param requestExecutor 请求执行函数
+     * @param bodySupplier    请求体构建函数
+     * @param serviceName     服务名称（用于日志）
+     * @param enableRetry     是否启用重试机制
      * @return AI 响应结果
      * @throws RuntimeException 当所有重试都失败时抛出
      */
@@ -128,7 +128,7 @@ public class AiServiceClient {
             log.info("调用{}结束，耗时：{}ms", serviceName, time);
             return response;
         }
-        
+
         int tryCount = 0;
         while (tryCount < properties.getRetry().getMaxAttempts()) {
             tryCount++;
@@ -214,6 +214,9 @@ public class AiServiceClient {
      */
     private MultipartBodyBuilder buildFileBody(AiChatRequest aiChatRequest) {
         MultipartBodyBuilder builder = new MultipartBodyBuilder();
+        // userId 是必需参数
+        Optional.ofNullable(aiChatRequest.getUserId()).filter(this::isNotEmpty)
+                .ifPresent(userId -> builder.part("userId", userId));
         Optional.ofNullable(aiChatRequest.getMessage()).filter(this::isNotEmpty)
                 .ifPresent(message -> builder.part("message", message));
         Optional.ofNullable(aiChatRequest.getConversationId()).filter(this::isNotEmpty)
@@ -250,7 +253,7 @@ public class AiServiceClient {
     /**
      * 添加 MultipartFile 到多部分表单构建器
      *
-     * @param builder         多部分表单构建器
+     * @param builder        多部分表单构建器
      * @param multipartFiles MultipartFile 文件列表
      */
     private void addMultipartFilesToBuilder(MultipartBodyBuilder builder, List<MultipartFile> multipartFiles) {
@@ -300,13 +303,14 @@ public class AiServiceClient {
      * 纯文本消息对话（阻塞方式）
      *
      * @param url            请求的 API 路径
+     * @param userId         用户 ID（必需）
      * @param message        消息内容
      * @param conversationId 对话 ID
      * @param enableRetry    是否启用重试机制
      * @return AI 响应结果
      */
-    public AiChatResponse chatWithMessage(String url, String message, String conversationId, boolean enableRetry) {
-        AiChatRequest request = new AiChatRequest(conversationId, message);
+    public AiChatResponse chatWithMessage(String url, String userId, String message, String conversationId, boolean enableRetry) {
+        AiChatRequest request = new AiChatRequest(userId, conversationId, message);
         return callAiService(url, request, enableRetry);
     }
 
@@ -314,13 +318,14 @@ public class AiServiceClient {
      * 文件上传对话（阻塞方式）
      *
      * @param url            请求的 API 路径
+     * @param userId         用户 ID（必需）
      * @param files          文件列表
      * @param conversationId 对话 ID，若为空则不传递
      * @param enableRetry    是否启用重试机制
      * @return AI 响应结果
      */
-    public AiChatResponse chatWithFiles(String url, List<File> files, String conversationId, boolean enableRetry) {
-        AiChatRequest request = AiChatRequest.ofFiles(conversationId, null, files);
+    public AiChatResponse chatWithFiles(String url, String userId, List<File> files, String conversationId, boolean enableRetry) {
+        AiChatRequest request = AiChatRequest.ofFiles(userId, conversationId, null, files);
         return callAiService(url, request, enableRetry);
     }
 
@@ -330,14 +335,15 @@ public class AiServiceClient {
      * 用于处理前端直接上传的 MultipartFile 文件
      *
      * @param url            请求的 API 路径
+     * @param userId         用户 ID（必需）
      * @param multipartFiles MultipartFile 文件列表
      * @param conversationId 对话 ID，若为空则不传递
      * @param enableRetry    是否启用重试机制
      * @return AI 响应结果
      */
-    public AiChatResponse chatWithMultipartFiles(String url, List<MultipartFile> multipartFiles,
+    public AiChatResponse chatWithMultipartFiles(String url, String userId, List<MultipartFile> multipartFiles,
                                                  String conversationId, boolean enableRetry) {
-        AiChatRequest request = AiChatRequest.ofMultipartFiles(conversationId, null, multipartFiles);
+        AiChatRequest request = AiChatRequest.ofMultipartFiles(userId, conversationId, null, multipartFiles);
         return callAiService(url, request, enableRetry);
     }
 
@@ -345,15 +351,16 @@ public class AiServiceClient {
      * 消息和文件同时上传对话（阻塞方式）
      *
      * @param url            请求的 API 路径
+     * @param userId         用户 ID（必需）
      * @param message        消息内容
      * @param files          文件列表
      * @param conversationId 对话 ID
      * @param enableRetry    是否启用重试机制
      * @return AI 响应结果
      */
-    public AiChatResponse chatWithMessageAndFiles(String url, String message, List<File> files,
+    public AiChatResponse chatWithMessageAndFiles(String url, String userId, String message, List<File> files,
                                                   String conversationId, boolean enableRetry) {
-        AiChatRequest request = AiChatRequest.ofFiles(conversationId, message, files);
+        AiChatRequest request = AiChatRequest.ofFiles(userId, conversationId, message, files);
         return callAiService(url, request, enableRetry);
     }
 
@@ -363,15 +370,16 @@ public class AiServiceClient {
      * 用于处理前端直接上传的 MultipartFile 文件并附带消息
      *
      * @param url            请求的 API 路径
+     * @param userId         用户 ID（必需）
      * @param message        消息内容
      * @param files          MultipartFile 文件列表
      * @param conversationId 对话 ID
      * @param enableRetry    是否启用重试机制
      * @return AI 响应结果
      */
-    public AiChatResponse chatWithMessageAndMultipartFiles(String url, String message, List<MultipartFile> files,
+    public AiChatResponse chatWithMessageAndMultipartFiles(String url, String userId, String message, List<MultipartFile> files,
                                                            String conversationId, boolean enableRetry) {
-        AiChatRequest request = AiChatRequest.ofMultipartFiles(conversationId, message, files);
+        AiChatRequest request = AiChatRequest.ofMultipartFiles(userId, conversationId, message, files);
         return callAiService(url, request, enableRetry);
     }
 
@@ -394,12 +402,13 @@ public class AiServiceClient {
      * 纯文本消息对话（流式方式）
      *
      * @param url            请求的 API 路径
+     * @param userId         用户 ID（必需）
      * @param message        消息内容
      * @param conversationId 对话 ID
      * @return 响应数据流
      */
-    public Flux<String> chatWithMessageStream(String url, String message, String conversationId) {
-        AiChatRequest request = new AiChatRequest(conversationId, message);
+    public Flux<String> chatWithMessageStream(String url, String userId, String message, String conversationId) {
+        AiChatRequest request = new AiChatRequest(userId, conversationId, message);
         return callAiServiceStream(url, request);
     }
 
@@ -407,12 +416,13 @@ public class AiServiceClient {
      * 文件上传对话（流式方式）
      *
      * @param url            请求的 API 路径
+     * @param userId         用户 ID（必需）
      * @param files          文件列表
      * @param conversationId 对话 ID，若为空则不传递
      * @return 响应数据流
      */
-    public Flux<String> chatWithFilesStream(String url, List<File> files, String conversationId) {
-        AiChatRequest request = AiChatRequest.ofFiles(conversationId, null, files);
+    public Flux<String> chatWithFilesStream(String url, String userId, List<File> files, String conversationId) {
+        AiChatRequest request = AiChatRequest.ofFiles(userId, conversationId, null, files);
         return callAiServiceStream(url, request);
     }
 
@@ -422,12 +432,13 @@ public class AiServiceClient {
      * 用于处理前端直接上传的 MultipartFile 文件并接收流式响应
      *
      * @param url            请求的 API 路径
+     * @param userId         用户 ID（必需）
      * @param files          MultipartFile 文件列表
      * @param conversationId 对话 ID，若为空则不传递
      * @return 响应数据流
      */
-    public Flux<String> chatWithMultipartFilesStream(String url, List<MultipartFile> files, String conversationId) {
-        AiChatRequest request = AiChatRequest.ofMultipartFiles(conversationId, null, files);
+    public Flux<String> chatWithMultipartFilesStream(String url, String userId, List<MultipartFile> files, String conversationId) {
+        AiChatRequest request = AiChatRequest.ofMultipartFiles(userId, conversationId, null, files);
         return callAiServiceStream(url, request);
     }
 
@@ -435,14 +446,15 @@ public class AiServiceClient {
      * 消息和文件同时上传对话（流式方式）
      *
      * @param url            请求的 API 路径
+     * @param userId         用户 ID（必需）
      * @param message        消息内容
      * @param files          文件列表
      * @param conversationId 对话 ID
      * @return 响应数据流
      */
-    public Flux<String> chatWithMessageAndFilesStream(String url, String message, List<File> files,
+    public Flux<String> chatWithMessageAndFilesStream(String url, String userId, String message, List<File> files,
                                                       String conversationId) {
-        AiChatRequest request = AiChatRequest.ofFiles(conversationId, message, files);
+        AiChatRequest request = AiChatRequest.ofFiles(userId, conversationId, message, files);
         return callAiServiceStream(url, request);
     }
 
@@ -452,14 +464,15 @@ public class AiServiceClient {
      * 用于处理前端直接上传的 MultipartFile 文件并附带消息，同时接收流式响应
      *
      * @param url            请求的 API 路径
+     * @param userId         用户 ID（必需）
      * @param message        消息内容
      * @param files          MultipartFile 文件列表
      * @param conversationId 对话 ID
      * @return 响应数据流
      */
-    public Flux<String> chatWithMessageAndMultipartFilesStream(String url, String message, List<MultipartFile> files,
+    public Flux<String> chatWithMessageAndMultipartFilesStream(String url, String userId, String message, List<MultipartFile> files,
                                                                String conversationId) {
-        AiChatRequest request = AiChatRequest.ofMultipartFiles(conversationId, message, files);
+        AiChatRequest request = AiChatRequest.ofMultipartFiles(userId, conversationId, message, files);
         return callAiServiceStream(url, request);
     }
 
@@ -514,17 +527,29 @@ public class AiServiceClient {
      * 通用 DELETE 请求方法
      *
      * @param url         请求的 API 路径（可包含路径参数）
+     * @param queryParams 查询参数（可选，如 userId）
      * @param serviceName 服务名称（用于日志）
      * @param enableRetry 是否启用重试机制
      * @return AI 响应结果
      */
-    public AiChatResponse deleteRequest(String url, String serviceName, boolean enableRetry) {
+    public AiChatResponse deleteRequest(String url, Map<String, Object> queryParams, String serviceName, boolean enableRetry) {
         return executeWithRetry(url, ignored -> {
             String token = AITokenUtil.createToken();
-            return webClient.delete()
-                    .uri(properties.getBaseUrl() + url)
-                    .header("Authorization", "Bearer " + token)
-                    .retrieve()
+            WebClient.RequestHeadersSpec<?> request = webClient.delete()
+                    .uri(uriBuilder -> {
+                        uriBuilder.path(properties.getBaseUrl() + url);
+                        if (queryParams != null) {
+                            queryParams.forEach((key, value) -> {
+                                if (value != null) {
+                                    uriBuilder.queryParam(key, value);
+                                }
+                            });
+                        }
+                        return uriBuilder.build();
+                    })
+                    .header("Authorization", "Bearer " + token);
+
+            return request.retrieve()
                     .bodyToMono(AiChatResponse.class)
                     .timeout(Duration.ofMillis(properties.getTimeout()))
                     .block(Duration.ofMillis(properties.getTimeout()));
@@ -561,58 +586,4 @@ public class AiServiceClient {
         }, () -> null, serviceName, enableRetry);
     }
 
-
-//    /**
-//     * 获取会话历史记录（GET 请求）
-//     *
-//     * @param sessionId 会话 ID
-//     * @param limit     限制返回数量（可选）
-//     * @return AI 响应结果，包含会话历史记录
-//     */
-//    public AiChatResponse getChatHistory(String sessionId, Integer limit) {
-//        Map<String, Object> queryParams = limit != null ? Map.of("limit", limit) : null;
-//        return getRequest("/chat/history/" + sessionId, queryParams, "获取会话历史", false);
-//    }
-//
-//    /**
-//     * 获取用户的会话列表（GET 请求）
-//     *
-//     * @param userId   用户 ID
-//     * @param page     页码
-//     * @param pageSize 每页数量
-//     * @return AI 响应结果，包含会话列表
-//     */
-//    public AiChatResponse getUserSessions(String userId, Integer page, Integer pageSize) {
-//        Map<String, Object> queryParams = new java.util.HashMap<>();
-//        queryParams.put("user_id", userId);
-//        if (page != null) {
-//            queryParams.put("page", page);
-//        }
-//        if (pageSize != null) {
-//            queryParams.put("page_size", pageSize);
-//        }
-//        return getRequest("/chat/sessions", queryParams, "获取会话列表", false);
-//    }
-//
-//    /**
-//     * 清除会话（DELETE 请求）
-//     *
-//     * @param sessionId 会话 ID
-//     * @return AI 响应结果
-//     */
-//    public AiChatResponse clearSession(String sessionId) {
-//        return deleteRequest("/chat/session/" + sessionId, "清除会话", false);
-//    }
-//
-//    /**
-//     * 更新会话标题（PUT 请求）
-//     *
-//     * @param sessionId 会话 ID
-//     * @param title     新标题
-//     * @return AI 响应结果
-//     */
-//    public AiChatResponse updateSessionTitle(String sessionId, String title) {
-//        Map<String, Object> params = Map.of("title", title);
-//        return putRequest("/chat/session/" + sessionId + "/title", params, "更新会话标题", false);
-//    }
 }

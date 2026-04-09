@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <!-- 定义日志文件存放的目录 -->
+    <property name="LOG_PATH" value="./logs" />
+
+    <!-- 定义应用名称，用于区分你的微服务 -->
+    <property name="APP_NAME" value="my-career-agent" />
+    <!-- 控制台输出格式 (带颜色) -->
+    <property name="CONSOLE_LOG_PATTERN"
+              value="%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr(%5p) %clr(${PID:- }){magenta} %clr(---){faint} %clr([%15.15t]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %m%n%wEx"/>
+
+    <!-- 文件输出格式 (不带颜色，方便后续如果用 ELK 采集) -->
+    <property name="FILE_LOG_PATTERN"
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} %5p ${PID:- } --- [%t] %-40.40logger{39} : %m%n%wEx"/>
+    
+    <!-- 1. 滚动文件 Appender -->
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        
+        <!-- 使用变量 ${LOG_PATH} 和 ${APP_NAME} -->
+        <file>${LOG_PATH}/${APP_NAME}.log</file>
+
+        <!-- 按天 + 分片序号，单文件最大 2 GB -->
+<!--        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">-->
+<!--            <fileNamePattern>logs/app.%d{yyyy-MM-dd}.%i.log</fileNamePattern>-->
+<!--            <maxFileSize>2GB</maxFileSize>-->
+<!--            <maxHistory>30</maxHistory>   &lt;!&ndash; 时间维度：30 天 &ndash;&gt;-->
+<!--            <totalSizeCap>10GB</totalSizeCap> &lt;!&ndash; 大小维度：目录总量 ≤ 10 GB &ndash;&gt;-->
+<!--        </rollingPolicy>-->
+        
+        <!-- 文件名：my-career-agent.2026-04-08.0.log.gz -->
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+          <fileNamePattern>logs/app.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+          <maxFileSize>2GB</maxFileSize>
+          <maxHistory>30</maxHistory>
+          <totalSizeCap>10GB</totalSizeCap>
+
+<!--          <maxFileSize>2kb</maxFileSize>-->
+<!--          <maxHistory>30</maxHistory>-->
+<!--          <totalSizeCap>10kb</totalSizeCap>-->
+          <cleanHistoryOnStart>true</cleanHistoryOnStart> <!-- 启动时清理过期日志 -->
+        </rollingPolicy>
+
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{64} - %msg%n</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+    <!-- 控制台 Appender -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+           <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %magenta([%thread]) %highlight(%-5level) %cyan(%logger{64}) - %msg%n</pattern>
+<!--            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %highlight(%-5level) %cyan(%logger{64}) - %msg%n</pattern>-->
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+
+    <!-- 2. 异步 Appender -->
+    <appender name="ASYNC_FILE" class="ch.qos.logback.classic.AsyncAppender">
+        <queueSize>8192</queueSize>
+        <neverBlock>true</neverBlock>
+        <appender-ref ref="FILE"/>
+    </appender>
+
+    <!-- 3. 根日志级别和输出目标 -->
+    <!--  <root level="DEBUG">-->
+    <root level="INFO">
+        <appender-ref ref="ASYNC_FILE"/><!-- 输出到文件 -->
+        <appender-ref ref="CONSOLE"/><!-- 输出到控制台 -->
+    </root>
+</configuration>

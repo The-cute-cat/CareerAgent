@@ -65,7 +65,8 @@ class MemoryExtractionAgent:
     async def extract(
             self,
             messages: list[Message],
-            min_score: float = 0.6
+            min_score: float = 0.6,
+            existing_memories: list[str] | None = None
     ) -> list[MemoryPoint]:
         """
         从对话中提取记忆点
@@ -73,6 +74,7 @@ class MemoryExtractionAgent:
         Args:
             messages: 消息列表
             min_score: 最低综合评分阈值
+            existing_memories: 已有记忆内容列表（用于避免重复）
             
         Returns:
             记忆点列表
@@ -81,8 +83,15 @@ class MemoryExtractionAgent:
             return []
         # 格式化对话内容
         conversation_text = self._format_messages(messages)
-        # 构建提示
-        prompt = ChatPromptTemplate.from_template(prompt_loader.extraction_prompt)
+        # 构建提示（包含已有记忆）
+        existing_text = ""
+        if existing_memories:
+            existing_text = f"\n\n【用户已有记忆点】（避免重复提取）：\n" + "\n".join(
+                f"- {m}" for m in existing_memories[:20]  # 最多显示20条
+            )
+        
+        prompt_template = prompt_loader.extraction_prompt + existing_text
+        prompt = ChatPromptTemplate.from_template(prompt_template)
         chain = prompt | self.llm
         content = None
         try:
@@ -149,17 +158,22 @@ class MemoryExtractionAgent:
             lines.append(f"{role_name}: {msg.content}")
         return "\n".join(lines)
 
-    async def extract_single_message(self, message: Message) -> list[MemoryPoint]:
+    async def extract_single_message(
+            self,
+            message: Message,
+            existing_memories: list[str] | None = None
+    ) -> list[MemoryPoint]:
         """
         从单条消息中提取记忆点
         
         Args:
             message: 单条消息
+            existing_memories: 已有记忆内容列表
             
         Returns:
             记忆点列表
         """
-        return await self.extract([message], min_score=0.5)
+        return await self.extract([message], min_score=0.5, existing_memories=existing_memories)
 
 
 memory_extraction_agent = MemoryExtractionAgent()
