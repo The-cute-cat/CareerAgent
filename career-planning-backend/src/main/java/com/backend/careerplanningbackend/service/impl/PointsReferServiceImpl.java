@@ -25,6 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.RequestBody;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
@@ -94,13 +95,6 @@ public class PointsReferServiceImpl implements PointsReferService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Result<Object> register(@RequestBody ReferralDTO referralDTO) {
-        /* 模拟延迟 */
-//        try {
-//            Thread.sleep(5000);
-//        }catch (Exception e){
-//            log.error("Thread.sleep--register 注册失败");
-//            e.printStackTrace();
-//        }
         Long userId = referralDTO.getUserId();
         String inviteCode = referralDTO.getInviteCode();
         UserReferral userReferral = null;

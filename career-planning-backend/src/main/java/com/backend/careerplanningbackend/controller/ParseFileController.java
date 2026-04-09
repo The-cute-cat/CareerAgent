@@ -67,15 +67,10 @@ public class ParseFileController {
 
         List<MultipartFile> files = new ArrayList<>();
         files.add(file);
-        AiChatResponse aiChatResponse = aiServiceClient.chatWithMultipartFiles("/parse/file", files, "", false);
-        log.info("parse-file接收到的参数: {}", aiChatResponse.toString());
-        System.out.println("python端传来的数据:" + aiChatResponse.getData());
-
-        System.out.println("user_id:" + userId);
-        System.out.println("overwrite:" + overwrite);
-        System.out.println("file.getOriginalFilename():" + file.getOriginalFilename());
-        System.out.println("file.getSize():" + file.getSize());
-        System.out.println("file.getContentType():" + file.getContentType());
+        AiChatResponse aiChatResponse = aiServiceClient.chatWithMultipartFiles("/parse/file",ThreadLocalUtil.getCurrentUserId().toString() ,files, "", false);
+        log.info("ParseFileController.parseFile 解析文件成功, AI返回数据: {}", aiChatResponse.getData());
+        log.debug("ParseFileController.parseFile 请求参数, 用户ID: {}, 是否覆盖: {}, 文件名: {}, 文件大小: {}, 文件类型: {}",
+                userId, overwrite, file.getOriginalFilename(), file.getSize(), file.getContentType());
 
         return Result.ok(aiChatResponse.getData());
     }
@@ -94,7 +89,7 @@ public class ParseFileController {
 
         List<MultipartFile> files = new ArrayList<>();
         files.add(file);
-        AiChatResponse aiChatResponse = aiServiceClient.chatWithMultipartFiles("/parse/file", files, "", false);
+        AiChatResponse aiChatResponse = aiServiceClient.chatWithMultipartFiles("/parse/file", ThreadLocalUtil.getCurrentUserId().toString() ,files, "", false);
         log.info("parse-file接收到的参数: {}", aiChatResponse.toString());
         return Result.ok(aiChatResponse.getData());
     }

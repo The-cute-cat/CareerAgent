@@ -5,6 +5,7 @@ import com.backend.careerplanningbackend.domain.dto.MultipartFileDTO;
 import com.backend.careerplanningbackend.domain.po.Result;
 import com.backend.careerplanningbackend.util.AiServiceClient;
 import com.backend.careerplanningbackend.util.AliOSSMultipartFileUtil;
+import com.backend.careerplanningbackend.util.ThreadLocalUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -70,6 +71,7 @@ public class ChatController {
 
             // 调用 AI 服务客户端，传入文件URL列表
             AiChatResponse response = aiServiceClient.chatWithMessageAndMultipartFiles("/chat/message",
+                    ThreadLocalUtil.getCurrentUserId().toString() ,
                     message, multipartFileDTO.getFiles(), conversationId, true);
 
             if (response.isState()) {
@@ -116,6 +118,7 @@ public class ChatController {
 
             // 调用 AI 服务客户端流式接口，传入文件URL列表
             return aiServiceClient.chatWithMessageAndMultipartFilesStream("/chat/message",
+                            ThreadLocalUtil.getCurrentUserId().toString() ,
                             message, multipartFileDTO.getFiles(), conversationId)
                     .doOnComplete(() -> log.info("流式响应完成"))
                     .doOnError(e -> log.error("流式响应错误", e));

@@ -44,8 +44,7 @@ public class QuestionController {
         Map<String, Object> params = new HashMap<>();
         AiChatResponse aiChatResponse = null;
 
-        System.out.println("questionDTO.getType():" + questionDTO.getType());
-        System.out.println("questionDTO.getName():" + questionDTO.getName());
+        log.debug("QuestionController.Generate 接收问题参数, 类型: {}, 名称: {}", questionDTO.getType(), questionDTO.getName());
 
         if ("skill".equals(questionDTO.getType())) {
             params.put("skill", questionDTO.getName());

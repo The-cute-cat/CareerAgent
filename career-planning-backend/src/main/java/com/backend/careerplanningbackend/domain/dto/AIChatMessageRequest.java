@@ -1,4 +1,5 @@
 package com.backend.careerplanningbackend.domain.dto;
+import com.backend.careerplanningbackend.util.ThreadLocalUtil;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
@@ -19,13 +20,13 @@ public class AIChatMessageRequest {
 
 
     public static AiChatRequest ofFiles(String conversationId, String message, List<File> files) {
-        AiChatRequest request = new AiChatRequest(conversationId, message);
+        AiChatRequest request = new AiChatRequest(ThreadLocalUtil.getCurrentUserId().toString(),conversationId, message);
         request.setFiles(files);
         return request;
     }
 
     public static AiChatRequest ofMultipartFiles(String conversationId, String message, List<MultipartFile> multipartFiles) {
-        AiChatRequest request = new AiChatRequest(conversationId, message);
+        AiChatRequest request = new AiChatRequest(ThreadLocalUtil.getCurrentUserId().toString(),conversationId, message);
         request.setMultipartFiles(multipartFiles);
         return request;
     }

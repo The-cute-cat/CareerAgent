@@ -81,7 +81,7 @@ public class AIChatAssistantController {
 
                 // 调用 AI 服务客户端流式接口，传入文件URL列表
                 return aiServiceClient.chatWithMessageAndMultipartFilesStream("/chat/message-and-files/stream",
-                                message, multipartFileDTO.getFiles(),userId ,conversationId)
+                                userId , message, multipartFileDTO.getFiles() ,conversationId)
                         .doOnComplete(() -> log.info("文本+文件流式响应完成"))
                         .doOnError(e -> log.error("文本+文件流式响应错误", e));
 

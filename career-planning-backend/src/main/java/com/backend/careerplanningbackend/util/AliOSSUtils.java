@@ -47,8 +47,7 @@ public class AliOSSUtils {
 
         // 关闭ossClient
         ossClient.shutdown();
-        log.info("阿里云url: {}" , url);
-        System.out.println("阿里云url=" + url);
+        log.info("AliOSSUtils.upload 上传头像到阿里云OSS成功, 用户ID: {}, 文件URL: {}", currentUserId, url);
         return url; // 把上传到oss的路径返回
     }
 
@@ -80,8 +79,7 @@ public class AliOSSUtils {
 
         // 关闭ossClient
         ossClient.shutdown();
-        log.info("阿里云url: {}" , url);
-        System.out.println("阿里云url=" + url);
+        log.info("AliOSSUtils.uploadFeedback 上传反馈图片到阿里云OSS成功, 用户ID: {}, 文件URL: {}", currentUserId, url);
         return url; // 把上传到oss的路径返回
     }
 
