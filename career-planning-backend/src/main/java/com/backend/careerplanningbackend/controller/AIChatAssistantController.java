@@ -1,5 +1,6 @@
 package com.backend.careerplanningbackend.controller;
 
+import cn.hutool.core.util.IdUtil;
 import com.backend.careerplanningbackend.domain.dto.AiChatResponse;
 import com.backend.careerplanningbackend.domain.dto.MultipartFileDTO;
 import com.backend.careerplanningbackend.domain.po.Result;
@@ -66,6 +67,13 @@ public class AIChatAssistantController {
             //从token中获取用户id
             String userId = ThreadLocalUtil.getCurrentUserId().toString();
 
+            //新建会话时后端雪花算法生成对话id
+            if(conversationId == null){
+                conversationId = IdUtil.getSnowflakeNextIdStr();
+            }
+
+            log.info("用户id: {}", userId);
+            log.info("会话id: {}", conversationId);
 
             // 处理文件上传（如果存在）
             List<String> fileUrls = new ArrayList<>();
@@ -81,7 +89,7 @@ public class AIChatAssistantController {
 
                 // 调用 AI 服务客户端流式接口，传入文件URL列表
                 return aiServiceClient.chatWithMessageAndMultipartFilesStream("/chat/message-and-files/stream",
-                                message, multipartFileDTO.getFiles(),userId ,conversationId)
+                                message, userId,multipartFileDTO.getFiles(),conversationId)
                         .doOnComplete(() -> log.info("文本+文件流式响应完成"))
                         .doOnError(e -> log.error("文本+文件流式响应错误", e));
 

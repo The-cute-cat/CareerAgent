@@ -58,6 +58,9 @@ public class ParseFileController {
 
         Long userId = ThreadLocalUtil.getCurrentUserId();
 
+        //从token中获取用户id
+        String user_Id = ThreadLocalUtil.getCurrentUserId().toString();
+
         String upload = aliOSSUtils.upload(file);
         FileUpload fileUpload = new FileUpload();
         fileUpload.setUserId(userId);
@@ -67,7 +70,7 @@ public class ParseFileController {
 
         List<MultipartFile> files = new ArrayList<>();
         files.add(file);
-        AiChatResponse aiChatResponse = aiServiceClient.chatWithMultipartFiles("/parse/file", files, "", false);
+        AiChatResponse aiChatResponse = aiServiceClient.chatWithMultipartFiles("/parse/file",user_Id ,files, "", false);
         log.info("parse-file接收到的参数: {}", aiChatResponse.toString());
         System.out.println("python端传来的数据:" + aiChatResponse.getData());
 
@@ -92,9 +95,11 @@ public class ParseFileController {
     public Result<Object> parseFiles(@RequestParam("file") MultipartFile file) {
         log.info("parse-resume接收到的参数: {}", file.toString());
 
+        String user_Id = ThreadLocalUtil.getCurrentUserId().toString();
+
         List<MultipartFile> files = new ArrayList<>();
         files.add(file);
-        AiChatResponse aiChatResponse = aiServiceClient.chatWithMultipartFiles("/parse/file", files, "", false);
+        AiChatResponse aiChatResponse = aiServiceClient.chatWithMultipartFiles("/parse/file", user_Id,files, "", false);
         log.info("parse-file接收到的参数: {}", aiChatResponse.toString());
         return Result.ok(aiChatResponse.getData());
     }
