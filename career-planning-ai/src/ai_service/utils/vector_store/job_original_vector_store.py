@@ -165,7 +165,8 @@ class JobOriginalVectorStore:
         }
 
         if self.url != "<url>" and self.token != "<token>":
-            connections.connect("default", uri=self.url, token=self.token, **conn_args)
+
+            connections.connect("default", host=self.url, port=self.port, **conn_args)
             log.info("✅ 已连接到 Zilliz 云服务")
         else:
             connections.connect("default", host=self.host, port=self.port, **conn_args)
@@ -723,9 +724,9 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
-    # store = JobOriginalVectorStore(
-    #     collection_name="job_original_embeddings",
-    #     embedding_model="BAAI/bge-base-zh-v1.5",
-    # )
-    # store.reset_collection()
+   # asyncio.run(main())
+    store = JobOriginalVectorStore(
+        collection_name="job_original_embeddings",
+        embedding_model="BAAI/bge-base-zh-v1.5",
+    )
+    store.reset_collection()

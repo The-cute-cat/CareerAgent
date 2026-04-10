@@ -14,6 +14,7 @@ from ai_service.services.database_manage import get_db_url
 from ai_service.services.job_profile_builder import analyze_job_description
 from ai_service.utils.HDBSCAN import cluster_standard_jobs_with_hdbscan
 from ai_service.utils.logger_handler import log
+from ai_service.utils.vector_store.job_vector_store import JobVectorStore
 
 router = APIRouter()
 
@@ -24,6 +25,7 @@ AsyncSessionLocal = async_sessionmaker(
     expire_on_commit=False,
     class_=AsyncSession,
 )
+store = JobVectorStore()
 
 
 async def _analyze_cluster_with_semaphore(
@@ -106,8 +108,11 @@ async def job_merger(max_concurrency: int = 5) -> Dict[str, Any]:
                 for job in jobs:
                     await job_repo.update(job.id, {"job_id": portrait_id})
                     total_jobs_processed += 1
+            stats = await store.load_all_jd_results_from_db(session=session)
+            await store.insert_job_async(stats["items"])
 
             log.info(f"岗位合并完成，创建 {len(portrait_ids)} 个岗位画像，处理 {total_jobs_processed} 个岗位")
+
     finally:
         await engine.dispose()
 

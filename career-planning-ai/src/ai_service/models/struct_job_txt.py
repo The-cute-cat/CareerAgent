@@ -7,7 +7,9 @@ import re
 from enum import StrEnum
 from pathlib import Path
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
-from typing import List, Tuple, Union
+from typing import List, Tuple, Union, Any, Dict
+
+from ai_service.models.job_portrait import JobPortrait
 from ai_service.utils.logger_handler import log
 
 
@@ -200,6 +202,7 @@ class JDAnalysisResult(BaseModel):
         return v
 
 
+
 """
 JD 数据转换工具
 读取文件中的 JSON 数据，转换为 Pydantic 模型列表
@@ -209,6 +212,51 @@ JD 数据转换工具
 # ==========================================
 # 2. 核心转换函数
 # ==========================================
+def ensure_dict(value: Any) -> Dict[str, Any]:
+    """将 JSON 字段安全转换为 dict"""
+    if value is None:
+        return {}
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str):
+        value = value.strip()
+        if not value:
+            return {}
+        return json.loads(value)
+    raise TypeError(f"不支持的 JSON 类型: {type(value)}")
+
+def build_jd_result_from_portrait(portrait: JobPortrait) -> JDAnalysisResult:
+    """
+    将 job_profile 表中的一条数据转换为 JDAnalysisResult。
+
+    约定：
+    1. skills_req 与 JDAnalysisResult.profiles 的内容结构对应；
+    2. 若 skills_req 本身已是完整 JDAnalysisResult 结构（含 profiles），则直接补齐 job_id / job_name；
+    3. Milvus 主键 job_id 使用 job_profile.id 的字符串形式，保证唯一稳定。
+    """
+    skills_req = ensure_dict(portrait.skills_req)
+    if not skills_req:
+        raise ValueError("skills_req 为空，无法转换为 JDAnalysisResult")
+
+    job_id = str(portrait.id)
+    job_name = portrait.job_title or f"岗位_{portrait.id}"
+
+    payload = dict(skills_req)
+
+    # 情况1：skills_req 已经是完整结构
+    if "profiles" in payload:
+        payload.setdefault("job_id", job_id)
+        payload.setdefault("job_name", job_name)
+        return JDAnalysisResult.model_validate(payload)
+
+    # 情况2：skills_req 仅为 profiles 内容
+    jd_payload = {
+        "job_id": job_id,
+        "job_name": job_name,
+        "profiles": payload
+    }
+    return JDAnalysisResult.model_validate(jd_payload)
+
 
 def convert_file_to_pydantic_list(
         file_path: Union[str, Path],

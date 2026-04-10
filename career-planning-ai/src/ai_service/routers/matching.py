@@ -66,4 +66,5 @@ async def job_merge(
     """
 这个接口的具体功能和实现细节不清楚，暂时留空。    """
 
-    return await job_merger()
+    result = await job_merger()
+    return result
