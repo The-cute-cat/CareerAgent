@@ -6,4 +6,5 @@ __all__ = [
     "convert",
     "report",
     "chat",
+    "knowledge_tutor",
 ]

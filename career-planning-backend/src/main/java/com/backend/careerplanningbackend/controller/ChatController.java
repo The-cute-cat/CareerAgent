@@ -32,7 +32,6 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/chat")
 @RequiredArgsConstructor
-
 public class ChatController {
 
     private final AiServiceClient aiServiceClient;
