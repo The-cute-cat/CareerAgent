@@ -627,14 +627,11 @@ class ConversationAgent:
         session_repo = self._ensure_session_repo(db_session)
         if not session_repo:
             return {"total": 0, "items": [], "page": page, "page_size": page_size}
-
         result = await session_repo.get_list_by_user(
             user_id=user_id,
             page=page,
             page_size=page_size
         )
-
-        # 转换为字典格式
         items = [
             {
                 "id": item.id,

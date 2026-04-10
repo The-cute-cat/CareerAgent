@@ -424,19 +424,13 @@ async def _create_sse_stream(
                     log.info(f"客户端断开连接，停止流式传输: session_id={session_id}")
                     break
                 event_id += 1
-
-                # 解析 chunk 类型
                 chunk_data = json.loads(chunk)
                 chunk_type = chunk_data.get("type", "content")
-
-                # 标准 SSE 格式：event + data + id
                 yield f"event: {chunk_type}\n"
                 yield f"data: {chunk}\n"
                 yield f"id: {event_id}\n\n"
-
                 # 主动让出控制权，确保数据立即发送
                 await asyncio.sleep(0)
-
             await db_session.commit()
             # 发送结束事件
             yield f"event: done\n"

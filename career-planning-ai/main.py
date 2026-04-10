@@ -20,6 +20,7 @@ from ai_service.routers import (
     graph_path,
     report,
     chat,
+    knowledge_tutor,
 )
 from ai_service.schemas.file import temp_file_queue
 from ai_service.utils.logger_handler import log
@@ -50,6 +51,7 @@ app.include_router(code_ability.router)
 app.include_router(graph_path.router)
 app.include_router(report.router)
 app.include_router(chat.router)
+app.include_router(knowledge_tutor.router)
 
 
 @app.exception_handler(StarletteHTTPException)

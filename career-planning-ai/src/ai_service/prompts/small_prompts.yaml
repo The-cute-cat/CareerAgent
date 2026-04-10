@@ -43,3 +43,20 @@ user_job_match_analyzer_user: |
   {context}
 
   请根据用户的提问给出专业、有帮助的回答。
+
+career_coach_planner_user: |
+  请分析以下知识点对目标岗位的影响：
+  
+  **当前知识点**：{current_node}
+  **目标岗位**：{target_position}
+  **图谱关系**：{graph_context}
+  **用户画像**：{user_profile}
+  **行业数据**：{industry_data}
+
+knowledge_tutor_explainer_user: |
+  请详细解释以下知识点：
+  
+  **当前知识点**：{current_node}
+  **目标岗位**：{target_position}
+  **图谱关系**：{graph_context}
+  **用户画像**：{user_profile}

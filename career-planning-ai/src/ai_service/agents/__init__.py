@@ -8,6 +8,7 @@ __all__ = [
     "middleware",
     "memory",
     "conversation_agent",
+    "report_assistant_agent",
 ]
 
 from ai_service.utils.logger_handler import get_logger
