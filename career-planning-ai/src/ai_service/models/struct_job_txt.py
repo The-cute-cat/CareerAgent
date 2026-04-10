@@ -7,7 +7,9 @@ import re
 from enum import StrEnum
 from pathlib import Path
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
-from typing import List, Tuple, Union
+from typing import List, Tuple, Union, Any, Dict
+
+from ai_service.models.job_portrait import JobPortrait
 from ai_service.utils.logger_handler import log
 
 
@@ -145,20 +147,13 @@ class JobAttributes(BaseModel):
     岗位属性：英文命名
     """
     model_config = ConfigDict(populate_by_name=True)
-    salary_competitiveness: LevelEnum = Field(validation_alias="薪资竞争力", default=LevelEnum.MEDIUM,
-                                              description="该岗位在行业内的薪资竞争力水平，必须从枚举值中选择：低/中/高，需结合市场数据和岗位级别判断")
-    social_demand: LevelEnum = Field(validation_alias="社会需求度", default=LevelEnum.MEDIUM,
-                                     description="该岗位在当前就业市场中的需求程度，必须从枚举值中选择：低/中/高，需参考招聘网站数据和行业报告")
-    industry_trend: IndustryTrendEnum = Field(validation_alias="行业发展趋势", default=IndustryTrendEnum.STABLE,
-                                              description="该岗位所属行业的发展趋势，必须从枚举值中选择：萎缩/平稳/朝阳")
-    industry: str = Field(validation_alias="所属行业", default="不限",
-                          description="岗位所属的具体行业领域，优先填写细分类别（如'互联网金融'、'新零售'、'SaaS软件'），若无法判断则填'不限'")
-    vertical_promotion_path: str = Field(validation_alias="垂直晋升路径", default="",
-                                         description="岗位的垂直晋升路径，需填写具体职位序列，如'初级工程师→中级工程师→高级工程师→技术专家'，若无法判断则填空字符串")
-    prerequisite_roles: str = Field(validation_alias="前置岗位要求", default="",
-                                    description="担任该岗位通常需要的前置职位，如'需有产品助理或运营专员经验'，若未明确则填空字符串")
-    lateral_transfer_directions: str = Field(validation_alias="横向转岗方向", default="",
-                                             description="从该岗位可以横向转岗的方向，如'产品经理可转向项目管理或运营管理'，若无法判断则填空字符串")
+    salary_competitiveness: LevelEnum = Field(validation_alias="薪资竞争力", default=LevelEnum.MEDIUM, description="该岗位在行业内的薪资竞争力水平，必须从枚举值中选择：低/中/高，需结合市场数据和岗位级别判断")
+    social_demand: LevelEnum = Field(validation_alias="社会需求度", default=LevelEnum.MEDIUM, description="该岗位在当前就业市场中的需求程度，必须从枚举值中选择：低/中/高，需参考招聘网站数据和行业报告")
+    industry_trend: IndustryTrendEnum = Field(validation_alias="行业发展趋势", default=IndustryTrendEnum.STABLE, description="该岗位所属行业的发展趋势，必须从枚举值中选择：萎缩/平稳/朝阳")
+    industry: str = Field(validation_alias="所属行业", default="不限", description="岗位所属的具体行业领域，优先填写细分类别（如'互联网金融'、'新零售'、'SaaS软件'），若无法判断则填'不限'")
+    vertical_promotion_path: str = Field(validation_alias="垂直晋升路径", default="", description="岗位的垂直晋升路径，需填写具体职位序列，如'初级工程师→中级工程师→高级工程师→技术专家'，若无法判断则填空字符串")
+    prerequisite_roles: str = Field(validation_alias="前置岗位要求", default="", description="担任该岗位通常需要的前置职位，如'需有产品助理或运营专员经验'，若未明确则填空字符串")
+    lateral_transfer_directions: List[str] = Field(validation_alias="横向转岗方向", default=[], description="从该岗位可以横向转岗的方向，如'产品经理可转向项目管理或运营管理'，若无法判断则填空字符串")
 
     @field_validator('salary_competitiveness', 'social_demand', mode='before')
     @classmethod
@@ -207,6 +202,7 @@ class JDAnalysisResult(BaseModel):
         return v
 
 
+
 """
 JD 数据转换工具
 读取文件中的 JSON 数据，转换为 Pydantic 模型列表
@@ -216,6 +212,51 @@ JD 数据转换工具
 # ==========================================
 # 2. 核心转换函数
 # ==========================================
+def ensure_dict(value: Any) -> Dict[str, Any]:
+    """将 JSON 字段安全转换为 dict"""
+    if value is None:
+        return {}
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str):
+        value = value.strip()
+        if not value:
+            return {}
+        return json.loads(value)
+    raise TypeError(f"不支持的 JSON 类型: {type(value)}")
+
+def build_jd_result_from_portrait(portrait: JobPortrait) -> JDAnalysisResult:
+    """
+    将 job_profile 表中的一条数据转换为 JDAnalysisResult。
+
+    约定：
+    1. skills_req 与 JDAnalysisResult.profiles 的内容结构对应；
+    2. 若 skills_req 本身已是完整 JDAnalysisResult 结构（含 profiles），则直接补齐 job_id / job_name；
+    3. Milvus 主键 job_id 使用 job_profile.id 的字符串形式，保证唯一稳定。
+    """
+    skills_req = ensure_dict(portrait.skills_req)
+    if not skills_req:
+        raise ValueError("skills_req 为空，无法转换为 JDAnalysisResult")
+
+    job_id = str(portrait.id)
+    job_name = portrait.job_title or f"岗位_{portrait.id}"
+
+    payload = dict(skills_req)
+
+    # 情况1：skills_req 已经是完整结构
+    if "profiles" in payload:
+        payload.setdefault("job_id", job_id)
+        payload.setdefault("job_name", job_name)
+        return JDAnalysisResult.model_validate(payload)
+
+    # 情况2：skills_req 仅为 profiles 内容
+    jd_payload = {
+        "job_id": job_id,
+        "job_name": job_name,
+        "profiles": payload
+    }
+    return JDAnalysisResult.model_validate(jd_payload)
+
 
 def convert_file_to_pydantic_list(
         file_path: Union[str, Path],
