@@ -3,7 +3,7 @@ import math
 import numpy as np
 import igraph as ig
 import leidenalg as la
-from typing import Optional, Callable, Literal, Dict, List, Tuple
+from typing import Optional, Callable, Literal, Dict, List, Tuple, Any, Union
 from collections import defaultdict
 from ai_service.services import log
 from sklearn.metrics.pairwise import cosine_similarity, manhattan_distances
@@ -33,8 +33,9 @@ class GraphAlgorithms:
         nodes: Optional[List[str]] = None,
         resolution: float = 0.1,
         isolation_threshold: float = 0.1,
-        weight_transform_fn: Callable[[float], float] = lambda x: x ** 2,
-    ) -> Dict[str, int]:
+        weight_transform_fn: Callable[[float], float] = lambda x: x**2,
+        return_stats: bool = False,
+    ) -> Union[Dict[str, int], Tuple[Dict[str, int], Dict[str, Any]]]:
         """
         通用的Leiden聚类函数
         input:
@@ -50,7 +51,6 @@ class GraphAlgorithms:
 
         if not nodes:
             nodes = list(set().union(*edge_score_map.keys())) if edge_score_map else []
-
 
         # 自动生成索引映射
         node_id_to_idx = {node_id: idx for idx, node_id in enumerate(nodes)}
@@ -104,10 +104,16 @@ class GraphAlgorithms:
             size_stats[cid] += 1
 
         # 孤立点处理(将其与最相似(即权重最高)的非孤立点合并)，解决孤立点过多导致社区碎片化问题
-        isolated_indices = [idx for idx, cid in enumerate(part.membership) if size_stats[cid] == 1]
-        isolation_ratio = list(size_stats.values()).count(1) / len(nodes)
+        isolated_indices = [
+            idx for idx, cid in enumerate(part.membership) if size_stats[cid] == 1
+        ]
+        isolated_count = list(size_stats.values()).count(1)
+        isolation_ratio = (isolated_count / len(nodes)) if nodes else 0.0
+        merged_count = 0
+        isolated_merge_triggered = False
         if isolation_ratio > isolation_threshold and len(isolated_indices) > 0:
-            log.info(f"触发孤立点合并机制...")
+            isolated_merge_triggered = True
+            log.info("触发孤立点合并机制...")
 
             # 预计算：为了快速找到孤立点的最佳邻居，我们需要建立一个临时的邻接索引
             # 这样就不需要 O(N^2) 遍历，只需要查看该点已有的连接
@@ -116,7 +122,6 @@ class GraphAlgorithms:
                 adj_scores[a][b] = score
                 adj_scores[b][a] = score
 
-            merged_count = 0
             for idx in isolated_indices:
                 u_id = idx_to_node_id[idx]
                 candidates = adj_scores.get(u_id, {})
@@ -147,7 +152,9 @@ class GraphAlgorithms:
                         del size_stats[old_cid]
                     merged_count += 1
 
-            log.info(f"孤立点合并尝试完成，成功合并：{merged_count} 个，保持孤立：{len(isolated_indices) - merged_count} 个")
+            log.info(
+                f"孤立点合并尝试完成，成功合并：{merged_count} 个，保持孤立：{len(isolated_indices) - merged_count} 个"
+            )
 
         log.info(
             f"Leiden聚类完成! | 社区总数：{len(size_stats)} "
@@ -155,17 +162,36 @@ class GraphAlgorithms:
             f"| 孤立点(社区规模为1)数量：{list(size_stats.values()).count(1)}"
         )
 
-        return community_map
+        if not return_stats:
+            return community_map
+
+        stats: Dict[str, Any] = {
+            "nodes": len(nodes),
+            "valid_edges": len(valid_edges),
+            "resolution": resolution,
+            "isolation_threshold": isolation_threshold,
+            "isolation_ratio": round(float(isolation_ratio), 6),
+            "communities": len(size_stats),
+            "largest_community": max(size_stats.values()) if size_stats else 0,
+            "isolated_nodes": isolated_count,
+            "isolated_merge_triggered": isolated_merge_triggered,
+            "isolated_merged": merged_count,
+            "weight_transform": getattr(weight_transform_fn, "__name__", "<callable>"),
+        }
+        return community_map, stats
 
     # 多目标计算 + 局部帕累托剪枝
     @staticmethod
     def run_pareto_sparsification(
-            community_map: Dict[str, int],
-            multi_objective_dict: Dict[str, Literal[0, 1]],
-            edge_info_map: Dict[Tuple[str, str], dict],
-            cross_community_penalty: float = 0.5,  # 跨社区转岗的基础难度惩罚，将作为最小化目标
-            keep_fronts: int = 2  # 保留前几层帕累托前沿
-    ) -> Dict[Tuple[str, str], dict]:
+        community_map: Dict[str, int],
+        multi_objective_dict: Dict[str, Literal[0, 1]],
+        edge_info_map: Dict[Tuple[str, str], dict],
+        cross_community_penalty: float = 0.5,  # 跨社区转岗的基础难度惩罚，将作为最小化目标
+        keep_fronts: int = 2,  # 保留前几层帕累托前沿
+        return_stats: bool = False,
+    ) -> Union[
+        Dict[Tuple[str, str], dict], Tuple[Dict[Tuple[str, str], dict], Dict[str, Any]]
+    ]:
         """
         骨架提取，剔除同起点内的垃圾边
         input:
@@ -210,22 +236,35 @@ class GraphAlgorithms:
 
         # 3. 局部帕累托筛选
         log.info("正在按起点分组做局部非支配排序")
-        obj_configs = list(local_mo_dict.items()) # 固定目标顺序
+        obj_configs = list(local_mo_dict.items())  # 固定目标顺序
+
+        groups_count = 0
+        total_candidates = 0
+        kept_cross_edges = 0
+        kept_edges = 0
 
         for from_node, edges in processed_groups.items():
+            groups_count += 1
+            group_size = len(edges)
+            total_candidates += group_size
             # 孤边直接保留为第一前沿
             if len(edges) == 1:
                 f, t, m = edges[0]
                 m["pareto_rank"] = 0
-                m["is_cross_community"] = m.get("is_cross_community", False) 
-                m.pop(TEMP_PENALTY_KEY, None) # 清理临时键
+                m["is_cross_community"] = m.get("is_cross_community", False)
+                m["pareto_group_size"] = 1
+                m["pareto_front_size"] = 1
+                m.pop(TEMP_PENALTY_KEY, None)  # 清理临时键
                 pareto_skeleton_edges[(f, t)] = m
+                kept_edges += 1
+                if m.get("is_cross_community"):
+                    kept_cross_edges += 1
                 continue
 
             objs = []
 
             for f, t, m in edges:
-                row =[]
+                row = []
                 for obj_name, is_higher_better in obj_configs:
                     if obj_name not in m:
                         raise ValueError(f"指标 '{obj_name}' 缺失于边 ({f}, {t})")
@@ -238,6 +277,7 @@ class GraphAlgorithms:
             # 矩阵化并进行非支配排序
             objs = np.array(objs)
             fronts = nds.do(objs)
+            front_sizes = [len(front) for front in fronts]
 
             # 4. 提取指定层数的前沿解
             for rank in range(min(len(fronts), keep_fronts)):
@@ -247,17 +287,44 @@ class GraphAlgorithms:
                     # 记录是第几层前沿
                     m["pareto_rank"] = rank
 
+                    # 注入局部竞争规模（用于在线解释“海选规模/前沿规模”）
+                    m["pareto_group_size"] = group_size
+                    m["pareto_front_size"] = (
+                        front_sizes[rank] if rank < len(front_sizes) else 0
+                    )
+
+                    # 显式保留跨区惩罚参数（便于追溯为何跨区边更难留下）
+                    m["cross_community_penalty"] = cross_community_penalty
+
                     # 清理内部使用的临时属性，保持输出结构干净
                     m.pop(TEMP_PENALTY_KEY, None)
 
                     pareto_skeleton_edges[(f, t)] = m
+                    kept_edges += 1
+                    if m.get("is_cross_community"):
+                        kept_cross_edges += 1
 
         log.info(f"帕累托剪枝完成！保留前沿边数：{len(pareto_skeleton_edges)}")
-        return pareto_skeleton_edges
+
+        if not return_stats:
+            return pareto_skeleton_edges
+
+        stats: Dict[str, Any] = {
+            "groups": groups_count,
+            "total_candidates": total_candidates,
+            "kept_edges": kept_edges,
+            "kept_cross_edges": kept_cross_edges,
+            "keep_fronts": keep_fronts,
+            "cross_community_penalty": cross_community_penalty,
+            "objectives": list(local_mo_dict.keys()),
+        }
+        return pareto_skeleton_edges, stats
 
     # 计算加权杰卡德相似度
     @staticmethod
-    def calculate_weighted_jaccard(data: List[dict], threshold: float = 0.1) -> Dict[Tuple[str, str], float]:
+    def calculate_weighted_jaccard(
+        data: List[dict], threshold: float = 0.1
+    ) -> Dict[Tuple[str, str], float]:
         # 构建内存结构：job_id → {comp_name: weight}
         job_comp_weights = defaultdict(dict)
         all_job_ids = set()
@@ -275,7 +342,9 @@ class GraphAlgorithms:
         jaccard_map = {}
 
         # 【优化 1】预先计算每个岗位的所有技能权重之和 (空间换时间)
-        job_sum_weights = {job: sum(comps.values()) for job, comps in job_comp_weights.items()}
+        job_sum_weights = {
+            job: sum(comps.values()) for job, comps in job_comp_weights.items()
+        }
 
         # 记录有效边数
         valid_edges = 0
@@ -287,7 +356,9 @@ class GraphAlgorithms:
 
             # 性能追踪打印
             if i % 1000 == 0 and i > 0:
-                log.info(f"  已处理 {i}/{len(all_jobs)} 个岗位，当前有效边数：{valid_edges}...")
+                log.info(
+                    f"  已处理 {i}/{len(all_jobs)} 个岗位，当前有效边数：{valid_edges}..."
+                )
 
             for j in range(i + 1, len(all_jobs)):
                 job_b = all_jobs[j]
@@ -297,7 +368,11 @@ class GraphAlgorithms:
                 sum_intersect = 0.0
 
                 # 【优化 3】只遍历较小的字典，寻找交集 (极大减少循环次数)
-                smaller_comps, larger_comps = (comps_a, comps_b) if len(comps_a) < len(comps_b) else (comps_b, comps_a)
+                smaller_comps, larger_comps = (
+                    (comps_a, comps_b)
+                    if len(comps_a) < len(comps_b)
+                    else (comps_b, comps_a)
+                )
 
                 # 计算标准的 Min 交集
                 for c, weight_small in smaller_comps.items():
@@ -323,38 +398,49 @@ class GraphAlgorithms:
             raise ValueError("硬筛选后无有效边，请调低Jaccard阈值")
         log.info(f"基础网生成完成，有效边数：{valid_edges}")
 
-        return jaccard_map  
+        return jaccard_map
 
     # 计算 IDF 权重列表
     @staticmethod
-    def get_idf_weights(raw_data: List[dict], threshold: float = 0.1) -> Optional[List[dict]]:
+    def get_idf_weights(
+        raw_data: List[dict], threshold: float = 0.1
+    ) -> Optional[List[dict]]:
         if not raw_data:
             return None
 
         # 2. 在纯内存中进行极速代数统计 (告别 Pydantic)
-        total_jobs = len(set(row['job_id'] for row in raw_data))
+        total_jobs = len(set(row["job_id"] for row in raw_data))
         if total_jobs == 0:
             log.warning("无有效岗位数据, 跳过IDF计算")
             return None
-        comp_df = defaultdict(int)  # 记录每个能力在多少个岗位中出现过
-
+        # comp_df: 记录每个能力在多少个“不同岗位”中出现过（证据口径：岗位覆盖率）
+        comp_job_sets: Dict[str, set] = defaultdict(set)
         for row in raw_data:
-            comp_df[row['comp_name']] += 1
+            comp_job_sets[row["comp_name"]].add(row["job_id"])
+
+        comp_df = {
+            comp_name: len(job_set) for comp_name, job_set in comp_job_sets.items()
+        }
 
         # 3. 计算 IDF 权重列表
         # 使用平滑对数公式防止除零，基数为 e
-        idf_updates =[]
+        idf_updates = []
         for comp_name, df in comp_df.items():
             # 经典 IDF 公式：log( N / DF )
             # 加上 1.0 是为了防止过于普遍的技能权重变成 0
-            if not raw_data:
-                return None
-            idf_value = math.log(total_jobs / df) + 1.0 
+            idf_value = math.log(total_jobs / df) + 1.0
 
-            idf_updates.append({
-                "comp_name": comp_name,
-                "idf_weight": round(idf_value, 4)
-            })
+            prevalence = df / total_jobs
+
+            idf_updates.append(
+                {
+                    "comp_name": comp_name,
+                    "idf_weight": round(idf_value, 4),
+                    "df": int(df),
+                    "total_jobs": int(total_jobs),
+                    "prevalence": round(float(prevalence), 6),
+                }
+            )
 
         log.info(f"Calculated IDF for {len(idf_updates)} unique competencies.")
 

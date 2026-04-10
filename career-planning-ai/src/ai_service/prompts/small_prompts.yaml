@@ -38,3 +38,8 @@ user_job_match_analyzer_user: |
   {user_profile_text}
 
   请严格输出 JSON。
+
+  当前对话上下文：
+  {context}
+
+  请根据用户的提问给出专业、有帮助的回答。

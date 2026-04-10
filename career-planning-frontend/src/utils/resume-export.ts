@@ -457,3 +457,276 @@ export async function exportManualResumeToWord(
   const blob = await Packer.toBlob(doc)
   saveAs(blob, options?.fileName ?? 'resume.docx')
 }
+
+export interface GrowthPlanWordExportData {
+  student_summary: string
+  target_position: string
+  current_gap: string
+  short_term_plan: {
+    duration: string
+    goal: string
+    focus_areas: string[]
+    milestones: Array<{
+      milestone_name: string
+      target_date: string
+      key_results: string[]
+      tasks: Array<{
+        task_name: string
+        description: string
+        priority: string
+        estimated_time: string
+        skill_target: string
+        success_criteria: string
+      }>
+    }>
+    quick_wins: string[]
+  }
+  mid_term_plan: {
+    duration: string
+    goal: string
+    skill_roadmap: string[]
+    milestones: Array<{
+      milestone_name: string
+      target_date: string
+      key_results: string[]
+      tasks: Array<{
+        task_name: string
+        description: string
+        priority: string
+        estimated_time: string
+        skill_target: string
+        success_criteria: string
+      }>
+    }>
+    career_progression: string
+    recommended_internships: Array<{
+      job_title: string
+      company_name: string
+      city: string
+      salary: string
+      job_type: string
+      reason: string
+      tech_stack?: string
+      content?: string
+    }>
+  }
+  action_checklist: string[]
+  tips: string[]
+}
+
+export async function exportGrowthPlanToWord(
+  plan: GrowthPlanWordExportData,
+  options?: ResumeWordExportOptions
+): Promise<void> {
+  const children: Paragraph[] = []
+
+  const pushHeading = (text: string, level: HeadingLevel = HeadingLevel.HEADING_1) => {
+    children.push(
+      new Paragraph({
+        text,
+        heading: level,
+        spacing: {
+          before: 240,
+          after: 120
+        }
+      })
+    )
+  }
+
+  const pushBody = (text?: string) => {
+    if (!asText(text)) return
+    children.push(
+      new Paragraph({
+        text: asText(text),
+        spacing: {
+          after: 120
+        }
+      })
+    )
+  }
+
+  children.push(
+    new Paragraph({
+      text: asText(plan.target_position) || '生涯成长报告',
+      heading: HeadingLevel.TITLE,
+      alignment: AlignmentType.CENTER,
+      spacing: {
+        after: 160
+      }
+    }),
+    new Paragraph({
+      text: '职业目标 / 路径规划 / 行动计划',
+      alignment: AlignmentType.CENTER,
+      spacing: {
+        after: 280
+      }
+    })
+  )
+
+  pushHeading('职业目标')
+  pushBody(plan.target_position)
+
+  pushHeading('学生画像摘要')
+  pushBody(plan.student_summary)
+
+  pushHeading('能力差距分析')
+  pushBody(plan.current_gap)
+
+  pushHeading('短期行动计划')
+  pushBody(`周期：${asText(plan.short_term_plan.duration)}`)
+  pushBody(plan.short_term_plan.goal)
+
+  if (plan.short_term_plan.focus_areas.length) {
+    pushBody(`重点方向：${plan.short_term_plan.focus_areas.join('、')}`)
+  }
+
+  if (plan.short_term_plan.quick_wins.length) {
+    children.push(
+      new Paragraph({
+        text: '短期快赢动作',
+        heading: HeadingLevel.HEADING_2
+      }),
+      ...toBulletParagraphs(plan.short_term_plan.quick_wins)
+    )
+  }
+
+  for (const milestone of plan.short_term_plan.milestones) {
+    children.push(
+      new Paragraph({
+        children: [
+          new TextRun({ text: milestone.milestone_name, bold: true }),
+          new TextRun({ text: milestone.target_date ? `  ${milestone.target_date}` : '' })
+        ],
+        spacing: {
+          before: 160,
+          after: 120
+        }
+      })
+    )
+
+    children.push(...toBulletParagraphs(milestone.key_results))
+
+    for (const task of milestone.tasks) {
+      children.push(
+        new Paragraph({
+          children: [
+            new TextRun({ text: task.task_name, bold: true }),
+            new TextRun({ text: task.priority ? `  [${task.priority}]` : '' })
+          ],
+          spacing: {
+            before: 120
+          }
+        })
+      )
+      pushBody(task.description)
+      pushBody(`预计时间：${asText(task.estimated_time)}`)
+      pushBody(`技能目标：${asText(task.skill_target)}`)
+      pushBody(`完成标准：${asText(task.success_criteria)}`)
+    }
+  }
+
+  pushHeading('中期路径规划')
+  pushBody(`周期：${asText(plan.mid_term_plan.duration)}`)
+  pushBody(plan.mid_term_plan.goal)
+
+  if (plan.mid_term_plan.skill_roadmap.length) {
+    pushBody(`技能路线：${plan.mid_term_plan.skill_roadmap.join('、')}`)
+  }
+
+  for (const milestone of plan.mid_term_plan.milestones) {
+    children.push(
+      new Paragraph({
+        children: [
+          new TextRun({ text: milestone.milestone_name, bold: true }),
+          new TextRun({ text: milestone.target_date ? `  ${milestone.target_date}` : '' })
+        ],
+        spacing: {
+          before: 160,
+          after: 120
+        }
+      })
+    )
+
+    children.push(...toBulletParagraphs(milestone.key_results))
+
+    for (const task of milestone.tasks) {
+      children.push(
+        new Paragraph({
+          children: [
+            new TextRun({ text: task.task_name, bold: true }),
+            new TextRun({ text: task.priority ? `  [${task.priority}]` : '' })
+          ],
+          spacing: {
+            before: 120
+          }
+        })
+      )
+      pushBody(task.description)
+      pushBody(`预计时间：${asText(task.estimated_time)}`)
+      pushBody(`技能目标：${asText(task.skill_target)}`)
+      pushBody(`完成标准：${asText(task.success_criteria)}`)
+    }
+  }
+
+  pushHeading('职业发展预期')
+  pushBody(plan.mid_term_plan.career_progression)
+
+  if (plan.mid_term_plan.recommended_internships.length) {
+    children.push(
+      new Paragraph({
+        text: '推荐实习岗位',
+        heading: HeadingLevel.HEADING_2
+      })
+    )
+
+    for (const item of plan.mid_term_plan.recommended_internships) {
+      children.push(
+        new Paragraph({
+          children: [
+            new TextRun({ text: item.job_title, bold: true }),
+            new TextRun({ text: item.company_name ? `  ${item.company_name}` : '' })
+          ],
+          spacing: {
+            before: 120
+          }
+        })
+      )
+
+      pushBody([asText(item.city), asText(item.salary), asText(item.job_type)].filter(Boolean).join(' | '))
+      pushBody(`推荐理由：${asText(item.reason)}`)
+      pushBody(asText(item.tech_stack) ? `技术栈：${asText(item.tech_stack)}` : '')
+      pushBody(item.content)
+    }
+  }
+
+  if (plan.action_checklist.length) {
+    children.push(
+      new Paragraph({
+        text: '行动清单',
+        heading: HeadingLevel.HEADING_1
+      }),
+      ...toBulletParagraphs(plan.action_checklist)
+    )
+  }
+
+  if (plan.tips.length) {
+    children.push(
+      new Paragraph({
+        text: '学习建议',
+        heading: HeadingLevel.HEADING_1
+      }),
+      ...toBulletParagraphs(plan.tips)
+    )
+  }
+
+  const doc = new Document({
+    sections: [
+      {
+        children
+      }
+    ]
+  })
+
+  const blob = await Packer.toBlob(doc)
+  saveAs(blob, options?.fileName ?? 'growth-plan.docx')
+}

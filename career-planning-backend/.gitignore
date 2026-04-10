@@ -19,6 +19,7 @@ src/main/java/com/backend/careerplanningbackend/http/
 
 ### IntelliJ IDEA ###
 .idea
+logs
 *.iws
 *.iml
 *.ipr

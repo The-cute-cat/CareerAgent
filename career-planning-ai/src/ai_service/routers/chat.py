@@ -7,6 +7,9 @@
 3. 支持文件上传
 4. 会话管理（列表、删除、更新标题）
 """
+import asyncio
+import json
+
 from fastapi import APIRouter, Depends, Form, Request, Query
 from fastapi.responses import StreamingResponse
 
@@ -27,7 +30,7 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 @router.post("/message")
 async def chat_with_message(
         message: str = Form(..., description="消息内容"),
-        user_id: str = Form(..., description="用户ID"),
+        user_id: int = Form(..., description="用户ID"),
         conversation_id: str | None = Form(None, description="对话ID"),
         auto_extract_memory: bool = Form(True, description="是否自动提取记忆"),
         _: bool = Depends(validate_token)
@@ -58,30 +61,29 @@ async def chat_with_message(
 async def chat_with_message_stream(
         request: Request,
         message: str = Form(..., description="消息内容"),
-        user_id: str = Form(..., description="用户ID"),
+        user_id: int = Form(..., description="用户ID"),
         conversation_id: str | None = Form(None, description="对话ID"),
         auto_extract_memory: bool = Form(True, description="是否自动提取记忆"),
+        show_thinking: bool = Form(False, description="是否显示思考过程"),
         _: bool = Depends(validate_token)
 ):
     """纯文本消息对话（流式方式 - SSE）"""
-    log.warning("⚠️警告：该接口正在测试中，可能存在问题")
     log.info(f"会话id:{conversation_id}")
     session_id = conversation_id or "default_session"
     return _create_sse_response(
-        _create_sse_stream(request, user_id, session_id, message, auto_extract_memory)
+        _create_sse_stream(request, user_id, session_id, message, auto_extract_memory, show_thinking)
     )
 
 
 @router.post("/files")
 async def chat_with_files(
         files: list[dict[str, str]] = Depends(handle_files),
-        user_id: str = Form(..., description="用户ID"),
+        user_id: int = Form(..., description="用户ID"),
         conversation_id: str | None = Form(None, description="对话ID"),
         auto_extract_memory: bool = Form(False, description="是否自动提取记忆"),
         _: bool = Depends(validate_token)
 ):
     """仅文件上传对话（阻塞方式）"""
-    log.warning("⚠️警告：该接口正在测试中，可能存在问题")
     session_id = conversation_id or "default_session"
     file_texts = await _extract_files_text(files)
     combined_message = "我上传了以下文件，请帮我分析：\n\n" + "\n\n".join(file_texts)
@@ -94,13 +96,12 @@ async def chat_with_files(
 async def chat_with_message_and_files(
         message: str = Form(..., description="消息内容"),
         files: list[dict[str, str]] = Depends(handle_files),
-        user_id: str = Form(..., description="用户ID"),
+        user_id: int = Form(..., description="用户ID"),
         conversation_id: str | None = Form(None, description="对话ID"),
         auto_extract_memory: bool = Form(False, description="是否自动提取记忆"),
         _: bool = Depends(validate_token)
 ):
     """消息+文件对话（阻塞方式）"""
-    log.warning("⚠️警告：该接口正在测试中，可能存在问题")
     session_id = conversation_id or "default_session"
     file_texts = await _extract_files_text(files)
     combined_message = f"{message}\n\n以下是我上传的文件内容：\n\n" + "\n\n".join(file_texts)
@@ -114,20 +115,21 @@ async def chat_with_message_and_files_stream(
         request: Request,
         message: str = Form(..., description="消息内容"),
         files: list[dict[str, str]] = Depends(handle_files),
-        user_id: str = Form(..., description="用户ID"),
+        user_id: int = Form(..., description="用户ID"),
         conversation_id: str | None = Form(None, description="对话ID"),
         auto_extract_memory: bool = Form(True, description="是否自动提取记忆"),
+        show_thinking: bool = Form(False, description="是否显示思考过程"),
         _: bool = Depends(validate_token)
 ):
     """消息+文件对话（流式方式 - SSE）"""
-    log.warning("⚠️警告：该接口正在测试中，可能存在问题")
     session_id = conversation_id or "default_session"
+
     async def event_stream():
         try:
             file_texts = await _extract_files_text(files)
             combined_message = f"{message}\n\n以下是我上传的文件内容：\n\n" + "\n\n".join(file_texts)
             async for chunk in _create_sse_stream(
-                    request, user_id, session_id, combined_message, auto_extract_memory
+                    request, user_id, session_id, combined_message, auto_extract_memory, show_thinking
             ):
                 yield chunk
         except Exception as e:
@@ -140,56 +142,30 @@ async def chat_with_message_and_files_stream(
 @router.get("/history/{session_id}")
 async def get_chat_history(
         session_id: str,
-        user_id: str = Query(..., description="用户ID"),
+        user_id: int = Query(..., description="用户ID"),
         limit: int | None = None,
         _: bool = Depends(validate_token)
 ):
-    """获取会话历史记录"""
-    log.warning("⚠️警告：该接口正在测试中，可能存在问题")
-    try:
-        history = await conversation_agent.get_session_history(user_id, session_id, limit)
-        return success({
-            "sessionId": session_id,
-            "userId": user_id,
-            "history": history,
-            "count": len(history)
-        })
-    except Exception as e:
-        log.error(f"获取会话历史失败: {e}", exc_info=True)
-        return error_msg(f"获取会话历史失败: {str(e)}")
-
-
-@router.delete("/session/{session_id}")
-async def clear_session(
-        session_id: str,
-        user_id: str = Query(..., description="用户ID"),
-        _: bool = Depends(validate_token)
-):
-    """清除会话的短期记忆并软删除持久化记录"""
-    log.warning("⚠️警告：该接口正在测试中，可能存在问题")
+    """获取会话历史记录（含标题）"""
     async with AsyncSessionLocal() as db_session:
         try:
-            success_flag = await conversation_agent.clear_session(user_id, session_id, db_session)
-            await db_session.commit()
-            if success_flag:
-                return success({"message": f"会话 {session_id} 已清除"})
-            else:
-                return error_msg(f"清除会话失败", 500)
+            result = await conversation_agent.get_session_history(
+                user_id, session_id, limit, db_session
+            )
+            return success(result)
         except Exception as e:
-            await db_session.rollback()
-            log.error(f"清除会话失败: {e}", exc_info=True)
-            return error_msg(f"清除会话失败: {str(e)}")
+            log.error(f"获取会话历史失败: {e}", exc_info=True)
+            return error_msg(f"获取会话历史失败: {str(e)}")
 
 
 @router.get("/sessions")
 async def get_user_sessions(
-        user_id: str = Query(..., description="用户ID"),
+        user_id: int = Query(..., description="用户ID"),
         page: int = Query(1, ge=1, description="页码"),
         page_size: int = Query(20, ge=1, le=100, description="每页数量"),
         _: bool = Depends(validate_token)
 ):
     """获取用户的会话列表"""
-    log.warning("⚠️警告：该接口正在测试中，可能存在问题")
     async with AsyncSessionLocal() as db_session:
         try:
             result = await conversation_agent.get_user_sessions(
@@ -205,15 +181,54 @@ async def get_user_sessions(
             return error_msg(f"获取会话列表失败: {str(e)}")
 
 
+@router.get("/session/{session_id}/title")
+async def get_session_title(
+        session_id: str,
+        user_id: int = Query(..., description="用户ID"),
+        _: bool = Depends(validate_token)
+):
+    """获取会话标题（返回为空表示还未生成）"""
+    async with AsyncSessionLocal() as db_session:
+        try:
+            title = await conversation_agent.get_session_title(user_id, session_id, db_session)
+            return success({
+                "sessionId": session_id,
+                "title": title
+            })
+        except Exception as e:
+            log.error(f"获取会话标题失败: {e}", exc_info=True)
+            return error_msg(f"获取会话标题失败: {str(e)}")
+
+
+@router.delete("/session/{session_id}")
+async def clear_session(
+        session_id: str,
+        user_id: int = Query(..., description="用户ID"),
+        _: bool = Depends(validate_token)
+):
+    """清除会话的短期记忆并软删除持久化记录"""
+    async with AsyncSessionLocal() as db_session:
+        try:
+            success_flag = await conversation_agent.clear_session(user_id, session_id, db_session)
+            await db_session.commit()
+            if success_flag:
+                return success({"message": f"会话 {session_id} 已清除"})
+            else:
+                return error_msg(f"清除会话失败", 500)
+        except Exception as e:
+            await db_session.rollback()
+            log.error(f"清除会话失败: {e}", exc_info=True)
+            return error_msg(f"清除会话失败: {str(e)}")
+
+
 @router.put("/session/{session_id}/title")
 async def update_session_title(
         session_id: str,
-        user_id: str = Form(..., description="用户ID"),
+        user_id: int = Form(..., description="用户ID"),
         title: str = Form(..., description="会话标题"),
         _: bool = Depends(validate_token)
 ):
     """更新会话标题"""
-    log.warning("⚠️警告：该接口正在测试中，可能存在问题")
     async with AsyncSessionLocal() as db_session:
         try:
             success_flag = await conversation_agent.update_session_title(
@@ -235,7 +250,7 @@ async def update_session_title(
 
 @router.get("/memories")
 async def get_user_memories(
-        user_id: str = Query(..., description="用户ID"),
+        user_id: int = Query(..., description="用户ID"),
         limit: int = Query(20, ge=1, le=100, description="返回数量限制"),
         min_score: float | None = Query(None, ge=0, le=1, description="最低分数过滤"),
         _: bool = Depends(validate_token)
@@ -278,7 +293,7 @@ async def get_user_memories(
 @router.delete("/memory/{memory_id}")
 async def delete_memory(
         memory_id: int,
-        user_id: str = Query(..., description="用户ID"),
+        user_id: int = Query(..., description="用户ID"),
         _: bool = Depends(validate_token)
 ):
     """删除指定的记忆点（软删除）"""
@@ -324,7 +339,7 @@ async def _extract_files_text(files: list[dict[str, str]]) -> list[str]:
 
 
 async def _handle_chat_with_files(
-        user_id: str,
+        user_id: int,
         session_id: str,
         combined_message: str,
         auto_extract_memory: bool,
@@ -368,13 +383,20 @@ async def _handle_chat_with_files(
 
 async def _create_sse_stream(
         request: Request,
-        user_id: str,
+        user_id: int,
         session_id: str,
         message: str,
-        auto_extract_memory: bool
+        auto_extract_memory: bool,
+        show_thinking: bool = False
 ):
     """
     SSE 事件流生成器
+
+    SSE 标准格式：
+    - event: 事件类型（可选）
+    - data: 数据内容（必需）
+    - id: 事件ID（可选，用于断点续传）
+    - 每个事件以空行（\\n\\n）结束
 
     Args:
         request: FastAPI 请求对象
@@ -382,10 +404,12 @@ async def _create_sse_stream(
         session_id: 会话 ID
         message: 消息内容
         auto_extract_memory: 是否自动提取记忆
+        show_thinking: 是否显示思考过程
 
     Yields:
         SSE 格式的数据流
     """
+    event_id = 0
     async with AsyncSessionLocal() as db_session:
         try:
             async for chunk in conversation_agent.chat_stream(
@@ -393,18 +417,37 @@ async def _create_sse_stream(
                     session_id=session_id,
                     user_message=message,
                     db_session=db_session,
-                    auto_extract_memory=auto_extract_memory
+                    auto_extract_memory=auto_extract_memory,
+                    show_thinking=show_thinking
             ):
                 if await request.is_disconnected():
                     log.info(f"客户端断开连接，停止流式传输: session_id={session_id}")
                     break
-                yield f"data: {chunk}\n\n"
+                event_id += 1
+
+                # 解析 chunk 类型
+                chunk_data = json.loads(chunk)
+                chunk_type = chunk_data.get("type", "content")
+
+                # 标准 SSE 格式：event + data + id
+                yield f"event: {chunk_type}\n"
+                yield f"data: {chunk}\n"
+                yield f"id: {event_id}\n\n"
+
+                # 主动让出控制权，确保数据立即发送
+                await asyncio.sleep(0)
+
             await db_session.commit()
-            yield f"data: [DONE]\n\n"
+            # 发送结束事件
+            yield f"event: done\n"
+            yield f"data: {json.dumps({'status': 'completed'})}\n"
+            yield f"id: {event_id + 1}\n\n"
         except Exception as e:
             await db_session.rollback()
             log.error(f"流式对话处理失败: {e}", exc_info=True)
-            yield f"data: [ERROR] {str(e)}\n\n"
+            # 发送错误事件
+            yield f"event: error\n"
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
 
 def _create_sse_response(stream_generator):
@@ -417,12 +460,15 @@ def _create_sse_response(stream_generator):
     Returns:
         StreamingResponse 对象
     """
+    # noinspection SpellCheckingInspection
     return StreamingResponse(
         stream_generator,
         media_type="text/event-stream",
         headers={
-            "Cache-Control": "no-cache",
+            "Cache-Control": "no-cache, no-store, must-revalidate",
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",
+            "X-Content-Type-Options": "nosniff",
+            "Access-Control-Allow-Origin": "*",
         }
     )

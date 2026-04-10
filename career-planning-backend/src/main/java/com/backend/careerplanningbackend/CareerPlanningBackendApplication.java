@@ -18,7 +18,7 @@ public class CareerPlanningBackendApplication {
     @Bean
     public MessageConverter jacksonMessageConvertor(){
         Jackson2JsonMessageConverter jjmc = new Jackson2JsonMessageConverter();
-        jjmc.setCreateMessageIds(true);
+        jjmc.setCreateMessageIds(true); // 自动生成消息 ID
         return jjmc;
     }
 }

@@ -41,7 +41,7 @@ public class FeedbackServiceImpl extends ServiceImpl<FeedbackMapper, Feedback> i
     public Result<Boolean> submitFeedback(Feedback feedback) {
         try {
             Long currentUserId = ThreadLocalUtil.getCurrentUserId();
-            feedback.setUserId(currentUserId.intValue());
+            feedback.setUserId(currentUserId);
             
             boolean success = feedbackMapper.insert(feedback) > 0;
             if (success) {
@@ -52,7 +52,7 @@ public class FeedbackServiceImpl extends ServiceImpl<FeedbackMapper, Feedback> i
                 return Result.fail("反馈提交失败");
             }
         } catch (Exception e) {
-            log.error("提交反馈异常: {}", e.getMessage());
+            log.error("FeedbackServiceImpl.submitFeedback 提交反馈异常", e);
             return Result.fail("反馈提交异常: " + e.getMessage());
         }
     }
@@ -73,7 +73,7 @@ public class FeedbackServiceImpl extends ServiceImpl<FeedbackMapper, Feedback> i
             log.info("分页查询反馈成功，页码: {}, 每页数量: {}, 总数: {}", pageNum, pageSize, result.getTotal());
             return Result.ok(result);
         } catch (Exception e) {
-            log.error("分页查询反馈异常: {}", e.getMessage());
+            log.error("FeedbackServiceImpl.getFeedbackList 分页查询反馈异常", e);
             return Result.fail("查询反馈失败");
         }
     }
@@ -86,14 +86,14 @@ public class FeedbackServiceImpl extends ServiceImpl<FeedbackMapper, Feedback> i
             Page<Feedback> page = new Page<>(pageNum, pageSize);
             
             LambdaQueryWrapper<Feedback> queryWrapper = new LambdaQueryWrapper<>();
-            queryWrapper.eq(Feedback::getUserId, userId.intValue())
+            queryWrapper.eq(Feedback::getUserId, userId)
                     .orderByDesc(Feedback::getId);
             
             IPage<Feedback> result = feedbackMapper.selectPage(page, queryWrapper);
             log.info("查询用户 {} 的反馈历史成功，总数: {}", userId, result.getTotal());
             return Result.ok(result);
         } catch (Exception e) {
-            log.error("查询用户反馈历史异常: {}", e.getMessage());
+            log.error("FeedbackServiceImpl.getUserFeedbackHistory 查询用户反馈历史异常, 用户ID: {}", userId, e);
             return Result.fail("查询反馈历史失败");
         }
     }
@@ -112,7 +112,7 @@ public class FeedbackServiceImpl extends ServiceImpl<FeedbackMapper, Feedback> i
                 return Result.fail("反馈不存在");
             }
         } catch (Exception e) {
-            log.error("查询反馈详情异常: {}", e.getMessage());
+            log.error("FeedbackServiceImpl.getFeedbackById 查询反馈详情异常, 反馈ID: {}", id, e);
             return Result.fail("查询反馈详情失败");
         }
     }
@@ -139,7 +139,7 @@ public class FeedbackServiceImpl extends ServiceImpl<FeedbackMapper, Feedback> i
                 return Result.fail("回复失败");
             }
         } catch (Exception e) {
-            log.error("管理员回复反馈异常: {}", e.getMessage());
+            log.error("FeedbackServiceImpl.replyFeedback 管理员回复反馈异常, 反馈ID: {}", id, e);
             return Result.fail("回复失败: " + e.getMessage());
         }
     }
@@ -159,7 +159,7 @@ public class FeedbackServiceImpl extends ServiceImpl<FeedbackMapper, Feedback> i
                 return Result.fail("删除失败");
             }
         } catch (Exception e) {
-            log.error("删除反馈异常: {}", e.getMessage());
+            log.error("FeedbackServiceImpl.deleteFeedback 删除反馈异常, 反馈ID: {}", id, e);
             return Result.fail("删除失败: " + e.getMessage());
         }
     }
@@ -177,7 +177,7 @@ public class FeedbackServiceImpl extends ServiceImpl<FeedbackMapper, Feedback> i
             log.info("查询类型为 {} 的反馈成功，数量: {}", type, list.size());
             return Result.ok(list);
         } catch (Exception e) {
-            log.error("查询指定类型反馈异常: {}", e.getMessage());
+            log.error("FeedbackServiceImpl.getFeedbackByType 查询指定类型反馈异常, 类型: {}", type, e);
             return Result.fail("查询失败");
         }
     }
@@ -209,7 +209,7 @@ public class FeedbackServiceImpl extends ServiceImpl<FeedbackMapper, Feedback> i
             int rows = feedbackMapper.updateById(existing);
             return rows > 0 ? Result.ok(true) : Result.fail("更新失败");
         } catch (Exception e) {
-            log.error("更新反馈异常: {}", e.getMessage());
+            log.error("FeedbackServiceImpl.updateFeedback 更新反馈异常, 反馈ID: {}", feedback.getId(), e);
             return Result.fail("更新失败: " + e.getMessage());
         }
     }

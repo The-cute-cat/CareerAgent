@@ -6,6 +6,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
+
 /**
  * PointsChangeDTO.java
  * 积分和会员变动DTO，用于记录用户积分和会员等级的变动信息
@@ -20,7 +22,7 @@ public class PointsMembershipChangeDTO {
     private Long userId;
     
     @NotNull(message = "变动积分不能为空")
-    private Integer amount; // 正数增加，负数扣减
+    private BigDecimal amount; // 正数增加，负数扣减
     
     /** 1:充值, 2:购买AI报告, 3:AI知识讲解消费, 4:推广奖励, 5:系统赠送. 6:会员赠送 */
     @NotNull(message = "变动类型不能为空")

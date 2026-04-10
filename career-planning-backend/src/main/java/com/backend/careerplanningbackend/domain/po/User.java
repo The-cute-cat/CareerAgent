@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
 public class User {
     
     private Long id;
-    /** 用户昵称 (默认显示用) */
+    /** 用户名 (默认显示用) */
     private String username;
 
     /** 用户昵称 (默认显示用) */
@@ -36,9 +36,20 @@ public class User {
     
     private String info;
 
+    /** 逻辑删除-1表示逻辑删除 */
+    private Integer isDeleted;
+
+    /** 手机号 */
+    private String phone;
+
     /** 注册时间 */
     private LocalDateTime createTime;
 
     /** 更新时间 */
     private LocalDateTime updateTime;
+
+    @Override
+    public String toString() {
+        return "LoginFormDTO{username='" + username + "', email='" + email + "'}";
+    }
 }

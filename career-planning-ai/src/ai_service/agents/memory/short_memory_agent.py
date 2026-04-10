@@ -59,13 +59,13 @@ class ShortMemoryAgent:
         logger.info(f"ShortMemoryAgent 初始化完成，Redis可用: {self.redis.is_available}")
 
     @staticmethod
-    def _build_key(user_id: str, session_id: str) -> str:
+    def _build_key(user_id: int, session_id: str) -> str:
         """构建 Redis 键名（包含 user_id 以支持不同用户有相同 session_id）"""
         return f"short_memory:{user_id}:{session_id}"
 
     async def get_messages(
             self,
-            user_id: str,
+            user_id: int,
             session_id: str
     ) -> list[Message]:
         """
@@ -86,7 +86,7 @@ class ShortMemoryAgent:
 
     async def add_message(
             self,
-            user_id: str,
+            user_id: int,
             session_id: str,
             role: str,
             content: str,
@@ -156,7 +156,7 @@ class ShortMemoryAgent:
 
     async def compress_messages(
             self,
-            user_id: str,
+            user_id: int,
             session_id: str,
             messages: list[Message]
     ) -> list[Message]:
@@ -189,7 +189,7 @@ class ShortMemoryAgent:
 
     async def remove_last_message(
             self,
-            user_id: str,
+            user_id: int,
             session_id: str
     ) -> bool:
         """
@@ -213,7 +213,7 @@ class ShortMemoryAgent:
 
     async def clear(
             self,
-            user_id: str,
+            user_id: int,
             session_id: str
     ) -> bool:
         """
@@ -231,7 +231,7 @@ class ShortMemoryAgent:
 
     async def get_context_messages(
             self,
-            user_id: str,
+            user_id: int,
             session_id: str,
             limit: Optional[int] = None
     ) -> list[BaseMessage]:
@@ -255,7 +255,7 @@ class ShortMemoryAgent:
 
     async def get_message_count(
             self,
-            user_id: str,
+            user_id: int,
             session_id: str
     ) -> int:
         """

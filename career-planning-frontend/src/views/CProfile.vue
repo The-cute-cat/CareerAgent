@@ -75,7 +75,7 @@ const allMenus = [
   { key: 'member', label: '会员计划', onlyProfile: true },
   { key: 'invite', label: '邀请好友', onlyProfile: true },
   { key: 'feedback', label: '反馈建议', onlyProfile: true },
-  { key: 'setting', label: '更多设置', onlyProfile: true }
+  { key: 'setting', label: '更多设置', onlyProfile: true, onlySettings: true }
 ]
 
 const visibleMenus = computed(() => {
@@ -357,9 +357,9 @@ const refreshUserInfoAfterPurchase = async () => {
       // 显示成功提示
       const memberType = String((newUserInfo as any).memberType || 'normal').toLowerCase()
       const memberText = memberType === 'normal' ? '基础会员' :
-                        memberType === 'monthly' ? '月度会员' :
-                        memberType === 'quarterly' || memberType === 'quarter' ? '季度会员' :
-                        memberType === 'yearly' || memberType === 'annual' ? '年度会员' : '基础会员'
+        memberType === 'monthly' ? '月度会员' :
+          memberType === 'quarterly' || memberType === 'quarter' ? '季度会员' :
+            memberType === 'yearly' || memberType === 'annual' ? '年度会员' : '基础会员'
 
       ElMessage.success({
         message: `账户信息已更新！当前会员：${memberText}，积分余额：${accountPoints.value?.pointsBalance || 0}`,
@@ -508,6 +508,7 @@ const refreshUserInfoAfterPurchase = async () => {
 .content-intro {
   margin-bottom: 32px;
   position: relative;
+  text-align: center;
 }
 
 .content-intro h1 {
@@ -520,7 +521,7 @@ const refreshUserInfoAfterPurchase = async () => {
 }
 
 .content-intro p {
-  margin: 0;
+  margin: 0 auto;
   max-width: 640px;
   font-size: 14px;
   line-height: 1.8;
@@ -545,10 +546,23 @@ const refreshUserInfoAfterPurchase = async () => {
 .mobile-nav-header {
   display: flex;
   align-items: center;
+  justify-content: center;
+  position: relative;
   gap: 12px;
   margin-bottom: 24px;
   padding-bottom: 16px;
   border-bottom: 1px solid #f1f5f9;
+}
+
+.back-btn {
+  position: absolute;
+  left: 0;
+  font-size: 20px;
+  color: #334155;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 8px;
+  transition: background 0.2s;
 }
 
 .back-btn {

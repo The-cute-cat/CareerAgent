@@ -2,7 +2,8 @@ package com.backend.careerplanningbackend.util;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
-
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 import javax.crypto.SecretKey;
 import java.util.Date;
 import java.util.HashMap;
@@ -10,14 +11,22 @@ import java.util.Map;
 import java.util.UUID;
 //生成双token
 
+@Component
 public class JwtUtil {
     // 使用安全的密钥生成方式（HS256算法需要至少256位密钥）
-    private static final String secretString="ThisIsSecretKeyForHopeProject2025715";
-    private static final SecretKey secret = Keys.hmacShaKeyFor(secretString.getBytes());
+    private static SecretKey secret;
+
+    @Value("${jwt.secret:ThisIsSecretKeyForHelloWorldProject20250715}")
+    public void setSecretString(String secretString) {
+        JwtUtil.secret = Keys.hmacShaKeyFor(secretString.getBytes());
+    }
+    
+//    private static final String secret="ThisIsSecretKeyForHopeProject2025715";
 
     // Token过期时间配置
-//    private static final long ACCESS_TOKEN_EXPIRE = 30 * 60 * 100000; // 30分钟
-    private static final long ACCESS_TOKEN_EXPIRE = 30 * 60 * 10000000; // 30分钟
+    //todo
+//    private static final long ACCESS_TOKEN_EXPIRE = 30 * 60 * 1000; // 30分钟
+    private static final long ACCESS_TOKEN_EXPIRE = 30 * 60 * 10000000; // 本地测试
     private static final long REFRESH_TOKEN_EXPIRE = 7 * 24 * 60 * 60 * 1000; // 7天
 
     //携带用户的基础信息

@@ -11,7 +11,16 @@ from starlette.responses import JSONResponse
 
 from ai_service.exceptions import ApiException
 from ai_service.response.result import success
-from ai_service.routers import parse, question, matching, convert, code_ability, graph_path, report, chat
+from ai_service.routers import (
+    parse,
+    question,
+    matching,
+    convert,
+    code_ability,
+    graph_path,
+    report,
+    chat,
+)
 from ai_service.schemas.file import temp_file_queue
 from ai_service.utils.logger_handler import log
 from config import settings
@@ -49,12 +58,9 @@ async def starlette_http_exception_handler(_: Request, exc: StarletteHTTPExcepti
     log.error(f"StarletteHTTPException: {exc}", exc_info=True)
     return JSONResponse(
         status_code=200,
-        content=jsonable_encoder({
-            "code": exc.status_code,
-            "state": False,
-            "msg": exc.detail,
-            "data": None
-        })
+        content=jsonable_encoder(
+            {"code": exc.status_code, "state": False, "msg": exc.detail, "data": None}
+        ),
     )
 
 
@@ -63,12 +69,14 @@ async def api_exception_handler(_: Request, exc: ApiException):
     log.error(f"ApiException: {exc}", exc_info=True)
     return JSONResponse(
         status_code=200,
-        content=jsonable_encoder({
-            "code": exc.code,
-            "state": exc.code < 400,
-            "msg": exc.msg,
-            "data": exc.data
-        })
+        content=jsonable_encoder(
+            {
+                "code": exc.code,
+                "state": exc.code < 400,
+                "msg": exc.msg,
+                "data": exc.data,
+            }
+        ),
     )
 
 
@@ -78,12 +86,9 @@ async def http_exception_handler(_: Request, exc: HTTPException):
     log.error(f"HTTPException: {exc}", exc_info=True)
     return JSONResponse(
         status_code=200,
-        content=jsonable_encoder({
-            "code": exc.status_code,
-            "state": False,
-            "msg": exc.detail,
-            "data": None
-        })
+        content=jsonable_encoder(
+            {"code": exc.status_code, "state": False, "msg": exc.detail, "data": None}
+        ),
     )
 
 
@@ -101,12 +106,14 @@ async def validation_exception_handler(_: Request, exc: RequestValidationError):
 
     return JSONResponse(
         status_code=200,
-        content=jsonable_encoder({
-            "code": 422,
-            "state": False,
-            "msg": msg,
-            "data": {"errors": errors} if len(errors) > 1 else None
-        })
+        content=jsonable_encoder(
+            {
+                "code": 422,
+                "state": False,
+                "msg": msg,
+                "data": {"errors": errors} if len(errors) > 1 else None,
+            }
+        ),
     )
 
 
@@ -116,12 +123,14 @@ async def exception_handler(_: Request, exc: Exception):
     log.error(f"服务器内部错误: {exc}", exc_info=True)
     return JSONResponse(
         status_code=200,
-        content=jsonable_encoder({
-            "code": 500,
-            "state": False,
-            "msg": "服务器内部错误",
-            "data": {"errors": str(exc)}
-        })
+        content=jsonable_encoder(
+            {
+                "code": 500,
+                "state": False,
+                "msg": "服务器内部错误",
+                "data": {"errors": str(exc)},
+            }
+        ),
     )
 
 
@@ -145,11 +154,12 @@ async def log_middleware(request: Request, call_next):
     log.info(f"请求路径: {request.url.path}, 响应时间: {end_time - start_time:.3f}s")
     log.debug(f"响应内容: {response_body.decode()}")
     from fastapi.responses import Response
+
     return Response(
         content=response_body,
         status_code=response.status_code,
         headers=dict(response.headers),
-        media_type=response.media_type
+        media_type=response.media_type,
     )
 
 

@@ -43,7 +43,7 @@ public class AliOSSMultipartFileUtil {
                 String originalFilename = multipartFile.getOriginalFilename();
                 String substring = originalFilename.substring(originalFilename.lastIndexOf("."));
                 // todo 这里需要把用户的源文件名字改回用户上传的文字
-                System.err.println("substring=" + substring + "" + originalFilename);
+                log.debug("AliOSSMultipartFileUtil.uploadFiles 文件截取结果, substring: {}, originalFilename: {}", substring, originalFilename);
 
                 originlList.add(substring);
                 urlList.add(url);

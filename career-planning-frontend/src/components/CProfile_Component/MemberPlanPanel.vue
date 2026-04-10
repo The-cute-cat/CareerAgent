@@ -7,7 +7,7 @@ import {
   Loading, CircleCheckFilled, CircleCloseFilled
 } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/modules/user'
-import { rechargePointsService, getPackagesByTypeService, type PointsMembershipChangeDTO, getAlipayService } from '@/api/points'
+import { rechargePointsService, getPackagesByTypeService, type PointsMembershipChangeDTO } from '@/api/points'
 import type { AccountPointsData } from '@/api/points'
 import alipayIcon from '@/assets/images/alipay.png'
 import wechatIcon from '@/assets/images/wechat.png'
@@ -308,11 +308,6 @@ const handlePay = async () => {
   } catch (err: any) {
     ElMessage.error(err.message || '网络或服务器错误，支付请求失败')
   }
-}
-
-// 旧的处理函数，现在指向新的支付流程
-const handlePay = async () => {
-  await startPayment()
 }
 
 const handleInvite = () => {
@@ -696,9 +691,9 @@ onUnmounted(() => {
 
 .panel-header {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
-  margin-bottom: 8px;
+  margin-bottom: 24px;
   color: #0f172a;
 }
 

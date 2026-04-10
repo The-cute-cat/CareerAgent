@@ -23,7 +23,7 @@ public class UserReferral {
     private Integer rewardPoints;
     private Integer status;
     private LocalDateTime endTime;
-    private LocalDateTime ActivityEndTime;
+    private LocalDateTime activityEndTime;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 }

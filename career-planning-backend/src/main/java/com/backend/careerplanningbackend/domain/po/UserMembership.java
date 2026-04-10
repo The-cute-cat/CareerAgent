@@ -17,7 +17,7 @@ public class UserMembership {
     private Long userId;
 
     /**
-     * 0普通用户, 1月度VIP, 2季度VIP, 3年度VIP
+     * 0普通用户, 1月度VIP, 2季度VIP, 3年度VIP, 4管理员
      */
     private Integer level;
 

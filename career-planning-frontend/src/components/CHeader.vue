@@ -112,7 +112,7 @@ const handleCommand = (command: string) => {
   if (command === 'logout') {
     confirmLogout()
   } else if (command === 'profile' || command === 'membership') {
-    router.push('/profile')
+    router.push({ path: '/profile', query: { tab: 'profile' } })
   }
 }
 
