@@ -29,11 +29,11 @@ from ai_service.services import log
 
 
 class GraphRepository:
-    def __init__(self, url: str, user: str, password: str):
+    def __init__(self, url: str, user: str, password: str, *, load_model: bool = True):
         self.driver = GraphDatabase.driver(url, auth=(user, password))
-        self.model = SentenceTransformer(
-            "all-MiniLM-L6-v2"
-        )  # 用于文本Embedding的轻量级模型
+        self.model = (
+            SentenceTransformer("all-MiniLM-L6-v2") if load_model else None
+        )  # 用于文本Embedding的轻量级模型（可按需加载）
 
     def init_constraints(self):
         with self.driver.session() as session:
@@ -457,6 +457,8 @@ class GraphRepository:
             all_texts.append(txt)
 
         # 2. 批量生成文本Embedding（离线计算，用完即弃）
+        if self.model is None:
+            self.model = SentenceTransformer("all-MiniLM-L6-v2")
         embeddings = self.model.encode(all_texts, convert_to_numpy=True)
 
         # 3. 结构化属性归一化矩阵

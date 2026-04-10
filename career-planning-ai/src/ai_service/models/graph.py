@@ -22,8 +22,8 @@ class GraphNodeJob(BaseModel):
     # --- 2. 物理过滤属性 (全部数字化/序数化，用于 Cypher WHERE) ---
     # 转为数字，方便图库里做 >= 的大小比较
     min_degree: int = Field(default=0, description="最低学历要求")
-    demand_rank: int = Field(default=2, description="需求排名")
-    trend_rank: int = Field(default=0, description="趋势排名")
+    demand_rank: int = Field(default=2, description="该岗位在当前就业市场中的需求程度")
+    trend_rank: int = Field(default=0, description="该岗位所属行业的发展趋势")
     salary_rank: int = Field(default=2, description="薪资竞争力等级")
     min_experience: int = Field(default=0, description="最低工作经验年限")
     major: str = Field(default="", description="专业要求")

@@ -207,12 +207,9 @@ class StudentFormProfile(BaseModel):
     # 3. 实践与产出 (这里是 AI 提取的“工作区”)
     # 修改：别名不与计算属性冲突，使用内部标识符
     codeLinks: Optional[List[str]] = Field(
-    codeLinks: Optional[List[str]] = Field(
         None,
         alias="codeLinks",
-        description="代码仓库链接列表。仅提取明确 URL(如 GitHub/Gitee), 不同链接用逗号分隔；无链接时返回 null。",
-        alias="codeLinks",
-        description="代码仓库链接列表。仅提取明确 URL(如 GitHub/Gitee), 不同链接用逗号分隔；无链接时返回 null。",
+        description="代码仓库链接列表。仅提取明确 URL(如 GitHub/Gitee), 不同链接用逗号分隔；无链接时返回 null。"
     )
 
     # AI 会根据 description 填充这两个列表
