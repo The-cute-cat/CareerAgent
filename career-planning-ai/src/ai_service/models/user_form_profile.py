@@ -24,8 +24,6 @@ __all__=[
 
 
 # --- 嵌套子模型 ---
-
-
 class QuizDetailItem(BaseModel):
     type: Literal["choice", "open_ended"] = Field(description="题目类型：选择题/开放题")
     question: str = Field(description="测评题目")
@@ -45,10 +43,8 @@ class InternshipExperience(BaseModel):
     role: str = Field(
         description="实习岗位名称，如'数据分析实习生'、'产品经理实习生'。"
     )
-    date: Optional[List[datetime.date]] = Field(
-        None,
-        min_length=2,
-        max_length=2,
+    date: List[datetime.date] = Field(
+        default_factory=list,
         description="""实习日期范围，必须包含两个元素：[开始日期, 结束日期]。格式统一为 YYYY-MM-DD, 如果是类似"至今"这样描述当前时间日期，直接输出"至今"。"""
     )
     desc: str = Field(
@@ -58,8 +54,14 @@ class InternshipExperience(BaseModel):
     @field_validator("date", mode="before")
     @classmethod
     def parse_date_list(cls, v):
+        if v is None:
+            return []
+
         if not isinstance(v, list):
             return v
+
+        if len(v) == 0:
+            return []
 
         PRESENT_RE = re.compile(r"(今|目|现|present|current|now|active|today|至今)", re.IGNORECASE)
 
@@ -106,6 +108,11 @@ class InternshipExperience(BaseModel):
                 # 3. 如果 dateutil 也跪了，尝试简单的正则补齐逻辑 (如 2024-5 -> 2024-05-01)
                 # 或者直接放行，让 Pydantic 抛错触发 Instructor 的 AI 重试
                 log.warning(f"无法解析的日期: {item}")
+
+        # 核心长度校验逻辑：只允许 0 或 2
+        final_len = len(cleaned_dates)
+        if final_len != 0 and final_len != 2:
+            raise ValueError(f"日期列表长度必须为 0 (空) 或 2 (开始和结束)，当前解析后长度为: {final_len}")
         return cleaned_dates
 
 
@@ -202,7 +209,7 @@ class StudentFormProfile(BaseModel):
         None,
         alias="codeLinks",
         description="代码仓库链接列表。仅提取明确 URL(如 GitHub/Gitee), 不同链接用逗号分隔；无链接时返回 null。",
-    )
+        )
 
     # AI 会根据 description 填充这两个列表
     projects: Optional[List[ProjectExperience]] = Field(

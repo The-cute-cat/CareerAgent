@@ -57,6 +57,7 @@ const toggleCollapse = () => {
 // 菜单配置项
 const menuItems = [
   { index: '/', icon: House, text: '首页' },
+  { index: 'spacer-home', isSpacer: true },
   {
     index: '/career-form-parent',
     icon: Document,
@@ -81,7 +82,6 @@ const menuItems = [
     ]
   },
   { index: 'spacer', isSpacer: true },
-  { index: '/settings', icon: Setting, text: '设置中心' },
   { index: '/profile', icon: User, text: '我的' }
 ]
 
@@ -312,7 +312,7 @@ defineExpose({ collapsed })
 
 .menu-spacer {
   height: 1px;
-  background: rgba(0, 0, 0, 0.05);
+  background: rgba(0, 0, 0, 0.12);
   margin: 16px 12px;
 }
 

@@ -36,6 +36,12 @@ public class User {
     
     private String info;
 
+    /** 逻辑删除-1表示逻辑删除 */
+    private Integer isDeleted;
+
+    /** 手机号 */
+    private String phone;
+
     /** 注册时间 */
     private LocalDateTime createTime;
 

@@ -1,25 +1,22 @@
 #通过岗位元信息构建岗位画像
-import os
-import json
-import requests
-import asyncio
-import aiohttp
-
-from dotenv import load_dotenv
-from langchain_community.chat_models import ChatTongyi
-from ai_service.models.struct_job_txt import JDAnalysisResult, Profiles, BasicRequirements, ProfessionalSkills, ProfessionalLiteracy, DevelopmentPotential, JobAttributes
-from langchain_core.prompts import ChatPromptTemplate
-
 import asyncio
 import json
 import random
+from typing import Any, cast
 from typing import List, Optional
-import requests
+
+from dotenv import load_dotenv
+from langchain_community.chat_models import ChatTongyi
 from langchain_core.output_parsers import PydanticOutputParser
-from ai_service.models.struct_job_txt import JDAnalysisResult
+from langchain_core.prompts import ChatPromptTemplate
+
 from ai_service.models.job_info import JobInfo
+from ai_service.models.struct_job_txt import JDAnalysisResult
+from ai_service.models.struct_job_txt import Profiles, BasicRequirements, ProfessionalSkills, ProfessionalLiteracy, \
+    DevelopmentPotential, JobAttributes
 from ai_service.services import log
 from config import settings
+
 load_dotenv()
 
 
@@ -95,18 +92,18 @@ jd_template = JDAnalysisResult(
     job_name="",
     profiles=Profiles(
         basic_requirements=BasicRequirements(
-            degree="",
+            degree=cast(Any, "不限"),
             major="",
-            certificates="",
+            certificates=cast(Any, "不限"),
             internship_requirement="",
             experience_years="",
             special_requirements=""
         ),
         professional_skills=ProfessionalSkills(
-            core_skills="",
-            tool_capabilities="",
+            core_skills=cast(Any, "不限"),
+            tool_capabilities=cast(Any, "不限"),
             domain_knowledge="",
-            language_requirements="",
+            language_requirements=cast(Any, "不限"),
             project_requirements=""
         ),
         professional_literacy=ProfessionalLiteracy(
@@ -124,13 +121,13 @@ jd_template = JDAnalysisResult(
             adaptability=""
         ),
         job_attributes=JobAttributes(
-            salary_competitiveness="",
+            salary_competitiveness=cast(Any, "不限"),
             industry="",
             vertical_promotion_path="",
             prerequisite_roles="",
-            lateral_transfer_directions="",
-            social_demand="",
-            industry_trend=""
+            lateral_transfer_directions=cast(Any, []),
+            social_demand=cast(Any, "不限"),
+            industry_trend=cast(Any, "不限")
         )
     )
 )

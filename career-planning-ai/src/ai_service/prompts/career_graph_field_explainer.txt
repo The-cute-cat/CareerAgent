@@ -1,0 +1,381 @@
+
+--------------------------------------------------------------------
+数据根对象：CareerPathBundle
+--------------------------------------------------------------------
+
+CareerPathBundle.start_job_id (string)
+- 含义：起点岗位的唯一标识。
+- 来源：请求参数 job_id（服务端透传），并用于在图中定位对应岗位节点的 id。
+
+CareerPathBundle.start_job_name (string | null)
+- 含义：起点岗位名称，用于展示。
+- 来源：从起点岗位节点属性 job_name（或等价字段）读取；查不到则为 null。
+
+CareerPathBundle.paths (array[CareerPath])
+- 含义：以 start_job_id 为起点的候选路径列表。
+- 来源：服务端基于图查询/约束计算得到的路径集合；可能为空数组。
+
+--------------------------------------------------------------------
+对象：CareerPath（单条路径）
+--------------------------------------------------------------------
+
+CareerPath.path_id (string)
+- 含义：路径的稳定唯一标识，用于列表去重与定位。
+- 来源：服务端生成（例如对起点与 steps 的目标序列做哈希/签名）。不是图中节点/连接的原始字段。
+
+CareerPath.path_type (string: "vertical" | "lateral" | "cross_industry")
+- 含义：服务端对整条路径的类型标签（仅用于分类展示/接口区分）。
+- 来源：服务端对整条路径进行归类计算得到；不是图中直接存储的字段。
+- 取值解释（以“社区标签 + 跨社区证据 + salary_gain”为判据的抽象口径）：
+	- vertical：路径中每一步通常不跨 micro/macro 社区（见每步连接证据 is_cross_micro/is_cross_macro），且 salary_gain>0（若该指标存在）。
+	- lateral：路径中每一步通常跨 micro 但不跨 macro。
+	- cross_industry：路径中至少存在一步跨 macro。
+
+CareerPath.total_steps (int)
+- 含义：路径包含的步骤数量。
+- 来源：服务端计算，等于 steps 数组长度。
+
+CareerPath.total_routing_cost (float)
+- 含义：路径的总成本/总阻力（用于排序/比较的聚合指标）。
+- 来源：服务端计算，为路径上每一步“连接证据”中的 final_routing_cost 求和；若某步缺失该字段，则以服务端实际求和口径为准。
+
+CareerPath.steps (array[TransitionStep])
+- 含义：路径的有序步骤列表；每个步骤描述一次从 from_job 到 to_job 的跳转。
+- 来源：服务端将图上的一条路径投影为可展示的步骤序列，并为每步拼装节点快照、连接快照与差集证据。
+
+CareerPath.build_run_evidence (BuildRunEvidence | null)
+- 含义：离线构建流程的 Run 级证据快照（用于追溯本批次图数据/统计口径）。
+- 来源：服务端根据路径中连接证据的 build_run_id 追溯到 Run 节点属性并封装；若无可追溯信息则为 null。
+
+
+--------------------------------------------------------------------
+对象：TransitionStep（路径中的一步）
+--------------------------------------------------------------------
+
+TransitionStep.step_index (int)
+- 含义：步骤序号（从 1 开始），用于稳定排序与定位。
+- 来源：服务端按 steps 顺序编号生成。
+
+TransitionStep.from_job_id (string)
+- 含义：该步起点岗位的唯一标识。
+- 来源：来自路径中起点岗位节点 id。
+
+TransitionStep.from_job_name (string)
+- 含义：该步起点岗位名称。
+- 来源：来自起点岗位节点属性 job_name（或等价字段）。
+
+TransitionStep.to_job_id (string)
+- 含义：该步终点岗位的唯一标识。
+- 来源：来自路径中终点岗位节点 id。
+
+TransitionStep.to_job_name (string)
+- 含义：该步终点岗位名称。
+- 来源：来自终点岗位节点属性 job_name（或等价字段）。
+
+TransitionStep.jaccard_high (float)
+- 含义：两岗位在“高区分度能力/技能集合”层面的重合度指标（越大表示越相似）。
+- 来源：来自两岗位之间连接关系的离线计算固化属性。
+
+TransitionStep.cos_low (float)
+- 含义：两岗位在“低区分度属性/文本背景”层面的相似度指标（通常为余弦相似度；越大表示越相似）。
+- 来源：来自两岗位之间连接关系的离线计算固化属性。
+
+TransitionStep.salary_gain (float)
+- 含义：从 from_job 到 to_job 的薪资增益估计指标。
+- 来源：来自两岗位之间连接关系的离线估计/固化属性。
+
+TransitionStep.from_job_snapshot (JobSnapshot | null)
+- 含义：from_job 的节点级证据快照（含结构化 attributes）。
+- 来源：服务端按 from_job_id 查询岗位节点属性并封装；缺失则为 null。
+
+TransitionStep.to_job_snapshot (JobSnapshot | null)
+- 含义：to_job 的节点级证据快照（含结构化 attributes）。
+- 来源：服务端按 to_job_id 查询岗位节点属性并封装；缺失则为 null。
+
+TransitionStep.skill_gaps (array[UniversalGapInfo])
+- 含义：为完成该步从 from_job 到 to_job，需要补齐的“硬技能缺口”证据列表。
+- 来源：服务端对目标岗位(to_job)的“能力要求集合”做差集计算得到，并结合路径上下文（如已掌握能力集合的累积）去重；属于服务端计算结果。
+
+TransitionStep.edge_evidence (object | null)
+- 含义：该步对应的“连接证据快照”（两岗位之间连接关系属性的结构化快照）。
+- 来源：从两岗位之间连接关系的属性读取并封装；缺失则为 null。
+
+
+--------------------------------------------------------------------
+对象：edge_evidence（连接证据快照的字段字典）
+说明：以下字段描述的是“from_job_id -> to_job_id”这对岗位之间的连接关系属性快照。
+--------------------------------------------------------------------
+
+edge_evidence.from_job_id (string)
+- 含义：连接关系的起点岗位 ID。
+- 来源：来自该步 from_job_id（或同一连接关系的起点节点 id）。
+
+edge_evidence.to_job_id (string)
+- 含义：连接关系的终点岗位 ID。
+- 来源：来自该步 to_job_id（或同一连接关系的终点节点 id）。
+
+edge_evidence.final_routing_cost (float | null)
+- 含义：连接关系的综合成本（用于路径代价累加）。
+- 来源：连接关系属性（离线计算固化，在线排序/最短路累加该值）。
+
+edge_evidence.transfer_cost (float | null)
+- 含义：连接成本中的“切换/转移难度”分量。
+- 来源：连接关系属性（离线计算/中间量固化或等价字段）。
+
+edge_evidence.salary_gain (float | null)
+- 含义：薪资增益估计。
+- 来源：连接关系属性（离线估计/固化）。
+
+edge_evidence.jaccard_high (float | null)
+- 含义：高区分度能力/技能集合的加权 Jaccard 重合度。
+- 来源：连接关系属性（离线计算固化）。
+
+edge_evidence.cos_low (float | null)
+- 含义：低区分度属性/文本背景的相似度（通常为余弦相似度）。
+- 来源：连接关系属性（离线计算固化）。
+
+edge_evidence.pareto_rank (int | null)
+- 含义：多目标筛选/稀疏化后的层级标记（越小越优）。
+- 来源：连接关系属性（离线多目标筛选过程固化）。
+
+edge_evidence.pareto_group_size (int | null)
+- 含义：同一起点岗位下，被一起比较的候选连接集合规模。
+- 来源：连接关系属性（离线统计固化）。
+
+edge_evidence.pareto_front_size (int | null)
+- 含义：当前 pareto_rank 对应层的连接数量。
+- 来源：连接关系属性（离线统计固化）。
+
+edge_evidence.is_cross_macro (bool | null)
+- 含义：该连接是否跨“宏观社区标签”（macro_community_id）。
+- 来源：连接关系属性（离线社区划分后固化），通常由两端节点的 macro_community_id 比较得到。
+
+edge_evidence.is_cross_micro (bool | null)
+- 含义：该连接是否跨“微观社区标签”（micro_community_id）。
+- 来源：连接关系属性（离线社区划分后固化），通常由两端节点的 micro_community_id 比较得到。
+
+edge_evidence.base_attraction (float | null)
+- 含义：连接打分中的基础吸引力/基础得分分量。
+- 来源：连接关系属性（离线路由/打分过程的中间量固化）。
+
+edge_evidence.rank_penalty (float | null)
+- 含义：连接打分中的层级惩罚分量。
+- 来源：连接关系属性（离线路由/打分过程的中间量固化）。
+
+edge_evidence.cross_penalty (float | null)
+- 含义：连接打分中的跨社区惩罚分量。
+- 来源：连接关系属性（离线路由/打分过程的中间量固化）。
+
+edge_evidence.build_run_id (string | null)
+- 含义：该连接证据来自哪个离线构建流程 Run。
+- 来源：连接关系属性（离线固化），应能与 BuildRunEvidence.run_id 对应。
+
+edge_evidence.lineage_json (string | null)
+- 含义：离线决策/参数快照原文（JSON 字符串），用于复核该连接为何被保留与其阈值/分解信息。
+- 来源：连接关系属性（离线固化）。
+
+
+--------------------------------------------------------------------
+对象：JobSnapshot（岗位节点快照）
+--------------------------------------------------------------------
+
+JobSnapshot.job_id (string)
+- 含义：岗位节点唯一标识。
+- 来源：岗位节点属性 id。
+
+JobSnapshot.job_name (string | null)
+- 含义：岗位节点名称。
+- 来源：岗位节点属性 job_name（或等价字段）。
+
+JobSnapshot.attributes (GraphNodeJob)
+- 含义：岗位节点的结构化属性快照（强类型字段集合）。
+- 来源：岗位节点同名属性的直接映射/读取；字段定义见下方 GraphNodeJob 字典。
+
+
+--------------------------------------------------------------------
+对象：UniversalGapInfo（通用缺口证据对象）
+说明：该对象用于表达“目标岗位要求中，当前路径上下文尚未覆盖的能力项”。
+--------------------------------------------------------------------
+
+UniversalGapInfo.gap_key (string)
+- 含义：缺口的稳定唯一 Key，用于去重与前端稳定渲染。
+- 来源：服务端生成的规则化 key（常见形式 hard:{competency_name}）。
+
+UniversalGapInfo.gap_type (string: "hard_skill" | "soft_trait")
+- 含义：缺口类别标签。
+- 来源：服务端标注。
+- 取值说明：
+	- hard_skill：来自“岗位-能力要求”集合差集（当前主要输出）。
+	- soft_trait：预留类型（出现并不代表已有可复核生产链路）。
+
+UniversalGapInfo.gap_name (string)
+- 含义：缺口名称。
+- 来源：hard_skill 时通常等于能力节点的 name；soft_trait（预留）时为维度名。
+
+UniversalGapInfo.category (string)
+- 含义：能力分类/类目。
+- 来源：来自能力节点的 category（若图中存在/离线写入）；否则为空字符串。
+
+UniversalGapInfo.target_score (int)
+- 含义：目标岗位对该能力的最低评分要求。
+- 来源：来自“岗位-能力要求”连接关系属性 min_score。
+
+UniversalGapInfo.original_context (string)
+- 含义：该能力要求的原始上下文文本（例如岗位描述中的原话/片段）。
+- 来源：来自“岗位-能力要求”连接关系属性 context。
+
+UniversalGapInfo.importance_weight (float | null)
+- 含义：该能力要求的重要性权重（常用于排序）。
+- 来源：来自“岗位-能力要求”连接关系属性 weight（离线可能做过归一化/融合）。
+
+UniversalGapInfo.local_weight (float | null)
+- 含义：局部权重快照（保留归一化/融合前后的对照口径）。
+- 来源：来自“岗位-能力要求”连接关系属性 local_weight（若离线流程有写入）。
+
+UniversalGapInfo.idf_weight (float | null)
+- 含义：全局 IDF 权重（稀缺度证据）。
+- 来源：来自“岗位-能力要求”连接关系属性 idf_weight（离线统计固化）。
+
+UniversalGapInfo.df (int | null)
+- 含义：在统计口径内，该能力出现在多少个岗位要求集合中。
+- 来源：来自“岗位-能力要求”连接关系属性 df（离线统计固化）。
+
+UniversalGapInfo.total_jobs (int | null)
+- 含义：统计口径内参与统计的岗位总数。
+- 来源：来自“岗位-能力要求”连接关系属性 total_jobs（离线统计固化）。
+
+UniversalGapInfo.prevalence (float | null)
+- 含义：覆盖率，通常等于 df/total_jobs。
+- 来源：来自“岗位-能力要求”连接关系属性 prevalence（离线统计固化）。
+
+UniversalGapInfo.idf_run_id (string | null)
+- 含义：该稀缺度(IDF)证据来自哪个离线统计 Run。
+- 来源：来自“岗位-能力要求”连接关系属性 idf_run_id（离线固化）。
+
+
+--------------------------------------------------------------------
+对象：BuildRunEvidence（离线构建流程 Run 快照）
+--------------------------------------------------------------------
+
+BuildRunEvidence.run_id (string)
+- 含义：离线构建流程 Run 的唯一标识。
+- 来源：来自 Run 节点属性 id。
+
+BuildRunEvidence.status (string | null)
+- 含义：Run 的状态（如 running/completed 等）。
+- 来源：来自 Run 节点属性 status。
+
+BuildRunEvidence.meta_json (string | null)
+- 含义：Run 的元数据原文（JSON 字符串），用于复核参数、统计口径、阶段快照等。
+- 来源：来自 Run 节点属性 meta_json。
+
+
+--------------------------------------------------------------------
+对象：GraphNodeJob（岗位节点结构化属性字典）
+说明：该对象通常来自“岗位画像解析结果”的字段规范化映射，并作为岗位节点属性存储与读取。
+--------------------------------------------------------------------
+
+GraphNodeJob.id (string)
+- 含义：岗位唯一标识。
+- 来源：岗位画像/数据源中的 job_id，写入为节点属性。
+
+GraphNodeJob.job_name (string)
+- 含义：岗位名称。
+- 来源：岗位画像/数据源中的 job_name，写入为节点属性。
+
+GraphNodeJob.macro_community_id (int)
+- 含义：宏观社区标签（第一层聚类得到的社区编号）。
+- 来源：离线聚类/社区划分结果写入为节点属性；默认可能为 0。
+
+GraphNodeJob.micro_community_id (int)
+- 含义：微观社区标签（第二层聚类得到的社区编号）。
+- 来源：离线聚类/社区划分结果写入为节点属性；默认可能为 0。
+
+GraphNodeJob.min_degree (int)
+- 含义：最低学历要求的序数编码。
+- 来源：从岗位画像中的学历枚举映射为数值（如 不限/专科/本科/硕士/博士 -> 0..4）。
+
+GraphNodeJob.demand_rank (int)
+- 含义：社会需求程度的等级编码。
+- 来源：从岗位画像中的等级枚举映射为数值（如 低/中/高 -> 1..3），默认可能为 2。
+
+GraphNodeJob.trend_rank (int)
+- 含义：行业趋势的等级编码。
+- 来源：从岗位画像中的趋势枚举映射为数值（如 萎缩/平稳/朝阳 -> -1/0/1）。
+
+GraphNodeJob.salary_rank (int)
+- 含义：薪资竞争力等级编码。
+- 来源：从岗位画像中的等级枚举映射为数值（如 低/中/高 -> 1..3），默认可能为 2。
+
+GraphNodeJob.min_experience (int)
+- 含义：最低工作经验年限（取最小值）。
+- 来源：由岗位画像中的经验年限字符串解析得到；若“应届/为空”则为 0。
+
+GraphNodeJob.major (string)
+- 含义：专业要求。
+- 来源：岗位画像字段 major（若缺失则为空字符串）。
+
+GraphNodeJob.industry (string)
+- 含义：所属行业。
+- 来源：岗位画像中的行业字段写入为节点属性。
+
+GraphNodeJob.career_orientation (string)
+- 含义：职业发展方向/方向标签。
+- 来源：岗位画像中的发展潜力字段写入为节点属性。
+
+GraphNodeJob.comm_desc (string)
+- 含义：沟通能力的原文描述。
+- 来源：岗位画像解析结果的文本字段，原样写入为节点属性。
+
+GraphNodeJob.team_desc (string)
+- 含义：团队合作能力的原文描述。
+- 来源：岗位画像解析结果的文本字段，原样写入为节点属性。
+
+GraphNodeJob.stress_desc (string)
+- 含义：抗压能力的原文描述。
+- 来源：岗位画像解析结果的文本字段，原样写入为节点属性。
+
+GraphNodeJob.logic_desc (string)
+- 含义：逻辑思维能力的原文描述。
+- 来源：岗位画像解析结果的文本字段，原样写入为节点属性。
+
+GraphNodeJob.learn_desc (string)
+- 含义：学习能力的原文描述。
+- 来源：岗位画像解析结果的文本字段，原样写入为节点属性。
+
+GraphNodeJob.innov_desc (string)
+- 含义：创新能力的原文描述。
+- 来源：岗位画像解析结果的文本字段，原样写入为节点属性。
+
+GraphNodeJob.lead_desc (string)
+- 含义：领导能力的原文描述。
+- 来源：岗位画像解析结果的文本字段，原样写入为节点属性。
+
+GraphNodeJob.adapt_desc (string)
+- 含义：适应能力的原文描述。
+- 来源：岗位画像解析结果的文本字段，原样写入为节点属性。
+
+GraphNodeJob.ethics_desc (string)
+- 含义：职业道德的原文描述。
+- 来源：岗位画像解析结果的文本字段，原样写入为节点属性。
+
+GraphNodeJob.project_reqs (string)
+- 含义：项目需求的原文描述。
+- 来源：岗位画像解析结果的文本字段，原样写入为节点属性。
+
+GraphNodeJob.intern_reqs (string)
+- 含义：实习要求的原文描述。
+- 来源：岗位画像解析结果的文本字段，原样写入为节点属性。
+
+GraphNodeJob.special_reqs (string)
+- 含义：特殊要求的原文描述。
+- 来源：岗位画像解析结果的文本字段，原样写入为节点属性。
+
+GraphNodeJob.last_build_run_id (string | null)
+- 含义：该岗位节点最后一次被写入/更新时对应的离线构建 Run 标识。
+- 来源：离线构建流程写入为节点属性；可能为 null。
+
+GraphNodeJob.last_build_ts (string | null)
+- 含义：该岗位节点最后一次被写入/更新时的时间戳。
+- 来源：离线构建流程写入为节点属性；可能为 null。
+

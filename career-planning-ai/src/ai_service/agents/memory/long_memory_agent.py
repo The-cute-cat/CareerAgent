@@ -22,7 +22,7 @@ from ai_service.agents import log as logger
 from ai_service.services.chroma_service import ChromaService
 from config import settings
 
-__all__=[
+__all__ = [
     "LongMemoryAgent",
     "long_memory_agent",
 ]
@@ -66,7 +66,7 @@ class LongMemoryAgent:
 
     async def add_memory(
             self,
-            user_id: str,
+            user_id: int,
             session_id: str,
             memory_point: MemoryPoint,
             db_session: AsyncSession | None = None,
@@ -159,7 +159,7 @@ class LongMemoryAgent:
 
     async def add_memories(
             self,
-            user_id: str,
+            user_id: int,
             session_id: str,
             memory_points: list[MemoryPoint],
             db_session: AsyncSession | None = None
@@ -187,7 +187,7 @@ class LongMemoryAgent:
 
     async def get_memories(
             self,
-            user_id: str,
+            user_id: int,
             limit: int = 20,
             min_score: float | None = None,
             db_session: AsyncSession | None = None
@@ -222,7 +222,7 @@ class LongMemoryAgent:
 
     async def search_memories(
             self,
-            user_id: str,
+            user_id: int,
             query: str,
             k: int = 5
     ) -> list[tuple[Memory, float]]:
@@ -269,7 +269,7 @@ class LongMemoryAgent:
 
     async def get_memory_count(
             self,
-            user_id: str,
+            user_id: int,
             db_session: Optional[AsyncSession] = None
     ) -> int:
         """
@@ -299,7 +299,7 @@ class LongMemoryAgent:
     async def delete_memory(
             self,
             memory_id: int,
-            user_id: str,
+            user_id: int,
             db_session: Optional[AsyncSession] = None
     ) -> bool:
         """
@@ -340,7 +340,7 @@ class LongMemoryAgent:
 
     async def _remove_low_score_memory(
             self,
-            user_id: str,
+            user_id: int,
             db_session: AsyncSession,
             new_score: float
     ) -> bool:
@@ -366,7 +366,7 @@ class LongMemoryAgent:
             result = await db_session.execute(query)
             lowest_memory = result.scalar_one_or_none()
             if lowest_memory:
-                return await self.delete_memory(lowest_memory.id, db_session)
+                return await self.delete_memory(lowest_memory.id, user_id, db_session)
             return False
         except Exception as e:
             logger.error(f"移除低分记忆失败: {e}")
@@ -374,7 +374,7 @@ class LongMemoryAgent:
 
     @staticmethod
     async def _check_duplicate(
-            user_id: str,
+            user_id: int,
             content: str,
             db_session: AsyncSession
     ) -> bool:
@@ -402,7 +402,7 @@ class LongMemoryAgent:
 
     async def _check_semantic_duplicate(
             self,
-            user_id: str,
+            user_id: int,
             content: str,
             db_session: AsyncSession,
             threshold: float = 0.85
@@ -426,7 +426,7 @@ class LongMemoryAgent:
                 k=3,
                 filter_dict={"user_id": user_id}
             )
-            
+
             for doc, score in results:
                 # ChromaDB 返回的是距离，距离越小越相似
                 # 对于 cosine 距离，score 范围通常是 0-2
@@ -445,7 +445,7 @@ class LongMemoryAgent:
 
     async def _find_similar_memory(
             self,
-            user_id: str,
+            user_id: int,
             content: str,
             db_session: AsyncSession,
             threshold: float = 0.85
@@ -468,13 +468,13 @@ class LongMemoryAgent:
                 k=3,
                 filter_dict={"user_id": user_id}
             )
-            
+
             for doc, score in results:
                 similarity = 1 - score / 2
                 if similarity >= threshold:
                     # 优先从 metadata 获取 vector_id
                     vector_id = doc.metadata.get("vector_id")
-                    
+
                     # 如果 metadata 中没有 vector_id，尝试通过内容匹配
                     if not vector_id:
                         query_stmt = select(Memory).where(
@@ -491,7 +491,7 @@ class LongMemoryAgent:
                                 Memory.is_active == True
                             )
                         )
-                    
+
                     result = await db_session.execute(query_stmt)
                     memory = result.scalar_one_or_none()
                     if memory:
@@ -527,7 +527,7 @@ class LongMemoryAgent:
             # 删除旧的向量
             if existing_memory.vector_id:
                 self.chroma.delete_by_ids([existing_memory.vector_id])
-            
+
             # 创建新的向量
             vector_id = str(uuid4())
             self.chroma.add_content(
@@ -541,7 +541,7 @@ class LongMemoryAgent:
                 },
                 id_str=vector_id
             )
-            
+
             # 更新数据库记录
             existing_memory.content = memory_point.content
             existing_memory.memory_type = memory_point.memory_type
@@ -553,7 +553,7 @@ class LongMemoryAgent:
             existing_memory.metadata_json = json.dumps({"reason": memory_point.reason})
             existing_memory.vector_id = vector_id
             existing_memory.updated_at = datetime.now()
-            
+
             await db_session.flush()
             logger.info(
                 f"更新长期记忆成功: id={existing_memory.id}, "
@@ -566,7 +566,7 @@ class LongMemoryAgent:
 
     async def get_context_summary(
             self,
-            user_id: str,
+            user_id: int,
             max_memories: int = 10,
             db_session: Optional[AsyncSession] = None
     ) -> str:
@@ -604,5 +604,6 @@ class LongMemoryAgent:
             for memory in type_memories:
                 parts.append(f"  - {memory.content}")
         return "\n".join(parts)
+
 
 long_memory_agent = LongMemoryAgent()

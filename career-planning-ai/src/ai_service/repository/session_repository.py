@@ -23,7 +23,7 @@ class SessionRepository:
     async def create(
             self,
             session_id: str,
-            user_id: str,
+            user_id: int,
             title: Optional[str] = None
     ) -> ConversationSession:
         """
@@ -52,7 +52,7 @@ class SessionRepository:
     async def get_or_create(
             self,
             session_id: str,
-            user_id: str,
+            user_id: int,
             title: str | None = None
     ) -> ConversationSession:
         """
@@ -81,7 +81,7 @@ class SessionRepository:
 
     async def get_by_user_and_session_id(
             self,
-            user_id: str,
+            user_id: int,
             session_id: str
     ) -> Optional[ConversationSession]:
         """根据用户ID和会话ID获取会话（联合唯一）"""
@@ -96,7 +96,7 @@ class SessionRepository:
 
     async def get_list_by_user(
             self,
-            user_id: str,
+            user_id: int,
             page: int = 1,
             page_size: int = 20,
             active_only: bool = True
@@ -136,7 +136,7 @@ class SessionRepository:
 
     async def get_all_active_by_user(
             self,
-            user_id: str
+            user_id: int
     ) -> List[ConversationSession]:
         """获取用户所有激活的会话（不分页）"""
         stmt = select(ConversationSession).where(
@@ -150,7 +150,7 @@ class SessionRepository:
 
     async def update_message_count(
             self,
-            user_id: str,
+            user_id: int,
             session_id: str,
             increment: int = 1
     ) -> Optional[ConversationSession]:
@@ -175,7 +175,7 @@ class SessionRepository:
 
     async def update_title(
             self,
-            user_id: str,
+            user_id: int,
             session_id: str,
             title: str
     ) -> Optional[ConversationSession]:
@@ -200,7 +200,7 @@ class SessionRepository:
 
     async def update_summary(
             self,
-            user_id: str,
+            user_id: int,
             session_id: str,
             summary: str
     ) -> Optional[ConversationSession]:
@@ -225,7 +225,7 @@ class SessionRepository:
 
     async def update(
             self,
-            user_id: str,
+            user_id: int,
             session_id: str,
             update_data: Dict[str, Any]
     ) -> Optional[ConversationSession]:
@@ -252,7 +252,7 @@ class SessionRepository:
 
     async def soft_delete(
             self,
-            user_id: str,
+            user_id: int,
             session_id: str
     ) -> bool:
         """
@@ -277,7 +277,7 @@ class SessionRepository:
 
     async def hard_delete(
             self,
-            user_id: str,
+            user_id: int,
             session_id: str
     ) -> bool:
         """
@@ -299,7 +299,7 @@ class SessionRepository:
         logger.info(f"硬删除会话: user_id={user_id}, session_id={session_id}")
         return True
 
-    async def delete_by_user(self, user_id: str, soft: bool = True) -> int:
+    async def delete_by_user(self, user_id: int, soft: bool = True) -> int:
         """
         删除用户所有会话
 

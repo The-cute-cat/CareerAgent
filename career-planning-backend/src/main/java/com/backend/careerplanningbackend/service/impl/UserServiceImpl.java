@@ -300,8 +300,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             sender.send(msg);
             return Result.ok();
         } catch (MailException e) {
-            e.printStackTrace();
-            return Result.fail("重置密码错误");
+            log.error("UserServiceImpl.sendCode 发送验证码邮件失败, 用户名: {}, 邮箱: {}", username, toEmail, e);
+            return Result.fail("发送验证码失败");
         }
     }
 
@@ -357,8 +357,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             sender.send(msg);
             return Result.ok();
         } catch (MailException e) {
-            e.printStackTrace();
-            return Result.fail("重置密码错误");
+            log.error("UserServiceImpl.sendCodeRegister 发送注册验证码邮件失败, 用户名: {}, 邮箱: {}", username, toEmail, e);
+            return Result.fail("发送验证码失败");
         }
     }
 
@@ -418,8 +418,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             sender.send(msg);
             return Result.ok();
         } catch (MailException e) {
-            e.printStackTrace();
-            return Result.fail("重置密码错误");
+            log.error("UserServiceImpl.sendCodeForget 发送忘记密码验证码邮件失败, 用户名: {}, 邮箱: {}", username, toEmail, e);
+            return Result.fail("发送验证码失败");
         }
     }
 
@@ -433,7 +433,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         if (user == null) {
             return Result.fail("前端传输过来的是空的东西或者邮箱为空");
         }
-        System.out.println("userinfo====" + user);
+        log.debug("UserServiceImpl.edit 修改用户信息, 用户信息: {}", user);
         String username = user.getUsername();
         String email = user.getEmail();
         String nickname = user.getNickname();
@@ -471,12 +471,12 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             claims = JwtUtil.parseToken(refreshToken);
             log.info("解析refreshToken成功, claims: {}", claims);
         } catch (Exception e) {
-            log.error("解析refreshToken失败, e: {}", e.getMessage());
+            log.error("UserServiceImpl.refreshToken 解析refreshToken失败", e);
             return Result.fail(401, "长token过期了,token expired");
         }
         log.info("登录的账号为 : {}", claims.getId());
         Long id = Long.valueOf(claims.getSubject());
-        System.out.println(id);
+        log.debug("UserServiceImpl.refreshToken 解析用户ID: {}", id);
         User user = userMapper.getUserOneInfo(id);
         if (user == null) {
             return Result.fail(401, "用户不存在,你竟然测试我");

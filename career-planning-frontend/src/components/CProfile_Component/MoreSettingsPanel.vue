@@ -126,7 +126,9 @@ const aboutSettings = [
 .section-header {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
+  margin-bottom: 4px;
 }
 
 .section-icon {

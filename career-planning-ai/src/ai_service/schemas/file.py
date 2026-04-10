@@ -16,7 +16,7 @@ from typing import ClassVar
 
 from fastapi import UploadFile, Depends, File
 
-from ai_service.exceptions import FileValidationError
+from ai_service.exceptions import FileValidationError, CommonHandleError
 from ai_service.schemas.auth import validate_token
 from ai_service.services.file_detector import file_detector
 from ai_service.utils.logger_handler import log
@@ -37,11 +37,17 @@ __all__ = [
 
 
 async def handle_files(
-        files: list[UploadFile] = File(...),
+        files: list[UploadFile] = File(default=None),
+        file: UploadFile = File(default=None),
         _: bool = Depends(validate_token)
 ) -> list[dict[str, str]]:
     """验证上传文件的安全性和类型，返回文件信息字典列表"""
-    return [await _validate_file(file) for file in files]
+    if not files and not file:
+        raise CommonHandleError(code=400, msg="files 或 file 必须提供其中一个")
+    all_files = list(files) if files else []
+    if file:
+        all_files.append(file)
+    return [await _validate_file(f) for f in all_files]
 
 
 async def handle_file(

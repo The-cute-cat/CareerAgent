@@ -39,6 +39,7 @@ public class AiServiceClient {
     public AiServiceClient(AiServiceProperties properties) {
         this.properties = properties;
         this.webClient = WebClient.builder()
+                .baseUrl(properties.getBaseUrl())
                 .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(16 * 1024 * 1024))
                 .build();
     }
@@ -58,6 +59,21 @@ public class AiServiceClient {
     }
 
     /**
+     * 调用 AI 服务（同步阻塞方式，支持额外参数）
+     * 支持自动重试机制
+     *
+     * @param url         请求的 API 路径
+     * @param request     请求参数对象
+     * @param extraParams 额外参数
+     * @param enableRetry 是否启用重试机制
+     * @return AI 服务响应结果
+     * @throws RuntimeException 当所有重试都失败时抛出
+     */
+    private AiChatResponse callAiService(String url, AiChatRequest request, Map<String, Object> extraParams, boolean enableRetry) {
+        return universalAiService(url, buildFileBody(request, extraParams), enableRetry);
+    }
+
+    /**
      * 通用 AI 服务调用方法（同步阻塞方式）
      *
      * @param url         请求的 API 路径（相对路径，会拼接 baseUrl）
@@ -70,7 +86,7 @@ public class AiServiceClient {
         return executeWithRetry(url, webClientBuilder -> {
             String token = AITokenUtil.createToken();
             return webClient.post()
-                    .uri(properties.getBaseUrl() + url)
+                    .uri(url)
                     .header("Authorization", "Bearer " + token)
                     .contentType(MediaType.MULTIPART_FORM_DATA)
                     .body(BodyInserters.fromMultipartData(builder.build()))
@@ -93,7 +109,7 @@ public class AiServiceClient {
         return executeWithRetry(url, ignored -> {
             String token = AITokenUtil.createToken();
             return webClient.post()
-                    .uri(properties.getBaseUrl() + url)
+                    .uri(url)
                     .header("Authorization", "Bearer " + token)
                     .contentType(MediaType.APPLICATION_JSON)
                     .bodyValue(params)
@@ -173,7 +189,20 @@ public class AiServiceClient {
      * @return 响应数据流
      */
     private Flux<String> callAiServiceStream(String url, AiChatRequest request) {
-        return universalAiServiceStream(url, buildFileBody(request));
+        return callAiServiceStream(url, request, null);
+    }
+
+    /**
+     * 调用 AI 服务（流式响应方式，支持额外参数）
+     * 返回 Flux<String> 用于 SSE（Server-Sent Events）推送
+     *
+     * @param url         请求的 API 路径
+     * @param request     请求参数对象
+     * @param extraParams 额外参数
+     * @return 响应数据流
+     */
+    private Flux<String> callAiServiceStream(String url, AiChatRequest request, Map<String, Object> extraParams) {
+        return universalAiServiceStream(url, buildFileBody(request, extraParams));
     }
 
     /**
@@ -189,7 +218,7 @@ public class AiServiceClient {
     private Flux<String> universalAiServiceStream(String url, MultipartBodyBuilder builder) {
         String token = AITokenUtil.createToken();
         return webClient.post()
-                .uri(properties.getBaseUrl() + url)
+                .uri(url)
                 .header("Authorization", "Bearer " + token)
                 .contentType(MediaType.MULTIPART_FORM_DATA)
                 .body(BodyInserters.fromMultipartData(builder.build()))
@@ -213,19 +242,34 @@ public class AiServiceClient {
      * @return 构建好的多部分表单构建器
      */
     private MultipartBodyBuilder buildFileBody(AiChatRequest aiChatRequest) {
+        return buildFileBody(aiChatRequest, null);
+    }
+
+    /**
+     * 构建多部分表单请求体（支持额外参数）
+     *
+     * @param aiChatRequest AI 聊天请求对象
+     * @param extraParams   额外参数
+     * @return 构建好的多部分表单构建器
+     */
+    private MultipartBodyBuilder buildFileBody(AiChatRequest aiChatRequest, Map<String, Object> extraParams) {
         MultipartBodyBuilder builder = new MultipartBodyBuilder();
-        // userId 是必需参数
-        Optional.ofNullable(aiChatRequest.getUserId()).filter(this::isNotEmpty)
-                .ifPresent(userId -> builder.part("userId", userId));
+        Optional.ofNullable(aiChatRequest.getUserId())
+                .ifPresent(userId -> builder.part("user_id", userId));
         Optional.ofNullable(aiChatRequest.getMessage()).filter(this::isNotEmpty)
                 .ifPresent(message -> builder.part("message", message));
         Optional.ofNullable(aiChatRequest.getConversationId()).filter(this::isNotEmpty)
-                .ifPresent(conversationId -> builder.part("conversationId", conversationId));
+                .ifPresent(conversationId -> builder.part("conversation_id", conversationId));
 
-        // 处理文件上传
         addFilesToBuilder(builder, aiChatRequest.getFiles(), FileSystemResource::new);
         addMultipartFilesToBuilder(builder, aiChatRequest.getMultipartFiles());
-
+        if (extraParams != null) {
+            for (Map.Entry<String, Object> entry : extraParams.entrySet()) {
+                if (entry.getValue() != null) {
+                    builder.part(entry.getKey(), entry.getValue());
+                }
+            }
+        }
         return builder;
     }
 
@@ -273,7 +317,7 @@ public class AiServiceClient {
      * 构建自定义参数的多部分表单请求体
      * <p>
      * 用于构建非标准 AiChatRequest 格式的请求，
-     * 支持任意键值对参数。
+     * 支持任意键值对参数，包括 MultipartFile 类型。
      *
      * @param params 自定义参数映射，键为参数名，值为参数值
      * @return 构建好的多部分表单构建器
@@ -281,7 +325,26 @@ public class AiServiceClient {
     private MultipartBodyBuilder buildOtherBody(Map<String, Object> params) {
         MultipartBodyBuilder builder = new MultipartBodyBuilder();
         for (Map.Entry<String, Object> entry : params.entrySet()) {
-            builder.part(entry.getKey(), entry.getValue());
+            String key = entry.getKey();
+            Object value = entry.getValue();
+            if (value instanceof MultipartFile[] multipartFiles) {
+                for (MultipartFile file : multipartFiles) {
+                    builder.part("files", file.getResource());
+                }
+            }
+            else if (value instanceof MultipartFile multipartFile) {
+                builder.part("file", multipartFile.getResource());
+            }
+            else if (value instanceof List<?> list && !list.isEmpty() && list.getFirst() instanceof MultipartFile) {
+                @SuppressWarnings("unchecked")
+                List<MultipartFile> multipartFiles = (List<MultipartFile>) value;
+                for (MultipartFile file : multipartFiles) {
+                    builder.part("files", file.getResource());
+                }
+            }
+            else if (value != null) {
+                builder.part(key, value);
+            }
         }
         return builder;
     }
@@ -309,9 +372,25 @@ public class AiServiceClient {
      * @param enableRetry    是否启用重试机制
      * @return AI 响应结果
      */
-    public AiChatResponse chatWithMessage(String url, String userId, String message, String conversationId, boolean enableRetry) {
+    public AiChatResponse chatWithMessage(String url, Long userId, String message, String conversationId, boolean enableRetry) {
+        return chatWithMessage(url, userId, message, conversationId, null, enableRetry);
+    }
+
+    /**
+     * 纯文本消息对话（阻塞方式，支持额外参数）
+     *
+     * @param url            请求的 API 路径
+     * @param userId         用户 ID（必需）
+     * @param message        消息内容
+     * @param conversationId 对话 ID
+     * @param extraParams    额外参数（如 auto_extract_memory, show_thinking 等）
+     * @param enableRetry    是否启用重试机制
+     * @return AI 响应结果
+     */
+    public AiChatResponse chatWithMessage(String url, Long userId, String message, String conversationId,
+                                          Map<String, Object> extraParams, boolean enableRetry) {
         AiChatRequest request = new AiChatRequest(userId, conversationId, message);
-        return callAiService(url, request, enableRetry);
+        return callAiService(url, request, extraParams, enableRetry);
     }
 
     /**
@@ -324,9 +403,25 @@ public class AiServiceClient {
      * @param enableRetry    是否启用重试机制
      * @return AI 响应结果
      */
-    public AiChatResponse chatWithFiles(String url, String userId, List<File> files, String conversationId, boolean enableRetry) {
+    public AiChatResponse chatWithFiles(String url, Long userId, List<File> files, String conversationId, boolean enableRetry) {
+        return chatWithFiles(url, userId, files, conversationId, null, enableRetry);
+    }
+
+    /**
+     * 文件上传对话（阻塞方式，支持额外参数）
+     *
+     * @param url            请求的 API 路径
+     * @param userId         用户 ID（必需）
+     * @param files          文件列表
+     * @param conversationId 对话 ID，若为空则不传递
+     * @param extraParams    额外参数
+     * @param enableRetry    是否启用重试机制
+     * @return AI 响应结果
+     */
+    public AiChatResponse chatWithFiles(String url, Long userId, List<File> files, String conversationId,
+                                        Map<String, Object> extraParams, boolean enableRetry) {
         AiChatRequest request = AiChatRequest.ofFiles(userId, conversationId, null, files);
-        return callAiService(url, request, enableRetry);
+        return callAiService(url, request, extraParams, enableRetry);
     }
 
     /**
@@ -341,10 +436,28 @@ public class AiServiceClient {
      * @param enableRetry    是否启用重试机制
      * @return AI 响应结果
      */
-    public AiChatResponse chatWithMultipartFiles(String url, String userId, List<MultipartFile> multipartFiles,
+    public AiChatResponse chatWithMultipartFiles(String url, Long userId, List<MultipartFile> multipartFiles,
                                                  String conversationId, boolean enableRetry) {
+        return chatWithMultipartFiles(url, userId, multipartFiles, conversationId, null, enableRetry);
+    }
+
+    /**
+     * MultipartFile 文件上传对话（阻塞方式，支持额外参数）
+     * <p>
+     * 用于处理前端直接上传的 MultipartFile 文件
+     *
+     * @param url            请求的 API 路径
+     * @param userId         用户 ID（必需）
+     * @param multipartFiles MultipartFile 文件列表
+     * @param conversationId 对话 ID，若为空则不传递
+     * @param extraParams    额外参数
+     * @param enableRetry    是否启用重试机制
+     * @return AI 响应结果
+     */
+    public AiChatResponse chatWithMultipartFiles(String url, Long userId, List<MultipartFile> multipartFiles,
+                                                 String conversationId, Map<String, Object> extraParams, boolean enableRetry) {
         AiChatRequest request = AiChatRequest.ofMultipartFiles(userId, conversationId, null, multipartFiles);
-        return callAiService(url, request, enableRetry);
+        return callAiService(url, request, extraParams, enableRetry);
     }
 
     /**
@@ -358,10 +471,27 @@ public class AiServiceClient {
      * @param enableRetry    是否启用重试机制
      * @return AI 响应结果
      */
-    public AiChatResponse chatWithMessageAndFiles(String url, String userId, String message, List<File> files,
+    public AiChatResponse chatWithMessageAndFiles(String url, Long userId, String message, List<File> files,
                                                   String conversationId, boolean enableRetry) {
+        return chatWithMessageAndFiles(url, userId, message, files, conversationId, null, enableRetry);
+    }
+
+    /**
+     * 消息和文件同时上传对话（阻塞方式，支持额外参数）
+     *
+     * @param url            请求的 API 路径
+     * @param userId         用户 ID（必需）
+     * @param message        消息内容
+     * @param files          文件列表
+     * @param conversationId 对话 ID
+     * @param extraParams    额外参数
+     * @param enableRetry    是否启用重试机制
+     * @return AI 响应结果
+     */
+    public AiChatResponse chatWithMessageAndFiles(String url, Long userId, String message, List<File> files,
+                                                  String conversationId, Map<String, Object> extraParams, boolean enableRetry) {
         AiChatRequest request = AiChatRequest.ofFiles(userId, conversationId, message, files);
-        return callAiService(url, request, enableRetry);
+        return callAiService(url, request, extraParams, enableRetry);
     }
 
     /**
@@ -377,10 +507,29 @@ public class AiServiceClient {
      * @param enableRetry    是否启用重试机制
      * @return AI 响应结果
      */
-    public AiChatResponse chatWithMessageAndMultipartFiles(String url, String userId, String message, List<MultipartFile> files,
+    public AiChatResponse chatWithMessageAndMultipartFiles(String url, Long userId, String message, List<MultipartFile> files,
                                                            String conversationId, boolean enableRetry) {
+        return chatWithMessageAndMultipartFiles(url, userId, message, files, conversationId, null, enableRetry);
+    }
+
+    /**
+     * 消息和 MultipartFile 文件同时上传对话（阻塞方式，支持额外参数）
+     * <p>
+     * 用于处理前端直接上传的 MultipartFile 文件并附带消息
+     *
+     * @param url            请求的 API 路径
+     * @param userId         用户 ID（必需）
+     * @param message        消息内容
+     * @param files          MultipartFile 文件列表
+     * @param conversationId 对话 ID
+     * @param extraParams    额外参数
+     * @param enableRetry    是否启用重试机制
+     * @return AI 响应结果
+     */
+    public AiChatResponse chatWithMessageAndMultipartFiles(String url, Long userId, String message, List<MultipartFile> files,
+                                                           String conversationId, Map<String, Object> extraParams, boolean enableRetry) {
         AiChatRequest request = AiChatRequest.ofMultipartFiles(userId, conversationId, message, files);
-        return callAiService(url, request, enableRetry);
+        return callAiService(url, request, extraParams, enableRetry);
     }
 
     /**
@@ -407,9 +556,24 @@ public class AiServiceClient {
      * @param conversationId 对话 ID
      * @return 响应数据流
      */
-    public Flux<String> chatWithMessageStream(String url, String userId, String message, String conversationId) {
+    public Flux<String> chatWithMessageStream(String url, Long userId, String message, String conversationId) {
+        return chatWithMessageStream(url, userId, message, conversationId, null);
+    }
+
+    /**
+     * 纯文本消息对话（流式方式，支持额外参数）
+     *
+     * @param url            请求的 API 路径
+     * @param userId         用户 ID（必需）
+     * @param message        消息内容
+     * @param conversationId 对话 ID
+     * @param extraParams    额外参数（如 show_thinking 等）
+     * @return 响应数据流
+     */
+    public Flux<String> chatWithMessageStream(String url, Long userId, String message, String conversationId,
+                                              Map<String, Object> extraParams) {
         AiChatRequest request = new AiChatRequest(userId, conversationId, message);
-        return callAiServiceStream(url, request);
+        return callAiServiceStream(url, request, extraParams);
     }
 
     /**
@@ -421,9 +585,24 @@ public class AiServiceClient {
      * @param conversationId 对话 ID，若为空则不传递
      * @return 响应数据流
      */
-    public Flux<String> chatWithFilesStream(String url, String userId, List<File> files, String conversationId) {
+    public Flux<String> chatWithFilesStream(String url, Long userId, List<File> files, String conversationId) {
+        return chatWithFilesStream(url, userId, files, conversationId, null);
+    }
+
+    /**
+     * 文件上传对话（流式方式，支持额外参数）
+     *
+     * @param url            请求的 API 路径
+     * @param userId         用户 ID（必需）
+     * @param files          文件列表
+     * @param conversationId 对话 ID，若为空则不传递
+     * @param extraParams    额外参数
+     * @return 响应数据流
+     */
+    public Flux<String> chatWithFilesStream(String url, Long userId, List<File> files, String conversationId,
+                                            Map<String, Object> extraParams) {
         AiChatRequest request = AiChatRequest.ofFiles(userId, conversationId, null, files);
-        return callAiServiceStream(url, request);
+        return callAiServiceStream(url, request, extraParams);
     }
 
     /**
@@ -437,9 +616,26 @@ public class AiServiceClient {
      * @param conversationId 对话 ID，若为空则不传递
      * @return 响应数据流
      */
-    public Flux<String> chatWithMultipartFilesStream(String url, String userId, List<MultipartFile> files, String conversationId) {
+    public Flux<String> chatWithMultipartFilesStream(String url, Long userId, List<MultipartFile> files, String conversationId) {
+        return chatWithMultipartFilesStream(url, userId, files, conversationId, null);
+    }
+
+    /**
+     * MultipartFile 文件上传对话（流式方式，支持额外参数）
+     * <p>
+     * 用于处理前端直接上传的 MultipartFile 文件并接收流式响应
+     *
+     * @param url            请求的 API 路径
+     * @param userId         用户 ID（必需）
+     * @param files          MultipartFile 文件列表
+     * @param conversationId 对话 ID，若为空则不传递
+     * @param extraParams    额外参数
+     * @return 响应数据流
+     */
+    public Flux<String> chatWithMultipartFilesStream(String url, Long userId, List<MultipartFile> files, String conversationId,
+                                                     Map<String, Object> extraParams) {
         AiChatRequest request = AiChatRequest.ofMultipartFiles(userId, conversationId, null, files);
-        return callAiServiceStream(url, request);
+        return callAiServiceStream(url, request, extraParams);
     }
 
     /**
@@ -452,10 +648,26 @@ public class AiServiceClient {
      * @param conversationId 对话 ID
      * @return 响应数据流
      */
-    public Flux<String> chatWithMessageAndFilesStream(String url, String userId, String message, List<File> files,
+    public Flux<String> chatWithMessageAndFilesStream(String url, Long userId, String message, List<File> files,
                                                       String conversationId) {
+        return chatWithMessageAndFilesStream(url, userId, message, files, conversationId, null);
+    }
+
+    /**
+     * 消息和文件同时上传对话（流式方式，支持额外参数）
+     *
+     * @param url            请求的 API 路径
+     * @param userId         用户 ID（必需）
+     * @param message        消息内容
+     * @param files          文件列表
+     * @param conversationId 对话 ID
+     * @param extraParams    额外参数（如 show_thinking 等）
+     * @return 响应数据流
+     */
+    public Flux<String> chatWithMessageAndFilesStream(String url, Long userId, String message, List<File> files,
+                                                      String conversationId, Map<String, Object> extraParams) {
         AiChatRequest request = AiChatRequest.ofFiles(userId, conversationId, message, files);
-        return callAiServiceStream(url, request);
+        return callAiServiceStream(url, request, extraParams);
     }
 
     /**
@@ -470,10 +682,28 @@ public class AiServiceClient {
      * @param conversationId 对话 ID
      * @return 响应数据流
      */
-    public Flux<String> chatWithMessageAndMultipartFilesStream(String url, String userId, String message, List<MultipartFile> files,
+    public Flux<String> chatWithMessageAndMultipartFilesStream(String url, Long userId, String message, List<MultipartFile> files,
                                                                String conversationId) {
+        return chatWithMessageAndMultipartFilesStream(url, userId, message, files, conversationId, null);
+    }
+
+    /**
+     * 消息和 MultipartFile 文件同时上传对话（流式方式，支持额外参数）
+     * <p>
+     * 用于处理前端直接上传的 MultipartFile 文件并附带消息，同时接收流式响应
+     *
+     * @param url            请求的 API 路径
+     * @param userId         用户 ID（必需）
+     * @param message        消息内容
+     * @param files          MultipartFile 文件列表
+     * @param conversationId 对话 ID
+     * @param extraParams    额外参数（如 show_thinking 等）
+     * @return 响应数据流
+     */
+    public Flux<String> chatWithMessageAndMultipartFilesStream(String url, Long userId, String message, List<MultipartFile> files,
+                                                               String conversationId, Map<String, Object> extraParams) {
         AiChatRequest request = AiChatRequest.ofMultipartFiles(userId, conversationId, message, files);
-        return callAiServiceStream(url, request);
+        return callAiServiceStream(url, request, extraParams);
     }
 
     /**
@@ -500,27 +730,7 @@ public class AiServiceClient {
      * @return AI 响应结果
      */
     public AiChatResponse getRequest(String url, Map<String, Object> queryParams, String serviceName, boolean enableRetry) {
-        return executeWithRetry(url, ignored -> {
-            String token = AITokenUtil.createToken();
-            WebClient.RequestHeadersSpec<?> request = webClient.get()
-                    .uri(uriBuilder -> {
-                        uriBuilder.path(properties.getBaseUrl() + url);
-                        if (queryParams != null) {
-                            queryParams.forEach((key, value) -> {
-                                if (value != null) {
-                                    uriBuilder.queryParam(key, value);
-                                }
-                            });
-                        }
-                        return uriBuilder.build();
-                    })
-                    .header("Authorization", "Bearer " + token);
-
-            return request.retrieve()
-                    .bodyToMono(AiChatResponse.class)
-                    .timeout(Duration.ofMillis(properties.getTimeout()))
-                    .block(Duration.ofMillis(properties.getTimeout()));
-        }, () -> null, serviceName, enableRetry);
+        return executeSimpleRequest(webClient.get(), url, queryParams, serviceName, enableRetry);
     }
 
     /**
@@ -533,11 +743,19 @@ public class AiServiceClient {
      * @return AI 响应结果
      */
     public AiChatResponse deleteRequest(String url, Map<String, Object> queryParams, String serviceName, boolean enableRetry) {
+        return executeSimpleRequest(webClient.delete(), url, queryParams, serviceName, enableRetry);
+    }
+
+    /**
+     * 执行简单的 GET/DELETE 请求（无请求体）
+     */
+    private AiChatResponse executeSimpleRequest(WebClient.RequestHeadersUriSpec<?> method, String url,
+                                                 Map<String, Object> queryParams, String serviceName, boolean enableRetry) {
         return executeWithRetry(url, ignored -> {
             String token = AITokenUtil.createToken();
-            WebClient.RequestHeadersSpec<?> request = webClient.delete()
+            WebClient.RequestHeadersSpec<?> request = method
                     .uri(uriBuilder -> {
-                        uriBuilder.path(properties.getBaseUrl() + url);
+                        uriBuilder.path(url);
                         if (queryParams != null) {
                             queryParams.forEach((key, value) -> {
                                 if (value != null) {
@@ -575,7 +793,7 @@ public class AiServiceClient {
                 }
             }
             return webClient.put()
-                    .uri(properties.getBaseUrl() + url)
+                    .uri(url)
                     .header("Authorization", "Bearer " + token)
                     .contentType(MediaType.MULTIPART_FORM_DATA)
                     .body(BodyInserters.fromMultipartData(builder.build()))

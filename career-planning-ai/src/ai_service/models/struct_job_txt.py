@@ -145,20 +145,13 @@ class JobAttributes(BaseModel):
     岗位属性：英文命名
     """
     model_config = ConfigDict(populate_by_name=True)
-    salary_competitiveness: LevelEnum = Field(validation_alias="薪资竞争力", default=LevelEnum.MEDIUM,
-                                              description="该岗位在行业内的薪资竞争力水平，必须从枚举值中选择：低/中/高，需结合市场数据和岗位级别判断")
-    social_demand: LevelEnum = Field(validation_alias="社会需求度", default=LevelEnum.MEDIUM,
-                                     description="该岗位在当前就业市场中的需求程度，必须从枚举值中选择：低/中/高，需参考招聘网站数据和行业报告")
-    industry_trend: IndustryTrendEnum = Field(validation_alias="行业发展趋势", default=IndustryTrendEnum.STABLE,
-                                              description="该岗位所属行业的发展趋势，必须从枚举值中选择：萎缩/平稳/朝阳")
-    industry: str = Field(validation_alias="所属行业", default="不限",
-                          description="岗位所属的具体行业领域，优先填写细分类别（如'互联网金融'、'新零售'、'SaaS软件'），若无法判断则填'不限'")
-    vertical_promotion_path: str = Field(validation_alias="垂直晋升路径", default="",
-                                         description="岗位的垂直晋升路径，需填写具体职位序列，如'初级工程师→中级工程师→高级工程师→技术专家'，若无法判断则填空字符串")
-    prerequisite_roles: str = Field(validation_alias="前置岗位要求", default="",
-                                    description="担任该岗位通常需要的前置职位，如'需有产品助理或运营专员经验'，若未明确则填空字符串")
-    lateral_transfer_directions: str = Field(validation_alias="横向转岗方向", default="",
-                                             description="从该岗位可以横向转岗的方向，如'产品经理可转向项目管理或运营管理'，若无法判断则填空字符串")
+    salary_competitiveness: LevelEnum = Field(validation_alias="薪资竞争力", default=LevelEnum.MEDIUM, description="该岗位在行业内的薪资竞争力水平，必须从枚举值中选择：低/中/高，需结合市场数据和岗位级别判断")
+    social_demand: LevelEnum = Field(validation_alias="社会需求度", default=LevelEnum.MEDIUM, description="该岗位在当前就业市场中的需求程度，必须从枚举值中选择：低/中/高，需参考招聘网站数据和行业报告")
+    industry_trend: IndustryTrendEnum = Field(validation_alias="行业发展趋势", default=IndustryTrendEnum.STABLE, description="该岗位所属行业的发展趋势，必须从枚举值中选择：萎缩/平稳/朝阳")
+    industry: str = Field(validation_alias="所属行业", default="不限", description="岗位所属的具体行业领域，优先填写细分类别（如'互联网金融'、'新零售'、'SaaS软件'），若无法判断则填'不限'")
+    vertical_promotion_path: str = Field(validation_alias="垂直晋升路径", default="", description="岗位的垂直晋升路径，需填写具体职位序列，如'初级工程师→中级工程师→高级工程师→技术专家'，若无法判断则填空字符串")
+    prerequisite_roles: str = Field(validation_alias="前置岗位要求", default="", description="担任该岗位通常需要的前置职位，如'需有产品助理或运营专员经验'，若未明确则填空字符串")
+    lateral_transfer_directions: List[str] = Field(validation_alias="横向转岗方向", default=[], description="从该岗位可以横向转岗的方向，如'产品经理可转向项目管理或运营管理'，若无法判断则填空字符串")
 
     @field_validator('salary_competitiveness', 'social_demand', mode='before')
     @classmethod
