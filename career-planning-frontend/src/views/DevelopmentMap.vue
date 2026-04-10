@@ -1,12 +1,17 @@
-﻿<template>
+<template>
   <div class="page" :class="{ 'has-detail-panel': visible }">
     <section class="hero">
-      <div>
+      <div class="hero-copy">
         <p class="eyebrow">Career Development Map</p>
         <h1>职业发展路线图谱</h1>
         <p class="desc">
           支持纵向晋升与横向转岗图谱，并完整展示每条路线的 Agent 全局点评、推荐原因、技能缺口、JD 原文和可落地学习建议。
         </p>
+        <div class="hero-hints">
+          <span>点击节点查看岗位详情</span>
+          <span>点击路径查看迁移分析</span>
+          <span>滚轮缩放，拖拽查看全图</span>
+        </div>
       </div>
 
       <div class="actions">
@@ -27,32 +32,30 @@
       <div class="stat-card">
         <span>当前起点</span>
         <strong>{{ activeData.startJobName }}</strong>
+        <small>当前分析基准岗位</small>
       </div>
       <div class="stat-card">
         <span>路线数量</span>
         <strong>{{ stats.totalPaths }} 条</strong>
+        <small>可切换高亮查看</small>
       </div>
       <div class="stat-card">
         <span>目标岗位</span>
         <strong>{{ stats.targetJobs }} 个</strong>
+        <small>{{ viewType === 'vertical' ? '覆盖晋升阶段目标' : '覆盖横向发展方向' }}</small>
       </div>
       <div class="stat-card">
         <span>平均迁移成本</span>
         <strong>{{ stats.avgCost.toFixed(2) }}</strong>
+        <small>{{ stats.avgCost <= 0.3 ? '迁移成本较低' : '建议分阶段推进' }}</small>
       </div>
     </section>
 
     <section class="chart-panel">
       <div class="panel-head">
         <div>
-          <h2>{{ viewType === 'vertical' ? '纵向晋升路线图谱' : '横向转岗路线图谱' }}</h2>
-          <p>
-            {{
-              viewType === 'vertical'
-                ? '纵向图按 stepIndex 分层展示，从当前岗位逐级向上推进。'
-                : '横向图围绕当前岗位展开，重点对比不同转岗方向的收益与缺口。'
-            }}
-          </p>
+          <h2>{{ chartHeadline }}</h2>
+          <p>{{ chartDescription }}</p>
         </div>
 
         <div class="legend">
@@ -62,10 +65,34 @@
         </div>
       </div>
 
+      <div class="chart-stage-hints" :class="`chart-stage-hints--${viewType}`">
+        <template v-if="viewType === 'vertical'">
+          <span>当前岗位</span>
+          <span>第一步晋升</span>
+          <span>第二步晋升</span>
+          <span>目标岗位</span>
+        </template>
+        <template v-else>
+          <span>核心岗位</span>
+          <span>相近方向</span>
+          <span>潜力方向</span>
+          <span>跨度较大方向</span>
+        </template>
+      </div>
+
       <div ref="chartRef" v-loading="loading" class="chart"></div>
 
       <div class="chart-toolbar">
-        <p class="chart-tip">可直接点击图中的节点、路径箭头，或使用下方路线快捷入口查看右侧详情。</p>
+        <div class="chart-toolbar__row">
+          <p class="chart-tip">点击节点查看岗位详情，点击路径查看迁移分析；滚轮缩放，拖拽查看全图。</p>
+          <div class="chart-tools">
+            <button type="button" class="tool-btn" @click="zoomChart(0.12)">放大</button>
+            <button type="button" class="tool-btn" @click="zoomChart(-0.12)">缩小</button>
+            <button type="button" class="tool-btn" @click="resetChartView">重置视图</button>
+            <button type="button" class="tool-btn" @click="focusStartJob">回到起点岗位</button>
+            <button type="button" class="tool-btn tool-btn--accent" @click="highlightSelectedPath">高亮当前路径</button>
+          </div>
+        </div>
         <div class="chart-shortcuts">
           <button
             v-for="path in activeData.paths"
@@ -83,14 +110,17 @@
 
     <section class="route-panel">
       <div class="route-header">
-        <h3>{{ viewType === 'vertical' ? '路线明细' : '转岗建议与缺口分析' }}</h3>
-        <p>
-          {{
-            viewType === 'vertical'
-              ? '每一步都会展示推荐原因、岗位差异和技能补齐建议。'
-              : '每条转岗路线都会展示 Agent 点评、JD 原文、技能缺口和行动建议。'
-          }}
-        </p>
+        <div>
+          <h3>{{ viewType === 'vertical' ? '路线概览入口' : '转岗路线概览' }}</h3>
+          <p>
+            {{
+              viewType === 'vertical'
+                ? '这里仅保留路线概览与选择入口，详细结论请在右侧分析面板查看。'
+                : '快速浏览不同转岗方向的成本、步数与一句话结论，深度分析统一收敛到右侧面板。'
+            }}
+          </p>
+        </div>
+        <el-tag type="info" effect="plain">当前高亮：{{ selectedPath?.pathTitle || '未选择' }}</el-tag>
       </div>
 
       <div class="route-grid">
@@ -108,78 +138,27 @@
             </el-tag>
           </div>
 
-          <div class="path-overview">
-            <div class="box-title">Agent 对整条路线的全局点评与风险提示</div>
-            <p class="route-summary">{{ path.overallSummary }}</p>
-          </div>
-
           <div class="route-metrics">
             <span>总步数：{{ path.totalSteps }}</span>
             <span>迁移成本：{{ path.totalRoutingCost.toFixed(2) }}</span>
+            <span>缺口：{{ path.steps.reduce((sum, step) => sum + step.skillGaps.length, 0) }} 项</span>
           </div>
 
-          <div v-for="step in path.steps" :key="`${path.pathid}-${step.stepIndex}-${step.toJobid}`" class="step-card">
-            <div class="step-top">
+          <div class="path-overview">
+            <div class="box-title">路线一句话总结</div>
+            <p class="route-summary">{{ path.overallSummary }}</p>
+          </div>
+
+          <div class="route-steps-preview">
+            <div v-for="step in path.steps" :key="`${path.pathid}-${step.stepIndex}-${step.toJobid}`" class="step-preview">
               <strong>{{ step.fromJobName }} -> {{ step.toJobName }}</strong>
               <span>第 {{ step.stepIndex }} 步</span>
             </div>
+          </div>
 
-            <div class="job-diff">
-              <div class="job-box">
-                <span class="job-label">起点岗位</span>
-                <strong>{{ step.fromJobName }}</strong>
-                <small>ID: {{ step.fromJobid }}</small>
-              </div>
-              <div class="job-arrow">-></div>
-              <div class="job-box target">
-                <span class="job-label">目标岗位</span>
-                <strong>{{ step.toJobName }}</strong>
-                <small>ID: {{ step.toJobid }}</small>
-              </div>
-            </div>
-
-            <div class="score-row">
-              <span>硬技能重合：{{ percent(step.jaccardHigh) }}</span>
-              <span>软素质契合：{{ percent(step.cosLow) }}</span>
-              <span>薪资增益：{{ salary(step.salaryGain) }}</span>
-            </div>
-
-            <div class="analysis-box">
-              <div class="box-title">AI 解释：为什么推荐走这一步</div>
-              <p>{{ step.transitionReason }}</p>
-            </div>
-
-            <div class="analysis-box">
-              <div class="box-title">缺失技术 / 技能总览</div>
-              <el-empty v-if="!step.skillGaps.length" description="当前步骤暂无明显技能缺口" />
-              <div v-for="(gap, index) in step.skillGaps" :key="`${path.pathid}-${step.stepIndex}-${index}`" class="gap-item">
-                <div class="gap-head">
-                  <strong>{{ gap.competencyName || '未命名技能' }}</strong>
-                  <el-tag size="small" effect="light">{{ gap.category || '未分类' }}</el-tag>
-                </div>
-                <div class="gap-meta">
-                  <span><strong>能力分类：</strong>{{ gap.category || '未分类' }}</span>
-                  <span><strong>最低要求评分：</strong>{{ gap.targetScore ?? '-' }}</span>
-                </div>
-                <div class="gap-section" v-if="gap.originalContext">
-                  <div class="gap-section-title">原始 JD 中的技能要求原文</div>
-                  <p class="gap-context">{{ gap.originalContext }}</p>
-                </div>
-                <div class="gap-section">
-                  <div class="gap-section-title">可落地的学习建议</div>
-                  <p class="gap-advice">{{ gap.actionableAdvice || '暂无行动建议' }}</p>
-                </div>
-              </div>
-            </div>
-
-            <div class="analysis-box" v-if="step.skillGaps.length">
-              <div class="box-title">本步学习建议汇总</div>
-              <ul class="advice-list">
-                <li v-for="(gap, index) in step.skillGaps" :key="`${path.pathid}-${step.stepIndex}-advice-${index}`">
-                  <strong>{{ gap.competencyName || '能力补齐' }}：</strong>{{ gap.actionableAdvice || '暂无行动建议' }}
-                </li>
-              </ul>
-            </div>
+          <div class="route-footer">
+            <span class="route-hint">{{ selectedPathId === path.pathid ? '当前已高亮该路线' : '点击可高亮路线并查看右侧详情' }}</span>
+            <el-button size="small" type="primary" plain>查看分析</el-button>
           </div>
         </article>
       </div>
@@ -210,13 +189,36 @@
                   }}
                 </el-tag>
               </div>
-              <el-descriptions :column="1" border class="node-descriptions">
-                <el-descriptions-item label="岗位 ID">{{ selectedNode.jobId }}</el-descriptions-item>
-                <el-descriptions-item label="层级说明">{{ selectedNode.levelText }}</el-descriptions-item>
-                <el-descriptions-item v-if="selectedNode.relatedPathTitles.length" label="相关路线">
-                  {{ selectedNode.relatedPathTitles.join('、') }}
-                </el-descriptions-item>
-              </el-descriptions>
+
+              <div class="metric-grid metric-grid--node">
+                <div class="metric-card">
+                  <span>岗位 ID</span>
+                  <strong>{{ selectedNode.jobId }}</strong>
+                </div>
+                <div class="metric-card">
+                  <span>当前位置说明</span>
+                  <strong>{{ selectedNode.levelText }}</strong>
+                </div>
+              </div>
+
+              <div class="dialog-box dialog-box--cool">
+                <div class="box-title">岗位角色说明</div>
+                <p>
+                  {{
+                    selectedNode.category === 'start'
+                      ? '这是当前分析的起点岗位，所有纵向晋升和横向转岗路线都围绕该岗位展开。'
+                      : selectedNode.pathType === 'vertical'
+                        ? '该岗位处于纵向晋升链路中，用于承接当前岗位的阶段性成长目标。'
+                        : '该岗位是横向转岗网络中的一个目标方向，可用于比较迁移成本、技能跨度与发展空间。'
+                  }}
+                </p>
+              </div>
+
+              <div class="dialog-box">
+                <div class="box-title">关联路线说明</div>
+                <p v-if="selectedNode.relatedPathTitles.length">{{ selectedNode.relatedPathTitles.join('、') }}</p>
+                <p v-else>当前节点暂无额外关联路线说明。</p>
+              </div>
             </div>
           </template>
 
@@ -266,6 +268,17 @@
                   <strong>{{ salary(selectedEdge.salaryGain) }}</strong>
                 </div>
               </div>
+
+              <div class="dialog-box dialog-box--cool">
+                <div class="box-title">关键结论</div>
+                <p>
+                  这一步迁移的重点在于
+                  <strong>{{ percent(selectedEdge.jaccardHigh) }}</strong>
+                  的硬技能重合与
+                  <strong>{{ percent(selectedEdge.cosLow) }}</strong>
+                  的软素质契合度，适合先判断“是否值得走”和“需要补哪些能力”。
+                </p>
+              </div>
             </div>
 
             <div class="dialog-block detail-card">
@@ -298,7 +311,7 @@
 
             <div class="dialog-block detail-card">
               <div class="dialog-box dialog-box--cool">
-                <div class="box-title">AI 解释：为什么推荐走这一步</div>
+                <div class="box-title">AI 推荐原因</div>
                 <p>{{ selectedEdge.transitionReason }}</p>
               </div>
             </div>
@@ -311,6 +324,18 @@
                 </div>
                 <el-tag type="info" effect="plain">共 {{ selectedEdge.skillGaps.length }} 项</el-tag>
               </div>
+
+              <div class="gap-summary-bar">
+                <span>缺失技能摘要</span>
+                <strong>
+                  {{
+                    selectedEdge.skillGaps.length
+                      ? selectedEdge.skillGaps.slice(0, 2).map((gap) => gap.competencyName || '能力补齐').join('、')
+                      : '当前步骤暂无明显技能缺口'
+                  }}
+                </strong>
+              </div>
+
               <el-empty v-if="!selectedEdge.skillGaps.length" description="当前步骤暂无明显技能缺口" />
               <div v-for="(gap, index) in selectedEdge.skillGaps" :key="`${selectedEdge.id}-dialog-gap-${index}`" class="gap-item">
                 <div class="gap-head">
@@ -335,8 +360,8 @@
             <div class="dialog-block detail-card" v-if="selectedEdge.skillGaps.length">
               <div class="section-head">
                 <div>
-                  <h4>学习建议汇总</h4>
-                  <p>适合直接整理成你的阶段性学习清单。</p>
+                  <h4>行动建议</h4>
+                  <p>建议先完成高优先级补齐项，再进入下一阶段路线推进。</p>
                 </div>
               </div>
               <ul class="advice-list">
@@ -777,6 +802,59 @@ const stats = computed(() => ({
     : 0
 }))
 
+const selectedPath = computed(() => activeData.value.paths.find((path) => path.pathid === selectedPathId.value) ?? activeData.value.paths[0] ?? null)
+
+const selectedStep = computed(() => {
+  if (!selectedPath.value) return null
+  if (selectedEdge.value) {
+    return (
+      selectedPath.value.steps.find(
+        (step) => step.stepIndex === selectedEdge.value?.stepIndex && step.toJobid === selectedEdge.value?.target,
+      ) ?? selectedPath.value.steps[0] ?? null
+    )
+  }
+  return selectedPath.value.steps[0] ?? null
+})
+
+const chartHeadline = computed(() =>
+  viewType.value === 'vertical' ? '纵向晋升路线图谱' : '横向转岗路线图谱',
+)
+
+const chartDescription = computed(() =>
+  viewType.value === 'vertical'
+    ? '纵向图按晋升阶段分层展示，重点突出当前岗位、关键跃迁节点和最终目标岗位。'
+    : '横向图围绕当前岗位展开，重点对比不同转岗方向的迁移成本、技能跨度与长期发展潜力。',
+)
+
+const selectedPathSummary = computed(() => {
+  const path = selectedPath.value
+  if (!path) {
+    return {
+      title: '暂无选中路线',
+      conclusion: '点击图谱中的节点、路径或下方快捷入口查看详细分析。',
+      action: '可通过搜索岗位、切换图谱模式或使用快捷入口快速定位目标路线。',
+      missingCount: 0,
+      tags: [] as string[],
+    }
+  }
+
+  const gaps = path.steps.flatMap((step) => step.skillGaps)
+  const tags = [
+    path.totalRoutingCost <= 0.25 ? '低成本迁移' : path.totalRoutingCost <= 0.45 ? '中等迁移成本' : '技能跨度较大',
+    path.pathType === 'vertical' ? '更适合阶段晋升' : path.totalSteps <= 1 ? '快速转岗方向' : '更适合长期发展',
+  ]
+
+  return {
+    title: path.pathTitle,
+    conclusion: path.overallSummary,
+    action:
+      gaps[0]?.actionableAdvice ||
+      '建议先点击右侧分析面板查看关键结论，再结合缺失技能安排下一阶段学习重点。',
+    missingCount: gaps.length,
+    tags,
+  }
+})
+
 const percent = (value: number) => `${(value * 100).toFixed(0)}%`
 const salary = (value: number) => (value > 0 ? `+${percent(value)}` : percent(value))
 
@@ -928,6 +1006,31 @@ function closeDetailPanel() {
   })
 }
 
+function zoomChart(delta: number) {
+  graphZoom.value = Math.max(0.65, Math.min(1.8, Number((graphZoom.value + delta).toFixed(2))))
+  renderChart()
+}
+
+function resetChartView() {
+  graphZoom.value = 1
+  graphCenter.value = null
+  renderChart()
+}
+
+function focusStartJob() {
+  graphZoom.value = 1
+  graphCenter.value = null
+  selectedPathId.value = activeData.value.paths[0]?.pathid ?? ''
+  renderChart()
+}
+
+function highlightSelectedPath() {
+  if (!selectedPathId.value) {
+    selectedPathId.value = activeData.value.paths[0]?.pathid ?? ''
+  }
+  renderChart()
+}
+
 function nodeStyle(kind: 'start' | 'target', type: PathType) {
   if (kind === 'start') {
     return {
@@ -1017,9 +1120,20 @@ function buildGraph(data: CareerData) {
           jobId: step.toJobid,
           category: 'target',
           pathType: path.pathType,
-          levelText: viewType.value === 'vertical' ? `第 ${step.stepIndex} 级节点` : '横向转岗目标',
+          levelText:
+            viewType.value === 'vertical'
+              ? step.stepIndex === 1
+                ? '第一步晋升'
+                : step.stepIndex === levels.length
+                  ? '目标岗位'
+                  : `第 ${step.stepIndex} 级节点`
+              : path.totalRoutingCost <= 0.25
+                ? '低成本迁移方向'
+                : path.totalRoutingCost >= 0.45
+                  ? '技能跨度较大'
+                  : '横向转岗目标',
           relatedPathTitles: [],
-          symbolSize: 66,
+          symbolSize: viewType.value === 'vertical' ? 68 + Math.max(0, levels.length - step.stepIndex) * 2 : 64,
           x: viewType.value === 'vertical' ? 420 + levelIndex * 180 + (pathIndex % 2 === 0 ? -50 : 50) : 460 + Math.cos(angle) * 270,
           y: viewType.value === 'vertical' ? 120 + levelIndex * 120 + (pathIndex % 3) * 24 : 320 + Math.sin(angle) * 200,
           itemStyle: nodeStyle('target', path.pathType),
@@ -1063,10 +1177,10 @@ function buildGraph(data: CareerData) {
         toJobName: step.toJobName,
         lineStyle: {
           color: path.pathType === 'vertical' ? '#ef4444' : '#f59e0b',
-          width: isSelectedPath ? 6 : 4,
+          width: isSelectedPath ? 6 : 3,
           type: path.pathType === 'vertical' ? 'solid' : 'dashed',
-          opacity: isSelectedPath ? 1 : 0.78,
-          curveness: viewType.value === 'vertical' ? 0.05 : 0.18
+          opacity: selectedPathId.value ? (isSelectedPath ? 1 : 0.2) : 0.78,
+          curveness: viewType.value === 'vertical' ? 0.04 : 0.2
         },
         label: {
           show: true,
@@ -1092,6 +1206,7 @@ function buildGraph(data: CareerData) {
     if (isPathSelected) {
       node.itemStyle = {
         ...node.itemStyle,
+        opacity: 1,
         shadowBlur: 24,
         shadowColor:
           node.category === 'start'
@@ -1099,6 +1214,12 @@ function buildGraph(data: CareerData) {
             : node.pathType === 'vertical'
               ? 'rgba(239, 68, 68, 0.24)'
               : 'rgba(245, 158, 11, 0.24)'
+      }
+      node.symbolSize = node.category === 'start' ? 84 : node.symbolSize + 6
+    } else if (selectedPathId.value) {
+      node.itemStyle = {
+        ...node.itemStyle,
+        opacity: 0.3
       }
     }
 
@@ -1138,10 +1259,19 @@ function renderChart() {
         trigger: 'item',
         formatter: (params: any) => {
           if (params.dataType === 'node') {
-            return `<strong>${params.data.name}</strong><br/>岗位 ID：${params.data.jobId}`
+            return `
+              <strong>${params.data.name}</strong><br/>
+              节点类型：${params.data.category === 'start' ? '当前岗位' : params.data.pathType === 'vertical' ? '晋升节点' : '转岗目标'}<br/>
+              所属路线数：${params.data.relatedPathTitles?.length ?? 0}
+            `
           }
 
-          return `<strong>${params.data.pathTitle}</strong><br/>${params.data.fromJobName} -> ${params.data.toJobName}<br/>迁移成本：${Number(params.data.totalRoutingCost).toFixed(2)}`
+          return `
+            <strong>${params.data.fromJobName} -> ${params.data.toJobName}</strong><br/>
+            路径：${params.data.pathTitle}<br/>
+            迁移成本：${Number(params.data.totalRoutingCost).toFixed(2)}<br/>
+            技能重合：${Math.round((params.data.jaccardHigh || 0) * 100)}%
+          `
         }
       },
       series: [
@@ -1161,7 +1291,8 @@ function renderChart() {
           lineStyle: { opacity: 0.9 },
           emphasis: {
             focus: 'adjacency',
-            lineStyle: { width: 8 }
+            scale: true,
+            lineStyle: { width: 8, opacity: 1 }
           }
         }
       ]
@@ -1309,9 +1440,14 @@ watch(visible, () => {
   display: flex;
   justify-content: space-between;
   gap: 24px;
-  padding: 28px;
+  padding: 22px 24px;
   border-radius: 24px;
-  margin-bottom: 20px;
+  margin-bottom: 18px;
+}
+
+.hero-copy {
+  display: flex;
+  flex-direction: column;
 }
 
 .eyebrow {
@@ -1330,10 +1466,29 @@ h1 {
 }
 
 .desc {
-  margin: 12px 0 0;
+  margin: 10px 0 0;
   max-width: 760px;
   color: #4b5563;
-  line-height: 1.7;
+  line-height: 1.75;
+}
+
+.hero-hints {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.hero-hints span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.08);
+  color: #33517a;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .actions {
@@ -1356,7 +1511,7 @@ h1 {
 
 .stat-card {
   border-radius: 18px;
-  padding: 18px 20px;
+  padding: 16px 18px;
 }
 
 .stat-card span {
@@ -1369,6 +1524,13 @@ h1 {
 .stat-card strong {
   font-size: 22px;
   color: #111827;
+}
+
+.stat-card small {
+  display: block;
+  margin-top: 8px;
+  color: #94a3b8;
+  font-size: 12px;
 }
 
 .chart-panel,
@@ -1397,6 +1559,27 @@ h1 {
 .route-header p {
   margin: 0;
   color: #6b7280;
+}
+
+.chart-stage-hints {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.chart-stage-hints span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 12px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(245, 248, 255, 0.98));
+  border: 1px solid rgba(219, 231, 245, 0.96);
+  color: #4b5563;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .legend {
@@ -1428,27 +1611,65 @@ h1 {
 }
 
 .chart {
-  height: 680px;
+  height: 760px;
   border-radius: 20px;
   background:
-    linear-gradient(rgba(148, 163, 184, 0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(148, 163, 184, 0.08) 1px, transparent 1px),
+    linear-gradient(rgba(148, 163, 184, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.05) 1px, transparent 1px),
     linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
-  background-size: 36px 36px, 36px 36px, auto;
+  background-size: 42px 42px, 42px 42px, auto;
   overflow: hidden;
 }
 
 .chart-toolbar {
-  margin-top: 16px;
+  margin-top: 14px;
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.chart-toolbar__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
 }
 
 .chart-tip {
   margin: 0;
   font-size: 13px;
   color: #6b7280;
+}
+
+.chart-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.tool-btn {
+  border: 1px solid #dbe3f0;
+  background: #ffffff;
+  color: #334155;
+  border-radius: 999px;
+  padding: 9px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tool-btn:hover {
+  border-color: #93c5fd;
+  color: #1d4ed8;
+  transform: translateY(-1px);
+}
+
+.tool-btn--accent {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1d4ed8;
 }
 
 .chart-shortcuts {
@@ -1484,13 +1705,14 @@ h1 {
 
 .route-grid {
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
 }
 
 .route-card {
   border: 1px solid #e5e7eb;
   border-radius: 20px;
-  padding: 18px;
+  padding: 16px;
   background: #ffffff;
   cursor: pointer;
   transition: 0.2s ease;
@@ -1518,10 +1740,10 @@ h1 {
 }
 
 .path-overview {
-  margin-top: 14px;
-  padding: 14px;
-  background: #fff7ed;
-  border: 1px solid #fed7aa;
+  margin-top: 12px;
+  padding: 13px 14px;
+  background: #f8fbff;
+  border: 1px solid #dbeafe;
   border-radius: 16px;
 }
 
@@ -1529,17 +1751,54 @@ h1 {
 .dialog-summary {
   margin: 0;
   line-height: 1.7;
-  color: #7c2d12;
+  color: #475569;
 }
 
 .route-metrics,
 .score-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px;
-  margin-top: 14px;
+  gap: 12px;
+  margin-top: 12px;
   color: #6b7280;
   font-size: 13px;
+}
+
+.route-steps-preview {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.step-preview {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 11px 12px;
+  border-radius: 14px;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 13px;
+}
+
+.step-preview strong {
+  color: #111827;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.route-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-top: 14px;
+}
+
+.route-hint {
+  color: #64748b;
+  font-size: 12px;
 }
 
 .job-diff,
@@ -1583,19 +1842,6 @@ h1 {
 .job-arrow {
   font-size: 24px;
   color: #9ca3af;
-}
-
-.step-card {
-  border-top: 1px dashed #e5e7eb;
-  padding-top: 14px;
-  margin-top: 14px;
-}
-
-.step-top {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  align-items: center;
 }
 
 .analysis-box {
@@ -1736,6 +1982,10 @@ h1 {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   margin-top: 14px;
+}
+
+.metric-grid--node {
+  margin-top: 16px;
 }
 
 .metric-card {
@@ -1886,6 +2136,29 @@ h1 {
   margin-top: 14px;
 }
 
+.gap-summary-bar {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #fffaf0;
+  border: 1px solid #fde68a;
+}
+
+.gap-summary-bar span {
+  color: #92400e;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.gap-summary-bar strong {
+  color: #7c2d12;
+  font-size: 13px;
+}
+
 .detail-slide-enter-active,
 .detail-slide-leave-active {
   transition: all 0.22s ease;
@@ -1899,6 +2172,7 @@ h1 {
 
 @media (max-width: 1100px) {
   .hero,
+  .chart-toolbar__row,
   .panel-head,
   .route-header {
     flex-direction: column;
@@ -1910,6 +2184,11 @@ h1 {
   }
 
   .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .chart-stage-hints,
+  .route-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -1935,6 +2214,8 @@ h1 {
     height: 560px;
   }
 
+  .chart-stage-hints,
+  .route-grid,
   .metric-grid,
   .metric-progress-grid {
     grid-template-columns: 1fr;
@@ -1969,6 +2250,12 @@ h1 {
 
   .detail-panel__body {
     padding: 16px;
+  }
+
+  .route-footer,
+  .gap-summary-bar {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .detail-slide-enter-from,

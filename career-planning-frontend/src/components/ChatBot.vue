@@ -1,13 +1,22 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { ChatDotRound, Close, Promotion, Paperclip, Delete, FullScreen, Loading } from '@element-plus/icons-vue'
+import {
+  ChatDotRound,
+  Close,
+  Promotion,
+  Paperclip,
+  Delete,
+  FullScreen,
+  Minus,
+  CopyDocument,
+  Sunny,
+} from '@element-plus/icons-vue'
 import VueMarkdown from 'vue-markdown-render'
 import { ElMessage } from 'element-plus'
+import { streamChatbotMessage } from '@/api/chatbot'
 
 interface ChatConfig {
-  apiBaseUrl: string
-  token: string
-  userId: string
+  userId?: string
   conversationId?: string
   title?: string
   subtitle?: string
@@ -41,15 +50,18 @@ const props = withDefaults(defineProps<ChatConfig>(), {
   openOnScroll: false,
   scrollThreshold: 500,
   openOnExit: false,
-  defaultWidth: 440,
-  defaultHeight: 680,
-  minWidth: 360,
-  minHeight: 480,
+  defaultWidth: 320,
+  defaultHeight: 400,
+  minWidth: 320,
+  minHeight: 400,
   maxFileSizeMB: 10,
   quickQuestions: () => ['帮我分析一下我的简历', '这个岗位适合我吗？', '给我一些职业规划建议'],
   persistLayout: true,
   layoutStorageKey: 'career-chatbot-layout'
 })
+
+// Conversation ID 本地存储 key
+const CONVERSATION_ID_KEY = 'career-chatbot-conversation-id'
 
 const emit = defineEmits<{
   (e: 'update:conversationId', value: string): void
@@ -96,6 +108,10 @@ interface LayoutState {
 const EDGE_GAP = 12
 const HEADER_HEIGHT = 64
 const FLOAT_BTN_SIZE = 64
+const MAX_UPLOAD_FILES = 5
+const COLLAPSE_THRESHOLD = 220
+const COLLAPSE_LINES = 4
+const emojiList = ['😊', '👍', '🎯', '📄', '💡', '🚀', '👏', '🤔']
 
 const dialogVisible = ref(false)
 const isMinimized = ref(false)
@@ -108,12 +124,29 @@ const isResizing = ref(false)
 const resizeDirection = ref<ResizeDirection | null>(null)
 const userInput = ref('')
 const uploadedFiles = ref<UploadedFileItem[]>([])
+const showEmojiPanel = ref(false)
+const expandedMessageIds = ref<string[]>([])
+const sendingState = ref<'idle' | 'sending' | 'error'>('idle')
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const chatWindowRef = ref<HTMLElement | null>(null)
 const floatBtnRef = ref<HTMLElement | null>(null)
 const messagesContainer = ref<HTMLElement | null>(null)
 const abortController = ref<AbortController | null>(null)
-const currentConversationId = ref(props.conversationId || '')
+
+// 从 localStorage 恢复 conversationId，如果没有则使用 props 传入的值（可能为空）
+function getStoredConversationId(): string {
+  try {
+    const stored = localStorage.getItem(CONVERSATION_ID_KEY)
+    if (stored) {
+      return stored
+    }
+  } catch {
+    // 静默处理存储异常
+  }
+  return props.conversationId || ''
+}
+
+const currentConversationId = ref(getStoredConversationId())
 
 const currentSize = ref({
   width: props.defaultWidth,
@@ -123,7 +156,6 @@ const windowPosition = ref({ x: 0, y: 0 })
 const btnPosition = ref({ x: 0, y: 0 })
 const dragOffset = ref({ x: 0, y: 0 })
 const btnDragOffset = ref({ x: 0, y: 0 })
-const dragStartPoint = ref({ x: 0, y: 0 })
 const resizeStartRect = ref({
   x: 0,
   y: 0,
@@ -155,7 +187,15 @@ const canSend = computed(() => {
 watch(
   () => props.conversationId,
   (value) => {
-    currentConversationId.value = value || ''
+    const newId = value || ''
+    if (newId !== currentConversationId.value) {
+      currentConversationId.value = newId
+      if (newId) {
+        saveConversationId(newId)
+      } else {
+        clearStoredConversationId()
+      }
+    }
   }
 )
 
@@ -166,15 +206,39 @@ function createId() {
   return `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
 }
 
+// 保存 conversationId 到 localStorage
+function saveConversationId(conversationId: string) {
+  if (!conversationId) return
+  try {
+    localStorage.setItem(CONVERSATION_ID_KEY, conversationId)
+  } catch {
+    // 静默处理存储异常
+  }
+}
+
+// 清除 localStorage 中的 conversationId
+function clearStoredConversationId() {
+  try {
+    localStorage.removeItem(CONVERSATION_ID_KEY)
+  } catch {
+    // 静默处理存储异常
+  }
+}
+
+function ensureConversationId() {
+  // 优先使用已有的 conversationId（从 localStorage 或 props 恢复）
+  if (currentConversationId.value) {
+    return currentConversationId.value
+  }
+
+  // 初始状态：返回空字符串，由服务端生成
+  // 第一次对话后，服务端会返回 conversationId
+  return ''
+}
+
 function getCurrentTime() {
   const now = new Date()
   return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
-}
-
-function buildUrl(path: string) {
-  const base = props.apiBaseUrl.replace(/\/$/, '')
-  const cleanedPath = path.startsWith('/') ? path : `/${path}`
-  return `${base}${cleanedPath}`
 }
 
 function getEventPoint(e: MouseEvent | TouchEvent) {
@@ -517,8 +581,6 @@ function removeFile(id: string) {
   uploadedFiles.value = uploadedFiles.value.filter((item) => item.id !== id)
 }
 
-const MAX_UPLOAD_FILES = 5
-
 function handleFileChange(e: Event) {
   const input = e.target as HTMLInputElement
   const files = Array.from(input.files || [])
@@ -616,6 +678,10 @@ function markAssistantError(messageId: string, errorMessage: string) {
 
 function clearLocalMessages() {
   stopStream(false)
+  // 清除 conversationId，开始新会话
+  currentConversationId.value = ''
+  clearStoredConversationId()
+  emit('update:conversationId', '')
   messages.value = [
     {
       id: createId(),
@@ -624,47 +690,54 @@ function clearLocalMessages() {
       time: getCurrentTime()
     }
   ]
+  expandedMessageIds.value = []
 }
 
-function parseSSEBuffer(buffer: string) {
-  const normalized = buffer.replace(/\r/g, '')
-  const rawEvents = normalized.split('\n\n')
-  if (rawEvents.length === 0) {
-    return { chunks: [], done: false, errorMessage: '', rest: buffer }
+function shouldCollapseMessage(message: ChatMessage) {
+  if (message.streaming) return false
+  if (message.files?.length) return false
+  const lineCount = message.content.split('\n').length
+  return message.content.length > COLLAPSE_THRESHOLD || lineCount > COLLAPSE_LINES
+}
+
+function isExpanded(messageId: string) {
+  return expandedMessageIds.value.includes(messageId)
+}
+
+function getDisplayContent(message: ChatMessage) {
+  if (!shouldCollapseMessage(message) || isExpanded(message.id)) {
+    return message.content
   }
-  const completeEvents = rawEvents.slice(0, -1)
-  const tail = rawEvents[rawEvents.length - 1] || ''
+  return `${message.content.slice(0, COLLAPSE_THRESHOLD).trim()}...`
+}
 
-  const chunks: string[] = []
-  let done = false
-  let errorMessage = ''
-
-  completeEvents.forEach((eventBlock) => {
-    const dataLines = eventBlock
-      .split('\n')
-      .filter((line) => line.startsWith('data:'))
-      .map((line) => line.slice(5).trimStart())
-
-    if (!dataLines.length) return
-
-    const data = dataLines.join('\n')
-    if (data === '[DONE]') {
-      done = true
-      return
-    }
-    if (data.startsWith('[ERROR]')) {
-      errorMessage = data.replace('[ERROR]', '').trim() || '流式响应失败'
-      return
-    }
-    chunks.push(data)
-  })
-
-  return {
-    chunks,
-    done,
-    errorMessage,
-    rest: tail
+function toggleMessageExpand(messageId: string) {
+  if (isExpanded(messageId)) {
+    expandedMessageIds.value = expandedMessageIds.value.filter((item) => item !== messageId)
+  } else {
+    expandedMessageIds.value = [...expandedMessageIds.value, messageId]
   }
+}
+
+async function copyMessage(content: string) {
+  try {
+    await navigator.clipboard.writeText(content)
+    ElMessage.success('消息已复制')
+  } catch {
+    ElMessage.warning('复制失败，请手动复制')
+  }
+}
+
+function deleteMessage(messageId: string) {
+  const target = messages.value.find((item) => item.id === messageId)
+  if (!target || target.streaming) return
+  messages.value = messages.value.filter((item) => item.id !== messageId)
+  expandedMessageIds.value = expandedMessageIds.value.filter((item) => item !== messageId)
+}
+
+function insertEmoji(emoji: string) {
+  userInput.value += emoji
+  showEmojiPanel.value = false
 }
 
 async function sendMessage() {
@@ -672,139 +745,68 @@ async function sendMessage() {
   const files = [...uploadedFiles.value]
 
   if ((!text && files.length === 0) || isStreaming.value) return
-  if (!props.apiBaseUrl) {
-    ElMessage.error('缺少 apiBaseUrl 配置')
-    return
-  }
-  if (!props.userId) {
-    ElMessage.error('缺少 userId 配置')
-    return
-  }
-  if (!props.token) {
-    ElMessage.error('缺少 token 配置')
-    return
-  }
+  const conversationId = ensureConversationId()
 
   messages.value.push({
     id: createId(),
     role: 'user',
-    content: text || '请分析我上传的文件',
+    content: text || 'Please analyze the uploaded file',
     time: getCurrentTime(),
     files: files.length ? files : undefined
   })
 
   userInput.value = ''
   uploadedFiles.value = []
+  showEmojiPanel.value = false
+  sendingState.value = 'sending'
   nextTick(() => scrollToBottom())
 
-    const assistantMessage = pushAssistantPlaceholder()
+  const assistantMessage = pushAssistantPlaceholder()
   const messageId = assistantMessage.id
   const controller = new AbortController()
   abortController.value = controller
   isStreaming.value = true
-  let reader: ReadableStreamDefaultReader<Uint8Array> | null = null
-  let streamClosed = false
-
-  const formData = new FormData()
-  formData.append('user_id', props.userId)
-  if (currentConversationId.value) {
-    formData.append('conversation_id', currentConversationId.value)
-  }
-  formData.append('auto_extract_memory', String(files.length > 0 ? props.autoExtractMemoryWithFiles : props.autoExtractMemory))
-
-  if (files.length > 0) {
-    formData.append('message', text || '请结合我上传的文件进行分析')
-    files.forEach((item) => formData.append('files', item.file))
-  } else {
-    formData.append('message', text)
-  }
-
-  const endpoint = files.length > 0 ? '/chat/message-and-files/stream' : '/chat/message/stream'
 
   try {
-    const response = await fetch(buildUrl(endpoint), {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${props.token}`
+    await streamChatbotMessage({
+      message: text || 'Please analyze the uploaded file',
+      conversationId,
+      files: files.map((item) => item.file),
+      signal: controller.signal,
+      onConversationId: (newConversationId) => {
+        // 接收到服务端返回的 conversationId，更新状态并持久化
+        if (newConversationId && newConversationId !== currentConversationId.value) {
+          currentConversationId.value = newConversationId
+          saveConversationId(newConversationId)
+          emit('update:conversationId', newConversationId)
+        }
       },
-      body: formData,
-      signal: controller.signal
+      onChunk: (chunk) => {
+        appendChunkToMessage(messageId, chunk)
+      }
     })
 
-    if (!response.ok || !response.body) {
-      throw new Error(`请求失败：${response.status}`)
-    }
-
-    const convIdFromHeader = response.headers.get('x-conversation-id')
-    if (convIdFromHeader) {
-      currentConversationId.value = convIdFromHeader
-      emit('update:conversationId', convIdFromHeader)
-    }
-
-    reader = response.body.getReader()
-    const decoder = new TextDecoder('utf-8')
-    let buffer = ''
-    let receivedAnyChunk = false
-
-    while (!streamClosed) {
-      const { done, value } = await reader.read()
-      if (done) {
-        streamClosed = true
-        break
-      }
-
-      buffer += decoder.decode(value, { stream: true })
-      const parsed = parseSSEBuffer(buffer)
-      buffer = parsed.rest
-
-      if (parsed.errorMessage) {
-        throw new Error(parsed.errorMessage)
-      }
-
-      if (parsed.chunks.length) {
-        receivedAnyChunk = true
-        parsed.chunks.forEach((chunk) => appendChunkToMessage(messageId, chunk))
-      }
-
-      if (parsed.done) {
-        break
-      }
-    }
-
-    if (!receivedAnyChunk && buffer.trim()) {
-      const maybeLine = buffer
-        .split(/\n/)
-        .find((line) => line.trim().startsWith('data:'))
-      if (maybeLine) {
-        const data = maybeLine.replace(/^\s*data:\s*/, '')
-        if (data && data !== '[DONE]') {
-          appendChunkToMessage(messageId, data)
-        }
-      }
-    }
-
     finishAssistantMessage(messageId)
+    sendingState.value = 'idle'
   } catch (error) {
     const message = error instanceof Error
       ? error.name === 'AbortError'
-        ? '已停止生成'
+        ? 'Generation stopped'
         : error.message
-      : '发送失败，请稍后重试'
+      : 'Send failed, please try again later'
 
-    if (message === '已停止生成') {
+    if (message === 'Generation stopped') {
       finishAssistantMessage(messageId)
+      sendingState.value = 'idle'
     } else {
       markAssistantError(messageId, message)
+      sendingState.value = 'error'
       ElMessage.error(message)
       emit('error', message)
     }
   } finally {
-    streamClosed = true
     isStreaming.value = false
     abortController.value = null
-    if (reader) {
-      try { reader.releaseLock() } catch {}
-    }
     nextTick(() => scrollToBottom())
     saveLayout()
   }
@@ -845,6 +847,13 @@ let scrollHandler: (() => void) | null = null
 let mouseLeaveHandler: ((e: MouseEvent) => void) | null = null
 let dragThrottleTimer: ReturnType<typeof setTimeout> | null = null
 let scrollRafId: number | null = null
+
+watch(
+  () => messages.value.length,
+  () => {
+    nextTick(() => scrollToBottom())
+  }
+)
 
 function setupAutoTriggers() {
   if (props.autoOpen) {
@@ -936,10 +945,11 @@ onUnmounted(() => {
               <div class="header-title-row">
                 <h4>{{ title }}</h4>
                 <span class="assistant-badge">AI</span>
+                <span class="drag-tip">可拖拽</span>
               </div>
               <div class="header-status">
                 <span class="status-dot" :class="{ streaming: isStreaming }"></span>
-                <span>{{ isStreaming ? '正在流式回复…' : subtitle }}</span>
+                <span>{{ isStreaming ? 'AI 正在输入…' : subtitle }}</span>
               </div>
             </div>
           </div>
@@ -958,8 +968,7 @@ onUnmounted(() => {
               停止
             </button>
             <button class="icon-btn" type="button" :title="isMinimized ? '展开' : '最小化'" @click="toggleMinimize">
-              <span v-if="isMinimized">□</span>
-              <span v-else>—</span>
+              <el-icon><Minus /></el-icon>
             </button>
             <button class="icon-btn" type="button" :title="isFullscreen ? '退出全屏' : '全屏'" @click="toggleFullscreen">
               <el-icon><FullScreen /></el-icon>
@@ -972,43 +981,78 @@ onUnmounted(() => {
 
         <div v-show="!isMinimized" class="chat-body">
           <div ref="messagesContainer" class="messages-container">
-            <div
-              v-for="message in messages"
-              :key="message.id"
-              class="message-row"
-              :class="message.role"
-            >
-              <div class="message-avatar">
-                <el-icon v-if="message.role === 'assistant'"><ChatDotRound /></el-icon>
-                <span v-else>我</span>
-              </div>
+            <TransitionGroup name="message-fade" tag="div" class="message-list">
+              <div
+                v-for="message in messages"
+                :key="message.id"
+                class="message-row"
+                :class="message.role"
+              >
+                <div class="message-avatar">
+                  <el-icon v-if="message.role === 'assistant'"><ChatDotRound /></el-icon>
+                  <span v-else>我</span>
+                </div>
 
-              <div class="message-main">
-                <div class="message-bubble" :class="{ error: message.error }">
-                  <template v-if="message.content">
-                    <VueMarkdown :source="message.content" :options="{ html: false, linkify: true, typographer: true }" />
-                  </template>
-                  <template v-else>
-                    <div class="typing-placeholder">
-                      <el-icon class="spinning"><Loading /></el-icon>
-                      <span>正在思考中…</span>
+                <div class="message-main">
+                  <div
+                    class="message-bubble"
+                    :class="{ error: message.error, collapsed: shouldCollapseMessage(message) && !isExpanded(message.id) }"
+                  >
+                    <div class="message-tools">
+                      <button class="bubble-tool-btn" type="button" title="复制消息" @click="copyMessage(message.content)">
+                        <el-icon><CopyDocument /></el-icon>
+                      </button>
+                      <button
+                        class="bubble-tool-btn"
+                        type="button"
+                        title="删除消息"
+                        :disabled="message.streaming"
+                        @click="deleteMessage(message.id)"
+                      >
+                        <el-icon><Delete /></el-icon>
+                      </button>
                     </div>
-                  </template>
 
-                  <div v-if="message.files?.length" class="message-files">
-                    <div v-for="file in message.files" :key="file.id" class="message-file-item">
-                      <el-icon><Paperclip /></el-icon>
-                      <span class="file-name">{{ file.name }}</span>
-                      <span class="file-size">{{ formatFileSize(file.size) }}</span>
+                    <template v-if="message.content">
+                      <VueMarkdown
+                        :source="getDisplayContent(message)"
+                        :options="{ html: false, linkify: true, typographer: true }"
+                      />
+                    </template>
+                    <template v-else>
+                      <div class="typing-placeholder">
+                        <span class="typing-dot"></span>
+                        <span class="typing-dot"></span>
+                        <span class="typing-dot"></span>
+                        <span>AI 正在输入…</span>
+                      </div>
+                    </template>
+
+                    <button
+                      v-if="shouldCollapseMessage(message)"
+                      class="expand-btn"
+                      type="button"
+                      @click="toggleMessageExpand(message.id)"
+                    >
+                      {{ isExpanded(message.id) ? '收起' : '展开更多' }}
+                    </button>
+
+                    <div v-if="message.files?.length" class="message-files">
+                      <div v-for="file in message.files" :key="file.id" class="message-file-item">
+                        <el-icon><Paperclip /></el-icon>
+                        <span class="file-name">{{ file.name }}</span>
+                        <span class="file-size">{{ formatFileSize(file.size) }}</span>
+                      </div>
+                    </div>
+
+                    <div class="message-time-inline">
+                      <span>{{ message.time }}</span>
+                      <span v-if="message.streaming" class="stream-tag">生成中</span>
                     </div>
                   </div>
                 </div>
-                <div class="message-meta">
-                  <span>{{ message.time }}</span>
-                  <span v-if="message.streaming" class="stream-tag">流式输出中</span>
-                </div>
               </div>
-            </div>
+            </TransitionGroup>
           </div>
 
           <div v-if="quickQuestions.length" class="quick-questions">
@@ -1037,44 +1081,66 @@ onUnmounted(() => {
           </div>
 
           <div class="input-panel">
+            <div v-if="showEmojiPanel" class="emoji-panel">
+              <button
+                v-for="emoji in emojiList"
+                :key="emoji"
+                class="emoji-btn"
+                type="button"
+                @click="insertEmoji(emoji)"
+              >
+                {{ emoji }}
+              </button>
+            </div>
+
             <div class="input-shell">
-              <el-input
-                v-model="userInput"
-                type="textarea"
-                :rows="3"
-                resize="none"
-                placeholder="输入你的问题，Enter 发送，Shift + Enter 换行"
-                @keydown="handleKeydown"
-              />
+              <div class="input-row">
+                <el-input
+                  v-model="userInput"
+                  type="textarea"
+                  resize="none"
+                  :autosize="{ minRows: 2, maxRows: 6 }"
+                  placeholder="输入你的问题，Enter 发送，Shift + Enter 换行"
+                  @keydown="handleKeydown"
+                />
+
+                <button
+                  v-if="isStreaming"
+                  class="send-btn stop"
+                  type="button"
+                  @click="stopStream()"
+                >
+                  停止
+                </button>
+                <button
+                  v-else
+                  class="send-btn"
+                  type="button"
+                  :disabled="!canSend"
+                  @click="sendMessage"
+                >
+                  <el-icon><Promotion /></el-icon>
+                  <span>发送</span>
+                </button>
+              </div>
 
               <div class="input-toolbar">
                 <div class="input-toolbar-left">
                   <button class="tool-btn" type="button" title="上传文件" @click="triggerFileUpload">
                     <el-icon><Paperclip /></el-icon>
-                    <span>附件</span>
+                    <span>上传</span>
                   </button>
-                  <span class="hint-text">支持 PDF / DOCX / PNG / JPG / JPEG</span>
+                  <button class="tool-btn ghost" type="button" title="表情" @click="showEmojiPanel = !showEmojiPanel">
+                    <el-icon><Sunny /></el-icon>
+                    <span>表情</span>
+                  </button>
                 </div>
 
                 <div class="input-toolbar-right">
-                  <button
-                    v-if="isStreaming"
-                    class="send-btn stop"
-                    type="button"
-                    @click="stopStream()"
-                  >
-                    停止
-                  </button>
-                  <button
-                    v-else
-                    class="send-btn"
-                    type="button"
-                    :disabled="!canSend"
-                    @click="sendMessage"
-                  >
-                    <el-icon><Promotion /></el-icon>
-                    <span>发送</span>
-                  </button>
+                  <span class="hint-text">支持 PDF / DOCX / PNG / JPG / JPEG</span>
+                  <span v-if="sendingState === 'error'" class="network-hint is-error">网络异常，请重试</span>
+                  <span v-else-if="isStreaming" class="network-hint">AI 正在输入…</span>
+                  <span v-else-if="sendingState === 'sending'" class="network-hint">消息发送中…</span>
                 </div>
               </div>
             </div>
@@ -1225,6 +1291,19 @@ onUnmounted(() => {
   background: rgba(255, 255, 255, 0.16);
 }
 
+.drag-tip {
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(15, 23, 42, 0.18);
+  color: rgba(255, 255, 255, 0.86);
+}
+
 .header-status {
   margin-top: 6px;
   display: flex;
@@ -1321,10 +1400,16 @@ onUnmounted(() => {
   overflow-y: auto;
 }
 
+.message-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .message-row {
   display: flex;
   gap: 10px;
-  margin-bottom: 14px;
+  align-items: flex-end;
 }
 
 .message-row.user {
@@ -1364,11 +1449,13 @@ onUnmounted(() => {
 }
 
 .message-bubble {
-  padding: 12px 14px;
-  border-radius: 18px;
+  position: relative;
+  padding: 12px 14px 30px;
+  border-radius: 14px;
   font-size: 13px;
   line-height: 1.7;
   word-break: break-word;
+  overflow-wrap: anywhere;
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
 }
 
@@ -1390,13 +1477,57 @@ onUnmounted(() => {
   border: 1px solid #fecdd3;
 }
 
-.message-meta {
-  margin-top: 6px;
+.message-bubble.collapsed {
+  overflow: hidden;
+}
+
+.message-tools {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  gap: 6px;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: all 0.18s ease;
+}
+
+.message-row:hover .message-tools {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.bubble-tool-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.68);
+  color: #334155;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.message-row.user .bubble-tool-btn {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.bubble-tool-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.message-time-inline {
+  position: absolute;
+  right: 12px;
+  bottom: 8px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   font-size: 11px;
-  color: #94a3b8;
+  color: inherit;
+  opacity: 0.72;
 }
 
 .stream-tag {
@@ -1406,6 +1537,11 @@ onUnmounted(() => {
   color: #2563eb;
 }
 
+.message-row.user .stream-tag {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
 .typing-placeholder {
   display: inline-flex;
   align-items: center;
@@ -1413,8 +1549,53 @@ onUnmounted(() => {
   color: #64748b;
 }
 
-.spinning {
-  animation: rotate 1s linear infinite;
+.typing-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #64748b;
+  animation: typing 1.2s infinite ease-in-out;
+}
+
+.typing-dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.typing-dot:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+.expand-btn {
+  margin-top: 8px;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  opacity: 0.85;
+}
+
+.emoji-panel {
+  margin-bottom: 10px;
+  padding: 8px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.emoji-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #f8fafc;
+  font-size: 18px;
+}
+
+.emoji-btn:hover {
+  background: #e2e8f0;
 }
 
 .message-files {
@@ -1519,8 +1700,16 @@ onUnmounted(() => {
   box-shadow: 0 16px 30px rgba(148, 163, 184, 0.12);
 }
 
+.input-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+
 .input-shell :deep(.el-textarea__inner) {
-  min-height: 78px !important;
+  min-height: 56px !important;
+  max-height: 140px;
   padding: 12px 14px;
   border-radius: 14px;
   border-color: rgba(148, 163, 184, 0.22);
@@ -1563,13 +1752,27 @@ onUnmounted(() => {
   font-weight: 600;
 }
 
+.tool-btn.ghost {
+  background: #f8fafc;
+  color: #475569;
+}
+
 .tool-btn:hover {
   background: #dbeafe;
 }
 
-.hint-text {
+.tool-btn.ghost:hover {
+  background: #e2e8f0;
+}
+
+.hint-text,
+.network-hint {
   font-size: 11px;
   color: #94a3b8;
+}
+
+.network-hint.is-error {
+  color: #dc2626;
 }
 
 .send-btn {
@@ -1600,6 +1803,17 @@ onUnmounted(() => {
 .send-btn.stop {
   background: linear-gradient(135deg, #f97316 0%, #ef4444 100%);
   box-shadow: 0 10px 20px rgba(249, 115, 22, 0.22);
+}
+
+.message-fade-enter-active,
+.message-fade-leave-active {
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+
+.message-fade-enter-from,
+.message-fade-leave-to {
+  opacity: 0;
+  transform: translateY(8px);
 }
 
 .chatbot-float-btn {
@@ -1794,12 +2008,16 @@ onUnmounted(() => {
   }
 }
 
-@keyframes rotate {
-  from {
-    transform: rotate(0deg);
+@keyframes typing {
+  0%,
+  80%,
+  100% {
+    transform: scale(0.7);
+    opacity: 0.45;
   }
-  to {
-    transform: rotate(360deg);
+  40% {
+    transform: scale(1);
+    opacity: 1;
   }
 }
 
@@ -1808,7 +2026,8 @@ onUnmounted(() => {
     border-radius: 18px;
   }
 
-  .header-actions .action-btn {
+  .header-actions .action-btn,
+  .drag-tip {
     display: none;
   }
 
@@ -1827,6 +2046,14 @@ onUnmounted(() => {
 
   .hint-text {
     display: none;
+  }
+
+  .input-row {
+    grid-template-columns: 1fr;
+  }
+
+  .send-btn {
+    width: 100%;
   }
 }
 

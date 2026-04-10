@@ -63,6 +63,11 @@ const routes = [
         component: () => import('../views/CReport.vue'),
       },
       {
+        path: 'report/edit',
+        name: 'report-editor',
+        component: () => import('../components/CReport_Component/CReportEditor.vue'),
+      },
+      {
         path: 'development-map',
         name: 'development-map',
         component: () => import('../views/DevelopmentMap.vue'),

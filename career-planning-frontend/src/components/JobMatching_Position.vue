@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { computed, ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
@@ -21,29 +21,82 @@ import {
   User,
   Collection,
   Aim,
-  Orange
+  Orange,
+  Histogram,
+  Opportunity,
+  Connection,
+  Promotion,
 } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import type { JobMatchItem } from '@/types/job-match'
 
-// ==================== Props ====================
 const props = defineProps<{
   jobData?: JobMatchItem
 }>()
 
-// ==================== 状态定义 ====================
 const route = useRoute()
 const router = useRouter()
 const jobItem = ref<JobMatchItem | null>(props.jobData || null)
 const loading = ref(!props.jobData)
 
-// 图表实例
 let literacyChart: echarts.ECharts | null = null
 let potentialChart: echarts.ECharts | null = null
 
-// ==================== 计算属性 ====================
+const literacyOrder = ['communication', 'teamwork', 'stress_management', 'logic_thinking', 'ethics']
+const potentialOrder = ['learning_ability', 'innovation', 'leadership', 'career_orientation', 'adaptability']
 
-/** 从localStorage或路由参数获取数据 */
+const score = computed(() => Math.round((jobItem.value?.score || 0) * 100))
+const missingSkillCount = computed(() => jobItem.value?.deep_analysis.missing_key_skills.length || 0)
+const literacyAverage = computed(() => {
+  if (!jobItem.value) return 0
+  const values = literacyOrder.map((key) =>
+    literacyToNum(jobItem.value!.raw_data.profiles.professional_literacy[key as keyof typeof jobItem.value.raw_data.profiles.professional_literacy]),
+  )
+  return Math.round(values.reduce((sum, item) => sum + item, 0) / values.length)
+})
+
+const potentialAverage = computed(() => {
+  if (!jobItem.value) return 0
+  const values = potentialOrder.map((key) =>
+    literacyToNum(jobItem.value!.raw_data.profiles.development_potential[key as keyof typeof jobItem.value.raw_data.profiles.development_potential]),
+  )
+  return Math.round(values.reduce((sum, item) => sum + item, 0) / values.length)
+})
+
+const dimensionCards = computed(() => {
+  if (!jobItem.value) return []
+
+  const baseRequirements = jobItem.value.raw_data.profiles.basic_requirements
+  const baseScore =
+    score.value >= 80
+      ? Math.min(92, score.value)
+      : baseRequirements.certificates && baseRequirements.certificates !== '无'
+        ? Math.max(55, score.value - 4)
+        : Math.max(50, score.value - 8)
+
+  const skillPenalty = Math.min(26, missingSkillCount.value * 8)
+  const skillScore = Math.max(38, Math.min(95, score.value - skillPenalty + 6))
+  const literacyScore = Math.max(45, Math.min(96, literacyAverage.value))
+  const potentialScore = Math.max(45, Math.min(96, potentialAverage.value))
+
+  return [
+    { key: 'basic', title: '基础匹配', desc: '学历、专业、经验与证书要求匹配度', value: baseScore, icon: School },
+    { key: 'skills', title: '技能匹配', desc: '核心技能、工具能力与项目经验匹配度', value: skillScore, icon: MagicStick },
+    { key: 'literacy', title: '素养匹配', desc: '职业素养结构与岗位协同要求匹配度', value: literacyScore, icon: User },
+    { key: 'potential', title: '潜力匹配', desc: '学习、创新、适应与成长潜力匹配度', value: potentialScore, icon: TrendCharts },
+  ]
+})
+
+const topActionItems = computed(() => {
+  if (!jobItem.value) return []
+  const adviceSource = jobItem.value.deep_analysis.actionable_advice || ''
+  const adviceParts = adviceSource.split(/[；;。]\s*/).map((item) => item.trim()).filter(Boolean)
+  const missingParts = jobItem.value.deep_analysis.missing_key_skills.map(
+    (skill, index) => `优先补强第 ${index + 1} 项关键能力：${skill}`,
+  )
+  return [...missingParts, ...adviceParts].slice(0, 4)
+})
+
 const loadJobData = () => {
   if (props.jobData) {
     jobItem.value = props.jobData
@@ -66,12 +119,10 @@ const loadJobData = () => {
   loading.value = false
 }
 
-/** 将逗号分隔的字符串转为数组 */
 const splitSkills = (str: string) => {
   return str ? str.split(/[,，、]/).map(s => s.trim()).filter(Boolean) : []
 }
 
-/** 文字等级转数值 */
 const literacyToNum = (val: string): number => {
   if (val === '高') return 90
   if (val === '中') return 60
@@ -79,22 +130,29 @@ const literacyToNum = (val: string): number => {
   return 50
 }
 
-/** 获取匹配度颜色 */
-const getMatchScoreColor = (score: number) => {
-  if (score >= 80) return '#67C23A'
-  if (score >= 60) return '#E6A23C'
+const getMatchScoreColor = (scoreValue: number) => {
+  if (scoreValue >= 80) return '#67C23A'
+  if (scoreValue >= 60) return '#E6A23C'
   return '#F56C6C'
 }
 
-/** 获取匹配度等级 */
-const getMatchScoreLevel = (score: number) => {
-  if (score >= 85) return '非常匹配'
-  if (score >= 70) return '较为匹配'
-  if (score >= 55) return '基本匹配'
+const getMatchScoreLevel = (scoreValue: number) => {
+  if (scoreValue >= 85) return '非常匹配'
+  if (scoreValue >= 70) return '较为匹配'
+  if (scoreValue >= 55) return '基本匹配'
   return '有待提升'
 }
 
-/** 素养雷达图配置 */
+const getGapLevel = (gapAnalysis: string) => {
+  if (/明显|较大|不足|短板|欠缺|薄弱/.test(gapAnalysis)) {
+    return { label: '高差距', type: 'danger' as const, color: '#F56C6C' }
+  }
+  if (/一定|需要|建议|提升|补足/.test(gapAnalysis)) {
+    return { label: '中差距', type: 'warning' as const, color: '#E6A23C' }
+  }
+  return { label: '低差距', type: 'success' as const, color: '#67C23A' }
+}
+
 const getLiteracyOption = (literacy: any) => {
   const data = [
     literacyToNum(literacy.communication),
@@ -105,6 +163,7 @@ const getLiteracyOption = (literacy: any) => {
   ]
 
   return {
+    tooltip: { trigger: 'item' },
     radar: {
       indicator: [
         { name: '沟通能力', max: 100 },
@@ -114,35 +173,28 @@ const getLiteracyOption = (literacy: any) => {
         { name: '职业道德', max: 100 }
       ],
       shape: 'polygon',
-      center: ['50%', '50%'],
-      radius: '65%',
-      name: {
-        textStyle: { color: '#606266', fontSize: 12, fontWeight: 500 }
-      },
-      splitArea: {
-        areaStyle: {
-          color: ['rgba(64,158,255,0.05)', 'rgba(64,158,255,0.1)', 'rgba(64,158,255,0.15)', 'rgba(64,158,255,0.2)']
-        }
-      },
-      axisLine: { lineStyle: { color: '#dcdfe6' } },
-      splitLine: { lineStyle: { color: '#e4e7ed' } }
+      center: ['50%', '54%'],
+      radius: '67%',
+      name: { textStyle: { color: '#5e6b80', fontSize: 12, fontWeight: 500 } },
+      splitArea: { areaStyle: { color: ['rgba(64,158,255,0.04)', 'rgba(64,158,255,0.08)', 'rgba(64,158,255,0.12)', 'rgba(64,158,255,0.16)'] } },
+      axisLine: { lineStyle: { color: '#d8e2ef' } },
+      splitLine: { lineStyle: { color: '#e6edf7' } }
     },
     series: [{
       type: 'radar',
       data: [{
         value: data,
         name: '职业素养',
-        areaStyle: { color: 'rgba(64,158,255,0.3)' },
-        lineStyle: { color: '#409EFF', width: 2 },
+        areaStyle: { color: 'rgba(64,158,255,0.28)' },
+        lineStyle: { color: '#409EFF', width: 2.5 },
         itemStyle: { color: '#409EFF' },
         symbol: 'circle',
-        symbolSize: 6
+        symbolSize: 7
       }]
     }]
   }
 }
 
-/** 潜力雷达图配置 */
 const getPotentialOption = (potential: any) => {
   const data = [
     literacyToNum(potential.learning_ability),
@@ -153,6 +205,7 @@ const getPotentialOption = (potential: any) => {
   ]
 
   return {
+    tooltip: { trigger: 'item' },
     radar: {
       indicator: [
         { name: '学习能力', max: 100 },
@@ -162,38 +215,30 @@ const getPotentialOption = (potential: any) => {
         { name: '适应能力', max: 100 }
       ],
       shape: 'polygon',
-      center: ['50%', '50%'],
-      radius: '65%',
-      name: {
-        textStyle: { color: '#606266', fontSize: 12, fontWeight: 500 }
-      },
-      splitArea: {
-        areaStyle: {
-          color: ['rgba(103,194,58,0.05)', 'rgba(103,194,58,0.1)', 'rgba(103,194,58,0.15)', 'rgba(103,194,58,0.2)']
-        }
-      },
-      axisLine: { lineStyle: { color: '#dcdfe6' } },
-      splitLine: { lineStyle: { color: '#e4e7ed' } }
+      center: ['50%', '54%'],
+      radius: '67%',
+      name: { textStyle: { color: '#5e6b80', fontSize: 12, fontWeight: 500 } },
+      splitArea: { areaStyle: { color: ['rgba(103,194,58,0.04)', 'rgba(103,194,58,0.08)', 'rgba(103,194,58,0.12)', 'rgba(103,194,58,0.16)'] } },
+      axisLine: { lineStyle: { color: '#d8e2ef' } },
+      splitLine: { lineStyle: { color: '#e6edf7' } }
     },
     series: [{
       type: 'radar',
       data: [{
         value: data,
         name: '发展潜力',
-        areaStyle: { color: 'rgba(103,194,58,0.3)' },
-        lineStyle: { color: '#67C23A', width: 2 },
+        areaStyle: { color: 'rgba(103,194,58,0.26)' },
+        lineStyle: { color: '#67C23A', width: 2.5 },
         itemStyle: { color: '#67C23A' },
         symbol: 'circle',
-        symbolSize: 6
+        symbolSize: 7
       }]
     }]
   }
 }
 
-/** 初始化雷达图 */
 const initCharts = () => {
   if (!jobItem.value) return
-
   nextTick(() => {
     const item = jobItem.value
     if (!item) return
@@ -202,23 +247,28 @@ const initCharts = () => {
     const potentialEl = document.getElementById('potential-radar')
 
     if (literacyEl) {
+      literacyChart?.dispose()
       literacyChart = echarts.init(literacyEl)
       literacyChart.setOption(getLiteracyOption(item.raw_data.profiles.professional_literacy))
     }
 
     if (potentialEl) {
+      potentialChart?.dispose()
       potentialChart = echarts.init(potentialEl)
       potentialChart.setOption(getPotentialOption(item.raw_data.profiles.development_potential))
     }
   })
 }
 
-/** 返回列表页 */
+const resizeCharts = () => {
+  literacyChart?.resize()
+  potentialChart?.resize()
+}
+
 const goBack = () => {
   router.push('/job-matching')
 }
 
-/** 格式化素养key */
 const formatLiteracyKey = (key: string): string => {
   const map: Record<string, string> = {
     communication: '沟通能力',
@@ -235,23 +285,23 @@ const formatLiteracyKey = (key: string): string => {
   return map[key] || key
 }
 
-// ==================== 生命周期 ====================
 onMounted(() => {
   loadJobData()
   if (jobItem.value) {
     initCharts()
   }
+  window.addEventListener('resize', resizeCharts)
 })
 
 onBeforeUnmount(() => {
   literacyChart?.dispose()
   potentialChart?.dispose()
+  window.removeEventListener('resize', resizeCharts)
 })
 </script>
 
 <template>
   <div class="position-detail-container">
-    <!-- 顶部导航 -->
     <div class="detail-header">
       <el-button type="primary" text @click="goBack">
         <el-icon>
@@ -263,11 +313,10 @@ onBeforeUnmount(() => {
         <el-icon>
           <TrendCharts />
         </el-icon>
-        岗位详情分析
+        岗位匹配分析报告
       </h1>
     </div>
 
-    <!-- 加载状态 -->
     <div v-if="loading" class="loading-container">
       <el-icon class="loading-icon" :size="48">
         <DataAnalysis />
@@ -276,318 +325,390 @@ onBeforeUnmount(() => {
     </div>
 
     <template v-else-if="jobItem">
-      <!-- 顶部概览区 -->
-      <div class="overview-section">
-        <!-- 左侧：岗位基本信息卡片 -->
-        <div class="info-card main-info">
-          <div class="job-header">
-            <div class="job-icon">
-              <el-icon :size="32">
-                <OfficeBuilding />
-              </el-icon>
+      <section class="overview-section">
+        <div class="overview-main info-card">
+          <div class="overview-main__head">
+            <div class="job-identity">
+              <div class="job-icon">
+                <el-icon :size="30">
+                  <OfficeBuilding />
+                </el-icon>
+              </div>
+              <div class="job-identity__content">
+                <div class="eyebrow">F-09 岗位 AI 画像</div>
+                <h2 class="job-name">{{ jobItem.raw_data.job_name }}</h2>
+                <div class="job-tags">
+                  <el-tag size="small" :color="getMatchScoreColor(score)" effect="dark">
+                    {{ score }}分匹配
+                  </el-tag>
+                  <el-tag size="small" :type="jobItem.deep_analysis.can_apply ? 'success' : 'danger'" effect="light">
+                    <el-icon class="tag-icon">
+                      <CircleCheck v-if="jobItem.deep_analysis.can_apply" />
+                      <CircleClose v-else />
+                    </el-icon>
+                    {{ jobItem.deep_analysis.can_apply ? '推荐投递' : '暂不建议直接投递' }}
+                  </el-tag>
+                  <el-tooltip
+                    placement="top"
+                    content="本次匹配结果综合了职业画像、岗位要求、技能标签、素养潜力等多维信息，由本地知识库岗位画像与 AI 提取结果支撑。"
+                  >
+                    <el-tag size="small" type="info" effect="plain">匹配可信度说明</el-tag>
+                  </el-tooltip>
+                </div>
+              </div>
             </div>
-            <div class="job-title-section">
-              <h2 class="job-name">{{ jobItem.raw_data.job_name }}</h2>
-              <div class="job-tags">
-                <el-tag size="small" :color="getMatchScoreColor(Math.round((jobItem.score || 0) * 100))" effect="dark">
-                  {{ Math.round((jobItem.score || 0) * 100) }}分匹配
-                </el-tag>
-                <el-tag size="small" :type="jobItem.deep_analysis.can_apply ? 'success' : 'danger'" effect="light">
-                  <el-icon class="tag-icon">
-                    <CircleCheck v-if="jobItem.deep_analysis.can_apply" />
-                    <CircleClose v-else />
-                  </el-icon>
-                  {{ jobItem.deep_analysis.can_apply ? '推荐' : '不推荐' }}
-                </el-tag>
+
+            <div class="score-panel" :style="{ '--score-color': getMatchScoreColor(score) }">
+              <div
+                class="score-ring"
+                :style="{ background: `conic-gradient(${getMatchScoreColor(score)} ${score * 3.6}deg, #e7eef7 0deg)` }"
+              >
+                <div class="score-ring__inner">
+                  <strong>{{ score }}</strong>
+                  <span>综合匹配分</span>
+                </div>
+              </div>
+              <div class="score-level" :style="{ color: getMatchScoreColor(score) }">
+                {{ getMatchScoreLevel(score) }}
               </div>
             </div>
           </div>
 
-          <div class="basic-info-grid">
-            <div class="info-item">
-              <el-icon>
-                <School />
-              </el-icon>
-              <span class="info-label">学历要求</span>
-              <span class="info-value">{{ jobItem.raw_data.profiles.basic_requirements.degree }}</span>
+          <div class="overview-grid">
+            <div class="overview-item">
+              <el-icon><School /></el-icon>
+              <span class="item-label">学历要求</span>
+              <strong>{{ jobItem.raw_data.profiles.basic_requirements.degree }}</strong>
             </div>
-            <div class="info-item">
-              <el-icon>
-                <Document />
-              </el-icon>
-              <span class="info-label">专业要求</span>
-              <span class="info-value">{{ jobItem.raw_data.profiles.basic_requirements.major }}</span>
+            <div class="overview-item">
+              <el-icon><Document /></el-icon>
+              <span class="item-label">专业要求</span>
+              <strong>{{ jobItem.raw_data.profiles.basic_requirements.major }}</strong>
             </div>
-            <div class="info-item">
-              <el-icon>
-                <Timer />
-              </el-icon>
-              <span class="info-label">经验要求</span>
-              <span class="info-value">{{ jobItem.raw_data.profiles.basic_requirements.experience_years }}</span>
+            <div class="overview-item">
+              <el-icon><Timer /></el-icon>
+              <span class="item-label">经验要求</span>
+              <strong>{{ jobItem.raw_data.profiles.basic_requirements.experience_years }}</strong>
             </div>
-            <div class="info-item">
-              <el-icon>
-                <Medal />
-              </el-icon>
-              <span class="info-label">证书要求</span>
-              <span class="info-value">{{ jobItem.raw_data.profiles.basic_requirements.certificates }}</span>
+            <div class="overview-item">
+              <el-icon><Medal /></el-icon>
+              <span class="item-label">证书要求</span>
+              <strong>{{ jobItem.raw_data.profiles.basic_requirements.certificates }}</strong>
             </div>
-            <div class="info-item">
-              <el-icon>
-                <Briefcase />
-              </el-icon>
-              <span class="info-label">所属行业</span>
-              <span class="info-value">{{ jobItem.raw_data.profiles.job_attributes.industry }}</span>
+            <div class="overview-item">
+              <el-icon><Briefcase /></el-icon>
+              <span class="item-label">所属行业</span>
+              <strong>{{ jobItem.raw_data.profiles.job_attributes.industry }}</strong>
             </div>
-            <div class="info-item">
-              <el-icon>
-                <Collection />
-              </el-icon>
-              <span class="info-label">行业趋势</span>
-              <span class="info-value">{{ jobItem.raw_data.profiles.job_attributes.industry_trend }}</span>
+            <div class="overview-item">
+              <el-icon><Collection /></el-icon>
+              <span class="item-label">行业趋势</span>
+              <strong>{{ jobItem.raw_data.profiles.job_attributes.industry_trend }}</strong>
             </div>
           </div>
         </div>
 
-        <!-- 中间：匹配分数大圆环 -->
-        <div class="info-card score-ring-card">
-          <div class="score-ring-container">
-            <div class="score-ring" :style="{
-              background: `conic-gradient(${getMatchScoreColor(Math.round((jobItem.score || 0) * 100))} ${Math.round((jobItem.score || 0) * 100) * 3.6}deg, #e4e7ed 0deg)`
-            }">
-              <div class="score-inner">
-                <span class="score-num">{{ Math.round((jobItem.score || 0) * 100) }}</span>
-                <span class="score-unit">分</span>
-              </div>
-            </div>
-          </div>
-          <div class="score-labels">
-            <div class="score-level" :style="{ color: getMatchScoreColor(Math.round((jobItem.score || 0) * 100)) }">
-              {{ getMatchScoreLevel(Math.round((jobItem.score || 0) * 100)) }}
-            </div>
-            <div class="score-desc">综合匹配度</div>
-          </div>
-        </div>
-
-        <!-- 右侧：岗位属性 -->
-        <div class="info-card attributes-card">
-          <h3 class="card-title">
-            <el-icon>
-              <Aim />
-            </el-icon>
+        <div class="overview-side info-card">
+          <h3 class="section-title">
+            <el-icon><Aim /></el-icon>
             岗位属性
           </h3>
-          <div class="attributes-list">
-            <div class="attr-item">
-              <span class="attr-label">薪资竞争力</span>
-              <el-tag size="small"
-                :type="jobItem.raw_data.profiles.job_attributes.salary_competitiveness === '高' ? 'danger' : 'info'">
+          <div class="attribute-list">
+            <div class="attribute-item">
+              <span>薪资竞争力</span>
+              <el-tag size="small" :type="jobItem.raw_data.profiles.job_attributes.salary_competitiveness === '高' ? 'danger' : 'info'">
                 {{ jobItem.raw_data.profiles.job_attributes.salary_competitiveness }}
               </el-tag>
             </div>
-            <div class="attr-item">
-              <span class="attr-label">社会需求度</span>
-              <el-tag size="small"
-                :type="jobItem.raw_data.profiles.job_attributes.social_demand === '高' ? 'success' : 'info'">
+            <div class="attribute-item">
+              <span>社会需求度</span>
+              <el-tag size="small" :type="jobItem.raw_data.profiles.job_attributes.social_demand === '高' ? 'success' : 'info'">
                 {{ jobItem.raw_data.profiles.job_attributes.social_demand }}
               </el-tag>
             </div>
-            <div class="attr-item">
-              <span class="attr-label">纵向晋升</span>
-              <span class="attr-value">{{ jobItem.raw_data.profiles.job_attributes.vertical_promotion_path }}</span>
+            <div class="attribute-item attribute-item--text">
+              <span><el-icon><Promotion /></el-icon>纵向晋升</span>
+              <strong>{{ jobItem.raw_data.profiles.job_attributes.vertical_promotion_path }}</strong>
             </div>
-            <div class="attr-item">
-              <span class="attr-label">横向发展</span>
-              <span class="attr-value">{{ jobItem.raw_data.profiles.job_attributes.lateral_transfer_directions }}</span>
+            <div class="attribute-item attribute-item--text">
+              <span><el-icon><Connection /></el-icon>横向发展</span>
+              <strong>{{ jobItem.raw_data.profiles.job_attributes.lateral_transfer_directions }}</strong>
             </div>
-            <div class="attr-item">
-              <span class="attr-label">前置角色</span>
-              <span class="attr-value">{{ jobItem.raw_data.profiles.job_attributes.prerequisite_roles }}</span>
+            <div class="attribute-item attribute-item--text">
+              <span><el-icon><Opportunity /></el-icon>前置角色</span>
+              <strong>{{ jobItem.raw_data.profiles.job_attributes.prerequisite_roles }}</strong>
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      <!-- 中间内容区：左右布局 -->
-      <div class="content-section">
-        <!-- 左侧：雷达图区域 -->
-        <div class="left-panel">
-          <!-- 职业素养雷达图 -->
+      <section class="dimension-section info-card">
+        <div class="module-head">
+          <div>
+            <div class="eyebrow">F-10 人岗匹配分析</div>
+            <h3 class="module-title">四大维度匹配总览</h3>
+            <p class="module-desc">将基础条件、技能结构、职业素养与成长潜力整理为更易阅读的分析视图。</p>
+          </div>
+        </div>
+
+        <div class="dimension-grid">
+          <div v-for="card in dimensionCards" :key="card.key" class="dimension-card">
+            <div class="dimension-card__head">
+              <div class="dimension-icon">
+                <el-icon>
+                  <component :is="card.icon" />
+                </el-icon>
+              </div>
+              <div>
+                <h4>{{ card.title }}</h4>
+                <p>{{ card.desc }}</p>
+              </div>
+              <strong :style="{ color: getMatchScoreColor(card.value) }">{{ card.value }}</strong>
+            </div>
+            <div class="dimension-progress">
+              <div class="dimension-progress__fill" :style="{ width: `${card.value}%`, background: getMatchScoreColor(card.value) }"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="analysis-layout">
+        <div class="charts-column">
           <div class="chart-card">
-            <h3 class="chart-title">
-              <el-icon>
-                <User />
-              </el-icon>
-              职业素养评估
-            </h3>
+            <div class="chart-head">
+              <div>
+                <div class="eyebrow">图表分析区</div>
+                <h3 class="section-title">
+                  <el-icon><User /></el-icon>
+                  职业素养评估
+                </h3>
+              </div>
+            </div>
             <div id="literacy-radar" class="radar-chart"></div>
             <div class="radar-legend">
               <div v-for="(val, key) in jobItem.raw_data.profiles.professional_literacy" :key="key" class="legend-item">
-                <span class="legend-dot"
-                  :style="{ background: val === '高' ? '#67C23A' : val === '中' ? '#E6A23C' : '#909399' }"></span>
+                <span class="legend-dot" :style="{ background: val === '高' ? '#67C23A' : val === '中' ? '#E6A23C' : '#909399' }"></span>
                 <span class="legend-name">{{ formatLiteracyKey(key as string) }}</span>
-                <span class="legend-value" :class="val === '高' ? 'high' : val === '中' ? 'medium' : 'low'">{{ val
-                  }}</span>
+                <span class="legend-value" :class="val === '高' ? 'high' : val === '中' ? 'medium' : 'low'">{{ val }}</span>
               </div>
             </div>
           </div>
 
-          <!-- 发展潜力雷达图 -->
           <div class="chart-card">
-            <h3 class="chart-title">
-              <el-icon>
-                <Orange />
-              </el-icon>
-              发展潜力评估
-            </h3>
+            <div class="chart-head">
+              <div>
+                <div class="eyebrow">图表分析区</div>
+                <h3 class="section-title">
+                  <el-icon><Orange /></el-icon>
+                  发展潜力评估
+                </h3>
+              </div>
+            </div>
             <div id="potential-radar" class="radar-chart"></div>
             <div class="radar-legend">
               <div v-for="(val, key) in jobItem.raw_data.profiles.development_potential" :key="key" class="legend-item">
-                <span class="legend-dot"
-                  :style="{ background: val === '高' ? '#67C23A' : val === '中' ? '#E6A23C' : '#909399' }"></span>
+                <span class="legend-dot" :style="{ background: val === '高' ? '#67C23A' : val === '中' ? '#E6A23C' : '#909399' }"></span>
                 <span class="legend-name">{{ formatLiteracyKey(key as string) }}</span>
-                <span class="legend-value" :class="val === '高' ? 'high' : val === '中' ? 'medium' : 'low'">{{ val
-                  }}</span>
+                <span class="legend-value" :class="val === '高' ? 'high' : val === '中' ? 'medium' : 'low'">{{ val }}</span>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- 右侧：详细信息区域 -->
-        <div class="right-panel">
-          <!-- 专业技能 -->
+        <div class="detail-column">
           <div class="detail-card">
-            <h3 class="card-title">
-              <el-icon>
-                <MagicStick />
-              </el-icon>
-              专业技能要求
-            </h3>
+            <div class="module-head">
+              <div>
+                <div class="eyebrow">F-09 岗位 AI 画像</div>
+                <h3 class="module-title">
+                  <el-icon><MagicStick /></el-icon>
+                  专业技能要求
+                </h3>
+              </div>
+            </div>
+
             <div class="skills-section">
-              <div class="skill-block">
+              <div class="skill-block skill-block--primary">
                 <div class="skill-label">核心技能</div>
                 <div class="skill-tags">
-                  <el-tag v-for="skill in splitSkills(jobItem.raw_data.profiles.professional_skills.core_skills)"
-                    :key="skill" size="small" effect="dark" class="skill-tag-primary">
+                  <el-tag
+                    v-for="skill in splitSkills(jobItem.raw_data.profiles.professional_skills.core_skills)"
+                    :key="skill"
+                    size="small"
+                    effect="dark"
+                    class="skill-tag-primary"
+                  >
                     {{ skill }}
                   </el-tag>
                 </div>
               </div>
-              <div class="skill-block">
-                <div class="skill-label">工具能力</div>
-                <div class="skill-tags">
-                  <el-tag v-for="tool in splitSkills(jobItem.raw_data.profiles.professional_skills.tool_capabilities)"
-                    :key="tool" size="small" type="warning" effect="plain">
-                    {{ tool }}
-                  </el-tag>
+
+              <div class="skill-grid">
+                <div class="skill-block">
+                  <div class="skill-label">工具能力</div>
+                  <div class="skill-tags">
+                    <el-tag
+                      v-for="tool in splitSkills(jobItem.raw_data.profiles.professional_skills.tool_capabilities)"
+                      :key="tool"
+                      size="small"
+                      type="warning"
+                      effect="plain"
+                    >
+                      {{ tool }}
+                    </el-tag>
+                  </div>
                 </div>
-              </div>
-              <div class="skill-block">
-                <div class="skill-label">领域知识</div>
-                <span class="skill-text">{{ jobItem.raw_data.profiles.professional_skills.domain_knowledge }}</span>
-              </div>
-              <div class="skill-block">
-                <div class="skill-label">语言要求</div>
-                <span class="skill-text">{{ jobItem.raw_data.profiles.professional_skills.language_requirements
-                  }}</span>
-              </div>
-              <div class="skill-block">
-                <div class="skill-label">项目要求</div>
-                <p class="skill-desc">{{ jobItem.raw_data.profiles.professional_skills.project_requirements }}</p>
+
+                <div class="skill-block">
+                  <div class="skill-label">领域知识</div>
+                  <div class="text-panel">{{ jobItem.raw_data.profiles.professional_skills.domain_knowledge }}</div>
+                </div>
+
+                <div class="skill-block">
+                  <div class="skill-label">语言要求</div>
+                  <div class="text-panel">{{ jobItem.raw_data.profiles.professional_skills.language_requirements }}</div>
+                </div>
+
+                <div class="skill-block">
+                  <div class="skill-label">项目要求</div>
+                  <div class="text-panel text-panel--desc">{{ jobItem.raw_data.profiles.professional_skills.project_requirements }}</div>
+                </div>
               </div>
             </div>
           </div>
 
-          <!-- 深度分析 -->
           <div class="detail-card">
-            <h3 class="card-title">
-              <el-icon>
-                <DataAnalysis />
-              </el-icon>
-              深度匹配分析
-            </h3>
+            <div class="module-head">
+              <div>
+                <div class="eyebrow">F-10 深度匹配分析</div>
+                <h3 class="module-title">
+                  <el-icon><DataAnalysis /></el-icon>
+                  综合分析与关键短板
+                </h3>
+              </div>
+            </div>
 
-            <!-- 综合评语 -->
-            <div class="analysis-section">
-              <div class="section-label">
-                <el-icon color="#409EFF">
-                  <InfoFilled />
-                </el-icon>
+            <div class="highlight-analysis">
+              <div class="highlight-analysis__label">
+                <el-icon><InfoFilled /></el-icon>
                 综合评语
               </div>
-              <p class="analysis-text">{{ jobItem.deep_analysis.all_analysis }}</p>
+              <p>{{ jobItem.deep_analysis.all_analysis }}</p>
             </div>
 
-            <!-- 缺失技能 -->
-            <div v-if="jobItem.deep_analysis.missing_key_skills.length > 0" class="analysis-section warning">
-              <div class="section-label">
-                <el-icon color="#E6A23C">
-                  <Warning />
-                </el-icon>
-                缺失的关键技能
+            <div v-if="jobItem.deep_analysis.missing_key_skills.length > 0" class="warning-panel">
+              <div class="warning-panel__head">
+                <span>
+                  <el-icon><Warning /></el-icon>
+                  当前最需要补强的关键技能
+                </span>
+                <el-tag type="warning" effect="dark">{{ jobItem.deep_analysis.missing_key_skills.length }} 项</el-tag>
               </div>
-              <div class="missing-skills">
-                <div v-for="(skill, i) in jobItem.deep_analysis.missing_key_skills" :key="i" class="missing-item">
-                  <el-icon color="#E6A23C">
-                    <Warning />
-                  </el-icon>
-                  <span>{{ skill }}</span>
-                </div>
+              <div class="warning-tags">
+                <el-tag v-for="(skill, i) in jobItem.deep_analysis.missing_key_skills" :key="i" type="warning" effect="plain" round>
+                  {{ skill }}
+                </el-tag>
               </div>
-            </div>
-
-            <!-- 差距矩阵表格 -->
-            <div class="analysis-section">
-              <div class="section-label">
-                <el-icon color="#409EFF">
-                  <DataAnalysis />
-                </el-icon>
-                差距矩阵
-              </div>
-              <div class="gap-cards-container">
-                <div v-for="(gap, i) in jobItem.deep_analysis.gap_matrix" :key="i" class="gap-card">
-                  <div class="gap-card-header">
-                    <el-tag :type="['primary', 'success', 'warning', 'danger'][i % 4]" effect="light" class="dim-tag"
-                      round>
-                      {{ gap.dimension }}
-                    </el-tag>
-                  </div>
-                  <div class="gap-card-body">
-                    <div class="compare-row">
-                      <div class="compare-item required">
-                        <div class="item-label">岗位要求</div>
-                        <div class="item-value">{{ gap.required }}</div>
-                      </div>
-                      <div class="compare-item current">
-                        <div class="item-label">当前水平</div>
-                        <div class="item-value">{{ gap.current }}</div>
-                      </div>
-                    </div>
-                    <div class="analysis-box">
-                      <div class="box-label">差距分析</div>
-                      <div class="box-value">{{ gap.gap_analysis }}</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- 可执行建议 -->
-            <div class="analysis-section success">
-              <div class="section-label">
-                <el-icon color="#67C23A">
-                  <SuccessFilled />
-                </el-icon>
-                可执行建议
-              </div>
-              <p class="advice-text">{{ jobItem.deep_analysis.actionable_advice }}</p>
             </div>
           </div>
         </div>
-      </div>
+      </section>
+
+      <section class="detail-card">
+        <div class="module-head">
+          <div>
+            <div class="eyebrow">F-11 差距分析报告</div>
+            <h3 class="module-title">
+              <el-icon><Histogram /></el-icon>
+              差距矩阵与优先改进方向
+            </h3>
+            <p class="module-desc">保留原有差距矩阵数据结构，通过卡片式对比让岗位要求、当前水平和差距说明更易理解。</p>
+          </div>
+        </div>
+
+        <div class="gap-cards-container">
+          <div v-for="(gap, i) in jobItem.deep_analysis.gap_matrix" :key="i" class="gap-card">
+            <div class="gap-card-header">
+              <el-tag :type="['primary', 'success', 'warning', 'danger'][i % 4]" effect="light" round>
+                {{ gap.dimension }}
+              </el-tag>
+              <el-tag size="small" :type="getGapLevel(gap.gap_analysis).type" effect="dark" round>
+                {{ getGapLevel(gap.gap_analysis).label }}
+              </el-tag>
+            </div>
+
+            <div class="compare-row">
+              <div class="compare-item required">
+                <div class="compare-title">岗位要求</div>
+                <div class="compare-value">{{ gap.required }}</div>
+              </div>
+              <div class="compare-item current">
+                <div class="compare-title">当前水平</div>
+                <div class="compare-value">{{ gap.current }}</div>
+              </div>
+            </div>
+
+            <div class="analysis-box" :style="{ '--gap-color': getGapLevel(gap.gap_analysis).color }">
+              <div class="analysis-box__label">差距说明</div>
+              <div class="analysis-box__value">{{ gap.gap_analysis }}</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="action-layout">
+        <div class="action-card action-card--primary">
+          <div class="module-head">
+            <div>
+              <div class="eyebrow">行动建议区</div>
+              <h3 class="module-title">
+                <el-icon><SuccessFilled /></el-icon>
+                下一步该做什么
+              </h3>
+            </div>
+          </div>
+
+          <div class="action-steps">
+            <div v-for="(item, index) in topActionItems" :key="`${item}-${index}`" class="action-step">
+              <div class="step-index">{{ index + 1 }}</div>
+              <div class="step-content">{{ item }}</div>
+            </div>
+          </div>
+
+          <div class="action-summary">
+            {{ jobItem.deep_analysis.actionable_advice }}
+          </div>
+        </div>
+
+        <div class="action-card action-card--trust">
+          <div class="module-head">
+            <div>
+              <div class="eyebrow">F-12 匹配可信度</div>
+              <h3 class="module-title">
+                <el-icon><InfoFilled /></el-icon>
+                数据来源说明
+              </h3>
+            </div>
+          </div>
+
+          <div class="trust-list">
+            <div class="trust-item">
+              <span>分析依据</span>
+              <p>岗位画像、岗位要求、技能标签、职业素养、发展潜力等多维信息综合判断。</p>
+            </div>
+            <div class="trust-item">
+              <span>知识支撑</span>
+              <p>岗位画像与分析结论由本地知识库及 AI 提取结果支撑，适合用于展示与决策参考。</p>
+            </div>
+            <div class="trust-item">
+              <span>使用建议</span>
+              <p>建议结合个人真实项目经验、证书情况和近期求职目标，进一步核验投递优先级。</p>
+            </div>
+          </div>
+        </div>
+      </section>
     </template>
 
-    <!-- 无数据状态 -->
     <div v-else class="empty-container">
       <el-icon class="empty-icon" :size="64">
         <Document />
@@ -601,14 +722,15 @@ onBeforeUnmount(() => {
 
 <style scoped lang="scss">
 .position-detail-container {
-  padding: 20px;
+  padding: 22px 20px 36px;
   max-width: 1400px;
   margin: 0 auto;
-  background-color: #f5f7fa;
   min-height: calc(100vh - 60px);
+  background:
+    radial-gradient(circle at top left, rgba(64, 158, 255, 0.08), transparent 20%),
+    linear-gradient(180deg, #f5f9ff 0%, #f2f7fd 52%, #f7fbff 100%);
 }
 
-// 顶部导航
 .detail-header {
   display: flex;
   align-items: center;
@@ -616,674 +738,768 @@ onBeforeUnmount(() => {
   margin-bottom: 20px;
 
   .detail-title {
-    font-size: 20px;
-    font-weight: 600;
-    color: #303133;
-    margin: 0;
     display: flex;
     align-items: center;
     gap: 8px;
-
-    .el-icon {
-      color: #409EFF;
-    }
+    margin: 0;
+    color: #173a5d;
+    font-size: 22px;
+    font-weight: 700;
   }
 }
 
-// 加载状态
-.loading-container {
+.loading-container,
+.empty-container,
+.info-card,
+.detail-card,
+.chart-card,
+.action-card {
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(220, 231, 244, 0.96);
+  border-radius: 24px;
+  box-shadow: 0 20px 48px rgba(28, 74, 127, 0.08);
+}
+
+.loading-container,
+.empty-container {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 80px 20px;
-  color: #909399;
-  background: #fff;
-  border-radius: 12px;
+  padding: 84px 24px;
+  text-align: center;
+  color: #7b8ca1;
+}
 
-  .loading-icon {
-    color: #409EFF;
-    animation: rotate 1.5s linear infinite;
-    margin-bottom: 16px;
-  }
+.loading-container p,
+.empty-container p {
+  margin: 12px 0 0;
+}
+
+.loading-icon {
+  color: #409eff;
+  animation: rotate 1.5s linear infinite;
+}
+
+.empty-icon {
+  color: #c8d4e3;
+  margin-bottom: 16px;
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(64, 158, 255, 0.1);
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.section-title,
+.module-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 0;
+  color: #173a5d;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.module-desc {
+  margin: 8px 0 0;
+  color: #6c8198;
+  line-height: 1.7;
+  font-size: 14px;
+}
+
+.overview-section {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.82fr);
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.info-card,
+.detail-card,
+.chart-card,
+.action-card {
+  padding: 24px;
+}
+
+.overview-main__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding-bottom: 20px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid #e9eff6;
+}
+
+.job-identity {
+  display: flex;
+  gap: 16px;
+  min-width: 0;
+}
+
+.job-icon {
+  width: 60px;
+  height: 60px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #409eff, #66b1ff);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  flex-shrink: 0;
+  box-shadow: 0 16px 30px rgba(64, 158, 255, 0.24);
+}
+
+.job-name {
+  margin: 12px 0;
+  color: #173a5d;
+  font-size: 30px;
+  line-height: 1.2;
+  font-weight: 800;
+}
+
+.job-tags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tag-icon {
+  margin-right: 2px;
+}
+
+.score-panel {
+  --score-color: #67C23A;
+  flex-shrink: 0;
+  width: 200px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.score-ring {
+  width: 164px;
+  height: 164px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.score-ring__inner {
+  width: 124px;
+  height: 124px;
+  background: #fff;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.score-ring__inner strong {
+  font-size: 42px;
+  line-height: 1;
+  color: #173a5d;
+}
+
+.score-ring__inner span {
+  margin-top: 6px;
+  font-size: 13px;
+  color: #6b8199;
+}
+
+.score-level {
+  margin-top: 14px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.overview-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.overview-item {
+  padding: 14px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #f9fbff 0%, #f2f7fd 100%);
+  border: 1px solid rgba(226, 234, 245, 0.92);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.overview-item .el-icon {
+  font-size: 16px;
+  color: #409eff;
+}
+
+.item-label {
+  color: #7a8ea5;
+  font-size: 12px;
+}
+
+.overview-item strong {
+  color: #2d435b;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.attribute-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.attribute-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px dashed #e6edf7;
+  color: #526b86;
+}
+
+.attribute-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.attribute-item--text {
+  align-items: flex-start;
+}
+
+.attribute-item--text span,
+.attribute-item--text strong {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.attribute-item strong {
+  color: #173a5d;
+  font-size: 14px;
+  text-align: right;
+}
+
+.dimension-section {
+  margin-bottom: 20px;
+}
+
+.module-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.dimension-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.dimension-card {
+  padding: 18px;
+  border-radius: 20px;
+  background: linear-gradient(180deg, #f9fbff 0%, #f3f8ff 100%);
+  border: 1px solid rgba(220, 231, 244, 0.96);
+}
+
+.dimension-card__head {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.dimension-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(64, 158, 255, 0.12);
+  color: #409eff;
+}
+
+.dimension-card__head h4 {
+  margin: 0 0 6px;
+  color: #173a5d;
+  font-size: 16px;
+}
+
+.dimension-card__head p {
+  margin: 0;
+  color: #6f849a;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.dimension-card__head strong {
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.dimension-progress {
+  height: 10px;
+  margin-top: 16px;
+  border-radius: 999px;
+  background: #e8f0fa;
+  overflow: hidden;
+}
+
+.dimension-progress__fill {
+  height: 100%;
+  border-radius: inherit;
+}
+
+.analysis-layout {
+  display: grid;
+  grid-template-columns: 380px minmax(0, 1fr);
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.charts-column,
+.detail-column {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.chart-head {
+  margin-bottom: 10px;
+}
+
+.radar-chart {
+  width: 100%;
+  height: 280px;
+}
+
+.radar-legend {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid #e9eff6;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 12px;
+}
+
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.legend-name {
+  color: #5f748c;
+}
+
+.legend-value {
+  margin-left: auto;
+  font-weight: 700;
+}
+
+.legend-value.high {
+  color: #67C23A;
+}
+
+.legend-value.medium {
+  color: #E6A23C;
+}
+
+.legend-value.low {
+  color: #909399;
+}
+
+.skills-section {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.skill-block {
+  padding: 16px;
+  border-radius: 18px;
+  background: #f8fbff;
+  border: 1px solid rgba(223, 232, 243, 0.92);
+}
+
+.skill-block--primary {
+  background: linear-gradient(135deg, rgba(64, 158, 255, 0.08), rgba(113, 182, 255, 0.12));
+}
+
+.skill-label {
+  margin-bottom: 10px;
+  color: #6e8399;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.skill-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.skill-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.skill-tag-primary {
+  border: none !important;
+  background: linear-gradient(135deg, #409eff, #66b1ff) !important;
+}
+
+.text-panel {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #fff;
+  color: #506980;
+  line-height: 1.7;
+  font-size: 14px;
+}
+
+.text-panel--desc {
+  min-height: 88px;
+}
+
+.highlight-analysis {
+  padding: 18px;
+  border-radius: 20px;
+  background: linear-gradient(180deg, #f7fbff 0%, #edf5ff 100%);
+  border: 1px solid rgba(64, 158, 255, 0.14);
+}
+
+.highlight-analysis__label,
+.warning-panel__head span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #2563eb;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.highlight-analysis p {
+  margin: 12px 0 0;
+  color: #4e6780;
+  line-height: 1.9;
+}
+
+.warning-panel {
+  margin-top: 18px;
+  padding: 18px;
+  border-radius: 20px;
+  background: linear-gradient(180deg, #fff8ef 0%, #fffaf5 100%);
+  border: 1px solid rgba(230, 162, 60, 0.18);
+}
+
+.warning-panel__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.warning-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.gap-cards-container {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.gap-card {
+  padding: 18px;
+  border-radius: 20px;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+  border: 1px solid rgba(224, 233, 244, 0.96);
+  transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+}
+
+.gap-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(64, 158, 255, 0.24);
+  box-shadow: 0 20px 42px rgba(32, 91, 165, 0.08);
+}
+
+.gap-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.compare-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.compare-item {
+  padding: 16px;
+  border-radius: 16px;
+  min-height: 120px;
+}
+
+.compare-item.required {
+  background: #fff6ea;
+  border: 1px solid rgba(230, 162, 60, 0.16);
+}
+
+.compare-item.current {
+  background: #f0f9eb;
+  border: 1px solid rgba(103, 194, 58, 0.16);
+}
+
+.compare-title {
+  color: #7a8ca1;
+  font-size: 12px;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.compare-value {
+  color: #304860;
+  line-height: 1.8;
+  font-size: 14px;
+}
+
+.analysis-box {
+  --gap-color: #409eff;
+  margin-top: 14px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--gap-color) 8%, white);
+  border-left: 4px solid var(--gap-color);
+}
+
+.analysis-box__label {
+  color: var(--gap-color);
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.analysis-box__value {
+  color: #47627d;
+  line-height: 1.8;
+  font-size: 14px;
+}
+
+.action-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+  gap: 20px;
+}
+
+.action-card--primary {
+  background:
+    radial-gradient(circle at top right, rgba(103, 194, 58, 0.08), transparent 26%),
+    rgba(255, 255, 255, 0.96);
+}
+
+.action-card--trust {
+  background:
+    radial-gradient(circle at top right, rgba(64, 158, 255, 0.08), transparent 26%),
+    rgba(255, 255, 255, 0.96);
+}
+
+.action-steps {
+  display: grid;
+  gap: 12px;
+}
+
+.action-step {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: #f7fbff;
+  border: 1px solid rgba(222, 232, 243, 0.92);
+}
+
+.step-index {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #67C23A, #95d475);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+}
+
+.step-content {
+  color: #49647f;
+  line-height: 1.8;
+  font-size: 14px;
+}
+
+.action-summary {
+  margin-top: 16px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  background: #f0f9eb;
+  border-left: 4px solid #67C23A;
+  color: #36546a;
+  line-height: 1.85;
+}
+
+.trust-list {
+  display: grid;
+  gap: 14px;
+}
+
+.trust-item {
+  padding: 16px;
+  border-radius: 18px;
+  background: #f7fbff;
+  border: 1px solid rgba(223, 232, 243, 0.92);
+}
+
+.trust-item span {
+  display: block;
+  margin-bottom: 8px;
+  color: #2563eb;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.trust-item p {
+  margin: 0;
+  color: #506980;
+  line-height: 1.8;
+  font-size: 14px;
 }
 
 @keyframes rotate {
   from {
     transform: rotate(0deg);
   }
-
   to {
     transform: rotate(360deg);
   }
 }
 
-// 顶部概览区
-.overview-section {
-  display: grid;
-  grid-template-columns: 2fr 1fr 1fr;
-  gap: 20px;
-  margin-bottom: 20px;
-
-  @media (max-width: 1200px) {
-    grid-template-columns: 1fr 1fr;
-
-    .main-info {
-      grid-column: 1 / -1;
-    }
+@media (max-width: 1400px) {
+  .dimension-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
 
-  @media (max-width: 768px) {
+@media (max-width: 1200px) {
+  .overview-section,
+  .analysis-layout,
+  .action-layout {
     grid-template-columns: 1fr;
+  }
 
-    .main-info {
-      grid-column: 1;
-    }
+  .score-panel {
+    width: 180px;
   }
 }
 
-.info-card {
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
-  padding: 20px;
-}
-
-// 主信息卡片
-.main-info {
-  .job-header {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    margin-bottom: 20px;
-    padding-bottom: 16px;
-    border-bottom: 1px solid #ebeef5;
-
-    .job-icon {
-      width: 56px;
-      height: 56px;
-      border-radius: 12px;
-      background: linear-gradient(135deg, #409EFF, #66b1ff);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #fff;
-    }
-
-    .job-title-section {
-      flex: 1;
-
-      .job-name {
-        font-size: 22px;
-        font-weight: 600;
-        color: #303133;
-        margin: 0 0 10px 0;
-      }
-
-      .job-tags {
-        display: flex;
-        gap: 8px;
-
-        .tag-icon {
-          margin-right: 2px;
-        }
-      }
-    }
+@media (max-width: 992px) {
+  .overview-main__head,
+  .module-head {
+    flex-direction: column;
   }
 
-  .basic-info-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
-
-    @media (max-width: 600px) {
-      grid-template-columns: repeat(2, 1fr);
-    }
-
-    .info-item {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      padding: 10px;
-      background: #f5f7fa;
-      border-radius: 8px;
-
-      .el-icon {
-        color: #409EFF;
-        font-size: 16px;
-      }
-
-      .info-label {
-        font-size: 12px;
-        color: #909399;
-      }
-
-      .info-value {
-        font-size: 14px;
-        color: #303133;
-        font-weight: 500;
-      }
-    }
+  .overview-grid,
+  .skill-grid,
+  .gap-cards-container {
+    grid-template-columns: 1fr;
   }
 }
 
-// 分数圆环卡片
-.score-ring-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+@media (max-width: 768px) {
+  .position-detail-container {
+    padding: 18px 14px 28px;
+  }
 
-  .score-ring-container {
-    position: relative;
+  .info-card,
+  .detail-card,
+  .chart-card,
+  .action-card {
+    padding: 20px 18px;
+    border-radius: 20px;
+  }
+
+  .detail-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .job-name {
+    font-size: 24px;
+  }
+
+  .score-panel {
+    width: 100%;
+    align-items: flex-start;
+  }
+
+  .score-ring {
     width: 140px;
     height: 140px;
-    margin-bottom: 16px;
-
-    .score-ring {
-      width: 100%;
-      height: 100%;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-
-      .score-inner {
-        width: 110px;
-        height: 110px;
-        background: #fff;
-        border-radius: 50%;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-
-        .score-num {
-          font-size: 36px;
-          font-weight: 700;
-          color: #303133;
-          line-height: 1;
-        }
-
-        .score-unit {
-          font-size: 14px;
-          color: #909399;
-        }
-      }
-    }
   }
 
-  .score-labels {
-    text-align: center;
-
-    .score-level {
-      font-size: 16px;
-      font-weight: 600;
-      margin-bottom: 4px;
-    }
-
-    .score-desc {
-      font-size: 13px;
-      color: #909399;
-    }
-  }
-}
-
-// 属性卡片
-.attributes-card {
-  .card-title {
-    font-size: 15px;
-    font-weight: 600;
-    color: #303133;
-    margin: 0 0 16px 0;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-
-    .el-icon {
-      color: #409EFF;
-    }
+  .score-ring__inner {
+    width: 106px;
+    height: 106px;
   }
 
-  .attributes-list {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-
-    .attr-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 8px 0;
-      border-bottom: 1px dashed #ebeef5;
-
-      &:last-child {
-        border-bottom: none;
-      }
-
-      .attr-label {
-        font-size: 13px;
-        color: #606266;
-      }
-
-      .attr-value {
-        font-size: 13px;
-        color: #303133;
-        font-weight: 500;
-        text-align: right;
-        max-width: 60%;
-      }
-    }
+  .score-ring__inner strong {
+    font-size: 34px;
   }
-}
 
-// 中间内容区
-.content-section {
-  display: grid;
-  grid-template-columns: 360px 1fr;
-  gap: 20px;
-
-  @media (max-width: 1100px) {
+  .radar-legend,
+  .compare-row,
+  .dimension-grid {
     grid-template-columns: 1fr;
   }
 }
 
-// 左侧面板
-.left-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.chart-card {
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
-  padding: 20px;
-
-  .chart-title {
-    font-size: 15px;
-    font-weight: 600;
-    color: #303133;
-    margin: 0 0 16px 0;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-
-    .el-icon {
-      color: #409EFF;
-    }
-  }
-
-  .radar-chart {
-    width: 100%;
-    height: 260px;
-  }
-
-  .radar-legend {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
-    margin-top: 12px;
-    padding-top: 12px;
-    border-top: 1px solid #ebeef5;
-
-    .legend-item {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 12px;
-
-      .legend-dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-      }
-
-      .legend-name {
-        color: #606266;
-      }
-
-      .legend-value {
-        font-weight: 500;
-        margin-left: auto;
-
-        &.high {
-          color: #67C23A;
-        }
-
-        &.medium {
-          color: #E6A23C;
-        }
-
-        &.low {
-          color: #909399;
-        }
-      }
-    }
-  }
-}
-
-// 右侧面板
-.right-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.detail-card {
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
-  padding: 20px;
-
-  .card-title {
-    font-size: 15px;
-    font-weight: 600;
-    color: #303133;
-    margin: 0 0 16px 0;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding-bottom: 12px;
-    border-bottom: 1px solid #ebeef5;
-
-    .el-icon {
-      color: #409EFF;
-    }
-  }
-}
-
-// 技能区域
-.skills-section {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-
-  .skill-block {
-    .skill-label {
-      font-size: 13px;
-      color: #909399;
-      margin-bottom: 8px;
-    }
-
-    .skill-tags {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-
-    .skill-tag-primary {
-      background: linear-gradient(135deg, #409EFF, #66b1ff) !important;
-      border: none !important;
-    }
-
-    .skill-text {
-      font-size: 14px;
-      color: #606266;
-    }
-
-    .skill-desc {
-      margin: 0;
-      font-size: 14px;
-      color: #606266;
-      line-height: 1.6;
-      padding: 12px;
-      background: #f5f7fa;
-      border-radius: 8px;
-    }
-  }
-}
-
-// 分析区域
-.analysis-section {
-  margin-bottom: 20px;
-
-  &:last-child {
-    margin-bottom: 0;
-  }
-
-  &.warning {
-
-    .analysis-text,
-    .missing-skills {
-      background: #fdf6ec;
-      border-left: 3px solid #E6A23C;
-    }
-  }
-
-  &.success {
-    .advice-text {
-      background: #f0f9eb;
-      border-left: 3px solid #67C23A;
-    }
-  }
-
-  .section-label {
-    font-size: 14px;
-    font-weight: 600;
-    color: #303133;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-bottom: 10px;
-  }
-
-  .analysis-text {
-    margin: 0;
-    font-size: 14px;
-    color: #606266;
-    line-height: 1.8;
-    padding: 14px;
-    background: #f5f7fa;
-    border-radius: 0 8px 8px 0;
-    border-left: 3px solid #409EFF;
-  }
-
-  .missing-skills {
-    padding: 14px;
-    background: #f5f7fa;
-    border-radius: 0 8px 8px 0;
-
-    .missing-item {
-      display: flex;
-      align-items: flex-start;
-      gap: 8px;
-      font-size: 13px;
-      color: #606266;
-      line-height: 1.6;
-      padding: 6px 0;
-
-      .el-icon {
-        flex-shrink: 0;
-        margin-top: 2px;
-      }
-    }
-  }
-
-  .advice-text {
-    margin: 0;
-    font-size: 14px;
-    color: #606266;
-    line-height: 1.8;
-    padding: 14px;
-    background: #f5f7fa;
-    border-radius: 0 8px 8px 0;
-  }
-}
-
-// 差距矩阵卡片式布局
-.gap-cards-container {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-
-  .gap-card {
-    background: #ffffff;
-    border: 1px solid #ebeef5;
-    border-radius: 10px;
-    padding: 16px;
-    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-
-    &:hover {
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-      border-color: #dcdfe6;
-      transform: translateY(-2px);
-    }
-
-    .gap-card-header {
-      margin-bottom: 12px;
-      display: flex;
-      align-items: center;
-
-      .dim-tag {
-        font-weight: 600;
-        font-size: 13px;
-        padding: 0 12px;
-      }
-    }
-
-    .gap-card-body {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-
-      // 左右对比区块（优化：强化左右协调与对比感）
-      .compare-row {
-        display: flex;
-        align-items: stretch; // 保证左右等高
-        border-radius: 8px;
-        border: 1px solid #ebeef5;
-        background: #fafbfc; // 整体底色
-        position: relative;
-        overflow: hidden;
-
-        @media (max-width: 600px) {
-          flex-direction: column; // 移动端自动转为上下布局
-        }
-
-        // 增加中间的 VS 对比徽章，提升左右联动感
-        &::after {
-          content: 'VS';
-          position: absolute;
-          left: 50%;
-          top: 50%;
-          transform: translate(-50%, -50%);
-          background: #fff;
-          color: #c0c4cc;
-          font-size: 12px;
-          font-weight: 900;
-          font-style: italic;
-          width: 26px;
-          height: 26px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          border-radius: 50%;
-          box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
-          border: 1px solid #ebeef5;
-          z-index: 2;
-
-          @media (max-width: 600px) {
-            display: none; // 移动端隐藏
-          }
-        }
-
-        .compare-item {
-          flex: 1; // 左右平分宽度
-          padding: 16px;
-          position: relative;
-
-          &.required {
-            background-color: #fdf6ec; // 柔和的橙色背景
-            border-right: 1px dashed #e4e7ed; // 中间虚线分割
-            
-            .item-label { color: #e6a23c; }
-            .item-value { color: #606266; }
-
-            @media (max-width: 600px) {
-              border-right: none;
-              border-bottom: 1px dashed #e4e7ed;
-            }
-          }
-
-          &.current {
-            background-color: #f0f9eb; // 柔和的绿色背景
-            
-            .item-label { color: #67c23a; }
-            .item-value { color: #606266; }
-          }
-
-          .item-label {
-            font-size: 13px;
-            font-weight: 600;
-            margin-bottom: 8px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-          }
-
-          .item-value {
-            font-size: 14px;
-            line-height: 1.6;
-          }
-        }
-      }
-
-      // 底部结论分析区块（优化：使其与卡片整体更搭配）
-      .analysis-box {
-        background: #ecf5ff; // 采用主题蓝，突出总结性
-        border-radius: 8px;
-        padding: 12px 16px;
-        border-left: 4px solid #409eff;
-
-        .box-label {
-          font-size: 13px;
-          color: #409eff;
-          font-weight: 600;
-          margin-bottom: 6px;
-        }
-
-        .box-value {
-          font-size: 13px;
-          color: #303133;
-          line-height: 1.6;
-        }
-      }
-    }
-  }
-}
-
-
-// 无数据状态
-.empty-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 80px 20px;
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
-
-  .empty-icon {
-    color: #dcdfe6;
-    margin-bottom: 16px;
-  }
-
-  h3 {
-    font-size: 18px;
-    color: #606266;
-    margin: 0 0 8px 0;
-  }
-
-  p {
-    color: #909399;
-    margin: 0 0 24px 0;
-  }
-}
-
-// 滚动条样式
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
