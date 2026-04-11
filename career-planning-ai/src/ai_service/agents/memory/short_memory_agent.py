@@ -10,15 +10,13 @@
 注意：Redis 键使用 (user_id, session_id) 组合，支持不同用户有相同 session_id
 """
 from datetime import datetime
-from typing import Optional, TYPE_CHECKING
+from typing import Optional
 
 from langchain_core.messages import BaseMessage
 
-from ai_service.models.memory import Message
 from ai_service.agents import log as logger
-
-if TYPE_CHECKING:
-    from ai_service.agents.memory.memory_compression_agent import MemoryCompressionAgent
+from ai_service.agents.memory.memory_compression_agent import MemoryCompressionAgent
+from ai_service.models.memory import Message
 from ai_service.services.redis_service import RedisService
 from config import settings
 
@@ -53,8 +51,9 @@ class ShortMemoryAgent:
             redis_prefix: Redis 键前缀
             compression_agent: 对话压缩智能体实例
         """
-        from ai_service.agents.memory.memory_compression_agent import MemoryCompressionAgent
         self.redis = RedisService.get_instance(prefix=redis_prefix)
+        if not self.redis.is_available:
+            raise ValueError("Redis 服务不可用，请检查配置")
         self.compression_agent = compression_agent or MemoryCompressionAgent()
         logger.info(f"ShortMemoryAgent 初始化完成，Redis可用: {self.redis.is_available}")
 
