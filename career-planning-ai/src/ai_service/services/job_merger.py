@@ -14,7 +14,7 @@ from ai_service.services.database_manage import get_db_url
 from ai_service.services.job_profile_builder import analyze_job_description
 from ai_service.utils.HDBSCAN import cluster_standard_jobs_with_hdbscan
 from ai_service.utils.logger_handler import log
-from ai_service.utils.vector_store.job_vector_store import JobVectorStore
+from ai_service.utils.vector_store.job_vector_store import store
 
 router = APIRouter()
 
@@ -25,7 +25,6 @@ AsyncSessionLocal = async_sessionmaker(
     expire_on_commit=False,
     class_=AsyncSession,
 )
-store = JobVectorStore()
 
 
 async def _analyze_cluster_with_semaphore(
