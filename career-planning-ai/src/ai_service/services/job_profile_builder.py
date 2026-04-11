@@ -3,13 +3,17 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
+import os
 import random
-from typing import List, Optional, Dict, Any, Type, TypeVar
+import traceback
+from dataclasses import dataclass, field
+from typing import Any, AsyncIterable, Dict, Generic, List, Optional, Type, TypeVar
 
+import instructor
+import litellm
 from pydantic import BaseModel, SecretStr
 
-from ai_service.engine.ai_engine import AIEngine, InputStep
-from ai_service.models.job_info import JobInfo
 from ai_service.models.struct_job_txt import (
     JDAnalysisResult,
     Profiles,
@@ -19,10 +23,15 @@ from ai_service.models.struct_job_txt import (
     DevelopmentPotential,
     JobAttributes,
 )
-from ai_service.services import log
-from config import _LLMModelBase, settings
 
 __all__ = [
+    "JobProfileAIEngine",
+    "BaseStep",
+    "InputStep",
+    "TuneStep",
+    "ShapeStep",
+    "StructActionStep",
+    "TextActionStep",
     "JobProfileBuilder",
     "analyze_job_description",
     "analyze_job_profiles",
@@ -30,8 +39,234 @@ __all__ = [
 
 T = TypeVar("T", bound=BaseModel)
 
+litellm.drop_params = True
+log = logging.getLogger(__name__)
+
+
 # ==========================================
-# 1. 定义 Prompt 模板
+# 0. 运行时模型配置（不依赖 config 顶层导入）
+# ==========================================
+@dataclass
+class RuntimeLLMModelConfig:
+    model_name: str
+    api_key: Optional[str] = None
+    api_base: Optional[str] = None
+    extra: Dict[str, Any] = field(default_factory=dict)
+
+
+def _unwrap_secret(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+    if isinstance(value, SecretStr):
+        return value.get_secret_value()
+    getter = getattr(value, "get_secret_value", None)
+    if callable(getter):
+        try:
+            return getter()
+        except Exception:
+            return str(value)
+    return str(value)
+
+
+def _safe_get_settings() -> Any:
+    """
+    延迟获取 settings。
+    若 config.py 在导入时会触发 ValidationError，这里直接吞掉并返回 None，
+    避免 import job_profile_builder.py 时就立刻崩溃。
+    """
+    try:
+        import config as config_module
+        return getattr(config_module, "settings", None)
+    except Exception as e:
+        log.warning("延迟加载 config.settings 失败，将改用显式参数 / 环境变量。错误: %s", e)
+        return None
+
+
+def _normalize_model_name(target_model_name: str) -> str:
+    if "/" in target_model_name:
+        return target_model_name
+
+    provider_map = {
+        "qwen": "dashscope",
+        "deepseek": "deepseek",
+        "gpt-4": "openai",
+        "gpt-3.5": "openai",
+        "claude": "anthropic",
+        "gemini": "gemini",
+    }
+    lower_name = target_model_name.lower()
+    for prefix, provider in provider_map.items():
+        if lower_name.startswith(prefix):
+            return f"{provider}/{target_model_name}"
+    return target_model_name
+
+
+def _resolve_default_model_name() -> str:
+    settings = _safe_get_settings()
+    if settings is not None:
+        try:
+            model_name = getattr(getattr(settings, "vector", None), "llm_long_model_name", None)
+            if isinstance(model_name, str) and model_name.strip():
+                return _normalize_model_name(model_name)
+
+            llm_long_model = getattr(getattr(settings, "llm", None), "llm_long_model_name", None)
+            model_name = getattr(llm_long_model, "model_name", None)
+            if isinstance(model_name, str) and model_name.strip():
+                return _normalize_model_name(model_name)
+        except Exception as e:
+            log.warning("从 settings 获取默认 model_name 失败，将继续尝试环境变量。错误: %s", e)
+
+    env_model = (
+        os.getenv("LLM_MODEL_NAME")
+        or os.getenv("OPENAI_MODEL")
+        or os.getenv("DASHSCOPE_MODEL")
+        or os.getenv("MODEL_NAME")
+    )
+    if env_model:
+        return _normalize_model_name(env_model)
+
+    return "dashscope/qwen-plus-latest"
+
+
+def _resolve_default_api_key() -> Optional[str]:
+    settings = _safe_get_settings()
+    if settings is not None:
+        try:
+            llm = getattr(settings, "llm", None)
+            if llm is not None:
+                for attr_name in ("api_key", "llm_api_key"):
+                    value = getattr(llm, attr_name, None)
+                    unwrapped = _unwrap_secret(value)
+                    if unwrapped:
+                        return unwrapped
+        except Exception as e:
+            log.warning("从 settings 获取默认 api_key 失败，将继续尝试环境变量。错误: %s", e)
+
+    for env_name in (
+        "OPENAI_API_KEY",
+        "DASHSCOPE_API_KEY",
+        "DEEPSEEK_API_KEY",
+        "ANTHROPIC_API_KEY",
+        "GEMINI_API_KEY",
+        "LLM_API_KEY",
+    ):
+        value = os.getenv(env_name)
+        if value:
+            return value
+
+    return None
+
+
+def _resolve_default_api_base() -> Optional[str]:
+    settings = _safe_get_settings()
+    if settings is not None:
+        try:
+            llm = getattr(settings, "llm", None)
+            if llm is not None:
+                for attr_name in ("base_url", "api_base"):
+                    value = getattr(llm, attr_name, None)
+                    if value:
+                        return str(value)
+
+                llm_long_model = getattr(llm, "llm_long_model_name", None)
+                api_base = getattr(llm_long_model, "api_base", None)
+                if api_base:
+                    return str(api_base)
+        except Exception as e:
+            log.warning("从 settings 获取默认 api_base 失败，将继续尝试环境变量。错误: %s", e)
+
+    return os.getenv("OPENAI_BASE_URL") or os.getenv("LLM_API_BASE") or os.getenv("API_BASE")
+
+
+def _coerce_model_config(
+    model: Any,
+    fallback_api_key: Optional[str] = None,
+    fallback_api_base: Optional[str] = None,
+) -> RuntimeLLMModelConfig:
+    """
+    把外部传入的 model（可能是 dict / Pydantic 模型 / 自定义配置对象）
+    统一转成 RuntimeLLMModelConfig。
+    """
+    if isinstance(model, RuntimeLLMModelConfig):
+        return model
+
+    if model is None:
+        raise ValueError("model 不能为空")
+
+    if isinstance(model, str):
+        return RuntimeLLMModelConfig(
+            model_name=_normalize_model_name(model),
+            api_key=fallback_api_key or _resolve_default_api_key(),
+            api_base=fallback_api_base or _resolve_default_api_base(),
+        )
+
+    if isinstance(model, dict):
+        model_name = model.get("model_name") or model.get("model")
+        if not model_name:
+            raise ValueError("model 配置中缺少 model_name/model 字段")
+
+        api_key = _unwrap_secret(model.get("api_key")) or fallback_api_key or _resolve_default_api_key()
+        api_base = model.get("api_base") or model.get("base_url") or fallback_api_base or _resolve_default_api_base()
+
+        extra = {
+            k: v for k, v in model.items()
+            if k not in {"model_name", "model", "api_key", "api_base", "base_url"}
+        }
+        return RuntimeLLMModelConfig(
+            model_name=_normalize_model_name(str(model_name)),
+            api_key=api_key,
+            api_base=api_base,
+            extra=extra,
+        )
+
+    model_name = getattr(model, "model_name", None) or getattr(model, "model", None)
+    if not model_name:
+        raise ValueError(f"无法从 model 对象中提取 model_name，收到类型: {type(model).__name__}")
+
+    api_key = (
+        _unwrap_secret(getattr(model, "api_key", None))
+        or fallback_api_key
+        or _resolve_default_api_key()
+    )
+    api_base = (
+        getattr(model, "api_base", None)
+        or getattr(model, "base_url", None)
+        or fallback_api_base
+        or _resolve_default_api_base()
+    )
+
+    extra: Dict[str, Any] = {}
+    for key in ("timeout", "max_tokens", "top_p", "frequency_penalty", "presence_penalty"):
+        value = getattr(model, key, None)
+        if value is not None:
+            extra[key] = value
+
+    return RuntimeLLMModelConfig(
+        model_name=_normalize_model_name(str(model_name)),
+        api_key=api_key,
+        api_base=str(api_base) if api_base else None,
+        extra=extra,
+    )
+
+
+def _create_model_config_from_name(
+    target_model_name: str,
+    api_key: Optional[str] = None,
+    api_base: Optional[str] = None,
+) -> RuntimeLLMModelConfig:
+    """
+    根据模型名称字符串动态创建运行时模型配置对象。
+    不在模块顶层导入 config，彻底避免 import 即触发 Settings 校验。
+    """
+    return RuntimeLLMModelConfig(
+        model_name=_normalize_model_name(target_model_name),
+        api_key=api_key or _resolve_default_api_key(),
+        api_base=api_base or _resolve_default_api_base(),
+    )
+
+
+# ==========================================
+# 1. Prompt 模板
 # ==========================================
 SYSTEM_PROMPT = """
 你是一位拥有 10 年经验的资深人力资源专家、组织架构分析师，以及职业图谱构建师，擅长岗位价值评估、胜任力模型搭建、组织人效提升和职位数据标准化。
@@ -250,51 +485,9 @@ PROFILE_SYSTEM_PROMPT = (
     + PROFILE_TEMPLATE_JSON
 )
 
-# ==========================================
-# 2. 模型配置辅助函数
-# ==========================================
-def _create_model_config_from_name(
-    target_model_name: str,
-    api_key: Optional[str] = None,
-    api_base: Optional[str] = None,
-) -> _LLMModelBase:
-    """
-    根据模型名称字符串动态创建 _LLMModelBase 配置对象
-    使用 Pydantic model_copy 避免类作用域冲突
-    """
-    if "/" not in target_model_name:
-        provider_map = {
-            "qwen": "dashscope",
-            "deepseek": "deepseek",
-            "gpt-4": "openai",
-            "gpt-3.5": "openai",
-            "claude": "anthropic",
-            "gemini": "gemini",
-        }
-        for prefix, provider in provider_map.items():
-            if target_model_name.lower().startswith(prefix):
-                target_model_name = f"{provider}/{target_model_name}"
-                break
-
-    default_config = settings.lite_llm.qwen
-
-    update_fields: Dict[str, Any] = {"model_name": target_model_name}
-
-    if api_key:
-        update_fields["api_key"] = SecretStr(api_key)
-    else:
-        update_fields["api_key"] = default_config.api_key
-
-    if api_base:
-        update_fields["api_base"] = api_base
-    elif getattr(default_config, "api_base", None):
-        update_fields["api_base"] = default_config.api_base
-
-    return default_config.model_copy(update=update_fields)
-
 
 # ==========================================
-# 3. 结果修正与输入构建辅助函数
+# 2. 结果修正与输入构建辅助函数
 # ==========================================
 def fix_llm_json_keys(data: dict) -> dict:
     """
@@ -306,13 +499,11 @@ def fix_llm_json_keys(data: dict) -> dict:
     if "profiles" in data and isinstance(data["profiles"], dict):
         profiles = data["profiles"]
 
-        # 修复 "行业 Domain 知识" -> "行业_Domain_知识"
         if "职业技能" in profiles and isinstance(profiles["职业技能"], dict):
             skills = profiles["职业技能"]
             if "行业 Domain 知识" in skills and "行业_Domain_知识" not in skills:
                 skills["行业_Domain_知识"] = skills.pop("行业 Domain 知识")
 
-        # 将空数组兜底为 ["未提及"]
         array_field_mapping = {
             "基础要求": ["证书要求"],
             "职业技能": ["核心专业技能", "工具与平台能力", "语言能力"],
@@ -321,14 +512,14 @@ def fix_llm_json_keys(data: dict) -> dict:
 
         for parent, fields in array_field_mapping.items():
             if parent in profiles and isinstance(profiles[parent], dict):
-                for field in fields:
-                    if field in profiles[parent] and profiles[parent][field] == []:
-                        profiles[parent][field] = ["未提及"]
+                for field_name in fields:
+                    if field_name in profiles[parent] and profiles[parent][field_name] == []:
+                        profiles[parent][field_name] = ["未提及"]
 
     return data
 
 
-def _build_jd_text(jobs: List[JobInfo]) -> str:
+def _build_jd_text(jobs: List[Any]) -> str:
     """
     构建发送给 LLM 的 JD 文本
     """
@@ -351,8 +542,281 @@ def _build_jd_text(jobs: List[JobInfo]) -> str:
 
 
 # ==========================================
+# 3. 轻量级本地 AIEngine（不依赖外部 ai_engine.py）
+# ==========================================
+@dataclass
+class _PipelineState:
+    model: RuntimeLLMModelConfig
+    model_fallbacks: List[RuntimeLLMModelConfig] = field(default_factory=list)
+    system_role: Optional[str] = None
+    instructions: List[str] = field(default_factory=list)
+    user_texts: List[str] = field(default_factory=list)
+    history: List[Dict[str, Any]] = field(default_factory=list)
+    llm_params: Dict[str, Any] = field(default_factory=dict)
+
+    def clone(self) -> "_PipelineState":
+        return _PipelineState(
+            model=self.model,
+            model_fallbacks=list(self.model_fallbacks),
+            system_role=self.system_role,
+            instructions=list(self.instructions),
+            user_texts=list(self.user_texts),
+            history=[dict(item) for item in self.history],
+            llm_params=dict(self.llm_params),
+        )
+
+    def compile_messages(self) -> List[Dict[str, Any]]:
+        messages: List[Dict[str, Any]] = []
+
+        if self.system_role:
+            messages.append({"role": "system", "content": self.system_role})
+
+        for item in self.history:
+            role = item.get("role", "user")
+            content = item.get("content", "")
+            if content:
+                messages.append({"role": role, "content": content})
+
+        user_blocks: List[str] = []
+        if self.instructions:
+            user_blocks.append("任务要求：\n" + "\n".join(self.instructions))
+        if self.user_texts:
+            user_blocks.append("\n\n".join(self.user_texts))
+
+        if user_blocks:
+            messages.append({"role": "user", "content": "\n\n".join(user_blocks)})
+
+        return messages
+
+    def to_litellm_params(self, model_cfg: RuntimeLLMModelConfig) -> Dict[str, Any]:
+        params: Dict[str, Any] = {
+            "model": model_cfg.model_name,
+            **self.llm_params,
+        }
+
+        if model_cfg.api_key:
+            params["api_key"] = model_cfg.api_key
+        if model_cfg.api_base:
+            params["api_base"] = model_cfg.api_base
+
+        if model_cfg.extra:
+            for key, value in model_cfg.extra.items():
+                if value is not None and key not in params:
+                    params[key] = value
+
+        return params
+
+
+class BaseStep:
+    def __init__(self, state: _PipelineState, engine: "JobProfileAIEngine") -> None:
+        self._state = state
+        self._engine = engine
+
+    def _clone_state(self) -> _PipelineState:
+        return self._state.clone()
+
+    def _ensure_has_input(self) -> None:
+        has_input = bool(self._state.instructions or self._state.user_texts or self._state.history)
+        if not has_input:
+            raise ValueError("必须至少注入 指令、文本 或 历史记录 中的一项")
+
+
+class StructActionStep(Generic[T], BaseStep):
+    def __init__(self, state: _PipelineState, engine: "JobProfileAIEngine", schema: Type[T]) -> None:
+        super().__init__(state, engine)
+        self.schema = schema
+
+    async def do(self) -> T:
+        messages = self._state.compile_messages()
+        if not messages:
+            raise ValueError("没有可发送给 LLM 的消息内容")
+
+        candidates = [self._state.model, *self._state.model_fallbacks]
+        last_error: Optional[Exception] = None
+
+        for idx, model_cfg in enumerate(candidates, start=1):
+            try:
+                kwargs = self._state.to_litellm_params(model_cfg)
+                kwargs["messages"] = messages
+                kwargs["response_model"] = self.schema
+
+                log.info(
+                    "[结构化提取] 开始执行 | 第 %s 个模型 | model=%s | schema=%s",
+                    idx,
+                    model_cfg.model_name,
+                    self.schema.__name__,
+                )
+
+                result = await self._engine.struct_client.chat.completions.create(**kwargs)
+                log.info("[结构化提取] 执行成功 | model=%s | schema=%s", model_cfg.model_name, self.schema.__name__)
+                return result
+            except Exception as e:
+                last_error = e
+                log.warning(
+                    "[结构化提取] 模型调用失败，尝试下一个候选 | model=%s | schema=%s | error=%s",
+                    model_cfg.model_name,
+                    self.schema.__name__,
+                    e,
+                )
+
+        raise RuntimeError(f"结构化提取失败，所有模型均调用失败。最后错误: {last_error}")
+
+
+class TextActionStep(BaseStep):
+    async def do(self) -> str:
+        messages = self._state.compile_messages()
+        if not messages:
+            raise ValueError("没有可发送给 LLM 的消息内容")
+
+        candidates = [self._state.model, *self._state.model_fallbacks]
+        last_error: Optional[Exception] = None
+
+        for idx, model_cfg in enumerate(candidates, start=1):
+            try:
+                kwargs = self._state.to_litellm_params(model_cfg)
+                kwargs["messages"] = messages
+
+                log.info("[文本生成] 开始执行 | 第 %s 个模型 | model=%s", idx, model_cfg.model_name)
+                response = await self._engine.text_client(**kwargs)
+                content = response.choices[0].message.content
+                result = content if content else "没有返回任何内容。"
+                log.info("[文本生成] 执行成功 | model=%s", model_cfg.model_name)
+                return result
+            except Exception as e:
+                last_error = e
+                log.warning("[文本生成] 模型调用失败，尝试下一个候选 | model=%s | error=%s", model_cfg.model_name, e)
+
+        raise RuntimeError(f"文本生成失败，所有模型均调用失败。最后错误: {last_error}")
+
+    async def stream(self) -> AsyncIterable[str]:
+        messages = self._state.compile_messages()
+        if not messages:
+            raise ValueError("没有可发送给 LLM 的消息内容")
+
+        candidates = [self._state.model, *self._state.model_fallbacks]
+        last_error: Optional[Exception] = None
+
+        for idx, model_cfg in enumerate(candidates, start=1):
+            try:
+                kwargs = self._state.to_litellm_params(model_cfg)
+                kwargs["messages"] = messages
+                kwargs["stream"] = True
+
+                log.info("[流式生成] 开始执行 | 第 %s 个模型 | model=%s", idx, model_cfg.model_name)
+                response = await self._engine.text_client(**kwargs)
+
+                async for chunk in response:
+                    content = chunk.choices[0].delta.content
+                    if content:
+                        yield content
+
+                log.info("[流式生成] 执行成功 | model=%s", model_cfg.model_name)
+                return
+            except Exception as e:
+                last_error = e
+                log.warning("[流式生成] 模型调用失败，尝试下一个候选 | model=%s | error=%s", model_cfg.model_name, e)
+
+        raise RuntimeError(f"流式生成失败，所有模型均调用失败。最后错误: {last_error}")
+
+
+class InputStep(BaseStep):
+    """
+    统一链式入口：
+    支持直接写成：
+    llm.set_system_role(...).add_text(...).set_llm_params(...).into_struct(...).do()
+    """
+
+    def set_system_role(self, role: str) -> "InputStep":
+        state = self._clone_state()
+        state.system_role = role
+        return InputStep(state, self._engine)
+
+    def add_instruction(self, task: str) -> "InputStep":
+        state = self._clone_state()
+        state.instructions.append(task)
+        return InputStep(state, self._engine)
+
+    def add_text(self, text: str) -> "InputStep":
+        state = self._clone_state()
+        state.user_texts.append(text)
+        return InputStep(state, self._engine)
+
+    def set_history(self, history: List[Dict[str, Any]]) -> "InputStep":
+        state = self._clone_state()
+        state.history = list(history)
+        return InputStep(state, self._engine)
+
+    def add_history_message(self, role: str, content: str) -> "InputStep":
+        state = self._clone_state()
+        state.history.append({"role": role, "content": content})
+        return InputStep(state, self._engine)
+
+    def set_llm_params(self, **params: Any) -> "InputStep":
+        state = self._clone_state()
+        state.llm_params.update(params)
+        return InputStep(state, self._engine)
+
+    def into_struct(self, schema: Type[T]) -> StructActionStep[T]:
+        self._ensure_has_input()
+        state = self._clone_state()
+        state.llm_params.setdefault("temperature", 0.1)
+        return StructActionStep(state, self._engine, schema)
+
+    def into_text(self) -> TextActionStep:
+        self._ensure_has_input()
+        return TextActionStep(self._state, self._engine)
+
+    def next_step(self) -> "InputStep":
+        """
+        为兼容旧代码保留，但现在不是必须的。
+        """
+        self._ensure_has_input()
+        return self
+
+
+class TuneStep(InputStep):
+    """
+    兼容旧导出名保留。
+    """
+    pass
+
+
+class ShapeStep(InputStep):
+    """
+    兼容旧导出名保留。
+    """
+    pass
+
+
+class JobProfileAIEngine:
+    """
+    岗位画像专用轻量 AI 引擎。
+    保留链式调用能力，但外部调用已简化为：
+    llm.set_system_role(...).add_text(...).set_llm_params(...).into_struct(...).do()
+    """
+    _converter = instructor.from_litellm(litellm.acompletion, mode=instructor.Mode.MD_JSON)
+
+    def __init__(self) -> None:
+        self.struct_client = self._converter
+        self.text_client = litellm.acompletion
+
+    def pick_brain(
+        self,
+        model: Any,
+        model_fallbacks: Optional[List[Any]] = None,
+    ) -> InputStep:
+        main_model = _coerce_model_config(model)
+        fallback_models = [_coerce_model_config(item) for item in (model_fallbacks or [])]
+
+        state = _PipelineState(
+            model=main_model,
+            model_fallbacks=fallback_models,
+        )
+        return InputStep(state, self)
+
+
+# ==========================================
 # 4. JobProfileBuilder
-#    让 job_profile_builder 也拥有和 AIEngine 一样的链式入口
 # ==========================================
 class JobProfileBuilder:
     """
@@ -360,44 +824,39 @@ class JobProfileBuilder:
 
     设计目标：
     1. 对外语义聚焦“岗位画像构建”
-    2. 对内完全复用 AIEngine 的链式分段调用能力
+    2. 对内提供链式分段调用能力
     3. 支持两种用法：
-       - 手动链式调用：builder.pick_brain(...).set_system_role(...).add_text(...).next_step()...
-       - 直接业务调用：await builder.build_jd_result(...), await builder.build_profiles(...)
+       - 手动链式调用：
+         builder.pick_brain(...).set_system_role(...).add_text(...).into_struct(...).do()
+       - 直接业务调用：
+         await builder.build_jd_result(...), await builder.build_profiles(...)
     """
 
     def __init__(
         self,
         system_prompt: str = FULL_SYSTEM_PROMPT,
         instruction_prompt: str = USER_PROMPT,
-        engine: Optional[AIEngine] = None,
+        engine: Optional[JobProfileAIEngine] = None,
     ) -> None:
         self.system_prompt = system_prompt
         self.instruction_prompt = instruction_prompt
-        self._engine = engine or AIEngine()
+        self._engine = engine or JobProfileAIEngine()
 
     def pick_brain(
         self,
-        model: _LLMModelBase,
-        model_fallbacks: Optional[List[_LLMModelBase]] = None,
+        model: Any,
+        model_fallbacks: Optional[List[Any]] = None,
     ) -> InputStep:
-        """
-        与 AIEngine 保持一致的入口
-        """
         return self._engine.pick_brain(model, model_fallbacks)
 
     def from_text(
         self,
         text: str,
-        model: _LLMModelBase,
-        model_fallbacks: Optional[List[_LLMModelBase]] = None,
+        model: Any,
+        model_fallbacks: Optional[List[Any]] = None,
         system_prompt: Optional[str] = None,
         instruction_prompt: Optional[str] = None,
     ) -> InputStep:
-        """
-        预填充岗位画像场景的链式起点
-        返回的仍然是 InputStep，后续链式调用和 AIEngine 完全一致
-        """
         if not text or not text.strip():
             raise ValueError("text 不能为空")
 
@@ -413,15 +872,12 @@ class JobProfileBuilder:
 
     def from_jobs(
         self,
-        jobs: List[JobInfo],
-        model: _LLMModelBase,
-        model_fallbacks: Optional[List[_LLMModelBase]] = None,
+        jobs: List[Any],
+        model: Any,
+        model_fallbacks: Optional[List[Any]] = None,
         system_prompt: Optional[str] = None,
         instruction_prompt: Optional[str] = None,
     ) -> InputStep:
-        """
-        直接从 JobInfo 列表构建链式起点
-        """
         jd_text = _build_jd_text(jobs)
         return self.from_text(
             text=jd_text,
@@ -435,45 +891,58 @@ class JobProfileBuilder:
         self,
         *,
         schema: Type[T],
-        jobs: Optional[List[JobInfo]] = None,
+        jobs: Optional[List[Any]] = None,
         text: Optional[str] = None,
         api_key: Optional[str] = None,
-        model_name: str = settings.vector.llm_long_model_name,
+        model_name: Optional[str] = None,
+        api_base: Optional[str] = None,
         temperature: float = 0.1,
         max_retries: int = 3,
-        model_fallbacks: Optional[List[_LLMModelBase]] = None,
+        model_fallbacks: Optional[List[Any]] = None,
         system_prompt: Optional[str] = None,
         instruction_prompt: Optional[str] = None,
     ) -> T:
-        """
-        通用结构化构建入口
-        可输出 Profiles / JDAnalysisResult / 其他 BaseModel
-        """
         if not text and not jobs:
             raise ValueError("text 和 jobs 至少传一个")
 
         payload_text = text if text else _build_jd_text(jobs or [])
 
-        if api_key is None:
-            api_key = settings.lite_llm.qwen.api_key.get_secret_value()
+        resolved_model_name = model_name or _resolve_default_model_name()
+        resolved_api_key = api_key or _resolve_default_api_key()
+        resolved_api_base = api_base or _resolve_default_api_base()
 
-        model_config = _create_model_config_from_name(model_name, api_key)
+        if not resolved_api_key:
+            raise ValueError(
+                "未能获取可用的 api_key。"
+                "请显式传入 api_key，或修复 config/settings 配置，或设置环境变量（如 DASHSCOPE_API_KEY / OPENAI_API_KEY）。"
+            )
+
+        model_config = _create_model_config_from_name(
+            target_model_name=resolved_model_name,
+            api_key=resolved_api_key,
+            api_base=resolved_api_base,
+        )
+
+        normalized_fallbacks = None
+        if model_fallbacks:
+            normalized_fallbacks = [
+                _coerce_model_config(item, fallback_api_key=resolved_api_key, fallback_api_base=resolved_api_base)
+                for item in model_fallbacks
+            ]
 
         for attempt in range(max_retries):
             try:
                 pipeline = self.from_text(
                     text=payload_text,
                     model=model_config,
-                    model_fallbacks=model_fallbacks,
+                    model_fallbacks=normalized_fallbacks,
                     system_prompt=system_prompt,
                     instruction_prompt=instruction_prompt,
                 )
 
                 result = await (
                     pipeline
-                    .next_step()
                     .set_llm_params(temperature=temperature)
-                    .next_step()
                     .into_struct(schema)
                     .do()
                 )
@@ -481,21 +950,27 @@ class JobProfileBuilder:
                 if result is None:
                     raise ValueError("LLM 返回为空")
 
-                log.info(f"岗位画像构建成功 | schema={schema.__name__}")
+                log.info("岗位画像构建成功 | schema=%s", schema.__name__)
                 return result
 
             except Exception as e:
                 if attempt >= max_retries - 1:
                     log.error(
-                        f"岗位画像构建失败（重试耗尽）| schema={schema.__name__} | error={e}",
+                        "岗位画像构建失败（重试耗尽）| schema=%s | error=%s",
+                        schema.__name__,
+                        e,
                         exc_info=True,
                     )
                     raise
 
                 wait_time = (attempt + 1) * 2 + random.uniform(0, 1)
                 log.warning(
-                    f"岗位画像构建失败，{wait_time:.2f} 秒后重试 "
-                    f"({attempt + 1}/{max_retries}) | schema={schema.__name__} | error={e}"
+                    "岗位画像构建失败，%.2f 秒后重试 (%s/%s) | schema=%s | error=%s",
+                    wait_time,
+                    attempt + 1,
+                    max_retries,
+                    schema.__name__,
+                    e,
                 )
                 await asyncio.sleep(wait_time)
 
@@ -504,23 +979,22 @@ class JobProfileBuilder:
     async def build_jd_result(
         self,
         *,
-        jobs: Optional[List[JobInfo]] = None,
+        jobs: Optional[List[Any]] = None,
         text: Optional[str] = None,
         api_key: Optional[str] = None,
-        model_name: str = settings.vector.llm_long_model_name,
+        model_name: Optional[str] = None,
+        api_base: Optional[str] = None,
         temperature: float = 0.1,
         max_retries: int = 3,
-        model_fallbacks: Optional[List[_LLMModelBase]] = None,
+        model_fallbacks: Optional[List[Any]] = None,
     ) -> JDAnalysisResult:
-        """
-        输出完整的 JDAnalysisResult
-        """
         result = await self.build_struct(
             schema=JDAnalysisResult,
             jobs=jobs,
             text=text,
             api_key=api_key,
             model_name=model_name,
+            api_base=api_base,
             temperature=temperature,
             max_retries=max_retries,
             model_fallbacks=model_fallbacks,
@@ -538,23 +1012,22 @@ class JobProfileBuilder:
     async def build_profiles(
         self,
         *,
-        jobs: Optional[List[JobInfo]] = None,
+        jobs: Optional[List[Any]] = None,
         text: Optional[str] = None,
         api_key: Optional[str] = None,
-        model_name: str = settings.vector.llm_long_model_name,
+        model_name: Optional[str] = None,
+        api_base: Optional[str] = None,
         temperature: float = 0.1,
         max_retries: int = 3,
-        model_fallbacks: Optional[List[_LLMModelBase]] = None,
+        model_fallbacks: Optional[List[Any]] = None,
     ) -> Profiles:
-        """
-        只输出 Profiles
-        """
         result = await self.build_struct(
             schema=Profiles,
             jobs=jobs,
             text=text,
             api_key=api_key,
             model_name=model_name,
+            api_base=api_base,
             temperature=temperature,
             max_retries=max_retries,
             model_fallbacks=model_fallbacks,
@@ -570,9 +1043,10 @@ class JobProfileBuilder:
 # 5. 对外兼容函数
 # ==========================================
 async def analyze_job_description(
-    jobs: List[JobInfo],
+    jobs: List[Any],
     api_key: Optional[str] = None,
-    model_name: str = settings.vector.llm_long_model_name,
+    model_name: Optional[str] = None,
+    api_base: Optional[str] = None,
 ) -> dict:
     """
     兼容旧调用方式：返回完整 JDAnalysisResult 的 dict
@@ -582,14 +1056,16 @@ async def analyze_job_description(
         jobs=jobs,
         api_key=api_key,
         model_name=model_name,
+        api_base=api_base,
     )
     return json.loads(result.model_dump_json(by_alias=True))
 
 
 async def analyze_job_profiles(
-    jobs: List[JobInfo],
+    jobs: List[Any],
     api_key: Optional[str] = None,
-    model_name: str = settings.vector.llm_long_model_name,
+    model_name: Optional[str] = None,
+    api_base: Optional[str] = None,
 ) -> dict:
     """
     返回纯 Profiles 的 dict
@@ -599,6 +1075,7 @@ async def analyze_job_profiles(
         jobs=jobs,
         api_key=api_key,
         model_name=model_name,
+        api_base=api_base,
     )
     return json.loads(result.model_dump_json(by_alias=True))
 
@@ -607,6 +1084,11 @@ async def analyze_job_profiles(
 # 6. 测试入口
 # ==========================================
 if __name__ == "__main__":
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s - %(message)s"
+    )
+
     async def main() -> None:
         sample_text = """
 ID: 1
@@ -619,21 +1101,19 @@ ID: 1
         builder = JobProfileBuilder()
 
         model_config = _create_model_config_from_name(
-            settings.vector.llm_long_model_name,
-            settings.lite_llm.qwen.api_key.get_secret_value(),
+            target_model_name=_resolve_default_model_name(),
+            api_key=_resolve_default_api_key(),
+            api_base=_resolve_default_api_base(),
         )
 
-        # 方式1：完全按 AIEngine 风格手动链式调用
-        llm = builder.pick_brain(model_config)
         try:
             result1 = await (
-                llm
+                builder
+                .pick_brain(model_config)
                 .set_system_role(PROFILE_SYSTEM_PROMPT)
                 .add_instruction("请提取岗位画像主体，只返回 Profiles 对象")
                 .add_text(sample_text)
-                .next_step()
                 .set_llm_params(temperature=0.1)
-                .next_step()
                 .into_struct(Profiles)
                 .do()
             )
@@ -642,12 +1122,8 @@ ID: 1
             print("异常内容:", repr(e))
             traceback.print_exc()
             raise
+
         print("=== result1: Profiles ===")
         print(result1.model_dump_json(by_alias=True, indent=2))
-
-        # 方式2：直接使用封装好的业务入口
-        result2 = await builder.build_jd_result(text=sample_text)
-        print("=== result2: JDAnalysisResult ===")
-        print(result2.model_dump_json(by_alias=True, indent=2))
 
     asyncio.run(main())
