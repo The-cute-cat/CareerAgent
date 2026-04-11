@@ -7,9 +7,14 @@ import {
   Paperclip,
   Delete,
   FullScreen,
-  Minus,
   CopyDocument,
-  Sunny,
+  MoreFilled,
+  Document,
+  Picture,
+  Files,
+  Loading,
+  CircleCheckFilled,
+  WarningFilled,
 } from '@element-plus/icons-vue'
 import VueMarkdown from 'vue-markdown-render'
 import { ElMessage } from 'element-plus'
@@ -38,6 +43,51 @@ interface ChatConfig {
   layoutStorageKey?: string
 }
 
+type MessageRole = 'user' | 'assistant'
+type ResizeDirection =
+  | 'top'
+  | 'right'
+  | 'bottom'
+  | 'left'
+  | 'top-left'
+  | 'top-right'
+  | 'bottom-left'
+  | 'bottom-right'
+type FileStatus = 'added' | 'parsing' | 'used' | 'failed'
+type StreamResult = 'idle' | 'stopped' | 'error'
+
+interface UploadedFileItem {
+  id: string
+  name: string
+  size: number
+  type: string
+  file: File | null
+  status: FileStatus
+  statusText?: string
+}
+
+interface ChatMessage {
+  id: string
+  role: MessageRole
+  content: string
+  time: string
+  files?: UploadedFileItem[]
+  streaming?: boolean
+  error?: boolean
+  stopped?: boolean
+}
+
+interface LayoutState {
+  btnPosition: { x: number; y: number }
+  windowPosition: { x: number; y: number }
+  size: { width: number; height: number }
+}
+
+interface RequestSnapshot {
+  text: string
+  fileIds: string[]
+}
+
 const props = withDefaults(defineProps<ChatConfig>(), {
   conversationId: '',
   title: 'AI 智能助手',
@@ -50,9 +100,9 @@ const props = withDefaults(defineProps<ChatConfig>(), {
   openOnScroll: false,
   scrollThreshold: 500,
   openOnExit: false,
-  defaultWidth: 320,
-  defaultHeight: 400,
-  minWidth: 320,
+  defaultWidth: 480,
+  defaultHeight: 600,
+  minWidth: 360,
   minHeight: 400,
   maxFileSizeMB: 10,
   quickQuestions: () => ['帮我分析一下我的简历', '这个岗位适合我吗？', '给我一些职业规划建议'],
@@ -60,8 +110,12 @@ const props = withDefaults(defineProps<ChatConfig>(), {
   layoutStorageKey: 'career-chatbot-layout'
 })
 
-// Conversation ID 本地存储 key
 const CONVERSATION_ID_KEY = 'career-chatbot-conversation-id'
+const EDGE_GAP = 12
+const FLOAT_BTN_SIZE = 64
+const MAX_UPLOAD_FILES = 5
+const COLLAPSE_THRESHOLD = 220
+const COLLAPSE_LINES = 4
 
 const emit = defineEmits<{
   (e: 'update:conversationId', value: string): void
@@ -70,84 +124,63 @@ const emit = defineEmits<{
   (e: 'closed'): void
 }>()
 
-type MessageRole = 'user' | 'assistant'
-type ResizeDirection =
-  | 'top'
-  | 'right'
-  | 'bottom'
-  | 'left'
-  | 'top-left'
-  | 'top-right'
-  | 'bottom-left'
-  | 'bottom-right'
-
-interface UploadedFileItem {
-  id: string
-  name: string
-  size: number
-  type: string
-  file: File
-}
-
-interface ChatMessage {
-  id: string
-  role: MessageRole
-  content: string
-  time: string
-  files?: UploadedFileItem[]
-  streaming?: boolean
-  error?: boolean
-}
-
-interface LayoutState {
-  btnPosition: { x: number; y: number }
-  windowPosition: { x: number; y: number }
-  size: { width: number; height: number }
-}
-
-const EDGE_GAP = 12
-const HEADER_HEIGHT = 64
-const FLOAT_BTN_SIZE = 64
-const MAX_UPLOAD_FILES = 5
-const COLLAPSE_THRESHOLD = 220
-const COLLAPSE_LINES = 4
-const emojiList = ['😊', '👍', '🎯', '📄', '💡', '🚀', '👏', '🤔']
-
 const dialogVisible = ref(false)
-const isMinimized = ref(false)
 const isFullscreen = ref(false)
 const isStreaming = ref(false)
 const isHeaderDragging = ref(false)
 const isDraggingWindow = ref(false)
 const isDraggingBtn = ref(false)
 const isResizing = ref(false)
+const isDragOver = ref(false)
+const moreMenuVisible = ref(false)
 const resizeDirection = ref<ResizeDirection | null>(null)
 const userInput = ref('')
 const uploadedFiles = ref<UploadedFileItem[]>([])
-const showEmojiPanel = ref(false)
 const expandedMessageIds = ref<string[]>([])
 const sendingState = ref<'idle' | 'sending' | 'error'>('idle')
+const showThinking = ref(false)
+const streamResult = ref<StreamResult>('idle')
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const chatWindowRef = ref<HTMLElement | null>(null)
 const floatBtnRef = ref<HTMLElement | null>(null)
 const messagesContainer = ref<HTMLElement | null>(null)
+const moreMenuRef = ref<HTMLElement | null>(null)
 const abortController = ref<AbortController | null>(null)
+const manualStopRequested = ref(false)
+const lastRequestSnapshot = ref<RequestSnapshot | null>(null)
 
-// 从 localStorage 恢复 conversationId，如果没有则使用 props 传入的值（可能为空）
+function createId() {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID()
+  }
+  return `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
+}
+
+function getCurrentTime() {
+  const now = new Date()
+  return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+}
+
+function createWelcomeMessage(): ChatMessage {
+  return {
+    id: createId(),
+    role: 'assistant',
+    content: props.welcomeMessage,
+    time: getCurrentTime()
+  }
+}
+
 function getStoredConversationId(): string {
   try {
     const stored = localStorage.getItem(CONVERSATION_ID_KEY)
-    if (stored) {
-      return stored
-    }
+    if (stored) return stored
   } catch {
-    // 静默处理存储异常
+    // ignore
   }
   return props.conversationId || ''
 }
 
 const currentConversationId = ref(getStoredConversationId())
-
 const currentSize = ref({
   width: props.defaultWidth,
   height: props.defaultHeight
@@ -171,17 +204,75 @@ const restoreRect = ref({
   height: props.defaultHeight
 })
 
-const messages = ref<ChatMessage[]>([
-  {
-    id: createId(),
-    role: 'assistant',
-    content: props.welcomeMessage,
-    time: getCurrentTime()
-  }
-])
+const messages = ref<ChatMessage[]>([createWelcomeMessage()])
 
+const validUploadedFiles = computed(() => uploadedFiles.value.filter((item) => item.status === 'added'))
+const hasConversationStarted = computed(() => messages.value.some((item) => item.role === 'user'))
 const canSend = computed(() => {
-  return (!!userInput.value.trim() || uploadedFiles.value.length > 0) && !isStreaming.value
+  return (!!userInput.value.trim() || validUploadedFiles.value.length > 0) && !isStreaming.value
+})
+const quickQuestionCards = computed(() => {
+  const defaults = [
+    { title: '简历分析', description: '快速识别亮点、短板与优化方向' },
+    { title: '岗位匹配', description: '结合目标职位判断匹配度与差距' },
+    { title: '职业规划建议', description: '从阶段目标到行动路径给出建议' },
+  ]
+
+  return props.quickQuestions.map((prompt, index) => ({
+    prompt,
+    title: defaults[index]?.title || `场景 ${index + 1}`,
+    description: defaults[index]?.description || '用这个问题快速开始一次对话',
+  }))
+})
+const assistantPresenceTone = computed(() => {
+  if (sendingState.value === 'error') return 'danger'
+  if (isStreaming.value) return 'info'
+  return 'success'
+})
+const assistantPresenceText = computed(() => {
+  if (sendingState.value === 'error') return '连接异常'
+  if (isStreaming.value) return '生成中'
+  return '在线'
+})
+const statusItems = computed(() => {
+  const items = [{ label: assistantPresenceText.value, tone: assistantPresenceTone.value }]
+  if (isStreaming.value) {
+    items.push({ label: '正在生成回答', tone: 'info' })
+  } else if (sendingState.value === 'sending') {
+    items.push({ label: '请求已发送', tone: 'neutral' })
+  }
+  if (uploadedFiles.value.length) {
+    items.push({ label: `文件 ${uploadedFiles.value.length}`, tone: 'neutral' })
+  }
+  return items
+})
+const streamStatusText = computed(() => {
+  if (isStreaming.value) return 'AI 正在持续生成回答，内容会随着流式返回实时补全。'
+  if (sendingState.value === 'sending') return '请求已发送，正在等待模型开始响应。'
+  if (streamResult.value === 'stopped') return '本次回答已停止生成，你可以继续追问或重新生成。'
+  if (streamResult.value === 'error') return '本次请求没有成功完成，请稍后重试。'
+  return props.subtitle
+})
+const composerStatusText = computed(() => {
+  if (sendingState.value === 'error') return '连接异常，请检查网络后重试'
+  if (isStreaming.value) return 'Shift + Enter 换行，当前可停止生成'
+  if (sendingState.value === 'sending') return '消息发送中，请稍候'
+  return 'Enter 发送，Shift + Enter 换行'
+})
+const showScenarioCards = computed(() => !hasConversationStarted.value && !validUploadedFiles.value.length)
+const latestInteractiveMessageId = computed(() => {
+  for (let i = messages.value.length - 1; i >= 0; i--) {
+    const item = messages.value[i]
+    if (item && item.role === 'assistant' && (item.stopped || item.error)) {
+      return item.id
+    }
+  }
+  return ''
+})
+const floatButtonStatusText = computed(() => {
+  if (sendingState.value === 'error') return '异常'
+  if (isStreaming.value) return '生成中'
+  return '在线'
 })
 
 watch(
@@ -199,46 +290,40 @@ watch(
   }
 )
 
-function createId() {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-    return crypto.randomUUID()
+watch(
+  () => messages.value.length,
+  () => {
+    nextTick(() => scrollToBottom())
   }
-  return `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
-}
+)
 
-// 保存 conversationId 到 localStorage
 function saveConversationId(conversationId: string) {
   if (!conversationId) return
   try {
     localStorage.setItem(CONVERSATION_ID_KEY, conversationId)
   } catch {
-    // 静默处理存储异常
+    // ignore
   }
 }
 
-// 清除 localStorage 中的 conversationId
 function clearStoredConversationId() {
   try {
     localStorage.removeItem(CONVERSATION_ID_KEY)
   } catch {
-    // 静默处理存储异常
+    // ignore
   }
 }
 
 function ensureConversationId() {
-  // 优先使用已有的 conversationId（从 localStorage 或 props 恢复）
   if (currentConversationId.value) {
     return currentConversationId.value
   }
 
-  // 初始状态：返回空字符串，由服务端生成
-  // 第一次对话后，服务端会返回 conversationId
-  return ''
-}
-
-function getCurrentTime() {
-  const now = new Date()
-  return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+  const newConversationId = createId()
+  currentConversationId.value = newConversationId
+  saveConversationId(newConversationId)
+  emit('update:conversationId', newConversationId)
+  return newConversationId
 }
 
 function getEventPoint(e: MouseEvent | TouchEvent) {
@@ -292,7 +377,7 @@ function saveLayout() {
     }
     localStorage.setItem(props.layoutStorageKey, JSON.stringify(payload))
   } catch {
-    // 静默处理存储异常（如存储空间已满）
+    // ignore
   }
 }
 
@@ -337,20 +422,16 @@ function syncToViewport() {
 
   currentSize.value.width = clamp(currentSize.value.width, props.minWidth, window.innerWidth - EDGE_GAP * 2)
   currentSize.value.height = clamp(currentSize.value.height, props.minHeight, window.innerHeight - EDGE_GAP * 2)
-
-  const minimizedHeight = isMinimized.value ? HEADER_HEIGHT : currentSize.value.height
   windowPosition.value.x = clamp(windowPosition.value.x, EDGE_GAP, window.innerWidth - currentSize.value.width - EDGE_GAP)
-  windowPosition.value.y = clamp(windowPosition.value.y, EDGE_GAP, window.innerHeight - minimizedHeight - EDGE_GAP)
-
+  windowPosition.value.y = clamp(windowPosition.value.y, EDGE_GAP, window.innerHeight - currentSize.value.height - EDGE_GAP)
   btnPosition.value.x = clamp(btnPosition.value.x, EDGE_GAP, window.innerWidth - FLOAT_BTN_SIZE - EDGE_GAP)
   btnPosition.value.y = clamp(btnPosition.value.y, EDGE_GAP, window.innerHeight - FLOAT_BTN_SIZE - EDGE_GAP)
-
   saveLayout()
 }
 
 function openChat() {
   dialogVisible.value = true
-  isMinimized.value = false
+  moreMenuVisible.value = false
   syncToViewport()
   nextTick(() => scrollToBottom())
   emit('opened')
@@ -359,21 +440,13 @@ function openChat() {
 function closeChat() {
   stopStream(false)
   dialogVisible.value = false
-  isMinimized.value = false
-  uploadedFiles.value = []
+  isDragOver.value = false
+  moreMenuVisible.value = false
   emit('closed')
 }
 
-function toggleMinimize() {
-  if (isFullscreen.value && isMinimized.value) {
-    isFullscreen.value = false
-  }
-  isMinimized.value = !isMinimized.value
-  syncToViewport()
-  saveLayout()
-}
-
 function toggleFullscreen() {
+  moreMenuVisible.value = false
   if (!isFullscreen.value) {
     restoreRect.value = {
       x: windowPosition.value.x,
@@ -382,7 +455,6 @@ function toggleFullscreen() {
       height: currentSize.value.height
     }
     isFullscreen.value = true
-    isMinimized.value = false
     windowPosition.value = { x: 0, y: 0 }
     currentSize.value = {
       width: window.innerWidth,
@@ -417,7 +489,6 @@ function startBtnDrag(e: MouseEvent | TouchEvent) {
   if (dialogVisible.value) return
   isDraggingBtn.value = true
   const point = getEventPoint(e)
-  dragOffset.value = { x: point.x, y: point.y }
   btnDragOffset.value = {
     x: point.x - btnPosition.value.x,
     y: point.y - btnPosition.value.y
@@ -426,13 +497,21 @@ function startBtnDrag(e: MouseEvent | TouchEvent) {
 
 function snapFloatButton() {
   const midpoint = window.innerWidth / 2
-  btnPosition.value.x = btnPosition.value.x + FLOAT_BTN_SIZE / 2 < midpoint ? EDGE_GAP : window.innerWidth - FLOAT_BTN_SIZE - EDGE_GAP
+  btnPosition.value.x =
+    btnPosition.value.x + FLOAT_BTN_SIZE / 2 < midpoint
+      ? EDGE_GAP
+      : window.innerWidth - FLOAT_BTN_SIZE - EDGE_GAP
   btnPosition.value.y = clamp(btnPosition.value.y, EDGE_GAP, window.innerHeight - FLOAT_BTN_SIZE - EDGE_GAP)
   saveLayout()
 }
 
 let btnDragStartTime = 0
 let btnDragStartPoint = { x: 0, y: 0 }
+let autoOpenTimer: ReturnType<typeof setTimeout> | null = null
+let scrollHandler: (() => void) | null = null
+let mouseLeaveHandler: ((e: MouseEvent) => void) | null = null
+let dragThrottleTimer: ReturnType<typeof setTimeout> | null = null
+let scrollRafId: number | null = null
 
 function onFloatBtnDown(e: MouseEvent | TouchEvent) {
   btnDragStartTime = Date.now()
@@ -456,7 +535,7 @@ function onFloatBtnUp(e: MouseEvent | TouchEvent) {
 }
 
 function startResize(direction: ResizeDirection, e: MouseEvent | TouchEvent) {
-  if (isFullscreen.value || isMinimized.value) return
+  if (isFullscreen.value) return
   isResizing.value = true
   resizeDirection.value = direction
   const point = getEventPoint(e)
@@ -472,15 +551,16 @@ function startResize(direction: ResizeDirection, e: MouseEvent | TouchEvent) {
 
 function onGlobalMove(e: MouseEvent | TouchEvent) {
   if (dragThrottleTimer) return
-  dragThrottleTimer = setTimeout(() => { dragThrottleTimer = null }, 16)
+  dragThrottleTimer = setTimeout(() => {
+    dragThrottleTimer = null
+  }, 16)
 
   if (isDraggingWindow.value && !isFullscreen.value) {
     e.preventDefault()
     const point = getEventPoint(e)
-    const height = isMinimized.value ? HEADER_HEIGHT : currentSize.value.height
     windowPosition.value = {
       x: clamp(point.x - dragOffset.value.x, EDGE_GAP, window.innerWidth - currentSize.value.width - EDGE_GAP),
-      y: clamp(point.y - dragOffset.value.y, EDGE_GAP, window.innerHeight - height - EDGE_GAP)
+      y: clamp(point.y - dragOffset.value.y, EDGE_GAP, window.innerHeight - currentSize.value.height - EDGE_GAP)
     }
     return
   }
@@ -506,12 +586,8 @@ function onGlobalMove(e: MouseEvent | TouchEvent) {
     let nextWidth = resizeStartRect.value.width
     let nextHeight = resizeStartRect.value.height
 
-    if (resizeDirection.value.includes('right')) {
-      nextWidth = resizeStartRect.value.width + dx
-    }
-    if (resizeDirection.value.includes('bottom')) {
-      nextHeight = resizeStartRect.value.height + dy
-    }
+    if (resizeDirection.value.includes('right')) nextWidth = resizeStartRect.value.width + dx
+    if (resizeDirection.value.includes('bottom')) nextHeight = resizeStartRect.value.height + dy
     if (resizeDirection.value.includes('left')) {
       nextWidth = resizeStartRect.value.width - dx
       nextX = resizeStartRect.value.x + dx
@@ -577,18 +653,53 @@ function formatFileSize(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
 
+function fileStatusLabel(status: FileStatus) {
+  if (status === 'parsing') return '解析中'
+  if (status === 'used') return '已用于问答'
+  if (status === 'failed') return '失败'
+  return '已添加'
+}
+
+function getFileIcon(file: UploadedFileItem) {
+  if (file.type.startsWith('image/')) return Picture
+  if (file.type.includes('pdf')) return Files
+  return Document
+}
+
+function updateFileStatus(fileIds: string[], status: FileStatus, statusText?: string) {
+  const idSet = new Set(fileIds)
+  uploadedFiles.value = uploadedFiles.value.map((item) => {
+    if (!idSet.has(item.id)) return item
+    return {
+      ...item,
+      status,
+      statusText: statusText || fileStatusLabel(status)
+    }
+  })
+}
+
 function removeFile(id: string) {
   uploadedFiles.value = uploadedFiles.value.filter((item) => item.id !== id)
 }
 
-function handleFileChange(e: Event) {
-  const input = e.target as HTMLInputElement
-  const files = Array.from(input.files || [])
+function buildUploadItem(file: File, status: FileStatus, statusText?: string): UploadedFileItem {
+  return {
+    id: createId(),
+    name: file.name,
+    size: file.size,
+    type: file.type,
+    file,
+    status,
+    statusText: statusText || fileStatusLabel(status)
+  }
+}
+
+function ingestFiles(files: File[]) {
   if (!files.length) return
 
-  if (uploadedFiles.value.length + files.length > MAX_UPLOAD_FILES) {
+  const availableSlots = MAX_UPLOAD_FILES - uploadedFiles.value.length
+  if (availableSlots <= 0) {
     ElMessage.warning(`最多只能上传 ${MAX_UPLOAD_FILES} 个文件`)
-    input.value = ''
     return
   }
 
@@ -601,25 +712,56 @@ function handleFileChange(e: Event) {
     'image/jpg'
   ]
 
-  files.forEach((file) => {
+  files.slice(0, availableSlots).forEach((file) => {
     if (file.size > maxFileSize) {
+      uploadedFiles.value.unshift(buildUploadItem(file, 'failed', `超过 ${props.maxFileSizeMB}MB 限制`))
       ElMessage.warning(`${file.name} 超过 ${props.maxFileSizeMB}MB 限制`)
       return
     }
+
     if (!allowedTypes.includes(file.type)) {
+      uploadedFiles.value.unshift(buildUploadItem(file, 'failed', '类型不支持'))
       ElMessage.warning(`${file.name} 类型不支持，仅支持 PDF / DOCX / PNG / JPG / JPEG`)
       return
     }
-    uploadedFiles.value.push({
-      id: createId(),
-      name: file.name,
-      size: file.size,
-      type: file.type,
-      file
-    })
+
+    uploadedFiles.value.unshift(buildUploadItem(file, 'added'))
   })
 
+  if (files.length > availableSlots) {
+    ElMessage.warning(`最多只能上传 ${MAX_UPLOAD_FILES} 个文件`)
+  }
+}
+
+function handleFileChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  ingestFiles(Array.from(input.files || []))
   input.value = ''
+}
+
+function onDropAreaDragOver(e: DragEvent) {
+  e.preventDefault()
+  isDragOver.value = true
+}
+
+function onDropAreaDragLeave(e: DragEvent) {
+  if (!chatWindowRef.value) {
+    isDragOver.value = false
+    return
+  }
+
+  const relatedTarget = e.relatedTarget as Node | null
+  if (relatedTarget && chatWindowRef.value.contains(relatedTarget)) {
+    return
+  }
+
+  isDragOver.value = false
+}
+
+function onDropAreaDrop(e: DragEvent) {
+  e.preventDefault()
+  isDragOver.value = false
+  ingestFiles(Array.from(e.dataTransfer?.files || []))
 }
 
 function handleKeydown(e: KeyboardEvent) {
@@ -652,10 +794,35 @@ function pushAssistantPlaceholder() {
   return message
 }
 
+function normalizeIncomingChunk(chunk: string): string {
+  const safeChunk = typeof chunk === 'string' ? chunk : ''
+  const trimmed = safeChunk.trim()
+
+  if (!trimmed) return safeChunk
+  if (!trimmed.startsWith('{')) return safeChunk
+
+  try {
+    const payload = JSON.parse(trimmed) as Record<string, unknown>
+    if (payload.type === 'content' && typeof payload.content === 'string') {
+      return payload.content
+    }
+    if (typeof payload.content === 'string') {
+      return payload.content
+    }
+    return ''
+  } catch {
+    return safeChunk
+  }
+}
+
 function appendChunkToMessage(messageId: string, chunk: string) {
   const target = messages.value.find((item) => item.id === messageId)
   if (!target) return
-  target.content += chunk
+
+  const normalizedChunk = normalizeIncomingChunk(chunk)
+  if (!normalizedChunk) return
+
+  target.content += normalizedChunk
   nextTick(() => scrollToBottom())
 }
 
@@ -663,8 +830,19 @@ function finishAssistantMessage(messageId: string) {
   const target = messages.value.find((item) => item.id === messageId)
   if (!target) return
   target.streaming = false
+  target.stopped = false
   if (!target.content.trim()) {
     target.content = '已收到请求，但本次没有返回可展示内容。'
+  }
+}
+
+function markAssistantStopped(messageId: string) {
+  const target = messages.value.find((item) => item.id === messageId)
+  if (!target) return
+  target.streaming = false
+  target.stopped = true
+  if (!target.content.trim()) {
+    target.content = '已停止生成。你可以继续追问，或重新生成本次回答。'
   }
 }
 
@@ -673,29 +851,24 @@ function markAssistantError(messageId: string, errorMessage: string) {
   if (!target) return
   target.streaming = false
   target.error = true
+  target.stopped = false
   target.content = errorMessage
 }
 
 function clearLocalMessages() {
   stopStream(false)
-  // 清除 conversationId，开始新会话
   currentConversationId.value = ''
   clearStoredConversationId()
   emit('update:conversationId', '')
-  messages.value = [
-    {
-      id: createId(),
-      role: 'assistant',
-      content: props.welcomeMessage,
-      time: getCurrentTime()
-    }
-  ]
+  messages.value = [createWelcomeMessage()]
+  uploadedFiles.value = []
   expandedMessageIds.value = []
+  streamResult.value = 'idle'
+  moreMenuVisible.value = false
 }
 
 function shouldCollapseMessage(message: ChatMessage) {
-  if (message.streaming) return false
-  if (message.files?.length) return false
+  if (message.streaming || message.files?.length) return false
   const lineCount = message.content.split('\n').length
   return message.content.length > COLLAPSE_THRESHOLD || lineCount > COLLAPSE_LINES
 }
@@ -704,19 +877,16 @@ function isExpanded(messageId: string) {
   return expandedMessageIds.value.includes(messageId)
 }
 
-function getDisplayContent(message: ChatMessage) {
-  if (!shouldCollapseMessage(message) || isExpanded(message.id)) {
-    return message.content
-  }
-  return `${message.content.slice(0, COLLAPSE_THRESHOLD).trim()}...`
-}
-
 function toggleMessageExpand(messageId: string) {
   if (isExpanded(messageId)) {
     expandedMessageIds.value = expandedMessageIds.value.filter((item) => item !== messageId)
   } else {
     expandedMessageIds.value = [...expandedMessageIds.value, messageId]
   }
+}
+
+function isLatestInteractiveMessage(messageId: string) {
+  return latestInteractiveMessageId.value === messageId
 }
 
 async function copyMessage(content: string) {
@@ -735,29 +905,38 @@ function deleteMessage(messageId: string) {
   expandedMessageIds.value = expandedMessageIds.value.filter((item) => item !== messageId)
 }
 
-function insertEmoji(emoji: string) {
-  userInput.value += emoji
-  showEmojiPanel.value = false
-}
-
-async function sendMessage() {
-  const text = userInput.value.trim()
-  const files = [...uploadedFiles.value]
+async function sendMessage(snapshot?: RequestSnapshot) {
+  const text = snapshot?.text ?? userInput.value.trim()
+  const fileIds = snapshot?.fileIds ?? validUploadedFiles.value.map((item) => item.id)
+  const files = fileIds
+    .map((id) => uploadedFiles.value.find((item) => item.id === id))
+    .filter((item): item is UploadedFileItem => !!item && !!item.file)
 
   if ((!text && files.length === 0) || isStreaming.value) return
+
   const conversationId = ensureConversationId()
+  const effectiveText = text || 'Please analyze the uploaded file'
+  lastRequestSnapshot.value = {
+    text: effectiveText,
+    fileIds: files.map((item) => item.id)
+  }
+  streamResult.value = 'idle'
+  manualStopRequested.value = false
 
   messages.value.push({
     id: createId(),
     role: 'user',
-    content: text || 'Please analyze the uploaded file',
+    content: effectiveText,
     time: getCurrentTime(),
-    files: files.length ? files : undefined
+    files: files.length ? files.map((item) => ({ ...item })) : undefined
   })
 
-  userInput.value = ''
-  uploadedFiles.value = []
-  showEmojiPanel.value = false
+  if (!snapshot) {
+    userInput.value = ''
+  }
+
+  updateFileStatus(files.map((item) => item.id), 'parsing')
+
   sendingState.value = 'sending'
   nextTick(() => scrollToBottom())
 
@@ -769,12 +948,13 @@ async function sendMessage() {
 
   try {
     await streamChatbotMessage({
-      message: text || 'Please analyze the uploaded file',
+      message: effectiveText,
       conversationId,
-      files: files.map((item) => item.file),
+      files: files.map((item) => item.file).filter((item): item is File => !!item),
       signal: controller.signal,
+      autoExtractMemory: files.length > 0 ? props.autoExtractMemoryWithFiles : props.autoExtractMemory,
+      showThinking: showThinking.value,
       onConversationId: (newConversationId) => {
-        // 接收到服务端返回的 conversationId，更新状态并持久化
         if (newConversationId && newConversationId !== currentConversationId.value) {
           currentConversationId.value = newConversationId
           saveConversationId(newConversationId)
@@ -783,30 +963,34 @@ async function sendMessage() {
       },
       onChunk: (chunk) => {
         appendChunkToMessage(messageId, chunk)
+        updateFileStatus(files.map((item) => item.id), 'used')
       }
     })
 
     finishAssistantMessage(messageId)
+    updateFileStatus(files.map((item) => item.id), 'used')
     sendingState.value = 'idle'
   } catch (error) {
-    const message = error instanceof Error
-      ? error.name === 'AbortError'
-        ? 'Generation stopped'
-        : error.message
-      : 'Send failed, please try again later'
+    const errorMessage = error instanceof Error ? error.message : '请求失败，请稍后再试'
+    const isAbort = manualStopRequested.value || errorMessage === 'Request was cancelled'
 
-    if (message === 'Generation stopped') {
-      finishAssistantMessage(messageId)
+    if (isAbort) {
+      markAssistantStopped(messageId)
+      updateFileStatus(files.map((item) => item.id), 'used')
       sendingState.value = 'idle'
+      streamResult.value = 'stopped'
     } else {
-      markAssistantError(messageId, message)
+      markAssistantError(messageId, errorMessage || '请求失败，请稍后再试')
+      updateFileStatus(files.map((item) => item.id), 'failed', '处理失败')
       sendingState.value = 'error'
-      ElMessage.error(message)
-      emit('error', message)
+      streamResult.value = 'error'
+      ElMessage.error(errorMessage || '请求失败，请稍后再试')
+      emit('error', errorMessage || '请求失败，请稍后再试')
     }
   } finally {
     isStreaming.value = false
     abortController.value = null
+    manualStopRequested.value = false
     nextTick(() => scrollToBottom())
     saveLayout()
   }
@@ -814,23 +998,19 @@ async function sendMessage() {
 
 function stopStream(showToast = true) {
   if (!abortController.value) return
+  manualStopRequested.value = true
   abortController.value.abort()
   abortController.value = null
   isStreaming.value = false
-    const lastIdx = messages.value.length - 1
-  for (let i = lastIdx; i >= 0; i--) {
-    const item = messages.value[i]
-    if (item && item.role === 'assistant' && item.streaming) {
-      item.streaming = false
-      if (!item.content.trim()) {
-        item.content = '生成已停止。'
-      }
-      break
-    }
-  }
+  streamResult.value = 'stopped'
   if (showToast) {
     ElMessage.info('已停止生成')
   }
+}
+
+function regenerateLastReply() {
+  if (!lastRequestSnapshot.value) return
+  sendMessage(lastRequestSnapshot.value)
 }
 
 function sendQuickQuestion(question: string) {
@@ -838,22 +1018,34 @@ function sendQuickQuestion(question: string) {
   sendMessage()
 }
 
+function toggleMoreMenu() {
+  moreMenuVisible.value = !moreMenuVisible.value
+}
+
+function closeMoreMenu() {
+  moreMenuVisible.value = false
+}
+
 function handleResize() {
   syncToViewport()
 }
 
-let autoOpenTimer: ReturnType<typeof setTimeout> | null = null
-let scrollHandler: (() => void) | null = null
-let mouseLeaveHandler: ((e: MouseEvent) => void) | null = null
-let dragThrottleTimer: ReturnType<typeof setTimeout> | null = null
-let scrollRafId: number | null = null
-
-watch(
-  () => messages.value.length,
-  () => {
-    nextTick(() => scrollToBottom())
+function handleDocumentPointerDown(e: MouseEvent) {
+  const target = e.target as Node | null
+  if (moreMenuVisible.value && moreMenuRef.value && target && !moreMenuRef.value.contains(target)) {
+    moreMenuVisible.value = false
   }
-)
+}
+
+function handleGlobalKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape') {
+    if (isFullscreen.value) {
+      toggleFullscreen()
+      return
+    }
+    closeMoreMenu()
+  }
+}
 
 function setupAutoTriggers() {
   if (props.autoOpen) {
@@ -895,6 +1087,8 @@ onMounted(() => {
   window.addEventListener('mouseup', onGlobalUp)
   window.addEventListener('touchmove', onGlobalMove, { passive: false })
   window.addEventListener('touchend', onGlobalUp)
+  document.addEventListener('mousedown', handleDocumentPointerDown)
+  window.addEventListener('keydown', handleGlobalKeydown)
 })
 
 onUnmounted(() => {
@@ -909,6 +1103,8 @@ onUnmounted(() => {
   window.removeEventListener('mouseup', onGlobalUp)
   window.removeEventListener('touchmove', onGlobalMove)
   window.removeEventListener('touchend', onGlobalUp)
+  document.removeEventListener('mousedown', handleDocumentPointerDown)
+  window.removeEventListener('keydown', handleGlobalKeydown)
 })
 </script>
 
@@ -919,243 +1115,313 @@ onUnmounted(() => {
         v-show="dialogVisible"
         ref="chatWindowRef"
         class="chat-window"
-        :class="{
-          minimized: isMinimized,
-          fullscreen: isFullscreen,
-          dragging: isHeaderDragging,
-          resizing: isResizing
-        }"
+        :class="{ fullscreen: isFullscreen, dragging: isHeaderDragging, resizing: isResizing }"
         :style="{
           left: `${windowPosition.x}px`,
           top: `${windowPosition.y}px`,
           width: `${currentSize.width}px`,
-          height: `${isMinimized ? HEADER_HEIGHT : currentSize.height}px`
+          height: `${currentSize.height}px`
         }"
+        @dragover="onDropAreaDragOver"
+        @dragleave="onDropAreaDragLeave"
+        @drop="onDropAreaDrop"
       >
-        <div
-          class="chat-header"
-          @mousedown="startWindowDrag"
-          @touchstart="startWindowDrag"
-        >
+        <div class="chat-header" @mousedown="startWindowDrag" @touchstart="startWindowDrag">
           <div class="header-left">
             <div class="assistant-avatar">
-              <el-icon :size="20"><ChatDotRound /></el-icon>
+              <el-icon :size="18"><ChatDotRound /></el-icon>
             </div>
             <div class="header-meta">
               <div class="header-title-row">
                 <h4>{{ title }}</h4>
-                <span class="assistant-badge">AI</span>
-                <span class="drag-tip">可拖拽</span>
+                <span class="assistant-badge">{{ assistantPresenceText }}</span>
               </div>
-              <div class="header-status">
-                <span class="status-dot" :class="{ streaming: isStreaming }"></span>
-                <span>{{ isStreaming ? 'AI 正在输入…' : subtitle }}</span>
-              </div>
+              <p class="header-subtitle">{{ subtitle }}</p>
             </div>
           </div>
 
           <div class="header-actions" @mousedown.stop @touchstart.stop>
-            <button class="action-btn" type="button" title="清空本地消息" @click="clearLocalMessages">
-              清空
-            </button>
             <button
-              v-if="isStreaming"
-              class="action-btn danger"
+              class="icon-btn"
               type="button"
-              title="停止生成"
-              @click="stopStream()"
+              :aria-label="isFullscreen ? '退出全屏' : '进入全屏'"
+              :title="isFullscreen ? '退出全屏' : '进入全屏'"
+              @click="toggleFullscreen"
             >
-              停止
-            </button>
-            <button class="icon-btn" type="button" :title="isMinimized ? '展开' : '最小化'" @click="toggleMinimize">
-              <el-icon><Minus /></el-icon>
-            </button>
-            <button class="icon-btn" type="button" :title="isFullscreen ? '退出全屏' : '全屏'" @click="toggleFullscreen">
               <el-icon><FullScreen /></el-icon>
             </button>
-            <button class="icon-btn close" type="button" title="关闭" @click="closeChat">
+
+            <div ref="moreMenuRef" class="header-menu">
+              <button
+                class="icon-btn"
+                type="button"
+                aria-label="更多操作"
+                title="更多操作"
+                @click="toggleMoreMenu"
+              >
+                <el-icon><MoreFilled /></el-icon>
+              </button>
+
+              <transition name="menu-fade">
+                <div v-if="moreMenuVisible" class="header-menu-popover">
+                  <button class="menu-item" type="button" @click="clearLocalMessages">清空会话</button>
+                  <button v-if="isStreaming" class="menu-item warning" type="button" @click="stopStream()">停止生成</button>
+                  <button v-if="lastRequestSnapshot" class="menu-item" type="button" @click="regenerateLastReply">重新生成</button>
+                </div>
+              </transition>
+            </div>
+
+            <button
+              class="icon-btn close"
+              type="button"
+              aria-label="关闭聊天窗口"
+              title="关闭"
+              @click="closeChat"
+            >
               <el-icon><Close /></el-icon>
             </button>
           </div>
         </div>
 
-        <div v-show="!isMinimized" class="chat-body">
-          <div ref="messagesContainer" class="messages-container">
-            <TransitionGroup name="message-fade" tag="div" class="message-list">
-              <div
-                v-for="message in messages"
-                :key="message.id"
-                class="message-row"
-                :class="message.role"
-              >
-                <div class="message-avatar">
-                  <el-icon v-if="message.role === 'assistant'"><ChatDotRound /></el-icon>
-                  <span v-else>我</span>
-                </div>
+        <div class="window-status-bar">
+          <span v-for="item in statusItems" :key="item.label" class="status-pill" :class="item.tone">
+            <span class="status-pill-dot"></span>
+            {{ item.label }}
+          </span>
+          <span class="status-summary">{{ streamStatusText }}</span>
+        </div>
+        <div class="chat-body" :class="{ fullscreen: isFullscreen }">
+          <div class="chat-main">
+            <div v-if="isStreaming || sendingState === 'sending' || streamResult !== 'idle'" class="stream-status-bar">
+              <span class="stream-status-indicator" :class="{ active: isStreaming || sendingState === 'sending' }"></span>
+              <span>{{ streamStatusText }}</span>
+              <button v-if="streamResult === 'stopped' && lastRequestSnapshot" class="inline-action" type="button" @click="regenerateLastReply">
+                重新生成
+              </button>
+            </div>
 
-                <div class="message-main">
-                  <div
-                    class="message-bubble"
-                    :class="{ error: message.error, collapsed: shouldCollapseMessage(message) && !isExpanded(message.id) }"
-                  >
-                    <div class="message-tools">
-                      <button class="bubble-tool-btn" type="button" title="复制消息" @click="copyMessage(message.content)">
-                        <el-icon><CopyDocument /></el-icon>
-                      </button>
-                      <button
-                        class="bubble-tool-btn"
-                        type="button"
-                        title="删除消息"
-                        :disabled="message.streaming"
-                        @click="deleteMessage(message.id)"
-                      >
-                        <el-icon><Delete /></el-icon>
-                      </button>
+            <div ref="messagesContainer" class="messages-container">
+              <TransitionGroup name="message-fade" tag="div" class="message-list">
+                <div v-for="message in messages" :key="message.id" class="message-row" :class="message.role">
+                  <div class="message-avatar">
+                    <el-icon v-if="message.role === 'assistant'"><ChatDotRound /></el-icon>
+                    <span v-else>我</span>
+                  </div>
+
+                  <div class="message-main">
+                    <div class="message-meta-line">
+                      <span class="message-author">{{ message.role === 'assistant' ? 'AI 助手' : '你' }}</span>
+                      <span class="message-time">{{ message.time }}</span>
                     </div>
 
-                    <template v-if="message.content">
-                      <VueMarkdown
-                        :source="getDisplayContent(message)"
-                        :options="{ html: false, linkify: true, typographer: true }"
-                      />
-                    </template>
-                    <template v-else>
-                      <div class="typing-placeholder">
-                        <span class="typing-dot"></span>
-                        <span class="typing-dot"></span>
-                        <span class="typing-dot"></span>
-                        <span>AI 正在输入…</span>
+                    <div class="message-bubble" :class="{ error: message.error, collapsed: shouldCollapseMessage(message) && !isExpanded(message.id) }">
+                      <div class="message-tools">
+                        <button class="bubble-tool-btn" type="button" aria-label="复制消息" title="复制消息" @click="copyMessage(message.content)">
+                          <el-icon><CopyDocument /></el-icon>
+                        </button>
+                        <button
+                          class="bubble-tool-btn"
+                          type="button"
+                          aria-label="删除消息"
+                          title="删除消息"
+                          :disabled="message.streaming"
+                          @click="deleteMessage(message.id)"
+                        >
+                          <el-icon><Delete /></el-icon>
+                        </button>
                       </div>
-                    </template>
 
-                    <button
-                      v-if="shouldCollapseMessage(message)"
-                      class="expand-btn"
-                      type="button"
-                      @click="toggleMessageExpand(message.id)"
-                    >
-                      {{ isExpanded(message.id) ? '收起' : '展开更多' }}
-                    </button>
+                      <template v-if="message.content">
+                        <div class="message-content" :class="{ 'is-collapsed': shouldCollapseMessage(message) && !isExpanded(message.id) }">
+                          <VueMarkdown :source="message.content" :options="{ html: false, linkify: true, typographer: true }" />
+                        </div>
+                        <div v-if="shouldCollapseMessage(message) && !isExpanded(message.id)" class="collapse-mask"></div>
+                      </template>
+                      <template v-else>
+                        <div class="typing-placeholder">
+                          <span class="typing-dot"></span>
+                          <span class="typing-dot"></span>
+                          <span class="typing-dot"></span>
+                          <span>AI 正在输入…</span>
+                        </div>
+                      </template>
 
-                    <div v-if="message.files?.length" class="message-files">
-                      <div v-for="file in message.files" :key="file.id" class="message-file-item">
-                        <el-icon><Paperclip /></el-icon>
-                        <span class="file-name">{{ file.name }}</span>
-                        <span class="file-size">{{ formatFileSize(file.size) }}</span>
+                      <span v-if="message.streaming" class="stream-cursor" aria-hidden="true"></span>
+
+                      <button v-if="shouldCollapseMessage(message)" class="expand-btn" type="button" @click="toggleMessageExpand(message.id)">
+                        {{ isExpanded(message.id) ? '收起' : '展开完整内容' }}
+                      </button>
+
+                      <div v-if="message.files?.length" class="message-files">
+                        <div v-for="file in message.files" :key="file.id" class="message-file-item">
+                          <el-icon><component :is="getFileIcon(file)" /></el-icon>
+                          <span class="file-name">{{ file.name }}</span>
+                          <span class="file-size">{{ formatFileSize(file.size) }}</span>
+                        </div>
                       </div>
-                    </div>
 
-                    <div class="message-time-inline">
-                      <span>{{ message.time }}</span>
-                      <span v-if="message.streaming" class="stream-tag">生成中</span>
+                      <div v-if="(message.stopped || message.error) && isLatestInteractiveMessage(message.id)" class="message-state-tip" :class="{ error: message.error }">
+                        <el-icon v-if="message.error"><WarningFilled /></el-icon>
+                        <el-icon v-else><CircleCheckFilled /></el-icon>
+                        <span>{{ message.error ? '请求未成功完成，请检查网络或稍后重试。' : '本次回答已手动停止。' }}</span>
+                        <button v-if="lastRequestSnapshot" class="inline-action" type="button" @click="regenerateLastReply">重新生成</button>
+                      </div>
+
+                      <div v-if="message.streaming" class="message-stream-tag">
+                        <el-icon class="rotating"><Loading /></el-icon>
+                        <span>正在生成回答</span>
+                      </div>
                     </div>
                   </div>
                 </div>
+              </TransitionGroup>
+            </div>
+
+            <div v-if="showScenarioCards" class="scenario-grid">
+              <button v-for="card in quickQuestionCards" :key="card.prompt" type="button" class="scenario-card" @click="sendQuickQuestion(card.prompt)">
+                <span class="scenario-title">{{ card.title }}</span>
+                <span class="scenario-desc">{{ card.description }}</span>
+                <span class="scenario-prompt">{{ card.prompt }}</span>
+              </button>
+            </div>
+
+            <div v-else-if="quickQuestionCards.length && !isFullscreen" class="quick-questions">
+              <button v-for="card in quickQuestionCards" :key="card.prompt" type="button" class="quick-chip" @click="sendQuickQuestion(card.prompt)">
+                {{ card.title }}
+              </button>
+            </div>
+
+            <div v-if="uploadedFiles.length && !isFullscreen" class="upload-preview">
+              <div v-for="file in uploadedFiles" :key="file.id" class="upload-card" :class="file.status">
+                <div class="upload-card-icon">
+                  <el-icon><component :is="getFileIcon(file)" /></el-icon>
+                </div>
+                <div class="upload-card-main">
+                  <div class="upload-card-name-row">
+                    <span class="file-name">{{ file.name }}</span>
+                    <span class="file-size">{{ formatFileSize(file.size) }}</span>
+                  </div>
+                  <div class="upload-card-status">
+                    <span class="upload-status-badge" :class="file.status">
+                      <el-icon v-if="file.status === 'parsing'" class="rotating"><Loading /></el-icon>
+                      <el-icon v-else-if="file.status === 'used'"><CircleCheckFilled /></el-icon>
+                      <el-icon v-else-if="file.status === 'failed'"><WarningFilled /></el-icon>
+                      <el-icon v-else><Paperclip /></el-icon>
+                      <span>{{ file.statusText || fileStatusLabel(file.status) }}</span>
+                    </span>
+                  </div>
+                </div>
+                <button class="delete-btn" type="button" aria-label="移除文件" title="移除文件" @click="removeFile(file.id)">
+                  <el-icon><Delete /></el-icon>
+                </button>
               </div>
-            </TransitionGroup>
-          </div>
+            </div>
 
-          <div v-if="quickQuestions.length" class="quick-questions">
-            <button
-              v-for="question in quickQuestions"
-              :key="question"
-              type="button"
-              class="quick-chip"
-              @click="sendQuickQuestion(question)"
-            >
-              {{ question }}
-            </button>
-          </div>
-
-          <div v-if="uploadedFiles.length" class="upload-preview">
-            <div v-for="file in uploadedFiles" :key="file.id" class="upload-chip">
-              <div class="upload-chip-left">
+            <div class="input-panel" :class="{ 'is-drag-over': isDragOver }">
+              <div class="drop-hint">
                 <el-icon><Paperclip /></el-icon>
-                <span class="file-name">{{ file.name }}</span>
-                <span class="file-size">{{ formatFileSize(file.size) }}</span>
-              </div>
-              <button class="delete-btn" type="button" @click="removeFile(file.id)">
-                <el-icon><Delete /></el-icon>
-              </button>
-            </div>
-          </div>
-
-          <div class="input-panel">
-            <div v-if="showEmojiPanel" class="emoji-panel">
-              <button
-                v-for="emoji in emojiList"
-                :key="emoji"
-                class="emoji-btn"
-                type="button"
-                @click="insertEmoji(emoji)"
-              >
-                {{ emoji }}
-              </button>
-            </div>
-
-            <div class="input-shell">
-              <div class="input-row">
-                <el-input
-                  v-model="userInput"
-                  type="textarea"
-                  resize="none"
-                  :autosize="{ minRows: 2, maxRows: 6 }"
-                  placeholder="输入你的问题，Enter 发送，Shift + Enter 换行"
-                  @keydown="handleKeydown"
-                />
-
-                <button
-                  v-if="isStreaming"
-                  class="send-btn stop"
-                  type="button"
-                  @click="stopStream()"
-                >
-                  停止
-                </button>
-                <button
-                  v-else
-                  class="send-btn"
-                  type="button"
-                  :disabled="!canSend"
-                  @click="sendMessage"
-                >
-                  <el-icon><Promotion /></el-icon>
-                  <span>发送</span>
-                </button>
+                <span>拖拽文件到这里上传</span>
               </div>
 
-              <div class="input-toolbar">
-                <div class="input-toolbar-left">
-                  <button class="tool-btn" type="button" title="上传文件" @click="triggerFileUpload">
+              <div class="input-shell">
+                <div class="input-topbar">
+                  <button class="tool-btn" type="button" aria-label="上传文件" title="上传文件" @click="triggerFileUpload">
                     <el-icon><Paperclip /></el-icon>
-                    <span>上传</span>
+                    <span>上传文件</span>
                   </button>
-                  <button class="tool-btn ghost" type="button" title="表情" @click="showEmojiPanel = !showEmojiPanel">
-                    <el-icon><Sunny /></el-icon>
-                    <span>表情</span>
+
+                  <button
+                    class="tool-btn subtle"
+                    :class="{ active: showThinking }"
+                    type="button"
+                    aria-label="切换深度思考模式"
+                    title="深度思考模式"
+                    @click="showThinking = !showThinking"
+                  >
+                    <el-icon><MoreFilled /></el-icon>
+                    <span>{{ showThinking ? '深度思考已开启' : '深度思考' }}</span>
+                  </button>
+
+                  <span class="input-meta-text">{{ composerStatusText }}</span>
+                </div>
+
+                <div class="input-row">
+                  <el-input
+                    v-model="userInput"
+                    type="textarea"
+                    resize="none"
+                    :autosize="{ minRows: 2, maxRows: 6 }"
+                    placeholder="输入你的问题，支持连续追问与文件问答"
+                    @keydown="handleKeydown"
+                  />
+
+                  <button
+                    class="send-btn"
+                    :class="{ stop: isStreaming }"
+                    type="button"
+                    :disabled="!isStreaming && !canSend"
+                    :aria-label="isStreaming ? '停止生成' : '发送消息'"
+                    @click="isStreaming ? stopStream() : sendMessage()"
+                  >
+                    <el-icon><component :is="isStreaming ? Close : Promotion" /></el-icon>
+                    <span>{{ isStreaming ? '停止生成' : '发送' }}</span>
                   </button>
                 </div>
 
-                <div class="input-toolbar-right">
-                  <span class="hint-text">支持 PDF / DOCX / PNG / JPG / JPEG</span>
-                  <span v-if="sendingState === 'error'" class="network-hint is-error">网络异常，请重试</span>
-                  <span v-else-if="isStreaming" class="network-hint">AI 正在输入…</span>
-                  <span v-else-if="sendingState === 'sending'" class="network-hint">消息发送中…</span>
+                <div class="input-footer">
+                  <span class="hint-text">支持 PDF / DOCX / PNG / JPG / JPEG，单个文件不超过 {{ props.maxFileSizeMB }}MB</span>
+                  <span v-if="sendingState === 'error'" class="network-hint is-error">请求失败，请稍后重试</span>
+                  <span v-else-if="isStreaming" class="network-hint">回答正在实时生成中</span>
+                  <span v-else-if="sendingState === 'sending'" class="network-hint">正在建立连接</span>
                 </div>
               </div>
             </div>
           </div>
+
+          <aside v-if="isFullscreen" class="chat-sidebar">
+            <section class="sidebar-section">
+              <div class="sidebar-title">文件工作台</div>
+              <div v-if="uploadedFiles.length" class="sidebar-file-list">
+                <div v-for="file in uploadedFiles" :key="file.id" class="upload-card compact" :class="file.status">
+                  <div class="upload-card-icon">
+                    <el-icon><component :is="getFileIcon(file)" /></el-icon>
+                  </div>
+                  <div class="upload-card-main">
+                    <div class="upload-card-name-row">
+                      <span class="file-name">{{ file.name }}</span>
+                      <span class="file-size">{{ formatFileSize(file.size) }}</span>
+                    </div>
+                    <div class="upload-card-status">
+                      <span class="upload-status-badge" :class="file.status">
+                        <span>{{ file.statusText || fileStatusLabel(file.status) }}</span>
+                      </span>
+                    </div>
+                  </div>
+                  <button class="delete-btn" type="button" aria-label="移除文件" title="移除文件" @click="removeFile(file.id)">
+                    <el-icon><Delete /></el-icon>
+                  </button>
+                </div>
+              </div>
+              <div v-else class="sidebar-empty">
+                <span>暂无文件</span>
+                <small>上传简历、JD 或作品材料后，侧栏会显示状态与使用记录。</small>
+              </div>
+            </section>
+
+            <section class="sidebar-section">
+              <div class="sidebar-title">推荐问题</div>
+              <div class="sidebar-question-list">
+                <button v-for="card in quickQuestionCards" :key="card.prompt" type="button" class="sidebar-question" @click="sendQuickQuestion(card.prompt)">
+                  <span>{{ card.title }}</span>
+                  <small>{{ card.prompt }}</small>
+                </button>
+              </div>
+            </section>
+          </aside>
         </div>
 
-        <template v-if="!isFullscreen && !isMinimized">
-          <span class="resize-handle top" @mousedown.prevent="startResize('top', $event)"></span>
-          <span class="resize-handle right" @mousedown.prevent="startResize('right', $event)"></span>
-          <span class="resize-handle bottom" @mousedown.prevent="startResize('bottom', $event)"></span>
-          <span class="resize-handle left" @mousedown.prevent="startResize('left', $event)"></span>
-          <span class="resize-handle top-left" @mousedown.prevent="startResize('top-left', $event)"></span>
-          <span class="resize-handle top-right" @mousedown.prevent="startResize('top-right', $event)"></span>
-          <span class="resize-handle bottom-left" @mousedown.prevent="startResize('bottom-left', $event)"></span>
-          <span class="resize-handle bottom-right" @mousedown.prevent="startResize('bottom-right', $event)"></span>
+        <template v-if="!isFullscreen">
+          <span class="resize-handle bottom-right" aria-hidden="true" @mousedown.prevent="startResize('bottom-right', $event)"></span>
         </template>
       </div>
     </transition>
@@ -1166,17 +1432,23 @@ onUnmounted(() => {
       class="chatbot-float-btn"
       :class="{ dragging: isDraggingBtn }"
       :style="{ left: `${btnPosition.x}px`, top: `${btnPosition.y}px` }"
+      role="button"
+      tabindex="0"
+      :aria-label="`打开 AI 助手，当前状态：${floatButtonStatusText}`"
       @mousedown="onFloatBtnDown"
       @mouseup="onFloatBtnUp"
       @touchstart="onFloatBtnDown"
       @touchend="onFloatBtnUp"
+      @keydown.enter.prevent="openChat"
+      @keydown.space.prevent="openChat"
     >
+      <span class="float-btn-status" :class="assistantPresenceTone"></span>
       <div class="float-btn-icon">
-        <el-icon :size="24"><ChatDotRound /></el-icon>
+        <el-icon :size="22"><ChatDotRound /></el-icon>
       </div>
-      <div class="float-btn-text">
+      <div class="float-btn-tooltip">
         <span>AI 助手</span>
-        <small>点击咨询</small>
+        <small>{{ floatButtonStatusText }}</small>
       </div>
     </div>
 
@@ -1202,17 +1474,26 @@ onUnmounted(() => {
 }
 
 .chat-window {
+  --surface: rgba(255, 255, 255, 0.92);
+  --surface-soft: rgba(248, 250, 252, 0.92);
+  --line: rgba(148, 163, 184, 0.18);
+  --text-main: #0f172a;
+  --text-subtle: #64748b;
+  --accent: #2563eb;
+  --danger: #dc2626;
   position: fixed;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border-radius: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  background: rgba(255, 255, 255, 0.86);
-  backdrop-filter: blur(16px);
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  background:
+    radial-gradient(circle at top left, rgba(59, 130, 246, 0.06), transparent 30%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(248, 250, 252, 0.96) 100%);
+  backdrop-filter: blur(18px);
   box-shadow:
-    0 24px 64px rgba(15, 23, 42, 0.16),
-    0 10px 24px rgba(15, 23, 42, 0.08);
+    0 20px 50px rgba(15, 23, 42, 0.12),
+    0 6px 20px rgba(15, 23, 42, 0.06);
   pointer-events: auto;
   user-select: none;
 }
@@ -1220,6 +1501,7 @@ onUnmounted(() => {
 .chat-window.fullscreen {
   border-radius: 0;
   border: none;
+  box-shadow: none;
 }
 
 .chat-window.dragging,
@@ -1228,13 +1510,15 @@ onUnmounted(() => {
 }
 
 .chat-header {
-  height: 64px;
-  padding: 0 16px;
+  min-height: 68px;
+  padding: 14px 18px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: linear-gradient(135deg, #3b82f6 0%, #7c3aed 52%, #0f172a 100%);
-  color: #fff;
+  gap: 16px;
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.78);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.16);
   cursor: grab;
   flex-shrink: 0;
 }
@@ -1251,15 +1535,16 @@ onUnmounted(() => {
 }
 
 .assistant-avatar {
-  width: 40px;
-  height: 40px;
+  width: 42px;
+  height: 42px;
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.18);
+  background: linear-gradient(145deg, rgba(37, 99, 235, 0.12), rgba(15, 23, 42, 0.08));
+  color: var(--accent);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
   flex-shrink: 0;
+  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.08);
 }
 
 .header-meta {
@@ -1274,113 +1559,208 @@ onUnmounted(() => {
 
 .header-title-row h4 {
   margin: 0;
-  font-size: 15px;
-  line-height: 1;
+  font-size: 16px;
+  line-height: 1.2;
   font-weight: 700;
+  color: var(--text-main);
 }
 
 .assistant-badge {
-  height: 20px;
+  height: 22px;
   padding: 0 8px;
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  background: rgba(37, 99, 235, 0.08);
+  color: var(--accent);
   font-size: 11px;
   font-weight: 700;
-  background: rgba(255, 255, 255, 0.16);
 }
 
-.drag-tip {
-  height: 20px;
-  padding: 0 8px;
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 700;
-  background: rgba(15, 23, 42, 0.18);
-  color: rgba(255, 255, 255, 0.86);
-}
-
-.header-status {
-  margin-top: 6px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
+.header-subtitle {
+  margin: 4px 0 0;
+  color: var(--text-subtle);
   font-size: 12px;
-  opacity: 0.95;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #86efac;
-  box-shadow: 0 0 0 4px rgba(134, 239, 172, 0.18);
-  flex-shrink: 0;
-}
-
-.status-dot.streaming {
-  animation: pulse 1.1s infinite ease-in-out;
 }
 
 .header-actions {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-left: 12px;
 }
 
-.action-btn,
+.header-menu {
+  position: relative;
+}
+
 .icon-btn,
 .tool-btn,
 .send-btn,
 .quick-chip,
-.delete-btn {
+.delete-btn,
+.bubble-tool-btn,
+.scenario-card,
+.sidebar-question,
+.menu-item,
+.inline-action,
+.expand-btn {
   border: none;
   outline: none;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease,
+    opacity 0.18s ease;
 }
 
-.action-btn {
-  height: 30px;
-  padding: 0 10px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.16);
-  color: #fff;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.action-btn:hover,
-.icon-btn:hover {
-  background: rgba(255, 255, 255, 0.24);
-}
-
-.action-btn.danger {
-  background: rgba(239, 68, 68, 0.18);
-}
-
-.icon-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.14);
-  color: #fff;
+.icon-btn,
+.delete-btn,
+.bubble-tool-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
+}
+
+.icon-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: rgba(248, 250, 252, 0.96);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  color: var(--text-main);
+}
+
+.icon-btn:hover,
+.tool-btn:hover,
+.delete-btn:hover,
+.bubble-tool-btn:hover,
+.quick-chip:hover,
+.scenario-card:hover,
+.sidebar-question:hover,
+.send-btn:hover,
+.inline-action:hover,
+.expand-btn:hover {
+  transform: translateY(-1px);
+}
+
+.icon-btn:hover {
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+  border-color: rgba(37, 99, 235, 0.18);
 }
 
 .icon-btn.close:hover {
-  background: rgba(239, 68, 68, 0.22);
+  color: var(--danger);
+  border-color: rgba(220, 38, 38, 0.18);
+}
+
+.icon-btn:focus-visible,
+.tool-btn:focus-visible,
+.send-btn:focus-visible,
+.quick-chip:focus-visible,
+.delete-btn:focus-visible,
+.bubble-tool-btn:focus-visible,
+.scenario-card:focus-visible,
+.sidebar-question:focus-visible,
+.menu-item:focus-visible,
+.inline-action:focus-visible,
+.expand-btn:focus-visible,
+.chatbot-float-btn:focus-visible {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+.header-menu-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 148px;
+  padding: 8px;
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.12);
+  z-index: 20;
+}
+
+.menu-item {
+  width: 100%;
+  min-height: 38px;
+  padding: 0 12px;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-main);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.menu-item:hover {
+  background: rgba(248, 250, 252, 0.9);
+}
+
+.menu-item.warning {
+  color: #b45309;
+}
+
+.window-status-bar {
+  min-height: 44px;
+  padding: 0 18px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+  background: rgba(255, 255, 255, 0.7);
+  overflow: hidden;
+}
+
+.status-pill {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-main);
+  background: rgba(248, 250, 252, 0.92);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  flex-shrink: 0;
+}
+
+.status-pill.success {
+  color: #166534;
+}
+
+.status-pill.info {
+  color: var(--accent);
+}
+
+.status-pill.danger {
+  color: var(--danger);
+}
+
+.status-pill-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 4px rgba(148, 163, 184, 0.12);
+}
+
+.status-summary {
+  min-width: 0;
+  color: var(--text-subtle);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .chat-body {
@@ -1389,8 +1769,112 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   background:
-    radial-gradient(circle at top, rgba(59, 130, 246, 0.08), transparent 28%),
-    linear-gradient(180deg, #f8fbff 0%, #f6f7fb 100%);
+    linear-gradient(180deg, rgba(248, 250, 252, 0.72) 0%, rgba(241, 245, 249, 0.9) 100%),
+    radial-gradient(circle at top right, rgba(37, 99, 235, 0.06), transparent 28%);
+}
+
+.chat-body.fullscreen {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+}
+
+.chat-main {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-sidebar {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 18px 18px 18px 0;
+}
+
+.sidebar-section {
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.76);
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.05);
+}
+
+.sidebar-title {
+  margin-bottom: 12px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.sidebar-file-list,
+.sidebar-question-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sidebar-question {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(248, 250, 252, 0.9);
+  border: 1px solid var(--line);
+  text-align: left;
+  color: var(--text-main);
+}
+
+.sidebar-question small {
+  display: block;
+  margin-top: 6px;
+  color: var(--text-subtle);
+  line-height: 1.5;
+}
+
+.sidebar-empty {
+  color: var(--text-subtle);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.sidebar-empty small {
+  display: block;
+  margin-top: 6px;
+}
+
+.stream-status-bar {
+  margin: 14px 16px 0;
+  padding: 10px 12px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.stream-status-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(148, 163, 184, 0.8);
+  flex-shrink: 0;
+}
+
+.stream-status-indicator.active {
+  background: var(--accent);
+  box-shadow: 0 0 0 6px rgba(37, 99, 235, 0.14);
+  animation: pulse 1.3s infinite ease-in-out;
+}
+
+.inline-action {
+  margin-left: auto;
+  padding: 0;
+  background: transparent;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .messages-container {
@@ -1403,13 +1887,13 @@ onUnmounted(() => {
 .message-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 14px;
 }
 
 .message-row {
   display: flex;
-  gap: 10px;
-  align-items: flex-end;
+  gap: 12px;
+  align-items: flex-start;
 }
 
 .message-row.user {
@@ -1417,8 +1901,8 @@ onUnmounted(() => {
 }
 
 .message-avatar {
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   border-radius: 12px;
   flex-shrink: 0;
   display: flex;
@@ -1429,67 +1913,78 @@ onUnmounted(() => {
 }
 
 .message-row.assistant .message-avatar {
-  background: linear-gradient(135deg, #3b82f6 0%, #7c3aed 100%);
-  color: #fff;
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--accent);
 }
 
 .message-row.user .message-avatar {
-  background: #0f172a;
+  background: rgba(15, 23, 42, 0.9);
   color: #fff;
 }
 
 .message-main {
-  max-width: min(82%, 680px);
+  max-width: min(82%, 720px);
   display: flex;
   flex-direction: column;
+  gap: 6px;
 }
 
 .message-row.user .message-main {
   align-items: flex-end;
 }
 
+.message-meta-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-subtle);
+  font-size: 12px;
+}
+
+.message-row.user .message-meta-line {
+  justify-content: flex-end;
+}
+
+.message-author {
+  font-weight: 700;
+  color: var(--text-main);
+}
+
 .message-bubble {
   position: relative;
-  padding: 12px 14px 30px;
-  border-radius: 14px;
-  font-size: 13px;
-  line-height: 1.7;
-  word-break: break-word;
-  overflow-wrap: anywhere;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+  padding: 14px 16px 14px;
+  border-radius: 18px;
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.05);
 }
 
 .message-row.assistant .message-bubble {
-  color: #1f2937;
-  background: rgba(255, 255, 255, 0.95);
-  border-bottom-left-radius: 6px;
+  border-bottom-left-radius: 8px;
 }
 
 .message-row.user .message-bubble {
-  color: #fff;
-  background: linear-gradient(135deg, #2563eb 0%, #4f46e5 100%);
-  border-bottom-right-radius: 6px;
+  background: linear-gradient(180deg, #eef4ff 0%, #e3edff 100%);
+  border-color: rgba(59, 130, 246, 0.12);
+  color: #16325c;
+  border-bottom-right-radius: 8px;
 }
 
 .message-bubble.error {
-  background: #fff1f2 !important;
-  color: #b91c1c !important;
-  border: 1px solid #fecdd3;
-}
-
-.message-bubble.collapsed {
-  overflow: hidden;
+  border-color: rgba(220, 38, 38, 0.18);
+  background: rgba(254, 242, 242, 0.96);
+  color: #991b1b;
 }
 
 .message-tools {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: 10px;
+  right: 10px;
   display: flex;
   gap: 6px;
   opacity: 0;
   transform: translateY(-4px);
-  transition: all 0.18s ease;
 }
 
 .message-row:hover .message-tools {
@@ -1498,19 +1993,11 @@ onUnmounted(() => {
 }
 
 .bubble-tool-btn {
-  width: 26px;
-  height: 26px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.68);
-  color: #334155;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.message-row.user .bubble-tool-btn {
-  background: rgba(255, 255, 255, 0.2);
-  color: #fff;
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
+  background: rgba(248, 250, 252, 0.9);
+  color: var(--text-subtle);
 }
 
 .bubble-tool-btn:disabled {
@@ -1518,42 +2005,97 @@ onUnmounted(() => {
   cursor: not-allowed;
 }
 
-.message-time-inline {
+.message-content {
+  padding-right: 28px;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.message-content.is-collapsed {
+  max-height: 220px;
+  overflow: hidden;
+}
+
+.collapse-mask {
   position: absolute;
-  right: 12px;
-  bottom: 8px;
+  inset: auto 0 44px 0;
+  height: 72px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.98) 82%);
+  pointer-events: none;
+}
+
+.message-row.user .collapse-mask {
+  background: linear-gradient(180deg, rgba(227, 237, 255, 0) 0%, rgba(227, 237, 255, 0.98) 82%);
+}
+
+.expand-btn {
+  margin-top: 10px;
+  padding: 0;
+  background: transparent;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.message-files {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed rgba(148, 163, 184, 0.3);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.message-file-item,
+.upload-card-name-row,
+.upload-card-status {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 11px;
+}
+
+.message-file-item {
+  gap: 8px;
   color: inherit;
-  opacity: 0.72;
 }
 
-.stream-tag {
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: rgba(59, 130, 246, 0.1);
-  color: #2563eb;
+.message-state-tip {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(248, 250, 252, 0.92);
+  color: var(--text-subtle);
 }
 
-.message-row.user .stream-tag {
-  background: rgba(255, 255, 255, 0.18);
-  color: #fff;
+.message-state-tip.error {
+  background: rgba(254, 242, 242, 0.92);
+  color: #b91c1c;
+}
+
+.message-stream-tag {
+  margin-top: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .typing-placeholder {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  color: #64748b;
+  color: var(--text-subtle);
 }
 
 .typing-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #64748b;
+  background: currentColor;
   animation: typing 1.2s infinite ease-in-out;
 }
 
@@ -1565,71 +2107,73 @@ onUnmounted(() => {
   animation-delay: 0.3s;
 }
 
-.expand-btn {
-  margin-top: 8px;
-  padding: 0;
-  background: transparent;
-  color: inherit;
-  font-size: 12px;
-  font-weight: 700;
-  opacity: 0.85;
-}
-
-.emoji-panel {
-  margin-bottom: 10px;
-  padding: 8px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(148, 163, 184, 0.16);
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.emoji-btn {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  background: #f8fafc;
-  font-size: 18px;
-}
-
-.emoji-btn:hover {
-  background: #e2e8f0;
-}
-
-.message-files {
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px dashed rgba(148, 163, 184, 0.35);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.message-file-item,
-.upload-chip-left {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
+.stream-cursor {
+  display: inline-block;
+  width: 8px;
+  height: 18px;
+  margin-left: 4px;
+  vertical-align: text-bottom;
+  background: currentColor;
+  border-radius: 999px;
+  animation: cursorBlink 1s infinite steps(1, end);
 }
 
 .file-name {
-  max-width: 180px;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.file-size {
+.file-size,
+.message-time {
   color: inherit;
-  opacity: 0.7;
+  opacity: 0.68;
   flex-shrink: 0;
 }
 
+.scenario-grid {
+  padding: 0 16px 12px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.scenario-card {
+  min-height: 122px;
+  padding: 16px;
+  border-radius: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  text-align: left;
+  color: var(--text-main);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
+}
+
+.scenario-title {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.scenario-desc {
+  color: var(--text-subtle);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.scenario-prompt {
+  margin-top: auto;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .quick-questions {
-  padding: 0 14px 10px;
+  padding: 0 16px 10px;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -1639,92 +2183,256 @@ onUnmounted(() => {
   height: 34px;
   padding: 0 14px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.85);
-  color: #334155;
-  font-size: 12px;
+  background: rgba(255, 255, 255, 0.88);
   border: 1px solid rgba(148, 163, 184, 0.18);
-}
-
-.quick-chip:hover {
-  transform: translateY(-1px);
-  color: #1d4ed8;
-  border-color: rgba(59, 130, 246, 0.24);
-  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.12);
+  color: var(--text-main);
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .upload-preview {
-  padding: 0 14px 10px;
+  padding: 0 16px 12px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
-.upload-chip {
-  padding: 10px 12px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.84);
-  border: 1px solid rgba(148, 163, 184, 0.16);
+.upload-card {
+  padding: 12px;
+  border-radius: 16px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(148, 163, 184, 0.16);
 }
 
-.delete-btn {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  background: #f8fafc;
-  color: #64748b;
+.upload-card.compact {
+  padding: 10px 12px;
+}
+
+.upload-card.parsing {
+  border-color: rgba(37, 99, 235, 0.22);
+  background: rgba(239, 246, 255, 0.96);
+}
+
+.upload-card.used {
+  border-color: rgba(22, 163, 74, 0.18);
+}
+
+.upload-card.failed {
+  border-color: rgba(220, 38, 38, 0.22);
+  background: rgba(254, 242, 242, 0.96);
+}
+
+.upload-card-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  background: rgba(37, 99, 235, 0.08);
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.upload-card.failed .upload-card-icon {
+  background: rgba(220, 38, 38, 0.08);
+  color: var(--danger);
+}
+
+.upload-card-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.upload-card-name-row {
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.upload-card-status {
+  margin-top: 8px;
+}
+
+.upload-status-badge {
+  min-height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(248, 250, 252, 0.92);
+  color: var(--text-subtle);
+}
+
+.upload-status-badge.added {
+  color: var(--text-main);
+}
+
+.upload-status-badge.parsing {
+  color: var(--accent);
+  background: rgba(219, 234, 254, 0.96);
+}
+
+.upload-status-badge.used {
+  color: #166534;
+  background: rgba(220, 252, 231, 0.9);
+}
+
+.upload-status-badge.failed {
+  color: #b91c1c;
+  background: rgba(254, 226, 226, 0.94);
+}
+
+.delete-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  background: rgba(248, 250, 252, 0.96);
+  color: var(--text-subtle);
   flex-shrink: 0;
 }
 
 .delete-btn:hover {
-  color: #dc2626;
-  background: #fee2e2;
+  color: var(--danger);
 }
 
 .input-panel {
-  padding: 0 14px 14px;
-  flex-shrink: 0;
+  position: relative;
+  padding: 0 16px 16px;
+}
+
+.drop-hint {
+  position: absolute;
+  inset: 0 16px 16px;
+  border-radius: 22px;
+  border: 1.5px dashed rgba(37, 99, 235, 0.22);
+  background: rgba(239, 246, 255, 0.88);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.98);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.input-panel.is-drag-over .drop-hint {
+  opacity: 1;
+  transform: scale(1);
 }
 
 .input-shell {
+  position: relative;
   padding: 12px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.92);
+  border-radius: 20px;
   border: 1px solid rgba(148, 163, 184, 0.16);
-  box-shadow: 0 16px 30px rgba(148, 163, 184, 0.12);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 16px 34px rgba(15, 23, 42, 0.08);
+}
+
+.input-topbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.input-meta-text {
+  min-width: 0;
+  margin-left: auto;
+  color: var(--text-subtle);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tool-btn {
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(239, 246, 255, 0.96);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.tool-btn.subtle {
+  background: rgba(248, 250, 252, 0.96);
+  color: var(--text-main);
+}
+
+.tool-btn.active {
+  background: rgba(219, 234, 254, 0.98);
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.1);
 }
 
 .input-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) 112px;
   gap: 10px;
-  align-items: end;
+  align-items: stretch;
+}
+
+.input-shell :deep(.el-textarea) {
+  height: 100%;
 }
 
 .input-shell :deep(.el-textarea__inner) {
-  min-height: 56px !important;
-  max-height: 140px;
-  padding: 12px 14px;
-  border-radius: 14px;
-  border-color: rgba(148, 163, 184, 0.22);
+  min-height: 72px !important;
+  max-height: 156px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border-color: rgba(148, 163, 184, 0.2);
   box-shadow: none;
-  background: #f8fafc;
+  background: rgba(248, 250, 252, 0.88);
+  color: var(--text-main);
   font-size: 13px;
   line-height: 1.7;
 }
 
 .input-shell :deep(.el-textarea__inner:focus) {
-  border-color: #60a5fa;
+  border-color: rgba(59, 130, 246, 0.38);
   background: #fff;
 }
 
-.input-toolbar {
+.send-btn {
+  min-height: 72px;
+  border-radius: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: #0f172a;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.12);
+}
+
+.send-btn.stop {
+  background: #dc2626;
+}
+
+.send-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.input-footer {
   margin-top: 10px;
   display: flex;
   align-items: center;
@@ -1732,88 +2440,14 @@ onUnmounted(() => {
   gap: 12px;
 }
 
-.input-toolbar-left,
-.input-toolbar-right {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.tool-btn {
-  height: 34px;
-  padding: 0 12px;
-  border-radius: 10px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: #eff6ff;
-  color: #1d4ed8;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.tool-btn.ghost {
-  background: #f8fafc;
-  color: #475569;
-}
-
-.tool-btn:hover {
-  background: #dbeafe;
-}
-
-.tool-btn.ghost:hover {
-  background: #e2e8f0;
-}
-
 .hint-text,
 .network-hint {
   font-size: 11px;
-  color: #94a3b8;
+  color: var(--text-subtle);
 }
 
 .network-hint.is-error {
-  color: #dc2626;
-}
-
-.send-btn {
-  height: 38px;
-  padding: 0 16px;
-  border-radius: 12px;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  background: linear-gradient(135deg, #2563eb 0%, #4f46e5 100%);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 700;
-  box-shadow: 0 10px 20px rgba(59, 130, 246, 0.22);
-}
-
-.send-btn:hover {
-  transform: translateY(-1px);
-}
-
-.send-btn:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-  transform: none;
-  box-shadow: none;
-}
-
-.send-btn.stop {
-  background: linear-gradient(135deg, #f97316 0%, #ef4444 100%);
-  box-shadow: 0 10px 20px rgba(249, 115, 22, 0.22);
-}
-
-.message-fade-enter-active,
-.message-fade-leave-active {
-  transition: opacity 0.22s ease, transform 0.22s ease;
-}
-
-.message-fade-enter-from,
-.message-fade-leave-to {
-  opacity: 0;
-  transform: translateY(8px);
+  color: var(--danger);
 }
 
 .chatbot-float-btn {
@@ -1821,144 +2455,132 @@ onUnmounted(() => {
   width: 64px;
   height: 64px;
   border-radius: 22px;
-  background: linear-gradient(135deg, #2563eb 0%, #7c3aed 68%, #111827 100%);
+  background: rgba(15, 23, 42, 0.96);
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 18px 36px rgba(37, 99, 235, 0.26);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
   cursor: grab;
   pointer-events: auto;
   user-select: none;
-  overflow: hidden;
-  transition: width 0.22s ease, border-radius 0.22s ease, transform 0.18s ease, box-shadow 0.18s ease;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
 }
 
 .chatbot-float-btn:hover {
-  width: 156px;
-  border-radius: 18px;
+  transform: translateY(-2px);
+  box-shadow: 0 22px 44px rgba(15, 23, 42, 0.22);
 }
 
 .chatbot-float-btn.dragging,
 .chatbot-float-btn:active {
   cursor: grabbing;
-  transform: scale(1.04);
-  box-shadow: 0 20px 40px rgba(37, 99, 235, 0.32);
+  transform: scale(1.03);
 }
 
 .float-btn-icon {
-  width: 64px;
-  height: 64px;
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
 }
 
-.float-btn-text {
-  width: 88px;
-  padding-right: 12px;
+.float-btn-status {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.14);
+}
+
+.float-btn-status.info {
+  background: var(--accent);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.16);
+}
+
+.float-btn-status.danger {
+  background: var(--danger);
+  box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.16);
+}
+
+.float-btn-tooltip {
+  position: absolute;
+  right: calc(100% + 12px);
+  top: 50%;
+  transform: translateY(-50%) translateX(6px);
+  min-width: 88px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.92);
+  color: #fff;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
   gap: 2px;
   font-size: 12px;
-  font-weight: 700;
   opacity: 0;
-  transform: translateX(10px);
-  transition: all 0.22s ease;
+  pointer-events: none;
+  transition: opacity 0.18s ease, transform 0.18s ease;
 }
 
-.float-btn-text small {
+.float-btn-tooltip small {
   font-size: 10px;
-  opacity: 0.82;
+  color: rgba(255, 255, 255, 0.72);
 }
 
-.chatbot-float-btn:hover .float-btn-text {
+.chatbot-float-btn:hover .float-btn-tooltip,
+.chatbot-float-btn:focus-visible .float-btn-tooltip {
   opacity: 1;
-  transform: translateX(0);
+  transform: translateY(-50%) translateX(0);
 }
 
 .resize-handle {
   position: absolute;
-  z-index: 3;
-}
-
-.resize-handle.top,
-.resize-handle.bottom {
-  left: 14px;
-  right: 14px;
-  height: 8px;
-}
-
-.resize-handle.left,
-.resize-handle.right {
-  top: 14px;
-  bottom: 14px;
-  width: 8px;
-}
-
-.resize-handle.top {
-  top: -4px;
-  cursor: ns-resize;
-}
-
-.resize-handle.right {
-  right: -4px;
-  cursor: ew-resize;
-}
-
-.resize-handle.bottom {
-  bottom: -4px;
-  cursor: ns-resize;
-}
-
-.resize-handle.left {
-  left: -4px;
-  cursor: ew-resize;
-}
-
-.resize-handle.top-left,
-.resize-handle.top-right,
-.resize-handle.bottom-left,
-.resize-handle.bottom-right {
-  width: 16px;
-  height: 16px;
-}
-
-.resize-handle.top-left {
-  left: -4px;
-  top: -4px;
-  cursor: nwse-resize;
-}
-
-.resize-handle.top-right {
-  right: -4px;
-  top: -4px;
-  cursor: nesw-resize;
-}
-
-.resize-handle.bottom-left {
-  left: -4px;
-  bottom: -4px;
-  cursor: nesw-resize;
+  z-index: 4;
 }
 
 .resize-handle.bottom-right {
-  right: -4px;
-  bottom: -4px;
+  right: 6px;
+  bottom: 6px;
+  width: 18px;
+  height: 18px;
   cursor: nwse-resize;
+}
+
+.resize-handle.bottom-right::before {
+  content: '';
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 12px;
+  height: 12px;
+  border-right: 2px solid rgba(148, 163, 184, 0.65);
+  border-bottom: 2px solid rgba(148, 163, 184, 0.65);
+  border-bottom-right-radius: 6px;
 }
 
 .assistant-window-enter-active,
-.assistant-window-leave-active {
+.assistant-window-leave-active,
+.menu-fade-enter-active,
+.menu-fade-leave-active,
+.message-fade-enter-active,
+.message-fade-leave-active {
   transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
 .assistant-window-enter-from,
 .assistant-window-leave-to {
   opacity: 0;
-  transform: translateY(16px) scale(0.98);
+  transform: translateY(14px) scale(0.985);
+}
+
+.menu-fade-enter-from,
+.menu-fade-leave-to,
+.message-fade-enter-from,
+.message-fade-leave-to {
+  opacity: 0;
+  transform: translateY(6px);
 }
 
 .messages-container::-webkit-scrollbar {
@@ -1967,7 +2589,7 @@ onUnmounted(() => {
 
 .messages-container::-webkit-scrollbar-thumb {
   border-radius: 999px;
-  background: rgba(148, 163, 184, 0.5);
+  background: rgba(148, 163, 184, 0.48);
   border: 2px solid transparent;
   background-clip: padding-box;
 }
@@ -1976,24 +2598,111 @@ onUnmounted(() => {
   background: transparent;
 }
 
+:deep(h1),
+:deep(h2),
+:deep(h3),
+:deep(h4) {
+  margin: 0 0 10px;
+  color: inherit;
+  line-height: 1.4;
+}
+
+:deep(h1) {
+  font-size: 20px;
+}
+
+:deep(h2) {
+  font-size: 17px;
+}
+
+:deep(h3) {
+  font-size: 15px;
+}
+
 :deep(p) {
-  margin: 0 0 8px;
+  margin: 0 0 10px;
 }
 
 :deep(p:last-child) {
   margin-bottom: 0;
 }
 
-:deep(pre) {
-  overflow-x: auto;
+:deep(ul),
+:deep(ol) {
+  margin: 0 0 10px;
+  padding-left: 18px;
+}
+
+:deep(li) {
+  margin: 4px 0;
+}
+
+:deep(blockquote) {
+  margin: 0 0 10px;
   padding: 10px 12px;
-  border-radius: 12px;
-  background: rgba(15, 23, 42, 0.06);
+  border-left: 3px solid rgba(37, 99, 235, 0.25);
+  background: rgba(248, 250, 252, 0.9);
+  color: #334155;
+  border-radius: 0 12px 12px 0;
+}
+
+:deep(pre) {
+  margin: 0 0 10px;
+  overflow-x: auto;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.92);
+  color: #e2e8f0;
 }
 
 :deep(code) {
   font-family: Consolas, Monaco, monospace;
   font-size: 12px;
+}
+
+:deep(:not(pre) > code) {
+  padding: 2px 6px;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.07);
+  color: #0f172a;
+}
+
+:deep(table) {
+  width: 100%;
+  margin: 0 0 10px;
+  border-collapse: collapse;
+  overflow: hidden;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+:deep(th),
+:deep(td) {
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+  text-align: left;
+  font-size: 12px;
+}
+
+:deep(th) {
+  background: rgba(248, 250, 252, 0.94);
+  font-weight: 700;
+}
+
+:deep(a) {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+:deep(hr) {
+  margin: 12px 0;
+  border: none;
+  border-top: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.rotating {
+  animation: spin 1s linear infinite;
 }
 
 @keyframes pulse {
@@ -2003,8 +2712,8 @@ onUnmounted(() => {
     opacity: 1;
   }
   50% {
-    transform: scale(1.12);
-    opacity: 0.72;
+    transform: scale(1.08);
+    opacity: 0.78;
   }
 }
 
@@ -2013,7 +2722,7 @@ onUnmounted(() => {
   80%,
   100% {
     transform: scale(0.7);
-    opacity: 0.45;
+    opacity: 0.4;
   }
   40% {
     transform: scale(1);
@@ -2021,31 +2730,95 @@ onUnmounted(() => {
   }
 }
 
+@keyframes cursorBlink {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  46%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 1024px) {
+  .chat-body.fullscreen {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .chat-sidebar {
+    padding: 0 16px 16px;
+  }
+
+  .scenario-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 768px) {
   .chat-window {
-    border-radius: 18px;
+    border-radius: 20px;
   }
 
-  .header-actions .action-btn,
-  .drag-tip {
-    display: none;
+  .window-status-bar {
+    padding: 8px 14px;
+    align-items: flex-start;
+    flex-wrap: wrap;
   }
 
-  .chatbot-float-btn:hover {
-    width: 64px;
-    border-radius: 22px;
-  }
-
-  .float-btn-text {
-    display: none;
+  .status-summary {
+    width: 100%;
   }
 
   .message-main {
-    max-width: 88%;
+    max-width: 90%;
   }
 
-  .hint-text {
-    display: none;
+  .input-topbar,
+  .input-footer {
+    flex-wrap: wrap;
+  }
+
+  .input-meta-text {
+    width: 100%;
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .chat-window:not(.fullscreen) {
+    width: calc(100vw - 16px) !important;
+    height: calc(100vh - 92px) !important;
+    left: 8px !important;
+    top: auto !important;
+    bottom: 76px !important;
+  }
+
+  .chat-header {
+    padding: 12px 14px;
+  }
+
+  .assistant-avatar {
+    width: 38px;
+    height: 38px;
+  }
+
+  .messages-container,
+  .quick-questions,
+  .upload-preview,
+  .input-panel,
+  .scenario-grid {
+    padding-left: 12px;
+    padding-right: 12px;
   }
 
   .input-row {
@@ -2053,26 +2826,11 @@ onUnmounted(() => {
   }
 
   .send-btn {
-    width: 100%;
-  }
-}
-
-@media (max-width: 480px) {
-  .chat-window:not(.fullscreen) {
-    width: calc(100vw - 16px) !important;
-    height: calc(100vh - 100px) !important;
-    left: 8px !important;
-    top: auto !important;
-    bottom: 80px !important;
+    min-height: 44px;
   }
 
-  .quick-questions {
-    padding-inline: 10px;
-  }
-
-  .upload-preview,
-  .input-panel {
-    padding-inline: 10px;
+  .float-btn-tooltip {
+    display: none;
   }
 }
 </style>
