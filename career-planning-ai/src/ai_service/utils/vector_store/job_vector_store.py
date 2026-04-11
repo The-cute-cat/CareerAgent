@@ -1,15 +1,19 @@
 import asyncio
 import json
-from typing import Union, List, Dict, Any
+from typing import Union, List, Dict, Any, Optional
 
 from pymilvus import (
     connections, FieldSchema, CollectionSchema, DataType, Collection, utility,
     AnnSearchRequest, WeightedRanker
 )
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from ai_service.models.struct_job_txt import JDAnalysisResult, convert_file_to_pydantic_list
+from ai_service.models.struct_job_txt import JDAnalysisResult, convert_file_to_pydantic_list, \
+    build_jd_result_from_portrait
 from ai_service.models.struct_txt import StudentProfile
 from ai_service.utils.aliyun_embedding import AliyunEmbedding
+from ai_service.repository.job_portrait_repository import JobPortraitRepository
+
 from ai_service.utils.json_fixer import fix_json_file
 from ai_service.utils.logger_handler import log
 from config import settings
@@ -36,7 +40,7 @@ class JobVectorStore:
         self.embedder = AliyunEmbedding(api_key=api_key)
         # 1. 连接 Milvus
         if self.url != "<url>" and self.token != "<token>":
-            connections.connect("default", uri=self.url, token=self.token)
+            connections.connect("default", host=self.url, port=self.port)
             log.info(f"✅ 已连接到 Zilliz 云服务!")
         else:
             connections.connect("default", host=self.host, port=self.port)
@@ -45,13 +49,38 @@ class JobVectorStore:
         # 2. 初始化或加载 Collection
         self.collection = self._init_collection()
 
+
     def _init_collection(self):
         """定义 Milvus 集合的 Schema，包含标量字段和 4 个向量字段"""
         if utility.has_collection(self.collection_name):
             collection = Collection(self.collection_name)
+
+            # 🔑 关键修复：检查并为缺失的向量字段创建索引
+            # 所有向量字段必须先有索引，才能 load() 到内存
+            vector_fields = ["vec_basic", "vec_skills", "vec_literacy", "vec_potential"]
+            existing_indexes = {idx.field_name for idx in collection.indexes}
+
+            for field_name in vector_fields:
+                # 如果字段没有索引，自动补建
+                if field_name not in existing_indexes:
+                    log.info(f"🔧 为字段 '{field_name}' 补建索引...")
+                    collection.create_index(
+                        field_name=field_name,
+                        index_params={
+                            "metric_type": "COSINE",
+                            "index_type": "HNSW",
+                            "params": {"M": 8, "efConstruction": 64}
+                        },
+                        index_name=f"{field_name}_idx"
+                    )
+                    log.info(f"✅ 索引 '{field_name}_idx' 创建成功")
+
+            # 确保所有索引创建完成后再加载
             collection.load()
+            log.info(f"✅ Collection '{self.collection_name}' 已存在，索引检查完成，加载成功")
             return collection
 
+        # ========== 新建集合的原有逻辑（保持不变）==========
         fields = [
             # 主键
             FieldSchema(name="job_id", dtype=DataType.VARCHAR, max_length=100, is_primary=True),
@@ -80,6 +109,45 @@ class JobVectorStore:
         collection.load()
         log.info(f"✅ Collection '{self.collection_name}' 初始化并加载完成")
         return collection
+    # def _init_collection(self):
+    #     """定义 Milvus 集合的 Schema，包含标量字段和 4 个向量字段"""
+    #     if utility.has_collection(self.collection_name):
+    #         collection = Collection(self.collection_name)
+    #         try:
+    #             collection.load()
+    #             return collection
+    #         except Exception as e:
+    #             log.warning(f"⚠️加载已有集合失败: {e}，正在尝试重新建立集合...")
+    #             utility.drop_collection(self.collection_name)
+    #
+    #     fields = [
+    #         # 主键
+    #         FieldSchema(name="job_id", dtype=DataType.VARCHAR, max_length=100, is_primary=True),
+    #         # 标量：用于 >= 过滤的数值等级
+    #         FieldSchema(name="degree_level", dtype=DataType.INT64, description="学历等级"),
+    #         FieldSchema(name="exp_level", dtype=DataType.INT64, description="经验等级"),
+    #         # 原始数据
+    #         FieldSchema(name="raw_data", dtype=DataType.JSON, description="岗位完整原始数据"),
+    #         # 四个维度的向量
+    #         FieldSchema(name="vec_basic", dtype=DataType.FLOAT_VECTOR, dim=self.dim, description="基础要求向量"),
+    #         FieldSchema(name="vec_skills", dtype=DataType.FLOAT_VECTOR, dim=self.dim, description="职业技能向量"),
+    #         FieldSchema(name="vec_literacy", dtype=DataType.FLOAT_VECTOR, dim=self.dim, description="职业素养向量"),
+    #         FieldSchema(name="vec_potential", dtype=DataType.FLOAT_VECTOR, dim=self.dim, description="发展潜力向量")
+    #     ]
+    #
+    #     schema = CollectionSchema(fields, description="多维岗位画像库")
+    #     collection = Collection(self.collection_name, schema)
+    #
+    #     # 为四个向量字段分别创建索引
+    #     index_params = {"metric_type": "COSINE", "index_type": "HNSW", "params": {"M": 8, "efConstruction": 64}}
+    #     collection.create_index(field_name="vec_basic", index_params=index_params)
+    #     collection.create_index(field_name="vec_skills", index_params=index_params)
+    #     collection.create_index(field_name="vec_literacy", index_params=index_params)
+    #     collection.create_index(field_name="vec_potential", index_params=index_params)
+    #
+    #     collection.load()
+    #     log.info(f"✅ Collection '{self.collection_name}' 初始化并加载完成")
+    #     return collection
 
     # ================= 工具方法：等级映射 =================
     @staticmethod
@@ -108,6 +176,48 @@ class JobVectorStore:
         if isinstance(obj, dict):
             return " ".join([f"{k}:{v}" for k, v in obj.items() if v])
         return obj.model_dump_json(by_alias=True)
+
+    async def load_all_jd_results_from_db(
+            self,
+            session: AsyncSession,
+            filters: Optional[Dict[str, Any]] = None,
+            active_only: bool = False,
+    ) -> Dict[str, Any]:
+        """
+        读取 job_profile 表全部数据，并将 skills_req 转换为 JDAnalysisResult 列表。
+        """
+        repo = JobPortraitRepository(session)
+
+        final_filters = dict(filters or {})
+        if active_only and "is_deleted" not in final_filters:
+            final_filters["is_deleted"] = 0
+
+        portraits = await repo.get_list_all(filters=final_filters or None)
+
+        stats = {
+            "db_total": len(portraits),
+            "convert_success": 0,
+            "convert_failed": 0,
+            "errors": []
+        }
+        jd_results: List[JDAnalysisResult] = []
+
+        for portrait in portraits:
+            try:
+                jd_result = build_jd_result_from_portrait(portrait)
+                jd_results.append(jd_result)
+                stats["convert_success"] += 1
+            except Exception as e:
+                stats["convert_failed"] += 1
+                stats["errors"].append({
+                    "job_profile_id": portrait.id,
+                    "job_title": portrait.job_title,
+                    "error": str(e)
+                })
+                log.error(f"❌ job_profile.id={portrait.id} 转 JDAnalysisResult 失败: {e}")
+
+        stats["items"] = jd_results
+        return stats
 
     # ================= 入库方法 =================
     def insert_job(self, jd_results: Union[JDAnalysisResult, List[JDAnalysisResult]]) -> Dict[str, Any]:
@@ -316,63 +426,44 @@ class JobVectorStore:
 
 
 if __name__ == "__main__":
-    from ai_service.models.struct_txt import StudentProfile, BasicRequirements, ProfessionalSkills, \
-        ProfessionalLiteracy, DevelopmentPotential, SpecialConstraints, PracticalExperience
+    # 1. 从数据库加载岗位画像并转换为 JDAnalysisResult 列表
+    # 注意：需要在异步环境中调用 load_all_jd_results_from_db 方法
+    async def load_and_insert():
+        from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+        from sqlalchemy.orm import sessionmaker
 
-    # 学生：一位精通 Vue3 和 Python AI 组件的软件工程大四 学生
-    student_test_data = StudentProfile(
-        基础信息=BasicRequirements(学历="博士", 专业背景="软件工程", 证书=["CET-6", "计算机二级"], 实习时长=6,
-                                   求职状态="应届生"),
-        专业技能=ProfessionalSkills(
-            核心专业技能=["Vue3", "Java", "Python", "RAG", "LLM", " TypeScript", " CSS3"],
-            工具与平台能力=["Milvus", "MySQL", "SQLAlchemy", "Git", "Webpack", " Vite"],
-            行业领域知识评分=4,
-            语言能力=["CET-6 流利"],
-            项目经验丰富度=4
-        ),
-        职业素养=ProfessionalLiteracy(
-            沟通能力=4,
-            团队协作=5,
-            抗压能力=4,
-            逻辑思维=5,
-            责任心与职业道德=5
-        ),
-        发展潜力=DevelopmentPotential(
-            学习能力=5,
-            创新能力=4,
-            领导力潜质=3,
-            职业倾向性="技术型",
-            环境适应性=4
-        ),
-        个人限制=SpecialConstraints(
-            生理限制="无",
-            价值观限制="不接受博彩行业",
-            环境限制="无",
-            时间习惯限制="无",
-            其他特殊要求="希望在西安或北京工作"
-        ),
-        实践详情=PracticalExperience(
-            项目经历详情="开发了一个基于 AI 的大学生职业规划 Agent 项目，负责全栈开发。",
-            实习经历详情="在某科技公司实习 6 个月，负责后端数据库优化。",
-            校园_实践活动="校学生会技术部部长",
-            竞赛获奖详情="中国高校计算机大赛一等奖"
+        # 创建异步数据库引擎和会话工厂
+        from ai_service.repository.connection_session import get_db_url
+        engine = create_async_engine(get_db_url(), echo=False)
+        AsyncSessionLocal = async_sessionmaker(
+            engine,
+            expire_on_commit=False,
+            class_=AsyncSession,
         )
-    )
+
+        async with AsyncSessionLocal() as session:
+            store = JobVectorStore()
+            stats = await store.load_all_jd_results_from_db(session=session)
+            log.info(f"从数据库加载并转换完成！总计: {stats['db_total']}, 转换成功: {stats['convert_success']}, 转换失败: {stats['convert_failed']}")
+            await store.insert_job_async(stats["items"])
+
+    asyncio.run(load_and_insert())
+
+
+if __name__ == "__main__":
 
     # 1. 初始化
     store = JobVectorStore()
     store.reset_collection()
-    # # 2. 模拟岗位入库
-    # for jd in job_list:
-    #     store.insert_job(jd)
-    #
-    # # 3. 执行匹配
-    # print("\n--- 正在为该学生匹配最合适的岗位 ---")
-    # matches = store.match_jobs_for_student(student_test_data, top_k=20)
-    # for match in matches:
-    #     print(f"匹配结果：{match['job_id']} (得分: {match['score']:.2f})")
-    #     print(f"岗位详情：{match['raw_data']}")
-    #     print("-" * 50)
+
+#
+#     # # 3. 执行匹配
+#     # print("\n--- 正在为该学生匹配最合适的岗位 ---")
+#     # matches = store.match_jobs_for_student(student_test_data, top_k=20)
+#     # for match in matches:
+#     #     print(f"匹配结果：{match['job_id']} (得分: {match['score']:.2f})")
+#     #     print(f"岗位详情：{match['raw_data']}")
+#     #     print("-" * 50)
 
 # async def main():
 #     file_path = r"E:\软件工程相关资料\项目比赛\服创2026\岗位.json"

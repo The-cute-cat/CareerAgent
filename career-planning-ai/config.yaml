@@ -18,7 +18,14 @@ vector:
   model_name: text-embedding-v4
   llm_model_name: qwen-max
   llm_long_model_name: qwen-long
-
+lite_llm:
+  model_name: dashscope/qwen-max
+  qwen:
+    model_name: dashscope/qwen3.5-plus
+  deepseek:
+    model_name: dashscope/deepseek-v3-plus
+  image:
+    model_name: dashscope/qwen-vl-plus
 llm:
   model_name: qwen-max
   base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
@@ -60,11 +67,11 @@ path_config: # 路径配置，需要绝对路径，否则使用默认路径
   data: <DATA_PATH>
 milvus:
   local:
-    host: 192.168.3.128
+    host: 47.110.225.35
     port: 19530
   cloud:
     url: <url>
-    token: <token>
+    password: <token>
 chroma_config:
   save_path: <SAVE_PATH>
   model_name: text-embedding-v4
