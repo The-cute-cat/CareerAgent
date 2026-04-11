@@ -66,12 +66,13 @@ path_config: # 路径配置，需要绝对路径，否则使用默认路径
   prompt: <PROMPT_PATH>
   data: <DATA_PATH>
 milvus:
+  force_local: false # true=强制本地模式，false=自动故障转移
   local:
     host: 47.110.225.35
     port: 19530
   cloud:
     url: <url>
-    password: <token>
+    token: <token>
 chroma_config:
   save_path: <SAVE_PATH>
   model_name: text-embedding-v4

@@ -253,6 +253,8 @@ class _Vector(BaseModel):
 
 
 class _Milvus(BaseModel):
+    force_local: bool = True  # true=强制本地模式，false=自动故障转移
+
     class _Local(BaseModel):
         host: str = ""
         port: int = 19530

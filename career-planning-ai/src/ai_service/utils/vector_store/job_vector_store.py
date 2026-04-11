@@ -8,16 +8,17 @@ from pymilvus import (
 )
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from ai_service.models.struct_job_txt import JDAnalysisResult, convert_file_to_pydantic_list, \
-    build_jd_result_from_portrait
+from ai_service.models.struct_job_txt import JDAnalysisResult, build_jd_result_from_portrait
 from ai_service.models.struct_txt import StudentProfile
-from ai_service.utils.aliyun_embedding import AliyunEmbedding
 from ai_service.repository.job_portrait_repository import JobPortraitRepository
-
-from ai_service.utils.json_fixer import fix_json_file
+from ai_service.utils.aliyun_embedding import AliyunEmbedding
 from ai_service.utils.logger_handler import log
 from config import settings
 
+__all__ = [
+    "JobVectorStore",
+    "store",
+]
 
 
 class JobVectorStore:
@@ -38,17 +39,64 @@ class JobVectorStore:
         self.token = token
         self.collection_name = collection_name
         self.embedder = AliyunEmbedding(api_key=api_key)
-        # 1. 连接 Milvus
-        if self.url != "<url>" and self.token != "<token>":
-            connections.connect("default", host=self.url, port=self.port)
-            log.info(f"✅ 已连接到 Zilliz 云服务!")
-        else:
-            connections.connect("default", host=self.host, port=self.port)
-            log.info(f"✅ 已连接到本地 Milvus: {self.host}:{self.port}")
+        # 1. 连接 Milvus（支持自动故障转移）
+        self._connect_with_failover()
 
         # 2. 初始化或加载 Collection
         self.collection = self._init_collection()
 
+    def _connect_with_failover(self):
+        """
+        智能连接 Milvus
+        - force_local=true: 强制使用本地配置，不进行故障转移
+        - force_local=false: 自动选择（优先本地，失败后尝试云端）
+        """
+        use_cloud = (
+                self.url not in ("", "<url>", None)
+                and self.token not in ("", "<token>", None)
+        )
+        force_local = getattr(settings.milvus, 'force_local', False)
+        if force_local:
+            # 强制使用本地，不尝试云端
+            connected = self._try_connect("local", self.host, self.port)
+            if not connected:
+                raise ConnectionError(
+                    f"❌ 无法连接到本地 Milvus 服务器（强制本地模式）！\n"
+                    f"  - 地址: {self.host}:{self.port}"
+                )
+        else:
+            # 自动选择：优先本地，失败后尝试云端
+            connections_to_try = [("local", self.host, self.port)]
+            if use_cloud:
+                connections_to_try.append(("cloud", self.url, self.token))
+            connected = False
+            for i, (conn_type, param1, param2) in enumerate(connections_to_try):
+                if i > 0:
+                    log.warning(f"⚠️ 上一个服务器连接失败，尝试切换到 {conn_type} 服务器...")
+                connected = self._try_connect(conn_type, param1, param2)
+                if connected:
+                    break
+            if not connected:
+                raise ConnectionError(
+                    f"❌ 无法连接到任何 Milvus 服务器！\n"
+                    f"  - 本地: {self.host}:{self.port}\n"
+                    f"  - 云端: {self.url if use_cloud else '未配置'}"
+                )
+
+    @staticmethod
+    def _try_connect(conn_type: str, param1, param2) -> bool:
+        """尝试连接 Milvus，返回是否成功"""
+        try:
+            if conn_type == "local":
+                connections.connect("default", host=param1, port=param2)
+                log.info(f"✅ 已连接到本地 Milvus: {param1}:{param2}")
+            else:
+                connections.connect("default", uri=param1, token=param2)
+                log.info(f"✅ 已连接到 Zilliz 云服务!")
+            return True
+        except Exception as e:
+            log.warning(f"⚠️ 连接 {conn_type} 失败: {e}")
+            return False
 
     def _init_collection(self):
         """定义 Milvus 集合的 Schema，包含标量字段和 4 个向量字段"""
@@ -109,6 +157,7 @@ class JobVectorStore:
         collection.load()
         log.info(f"✅ Collection '{self.collection_name}' 初始化并加载完成")
         return collection
+
     # def _init_collection(self):
     #     """定义 Milvus 集合的 Schema，包含标量字段和 4 个向量字段"""
     #     if utility.has_collection(self.collection_name):
@@ -341,6 +390,7 @@ class JobVectorStore:
             统计信息 {success: int, failed: int, total: int, errors: []}
         """
         return await asyncio.to_thread(self.insert_job, jd_results)
+
     # ================= 重置方法 =================
     def reset_collection(self):
         self.collection.drop()
@@ -425,12 +475,13 @@ class JobVectorStore:
         return matched_jobs
 
 
+store = JobVectorStore()
+
 if __name__ == "__main__":
     # 1. 从数据库加载岗位画像并转换为 JDAnalysisResult 列表
     # 注意：需要在异步环境中调用 load_all_jd_results_from_db 方法
     async def load_and_insert():
         from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-        from sqlalchemy.orm import sessionmaker
 
         # 创建异步数据库引擎和会话工厂
         from ai_service.repository.connection_session import get_db_url
@@ -442,18 +493,16 @@ if __name__ == "__main__":
         )
 
         async with AsyncSessionLocal() as session:
-            store = JobVectorStore()
             stats = await store.load_all_jd_results_from_db(session=session)
-            log.info(f"从数据库加载并转换完成！总计: {stats['db_total']}, 转换成功: {stats['convert_success']}, 转换失败: {stats['convert_failed']}")
+            log.info(
+                f"从数据库加载并转换完成！总计: {stats['db_total']}, 转换成功: {stats['convert_success']}, 转换失败: {stats['convert_failed']}")
             await store.insert_job_async(stats["items"])
+
 
     asyncio.run(load_and_insert())
 
-
 if __name__ == "__main__":
-
     # 1. 初始化
-    store = JobVectorStore()
     store.reset_collection()
 
 #
