@@ -26,7 +26,7 @@ except Exception:
 # 模型：BAAI/bge-base-zh-v1.5 或 BAAI/bge-small-zh-v1.5 或 BAAI/bge-tiny-zh-v1.5
 async def cluster_standard_jobs_with_hdbscan(
     session: AsyncSession,
-    min_cluster_size: int = 6,# 1. 形成簇的最小样本数
+    min_cluster_size: int = 8,# 1. 形成簇的最小样本数
     batch_size: int = 64,
     embedding_model: str = "BAAI/bge-base-zh-v1.5",
     hdbscan_min_samples: int = 3,    # 2. 核心点的最小邻居数 (密度敏感度)
@@ -70,7 +70,7 @@ async def cluster_standard_jobs_with_hdbscan(
         desc_max_len=desc_max_len,
     )
 
-    log.info(f"向量同步结果：{sync_stats}")
+    # log.info(f"向量同步结果：{sync_stats}")
 
     total = len(valid_jobs)
     if total == 0:
