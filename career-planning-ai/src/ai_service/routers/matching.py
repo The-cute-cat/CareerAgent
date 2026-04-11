@@ -1,20 +1,20 @@
 from fastapi import APIRouter, Body, Depends
 
+from ai_service.agents.career_analyst_agent import CareerAnalystAgent
 from ai_service.models.struct_txt import StudentProfile
 from ai_service.response.result import success
 from ai_service.schemas.auth import validate_token
 from ai_service.services import log
 from ai_service.services.job_merger import job_merger
-from ai_service.agents.career_analyst_agent import CareerAnalystAgent
-from ai_service.utils.vector_store.job_vector_store import JobVectorStore
+from ai_service.utils.vector_store.job_vector_store import store
 
 __all__ = ["router"]
 
 router = APIRouter(prefix="/matching", tags=["match"])
 
 # 初始化组件 (建议在全局作用域或 lifespan 中初始化以复用连接和模型加载)
-store = JobVectorStore()
 agent = CareerAnalystAgent()
+
 
 @router.post("/jobs", summary="基于人物画像进行人岗匹配与深度分析")
 # 如果发现运行是model限流的话，就改career_analyst_agent.py这个文件
@@ -56,7 +56,7 @@ async def match_jobs(
         # 假设你有一个错误处理机制或特定的 Error 返回格式
         # 这里可以直接抛出你项目中定义的 CommonHandleError
         from ai_service.exceptions import CommonHandleError
-        raise CommonHandleError(f"匹配失败: {str(e)}")
+        raise CommonHandleError(msg=f"匹配失败: {str(e)}")
 
 
 @router.post("/job_merge", summary="合并岗位")
