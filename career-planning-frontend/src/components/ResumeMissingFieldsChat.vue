@@ -118,7 +118,7 @@ const getCodeAbilityUrls = (rawLinks: string) => rawLinks
   .split(/[\n,，]/)
   .map(item => item.trim())
   .filter(Boolean)
-const isValidCodeRepoUrl = (url: string) => /^https?:\/\/(www\.)?(github\.com|gitee\.com)\/[^/]+\/[^/]+\/?$/i.test(url)
+const isValidCodeProfileUrl = (url: string) => /^https?:\/\/(www\.)?(github\.com|gitee\.com)\/[^/]+\/?$/i.test(url)
 
 const syncDraftFromForm = () => {
   const field = currentField.value?.field
@@ -294,7 +294,7 @@ const validateCurrentField = () => {
     case 'codeAbility':
       return {
         valid: !!codeAbilityLinksValue.value.trim(),
-        message: '请输入至少一个 GitHub 或 Gitee 仓库链接',
+        message: '请输入至少一个 GitHub 或 Gitee 用户主页链接，如 https://github.com/username',
         value: {
           links: codeAbilityLinksValue.value.trim(),
           useAi: codeAbilityUseAiValue.value
@@ -317,9 +317,9 @@ const submitCurrentField = () => {
 
   if (currentField.value.field === 'codeAbility') {
     const payload = result.value as { links: string; useAi: boolean }
-    const invalidUrl = getCodeAbilityUrls(payload.links).find(url => !isValidCodeRepoUrl(url))
+    const invalidUrl = getCodeAbilityUrls(payload.links).find(url => !isValidCodeProfileUrl(url))
     if (invalidUrl) {
-      ElMessage.warning(`存在无效仓库链接：${invalidUrl}`)
+      ElMessage.warning(`链接格式不正确，仅支持主页链接如 https://github.com/username：${invalidUrl}`)
       return
     }
   }
@@ -542,7 +542,7 @@ const skipCurrentField = () => {
         <div v-else-if="currentField?.field === 'codeAbility'" class="composer-body">
           <div class="code-ability-guide">
             <p class="code-ability-guide-text">
-              支持填写一个或多个 GitHub / Gitee 仓库链接，多个链接可用换行、英文逗号或中文逗号分隔。提交后会直接打开评估结果。
+              支持填写 GitHub / Gitee 用户主页链接，如 https://github.com/username，多个链接可用换行、英文逗号或中文逗号分隔。提交后会直接打开评估结果。
             </p>
             <el-input
               v-model="codeAbilityLinksValue"
