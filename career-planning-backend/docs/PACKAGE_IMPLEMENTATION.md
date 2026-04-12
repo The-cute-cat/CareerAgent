@@ -307,7 +307,7 @@ GET /package/list/type/2  // 查询所有会员套餐
 
 ## 📚 相关文档
 
-- [PACKAGE_API.md](./PACKAGE_API.md) - 详细的 API 接口文档
+- [PACKAGE_API.md](PACKAGE_API.md) - 详细的 API 接口文档
 - [src/main/resources/package_init.sql](./src/main/resources/package_init.sql) - SQL 初始化脚本
 - [test_package_api.py](./test_package_api.py) - Python 测试脚本
 

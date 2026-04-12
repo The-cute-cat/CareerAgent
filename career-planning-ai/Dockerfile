@@ -1,25 +1,34 @@
+# 构建阶段
+FROM python:3.12-slim as builder
+
+WORKDIR /app
+RUN apt-get update && apt-get install -y build-essential gcc g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install poetry==2.3.1
+
+COPY pyproject.toml poetry.lock poetry.toml ./
+RUN poetry config virtualenvs.in-project true && \
+    poetry install --no-interaction --no-ansi --only main --no-root
+
+# 运行阶段
 FROM python:3.12-slim
 
 WORKDIR /app
 
-# 系统依赖
-RUN apt-get update && apt-get install -y \
-    build-essential gcc g++ libgl1 libglib2.0-0 curl \
+RUN apt-get update && apt-get install -y libgl1 libglib2.0-0 libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Poetry 配置
-ENV POETRY_HOME=/opt/poetry
-ENV POETRY_VIRTUALENVS_CREATE=false
-ENV POETRY_NO_INTERACTION=1
-RUN pip install poetry==2.3.1
+COPY --from=builder /app/.venv /app/.venv
+ENV PATH="/app/.venv/bin:$PATH"
 
-# 安装依赖
-COPY pyproject.toml poetry.lock ./
-RUN poetry install --no-interaction --no-ansi --only main --no-root
+# ✅ 关键：设置 PYTHONPATH 包含 src 目录
+ENV PYTHONPATH="/app/src:/app"
 
-# 复制代码
-COPY . .
+COPY main.py config.py config.yaml ./
+COPY src ./src
+
+RUN mkdir -p /app/data /app/logs
 
 EXPOSE 9000
-
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "9000"]
