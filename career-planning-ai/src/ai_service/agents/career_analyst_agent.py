@@ -141,7 +141,8 @@ class CareerAnalystAgent:
             "score": 0,
             "missing_key_skills": ["分析接口请求失败"],
             "gap_matrix": [],
-            "actionable_advice": "系统繁忙，请稍后重试"
+            "actionable_advice": "系统繁忙，请稍后重试",
+            "all_analysis": "分析接口请求失败"
         }
 
     async def batch_analyze_async(
@@ -165,8 +166,8 @@ class CareerAnalystAgent:
         ]
 
         # 2. 等待所有任务并发完成 (这里将 10 个请求的时间压缩到 1 个请求的时间)
-        log.info(f"🚀 启动并发分析，共 {len(tasks)} 个岗位，请稍候...")
-        analyzed_jobs = await asyncio.gather(*tasks)
+        log.info(f"🚀启动并发分析，共 {len(tasks)} 个岗位，请稍候...")
+        analyzed_jobs  = await asyncio.gather(*tasks)
 
         # 3. 拦截与重排逻辑 (Rerank)
         # 排序规则：can_apply 为 True 的排在前面，同状态下按 score 降序，最后按原向量召回 score 降序
