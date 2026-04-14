@@ -1,13 +1,17 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 import {
   DocumentCopy,
   View,
   Download,
   MagicStick,
-  ArrowRight
+  ArrowRight,
+  Edit
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+
+const router = useRouter()
 
 const templates = ref([
   {
@@ -40,6 +44,10 @@ const templates = ref([
 const handleUse = (name: string) => {
   ElMessage.success(`开始生成「${name}」面试简历...`)
 }
+
+const goToResumeEditor = () => {
+  router.push('/resume-editor')
+}
 </script>
 
 <template>
@@ -52,9 +60,14 @@ const handleUse = (name: string) => {
           <p>基于你的“能力画像”，精选多款由资深猎头推荐的职场黄金模板</p>
         </div>
       </div>
-      <el-button type="primary" round class="batch-btn">
-        一键同步能力画像 <el-icon class="el-icon--right"><ArrowRight /></el-icon>
-      </el-button>
+      <div class="header-actions">
+        <el-button type="primary" round class="batch-btn">
+          一键同步能力画像 <el-icon class="el-icon--right"><ArrowRight /></el-icon>
+        </el-button>
+        <el-button type="success" round class="editor-btn" :icon="Edit" @click="goToResumeEditor">
+          编辑简历
+        </el-button>
+      </div>
     </div>
 
     <div class="template-grid">
@@ -117,6 +130,11 @@ const handleUse = (name: string) => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.header-actions {
+  display: flex;
+  gap: 12px;
 }
 
 .header-content {
@@ -252,6 +270,16 @@ const handleUse = (name: string) => {
     padding: 24px;
     align-items: flex-start;
   }
-  .batch-btn { width: 100%; }
+  .header-actions {
+    width: 100%;
+    flex-direction: column;
+  }
+  .batch-btn, .editor-btn { width: 100%; }
+}
+
+.editor-btn {
+  background: linear-gradient(135deg, #409eff 0%, #66b1ff 100%);
+  border: none;
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.3);
 }
 </style>

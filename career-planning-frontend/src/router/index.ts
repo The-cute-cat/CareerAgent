@@ -29,6 +29,11 @@ const routes = [
     component: () => import('../views/ResumeEditor.vue'),
   },
   {
+    path: '/career-form/voice',
+    name: 'career-form-voice',
+    component: () => import('../views/CareerFormVoice.vue'),
+  },
+  {
     path: '/',
     component: () => import('../components/Layout.vue'), // 布局组件
     children: [

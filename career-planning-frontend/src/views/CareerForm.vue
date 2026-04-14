@@ -69,6 +69,7 @@ const formRef = ref<FormInstance>()
 
 /** 当前激活的菜单项索引，控制显示哪个表单步骤 (1-5) */
 const activeMenu = ref('1')
+type CareerSection = 'resume' | 'template' | 'voice'
 const activeProfileTab = ref<'resume' | 'template'>('resume')
 
 /** 表单提交状态，控制提交按钮的加载状态 */
@@ -139,7 +140,11 @@ if (!resumeProfileExtras.value.educationHistory?.length) {
 }
 
 const syncCareerSectionFromRoute = () => {
-  activeProfileTab.value = route.path.includes('/career-form/template') ? 'template' : 'resume'
+  if (route.path.includes('/career-form/template')) {
+    activeProfileTab.value = 'template'
+    return
+  }
+  activeProfileTab.value = 'resume'
 }
 
 watch(() => route.path, syncCareerSectionFromRoute, { immediate: true })
@@ -395,9 +400,16 @@ const handleMenuSelect = (index: string) => {
   activeMenu.value = index
 }
 
-const switchCareerSection = (section: 'resume' | 'template') => {
-  activeProfileTab.value = section
-  router.push(section === 'resume' ? '/career-form/resume' : '/career-form/template')
+const switchCareerSection = (section: CareerSection) => {
+  if (section !== 'voice') {
+    activeProfileTab.value = section
+  }
+  const routeMap: Record<CareerSection, string> = {
+    resume: '/career-form/resume',
+    template: '/career-form/template',
+    voice: '/career-form/voice'
+  }
+  router.push(routeMap[section])
 }
 
 const goToResumeEditor = () => {
@@ -2369,6 +2381,15 @@ const resetForm = () => {
             <el-icon><Folder /></el-icon>
             <span>导出简历</span>
           </button>
+          <button
+            type="button"
+            class="career-section-tab"
+            :class="{ 'is-active': route.path.includes('/career-form/voice') }"
+            @click="switchCareerSection('voice')"
+          >
+            <el-icon><DataAnalysis /></el-icon>
+            <span>语音输入</span>
+          </button>
         </div>
 
         <template v-if="activeProfileTab === 'resume'">
@@ -2448,6 +2469,7 @@ const resetForm = () => {
             </div>
           </div>
         </template>
+
       </el-aside>
 
       <!-- 主内容区 -->
@@ -2957,6 +2979,9 @@ const resetForm = () => {
             <div class="form-actions">
               <el-button class="form-action-btn" @click="resetForm" :icon="RefreshRight">
                 重置表单
+              </el-button>
+              <el-button class="form-action-btn" @click="switchCareerSection('voice')" :icon="DataAnalysis">
+                语音输入
               </el-button>
               <el-button class="form-action-btn form-action-btn--template" @click="switchCareerSection('template')" :icon="Document">
                 前往简历模板
