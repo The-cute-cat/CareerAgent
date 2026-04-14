@@ -14,6 +14,7 @@ import instructor
 import litellm
 from pydantic import BaseModel, SecretStr
 
+from ai_service.models.job_info import JobInfo
 from ai_service.models.struct_job_txt import (
     JDAnalysisResult,
     Profiles,
