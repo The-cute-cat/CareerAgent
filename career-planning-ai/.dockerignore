@@ -1,0 +1,60 @@
+# Python 相关
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# 虚拟环境
+venv/
+ENV/
+env/
+.venv
+
+# Poetry
+.poetry/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# 测试
+tests/
+*.test
+.pytest_cache/
+.coverage
+htmlcov/
+
+# 文档
+docs/
+*.md
+!README.md
+
+# 临时文件
+*.log
+*.tmp
+temp/
+logs/
+
+# Node.js
+node_modules/
+npm-debug.log
+package-lock.json
+
+
+# 其他
+.DS_Store
+Thumbs.db
+test_*.http

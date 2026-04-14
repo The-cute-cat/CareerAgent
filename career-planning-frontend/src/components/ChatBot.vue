@@ -100,10 +100,10 @@ const props = withDefaults(defineProps<ChatConfig>(), {
   openOnScroll: false,
   scrollThreshold: 500,
   openOnExit: false,
-  defaultWidth: 480,
-  defaultHeight: 600,
-  minWidth: 360,
-  minHeight: 400,
+  defaultWidth: 420,
+  defaultHeight: 560,
+  minWidth: 340,
+  minHeight: 500,
   maxFileSizeMB: 10,
   quickQuestions: () => ['帮我分析一下我的简历', '这个岗位适合我吗？', '给我一些职业规划建议'],
   persistLayout: true,
@@ -112,7 +112,7 @@ const props = withDefaults(defineProps<ChatConfig>(), {
 
 const CONVERSATION_ID_KEY = 'career-chatbot-conversation-id'
 const EDGE_GAP = 12
-const FLOAT_BTN_SIZE = 64
+const FLOAT_BTN_SIZE = 72
 const MAX_UPLOAD_FILES = 5
 const COLLAPSE_THRESHOLD = 220
 const COLLAPSE_LINES = 4
@@ -142,7 +142,6 @@ const showThinking = ref(false)
 const streamResult = ref<StreamResult>('idle')
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const chatWindowRef = ref<HTMLElement | null>(null)
-const floatBtnRef = ref<HTMLElement | null>(null)
 const messagesContainer = ref<HTMLElement | null>(null)
 const moreMenuRef = ref<HTMLElement | null>(null)
 const abortController = ref<AbortController | null>(null)
@@ -207,7 +206,6 @@ const restoreRect = ref({
 const messages = ref<ChatMessage[]>([createWelcomeMessage()])
 
 const validUploadedFiles = computed(() => uploadedFiles.value.filter((item) => item.status === 'added'))
-const hasConversationStarted = computed(() => messages.value.some((item) => item.role === 'user'))
 const canSend = computed(() => {
   return (!!userInput.value.trim() || validUploadedFiles.value.length > 0) && !isStreaming.value
 })
@@ -217,7 +215,6 @@ const quickQuestionCards = computed(() => {
     { title: '岗位匹配', description: '结合目标职位判断匹配度与差距' },
     { title: '职业规划建议', description: '从阶段目标到行动路径给出建议' },
   ]
-
   return props.quickQuestions.map((prompt, index) => ({
     prompt,
     title: defaults[index]?.title || `场景 ${index + 1}`,
@@ -234,32 +231,12 @@ const assistantPresenceText = computed(() => {
   if (isStreaming.value) return '生成中'
   return '在线'
 })
-const statusItems = computed(() => {
-  const items = [{ label: assistantPresenceText.value, tone: assistantPresenceTone.value }]
-  if (isStreaming.value) {
-    items.push({ label: '正在生成回答', tone: 'info' })
-  } else if (sendingState.value === 'sending') {
-    items.push({ label: '请求已发送', tone: 'neutral' })
-  }
-  if (uploadedFiles.value.length) {
-    items.push({ label: `文件 ${uploadedFiles.value.length}`, tone: 'neutral' })
-  }
-  return items
-})
-const streamStatusText = computed(() => {
-  if (isStreaming.value) return 'AI 正在持续生成回答，内容会随着流式返回实时补全。'
-  if (sendingState.value === 'sending') return '请求已发送，正在等待模型开始响应。'
-  if (streamResult.value === 'stopped') return '本次回答已停止生成，你可以继续追问或重新生成。'
-  if (streamResult.value === 'error') return '本次请求没有成功完成，请稍后重试。'
-  return props.subtitle
-})
 const composerStatusText = computed(() => {
   if (sendingState.value === 'error') return '连接异常，请检查网络后重试'
   if (isStreaming.value) return 'Shift + Enter 换行，当前可停止生成'
   if (sendingState.value === 'sending') return '消息发送中，请稍候'
   return 'Enter 发送，Shift + Enter 换行'
 })
-const showScenarioCards = computed(() => !hasConversationStarted.value && !validUploadedFiles.value.length)
 const latestInteractiveMessageId = computed(() => {
   for (let i = messages.value.length - 1; i >= 0; i--) {
     const item = messages.value[i]
@@ -273,6 +250,10 @@ const floatButtonStatusText = computed(() => {
   if (sendingState.value === 'error') return '异常'
   if (isStreaming.value) return '生成中'
   return '在线'
+})
+
+const isTooltipRight = computed(() => {
+  return btnPosition.value.x < window.innerWidth / 2
 })
 
 watch(
@@ -1134,9 +1115,8 @@ onUnmounted(() => {
             <div class="header-meta">
               <div class="header-title-row">
                 <h4>{{ title }}</h4>
-                <span class="assistant-badge">{{ assistantPresenceText }}</span>
+                <span class="assistant-badge" v-if="sendingState === 'error' || isStreaming">{{ assistantPresenceText }}</span>
               </div>
-              <p class="header-subtitle">{{ subtitle }}</p>
             </div>
           </div>
 
@@ -1183,23 +1163,8 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <div class="window-status-bar">
-          <span v-for="item in statusItems" :key="item.label" class="status-pill" :class="item.tone">
-            <span class="status-pill-dot"></span>
-            {{ item.label }}
-          </span>
-          <span class="status-summary">{{ streamStatusText }}</span>
-        </div>
         <div class="chat-body" :class="{ fullscreen: isFullscreen }">
           <div class="chat-main">
-            <div v-if="isStreaming || sendingState === 'sending' || streamResult !== 'idle'" class="stream-status-bar">
-              <span class="stream-status-indicator" :class="{ active: isStreaming || sendingState === 'sending' }"></span>
-              <span>{{ streamStatusText }}</span>
-              <button v-if="streamResult === 'stopped' && lastRequestSnapshot" class="inline-action" type="button" @click="regenerateLastReply">
-                重新生成
-              </button>
-            </div>
-
             <div ref="messagesContainer" class="messages-container">
               <TransitionGroup name="message-fade" tag="div" class="message-list">
                 <div v-for="message in messages" :key="message.id" class="message-row" :class="message.role">
@@ -1277,46 +1242,6 @@ onUnmounted(() => {
               </TransitionGroup>
             </div>
 
-            <div v-if="showScenarioCards" class="scenario-grid">
-              <button v-for="card in quickQuestionCards" :key="card.prompt" type="button" class="scenario-card" @click="sendQuickQuestion(card.prompt)">
-                <span class="scenario-title">{{ card.title }}</span>
-                <span class="scenario-desc">{{ card.description }}</span>
-                <span class="scenario-prompt">{{ card.prompt }}</span>
-              </button>
-            </div>
-
-            <div v-else-if="quickQuestionCards.length && !isFullscreen" class="quick-questions">
-              <button v-for="card in quickQuestionCards" :key="card.prompt" type="button" class="quick-chip" @click="sendQuickQuestion(card.prompt)">
-                {{ card.title }}
-              </button>
-            </div>
-
-            <div v-if="uploadedFiles.length && !isFullscreen" class="upload-preview">
-              <div v-for="file in uploadedFiles" :key="file.id" class="upload-card" :class="file.status">
-                <div class="upload-card-icon">
-                  <el-icon><component :is="getFileIcon(file)" /></el-icon>
-                </div>
-                <div class="upload-card-main">
-                  <div class="upload-card-name-row">
-                    <span class="file-name">{{ file.name }}</span>
-                    <span class="file-size">{{ formatFileSize(file.size) }}</span>
-                  </div>
-                  <div class="upload-card-status">
-                    <span class="upload-status-badge" :class="file.status">
-                      <el-icon v-if="file.status === 'parsing'" class="rotating"><Loading /></el-icon>
-                      <el-icon v-else-if="file.status === 'used'"><CircleCheckFilled /></el-icon>
-                      <el-icon v-else-if="file.status === 'failed'"><WarningFilled /></el-icon>
-                      <el-icon v-else><Paperclip /></el-icon>
-                      <span>{{ file.statusText || fileStatusLabel(file.status) }}</span>
-                    </span>
-                  </div>
-                </div>
-                <button class="delete-btn" type="button" aria-label="移除文件" title="移除文件" @click="removeFile(file.id)">
-                  <el-icon><Delete /></el-icon>
-                </button>
-              </div>
-            </div>
-
             <div class="input-panel" :class="{ 'is-drag-over': isDragOver }">
               <div class="drop-hint">
                 <el-icon><Paperclip /></el-icon>
@@ -1324,39 +1249,29 @@ onUnmounted(() => {
               </div>
 
               <div class="input-shell">
-                <div class="input-topbar">
-                  <button class="tool-btn" type="button" aria-label="上传文件" title="上传文件" @click="triggerFileUpload">
-                    <el-icon><Paperclip /></el-icon>
-                    <span>上传文件</span>
-                  </button>
-
-                  <button
-                    class="tool-btn subtle"
-                    :class="{ active: showThinking }"
-                    type="button"
-                    aria-label="切换深度思考模式"
-                    title="深度思考模式"
-                    @click="showThinking = !showThinking"
-                  >
-                    <el-icon><MoreFilled /></el-icon>
-                    <span>{{ showThinking ? '深度思考已开启' : '深度思考' }}</span>
-                  </button>
-
-                  <span class="input-meta-text">{{ composerStatusText }}</span>
-                </div>
-
                 <div class="input-row">
-                  <el-input
-                    v-model="userInput"
-                    type="textarea"
-                    resize="none"
-                    :autosize="{ minRows: 2, maxRows: 6 }"
-                    placeholder="输入你的问题，支持连续追问与文件问答"
-                    @keydown="handleKeydown"
-                  />
+                  <div class="input-left-area">
+                    <button
+                      class="tool-btn icon-only"
+                      type="button"
+                      aria-label="上传文件"
+                      title="上传文件"
+                      @click="triggerFileUpload"
+                    >
+                      <el-icon><Paperclip /></el-icon>
+                    </button>
+                    <el-input
+                      v-model="userInput"
+                      type="textarea"
+                      resize="none"
+                      :autosize="{ minRows: 1, maxRows: 4 }"
+                      placeholder="输入你的问题..."
+                      @keydown="handleKeydown"
+                    />
+                  </div>
 
                   <button
-                    class="send-btn"
+                    class="send-btn compact"
                     :class="{ stop: isStreaming }"
                     type="button"
                     :disabled="!isStreaming && !canSend"
@@ -1364,15 +1279,24 @@ onUnmounted(() => {
                     @click="isStreaming ? stopStream() : sendMessage()"
                   >
                     <el-icon><component :is="isStreaming ? Close : Promotion" /></el-icon>
-                    <span>{{ isStreaming ? '停止生成' : '发送' }}</span>
                   </button>
                 </div>
 
-                <div class="input-footer">
-                  <span class="hint-text">支持 PDF / DOCX / PNG / JPG / JPEG，单个文件不超过 {{ props.maxFileSizeMB }}MB</span>
-                  <span v-if="sendingState === 'error'" class="network-hint is-error">请求失败，请稍后重试</span>
-                  <span v-else-if="isStreaming" class="network-hint">回答正在实时生成中</span>
-                  <span v-else-if="sendingState === 'sending'" class="network-hint">正在建立连接</span>
+                <div v-if="uploadedFiles.length" class="compact-upload-preview">
+                  <div v-for="file in uploadedFiles" :key="file.id" class="compact-upload-item" :class="file.status">
+                    <el-icon><component :is="getFileIcon(file)" /></el-icon>
+                    <span class="file-name">{{ file.name }}</span>
+                    <button class="delete-btn tiny" type="button" @click="removeFile(file.id)">
+                      <el-icon><Delete /></el-icon>
+                    </button>
+                  </div>
+                </div>
+
+                <div class="input-footer-hint">
+                  <span>{{ composerStatusText }}</span>
+                  <button v-if="showThinking || isStreaming || sendingState === 'error'" class="thinking-toggle subtle-text" type="button" @click="showThinking = !showThinking">
+                    {{ showThinking ? '深度思考已开启' : '深度思考' }}
+                  </button>
                 </div>
               </div>
             </div>
@@ -1428,9 +1352,8 @@ onUnmounted(() => {
 
     <div
       v-show="!dialogVisible"
-      ref="floatBtnRef"
       class="chatbot-float-btn"
-      :class="{ dragging: isDraggingBtn }"
+      :class="{ dragging: isDraggingBtn, 'tooltip-right': isTooltipRight }"
       :style="{ left: `${btnPosition.x}px`, top: `${btnPosition.y}px` }"
       role="button"
       tabindex="0"
@@ -1444,10 +1367,11 @@ onUnmounted(() => {
     >
       <span class="float-btn-status" :class="assistantPresenceTone"></span>
       <div class="float-btn-icon">
-        <el-icon :size="22"><ChatDotRound /></el-icon>
+        <el-icon :size="20"><ChatDotRound /></el-icon>
       </div>
+      <span class="float-btn-label">AI 助手</span>
       <div class="float-btn-tooltip">
-        <span>AI 助手</span>
+        <span>AI 智能助手</span>
         <small>{{ floatButtonStatusText }}</small>
       </div>
     </div>
@@ -1510,15 +1434,15 @@ onUnmounted(() => {
 }
 
 .chat-header {
-  min-height: 68px;
-  padding: 14px 18px;
+  min-height: 52px;
+  padding: 10px 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 12px;
   color: var(--text-main);
-  background: rgba(255, 255, 255, 0.78);
-  border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(255, 255, 255, 0.82);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
   cursor: grab;
   flex-shrink: 0;
 }
@@ -1535,9 +1459,9 @@ onUnmounted(() => {
 }
 
 .assistant-avatar {
-  width: 42px;
-  height: 42px;
-  border-radius: 14px;
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
   background: linear-gradient(145deg, rgba(37, 99, 235, 0.12), rgba(15, 23, 42, 0.08));
   color: var(--accent);
   display: flex;
@@ -1559,7 +1483,7 @@ onUnmounted(() => {
 
 .header-title-row h4 {
   margin: 0;
-  font-size: 16px;
+  font-size: 14px;
   line-height: 1.2;
   font-weight: 700;
   color: var(--text-main);
@@ -1600,10 +1524,8 @@ onUnmounted(() => {
 .icon-btn,
 .tool-btn,
 .send-btn,
-.quick-chip,
 .delete-btn,
 .bubble-tool-btn,
-.scenario-card,
 .sidebar-question,
 .menu-item,
 .inline-action,
@@ -1629,9 +1551,9 @@ onUnmounted(() => {
 }
 
 .icon-btn {
-  width: 36px;
-  height: 36px;
-  border-radius: 12px;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
   background: rgba(248, 250, 252, 0.96);
   border: 1px solid rgba(148, 163, 184, 0.2);
   color: var(--text-main);
@@ -1641,8 +1563,6 @@ onUnmounted(() => {
 .tool-btn:hover,
 .delete-btn:hover,
 .bubble-tool-btn:hover,
-.quick-chip:hover,
-.scenario-card:hover,
 .sidebar-question:hover,
 .send-btn:hover,
 .inline-action:hover,
@@ -1663,10 +1583,8 @@ onUnmounted(() => {
 .icon-btn:focus-visible,
 .tool-btn:focus-visible,
 .send-btn:focus-visible,
-.quick-chip:focus-visible,
 .delete-btn:focus-visible,
 .bubble-tool-btn:focus-visible,
-.scenario-card:focus-visible,
 .sidebar-question:focus-visible,
 .menu-item:focus-visible,
 .inline-action:focus-visible,
@@ -1708,61 +1626,6 @@ onUnmounted(() => {
   color: #b45309;
 }
 
-.window-status-bar {
-  min-height: 44px;
-  padding: 0 18px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
-  background: rgba(255, 255, 255, 0.7);
-  overflow: hidden;
-}
-
-.status-pill {
-  height: 26px;
-  padding: 0 10px;
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-main);
-  background: rgba(248, 250, 252, 0.92);
-  border: 1px solid rgba(148, 163, 184, 0.14);
-  flex-shrink: 0;
-}
-
-.status-pill.success {
-  color: #166534;
-}
-
-.status-pill.info {
-  color: var(--accent);
-}
-
-.status-pill.danger {
-  color: var(--danger);
-}
-
-.status-pill-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: currentColor;
-  box-shadow: 0 0 0 4px rgba(148, 163, 184, 0.12);
-}
-
-.status-summary {
-  min-width: 0;
-  color: var(--text-subtle);
-  font-size: 12px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 .chat-body {
   min-height: 0;
   flex: 1;
@@ -1781,6 +1644,7 @@ onUnmounted(() => {
 .chat-main {
   min-width: 0;
   min-height: 0;
+  height: 100%;
   display: flex;
   flex-direction: column;
 }
@@ -1842,32 +1706,6 @@ onUnmounted(() => {
   margin-top: 6px;
 }
 
-.stream-status-bar {
-  margin: 14px 16px 0;
-  padding: 10px 12px;
-  border-radius: 14px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: var(--text-main);
-  background: rgba(255, 255, 255, 0.88);
-  border: 1px solid rgba(148, 163, 184, 0.16);
-}
-
-.stream-status-indicator {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: rgba(148, 163, 184, 0.8);
-  flex-shrink: 0;
-}
-
-.stream-status-indicator.active {
-  background: var(--accent);
-  box-shadow: 0 0 0 6px rgba(37, 99, 235, 0.14);
-  animation: pulse 1.3s infinite ease-in-out;
-}
-
 .inline-action {
   margin-left: auto;
   padding: 0;
@@ -1880,7 +1718,7 @@ onUnmounted(() => {
 .messages-container {
   flex: 1;
   min-height: 0;
-  padding: 18px 16px 12px;
+  padding: 14px 12px 12px;
   overflow-y: auto;
 }
 
@@ -2132,64 +1970,6 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 
-.scenario-grid {
-  padding: 0 16px 12px;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.scenario-card {
-  min-height: 122px;
-  padding: 16px;
-  border-radius: 18px;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(148, 163, 184, 0.14);
-  text-align: left;
-  color: var(--text-main);
-  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
-}
-
-.scenario-title {
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.scenario-desc {
-  color: var(--text-subtle);
-  font-size: 12px;
-  line-height: 1.6;
-}
-
-.scenario-prompt {
-  margin-top: auto;
-  color: var(--accent);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.quick-questions {
-  padding: 0 16px 10px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.quick-chip {
-  height: 34px;
-  padding: 0 14px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.88);
-  border: 1px solid rgba(148, 163, 184, 0.18);
-  color: var(--text-main);
-  font-size: 12px;
-  font-weight: 600;
-}
-
 .upload-preview {
   padding: 0 16px 12px;
   display: flex;
@@ -2301,9 +2081,74 @@ onUnmounted(() => {
   color: var(--danger);
 }
 
+.compact-upload-preview {
+  margin-top: 8px;
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.compact-upload-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 160px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(248, 250, 252, 0.92);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.compact-upload-item .file-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-main);
+}
+
+.compact-upload-item.parsing {
+  border-color: rgba(37, 99, 235, 0.22);
+  background: rgba(239, 246, 255, 0.96);
+}
+
+.compact-upload-item.used {
+  border-color: rgba(22, 163, 74, 0.18);
+}
+
+.compact-upload-item.failed {
+  border-color: rgba(220, 38, 38, 0.22);
+  background: rgba(254, 242, 242, 0.96);
+}
+
+.delete-btn.tiny {
+  width: 20px;
+  height: 20px;
+  border-radius: 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: var(--text-subtle);
+  flex-shrink: 0;
+  font-size: 12px;
+}
+
+.delete-btn.tiny:hover {
+  color: var(--danger);
+  background: rgba(254, 242, 242, 0.9);
+}
+
 .input-panel {
   position: relative;
-  padding: 0 16px 16px;
+  margin-top: auto;
+  flex-shrink: 0;
+  padding: 12px 14px 16px;
+  background: linear-gradient(180deg, rgba(241, 245, 249, 0) 0%, rgba(241, 245, 249, 0.92) 28%, rgba(241, 245, 249, 0.98) 100%);
 }
 
 .drop-hint {
@@ -2330,41 +2175,49 @@ onUnmounted(() => {
 
 .input-shell {
   position: relative;
-  padding: 12px;
-  border-radius: 20px;
-  border: 1px solid rgba(148, 163, 184, 0.16);
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 16px 34px rgba(15, 23, 42, 0.08);
+  padding: 12px 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.05);
 }
 
-.input-topbar {
-  display: flex;
+.tool-btn.icon-only {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 10px;
+  display: inline-flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
+  justify-content: center;
+  background: rgba(239, 246, 255, 0.96);
+  color: var(--accent);
+  margin-top: 0;
 }
 
-.input-meta-text {
+.tool-btn.icon-only:hover {
+  transform: translateY(-1px);
+}
+
+.input-left-area {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
   min-width: 0;
-  margin-left: auto;
-  color: var(--text-subtle);
-  font-size: 11px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  flex: 1;
 }
 
 .tool-btn {
-  height: 34px;
-  padding: 0 12px;
-  border-radius: 12px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 10px;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   background: rgba(239, 246, 255, 0.96);
   color: var(--accent);
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 11px;
+  font-weight: 600;
 }
 
 .tool-btn.subtle {
@@ -2379,10 +2232,9 @@ onUnmounted(() => {
 }
 
 .input-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 112px;
+  display: flex;
   gap: 10px;
-  align-items: stretch;
+  align-items: center;
 }
 
 .input-shell :deep(.el-textarea) {
@@ -2390,16 +2242,16 @@ onUnmounted(() => {
 }
 
 .input-shell :deep(.el-textarea__inner) {
-  min-height: 72px !important;
-  max-height: 156px;
-  padding: 14px 16px;
-  border-radius: 16px;
-  border-color: rgba(148, 163, 184, 0.2);
+  min-height: 36px !important;
+  max-height: 120px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border-color: rgba(148, 163, 184, 0.16);
   box-shadow: none;
   background: rgba(248, 250, 252, 0.88);
   color: var(--text-main);
-  font-size: 13px;
-  line-height: 1.7;
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 .input-shell :deep(.el-textarea__inner:focus) {
@@ -2408,17 +2260,24 @@ onUnmounted(() => {
 }
 
 .send-btn {
-  min-height: 72px;
-  border-radius: 16px;
+  width: 38px;
+  height: 38px;
+  min-height: unset;
+  border-radius: 10px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  background: #0f172a;
+  gap: 4px;
+  background: #3b82f6;
   color: #fff;
-  font-size: 13px;
-  font-weight: 700;
-  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.12);
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
+  flex-shrink: 0;
+}
+
+.send-btn.compact span {
+  display: none;
 }
 
 .send-btn.stop {
@@ -2432,106 +2291,169 @@ onUnmounted(() => {
   box-shadow: none;
 }
 
-.input-footer {
-  margin-top: 10px;
+.input-footer-hint {
+  margin-top: 8px;
+  padding-left: 46px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
 }
 
-.hint-text,
-.network-hint {
+.input-footer-hint span,
+.thinking-toggle {
   font-size: 11px;
-  color: var(--text-subtle);
+  color: #94a3b8;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: color 0.18s ease;
 }
 
-.network-hint.is-error {
-  color: var(--danger);
+.thinking-toggle:hover {
+  color: var(--accent);
 }
 
 .chatbot-float-btn {
   position: fixed;
-  width: 64px;
-  height: 64px;
-  border-radius: 22px;
-  background: rgba(15, 23, 42, 0.96);
+  width: 72px;
+  height: 72px;
+  border-radius: 24px;
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.96) 0%, rgba(30, 41, 59, 0.95) 100%);
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+  box-shadow:
+    0 8px 24px rgba(15, 23, 42, 0.22),
+    0 2px 8px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
   cursor: grab;
   pointer-events: auto;
   user-select: none;
-  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.22s ease;
+  z-index: 2147483647;
 }
 
 .chatbot-float-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 22px 44px rgba(15, 23, 42, 0.22);
+  transform: translateY(-4px) scale(1.03);
+  box-shadow:
+    0 20px 50px rgba(15, 23, 42, 0.28),
+    0 4px 12px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .chatbot-float-btn.dragging,
 .chatbot-float-btn:active {
   cursor: grabbing;
-  transform: scale(1.03);
+  transform: scale(1.06);
+  transition: transform 0.1s ease;
 }
 
 .float-btn-icon {
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 6px;
+}
+
+.float-btn-label {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  line-height: 1;
 }
 
 .float-btn-status {
   position: absolute;
-  top: 10px;
-  right: 10px;
-  width: 10px;
-  height: 10px;
+  top: 9px;
+  right: 9px;
+  width: 11px;
+  height: 11px;
   border-radius: 50%;
   background: #22c55e;
-  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.14);
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.14), 0 0 6px rgba(34, 197, 94, 0.3);
+  animation: pulse-dot 2s infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
 }
 
 .float-btn-status.info {
   background: var(--accent);
-  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.16);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16), 0 0 6px rgba(37, 99, 235, 0.3);
 }
 
 .float-btn-status.danger {
   background: var(--danger);
-  box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.16);
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.16), 0 0 6px rgba(220, 38, 38, 0.3);
 }
 
+/* tooltip 默认在左侧 */
 .float-btn-tooltip {
   position: absolute;
-  right: calc(100% + 12px);
+  right: calc(100% + 14px);
   top: 50%;
-  transform: translateY(-50%) translateX(6px);
-  min-width: 88px;
-  padding: 8px 10px;
-  border-radius: 12px;
-  background: rgba(15, 23, 42, 0.92);
+  transform: translateY(-50%) translateX(8px);
+  min-width: 92px;
+  padding: 9px 12px;
+  border-radius: 13px;
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.94) 0%, rgba(30, 41, 59, 0.93) 100%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   color: #fff;
   display: flex;
   flex-direction: column;
   gap: 2px;
   font-size: 12px;
+  line-height: 1.35;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.2);
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.18s ease, transform 0.18s ease;
+  transition: opacity 0.22s ease, transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.float-btn-tooltip::after {
+  content: '';
+  position: absolute;
+  right: -6px;
+  top: 50%;
+  transform: translateY(-50%) rotate(45deg);
+  width: 10px;
+  height: 10px;
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.93) 0%, rgba(15, 23, 42, 0.94) 100%);
+  border-radius: 2px;
 }
 
 .float-btn-tooltip small {
   font-size: 10px;
-  color: rgba(255, 255, 255, 0.72);
+  color: rgba(255, 255, 255, 0.65);
+}
+
+/* 按钮靠左时 tooltip 显示在右侧 */
+.chatbot-float-btn.tooltip-right .float-btn-tooltip {
+  right: auto;
+  left: calc(100% + 14px);
+  transform: translateY(-50%) translateX(-8px);
+}
+
+.chatbot-float-btn.tooltip-right .float-btn-tooltip::after {
+  right: auto;
+  left: -6px;
 }
 
 .chatbot-float-btn:hover .float-btn-tooltip,
 .chatbot-float-btn:focus-visible .float-btn-tooltip {
   opacity: 1;
+  transform: translateY(-50%) translateX(0);
+}
+
+.chatbot-float-btn.tooltip-right:hover .float-btn-tooltip,
+.chatbot-float-btn.tooltip-right:focus-visible .float-btn-tooltip {
   transform: translateY(-50%) translateX(0);
 }
 
@@ -2758,79 +2680,68 @@ onUnmounted(() => {
   .chat-sidebar {
     padding: 0 16px 16px;
   }
-
-  .scenario-grid {
-    grid-template-columns: 1fr;
-  }
 }
 
 @media (max-width: 768px) {
   .chat-window {
-    border-radius: 20px;
-  }
-
-  .window-status-bar {
-    padding: 8px 14px;
-    align-items: flex-start;
-    flex-wrap: wrap;
-  }
-
-  .status-summary {
-    width: 100%;
+    border-radius: 18px;
   }
 
   .message-main {
     max-width: 90%;
-  }
-
-  .input-topbar,
-  .input-footer {
-    flex-wrap: wrap;
-  }
-
-  .input-meta-text {
-    width: 100%;
-    margin-left: 0;
   }
 }
 
 @media (max-width: 480px) {
   .chat-window:not(.fullscreen) {
     width: calc(100vw - 16px) !important;
-    height: calc(100vh - 92px) !important;
+    height: calc(100vh - 80px) !important;
     left: 8px !important;
     top: auto !important;
-    bottom: 76px !important;
+    bottom: 64px !important;
   }
 
   .chat-header {
-    padding: 12px 14px;
+    padding: 10px 12px;
   }
 
   .assistant-avatar {
-    width: 38px;
-    height: 38px;
+    width: 32px;
+    height: 32px;
   }
 
   .messages-container,
-  .quick-questions,
-  .upload-preview,
-  .input-panel,
-  .scenario-grid {
+  .input-panel {
     padding-left: 12px;
     padding-right: 12px;
   }
 
   .input-row {
-    grid-template-columns: 1fr;
+    gap: 8px;
   }
 
-  .send-btn {
-    min-height: 44px;
+  .send-btn.compact {
+    width: 36px;
+    height: 36px;
   }
+
+  .input-footer-hint {
+    padding-left: 0;
+  }
+}
 
   .float-btn-tooltip {
     display: none;
   }
-}
+
+  .chatbot-float-btn {
+    width: 64px;
+    height: 64px;
+    border-radius: 20px;
+  }
+
+  .float-btn-label {
+    display: none;
+  }
+
 </style>

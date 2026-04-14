@@ -418,8 +418,11 @@ const getMatchScoreLevel = (score: number) => {
   return '有待提升'
 }
 
-const splitSkills = (str: string) => {
-  return str ? str.split(/[,，、]/).map(s => s.trim()).filter(Boolean) : []
+const splitSkills = (str: string | any[] | null | undefined): string[] => {
+  if (!str) return []
+  if (Array.isArray(str)) return str.map((s) => String(s).trim()).filter(Boolean)
+  if (typeof str === 'string') return str.split(/[,，、]/).map((s) => s.trim()).filter(Boolean)
+  return []
 }
 
 const goToAssessment = () => {
