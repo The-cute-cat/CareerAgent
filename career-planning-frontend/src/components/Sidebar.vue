@@ -97,7 +97,7 @@ defineExpose({ collapsed })
         <img src="../assets/1234.png" alt="logo" />
       </div>
       <transition name="text-fade">
-        <span v-if="!collapsed" class="logo-text">职路 Agent</span>
+        <span v-if="!collapsed" class="logo-text">职引未来</span>
       </transition>
     </div>
     

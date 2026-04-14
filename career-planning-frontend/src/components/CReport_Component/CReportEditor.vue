@@ -1,4 +1,4 @@
-﻿
+
 <template>
   <div class="report-editor-page">
     <nav class="editor-topbar">
@@ -37,6 +37,7 @@
           <button
             class="nav-button"
             type="button"
+            :data-key="item.key"
             :class="[`nav-button--${getNavState(item.key)}`, { 'has-children': !!item.children }]"
             @click="item.children ? toggleNavItem(item.key) : scrollToSection(item.key)"
           >
@@ -104,7 +105,7 @@
         <section :id="sectionIdMap.summary" class="editor-section editor-section--primary" :class="{ 'is-focus': activeFocusKey === 'student_summary' || activeFocusKey === 'current_gap' || activeFocusKey === 'short_goal' || activeFocusKey === 'mid_goal' || activeFocusKey === 'career_progression' }">
           <div class="section-head">
             <div>
-              <h2>核心内容</h2>
+              <h2 class="section-title-core">核心内容</h2>
               <span class="section-hint">报告正文的核心表达区，建议一次只聚焦一个模块深入修改。</span>
             </div>
             <div class="section-head-actions">
@@ -459,6 +460,7 @@ import WangEditor from '@/components/Person_Report/WangEditor.vue'
 import { useCareerReportStore } from '@/stores'
 import {
   createEmptyCareerReport,
+  normalizeGrowthPlanData,
   type EditableSectionKey,
   type GrowthPlanData,
   type InternshipItem,
@@ -533,8 +535,21 @@ const sectionIdMap = {
   checklist: 'editor-checklist',
   tips: 'editor-tips',
 } as const
+const routeJobId = computed(() => {
+  const raw = route.query.jobId ?? route.query.job_id
+  if (Array.isArray(raw)) return raw[0] || ''
+  return typeof raw === 'string' ? raw : ''
+})
 
-const form = reactive<GrowthPlanData>(cloneReport(reportStore.ensureReport(createEmptyCareerReport())))
+const initialReport = routeJobId.value
+  ? reportStore.ensureReportForJob(routeJobId.value, createEmptyCareerReport())
+  : reportStore.ensureReport(createEmptyCareerReport())
+
+if (routeJobId.value) {
+  reportStore.setCurrentJobId(routeJobId.value)
+}
+
+const form = reactive<GrowthPlanData>(normalizeGrowthPlanData(cloneReport(initialReport)))
 const lastSavedAt = ref<string>('未保存')
 const saveState = ref<'idle' | 'saved' | 'dirty'>('idle')
 const lastSavedSnapshot = ref('')
@@ -810,13 +825,21 @@ function addInternship(): void {
 }
 
 function goBack(): void {
-  router.push({ name: 'report' })
+  router.push({ name: 'report', query: routeJobId.value ? { jobId: routeJobId.value } : {} })
 }
 
 function saveReport(): void {
-  reportStore.setReport(cloneReport(form))
+  const normalized = normalizeGrowthPlanData(cloneReport(form))
+  if (routeJobId.value) {
+    reportStore.setReportForJob(routeJobId.value, normalized)
+  } else {
+    reportStore.setReport(normalized)
+  }
 
   if (assistantFocusKey.value in editableFocusLabels) {
+    if (routeJobId.value) {
+      reportStore.setCurrentJobId(routeJobId.value)
+    }
     reportStore.setLastEditedSection(assistantFocusKey.value as EditableSectionKey)
   }
 
@@ -825,7 +848,7 @@ function saveReport(): void {
   lastSavedAt.value = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
   saveState.value = 'saved'
   setTimeout(() => {
-    router.push({ name: 'report' })
+    router.push({ name: 'report', query: routeJobId.value ? { jobId: routeJobId.value } : {} })
   }, 300)
 }
 
@@ -848,7 +871,10 @@ async function scrollToSection(key: string): Promise<void> {
   }
 
   assistantFocusKey.value = normalizeAssistantFocus(key)
-  document.getElementById(idMap[key])?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  const targetId = idMap[key]
+  if (targetId) {
+    document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
 }
 function normalizeAssistantFocus(key: string): string {
   if (key in editableFocusLabels) return key
@@ -1101,11 +1127,22 @@ const MilestoneEditor = defineComponent({
 }
 
 .editor-brand h1,
-.ai-panel-head h2,
-.section-head h2 {
+.ai-panel-head h2
+{
   margin: 0;
   color: #0f172a;
 }
+
+.section-head h2 {
+  margin: 6px 0 4px;
+  font-size: 18px;
+  color: #0f172a;
+}
+
+.section-head h2.section-title-core {
+  font-size: 14px !important;
+}
+
 
 .editor-subtitle,
 .ai-panel-desc,
@@ -1250,7 +1287,12 @@ const MilestoneEditor = defineComponent({
 
 .nav-button-text {
   flex: 1;
-  font-weight: 600;
+  font-weight: 700;
+}
+
+.nav-button[data-key="summary"] .nav-button-text {
+  font-size: 16px;
+  white-space: nowrap;
 }
 
 .nav-state-dot {
@@ -1265,6 +1307,7 @@ const MilestoneEditor = defineComponent({
   font-size: 11px;
   font-weight: 700;
   color: #94a3b8;
+  white-space: nowrap;
 }
 
 .nav-button--active {

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, nextTick, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox, ElLoading } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { cloneDeep } from 'lodash'
 
@@ -69,6 +69,7 @@ const formRef = ref<FormInstance>()
 
 /** 当前激活的菜单项索引，控制显示哪个表单步骤 (1-5) */
 const activeMenu = ref('1')
+type CareerSection = 'resume' | 'template' | 'voice'
 const activeProfileTab = ref<'resume' | 'template'>('resume')
 
 /** 表单提交状态，控制提交按钮的加载状态 */
@@ -139,7 +140,11 @@ if (!resumeProfileExtras.value.educationHistory?.length) {
 }
 
 const syncCareerSectionFromRoute = () => {
-  activeProfileTab.value = route.path.includes('/career-form/template') ? 'template' : 'resume'
+  if (route.path.includes('/career-form/template')) {
+    activeProfileTab.value = 'template'
+    return
+  }
+  activeProfileTab.value = 'resume'
 }
 
 watch(() => route.path, syncCareerSectionFromRoute, { immediate: true })
@@ -395,9 +400,16 @@ const handleMenuSelect = (index: string) => {
   activeMenu.value = index
 }
 
-const switchCareerSection = (section: 'resume' | 'template') => {
-  activeProfileTab.value = section
-  router.push(section === 'resume' ? '/career-form/resume' : '/career-form/template')
+const switchCareerSection = (section: CareerSection) => {
+  if (section !== 'voice') {
+    activeProfileTab.value = section
+  }
+  const routeMap: Record<CareerSection, string> = {
+    resume: '/career-form/resume',
+    template: '/career-form/template',
+    voice: '/career-form/voice'
+  }
+  router.push(routeMap[section])
 }
 
 const goToResumeEditor = () => {
@@ -1250,9 +1262,8 @@ const getCodeAbilityUrls = (rawLinks: string) => {
     .filter(Boolean)
 }
 
-const isValidCodeProfileUrl = (url: string) => {
-  // 只接受主页链接格式：https://github.com/username 或 https://gitee.com/username
-  return /^https?:\/\/(www\.)?(github\.com|gitee\.com)\/[^/]+\/?$/i.test(url)
+const isValidCodeRepoUrl = (url: string) => {
+  return /^https?:\/\/(www\.)?(github\.com|gitee\.com)\/[^/]+\/[^/]+\/?$/i.test(url)
 }
 
 const getCodeRepoMeta = (url: string) => {
@@ -1321,44 +1332,25 @@ const handleCodeAbilityEvaluate = async (options?: {
   const repoUrls = getCodeAbilityUrls(rawLinks)
 
   if (!repoUrls.length) {
-    ElMessage.warning('请输入至少一个 GitHub 或 Gitee 用户主页链接，如 https://github.com/username')
+    ElMessage.warning('请输入至少一个 GitHub 或 Gitee 仓库链接')
     return
   }
 
-  const invalidUrl = repoUrls.find(url => !isValidCodeProfileUrl(url))
+  const invalidUrl = repoUrls.find(url => !isValidCodeRepoUrl(url))
   if (invalidUrl) {
-    ElMessage.warning(`链接格式不正确，仅支持主页链接如 https://github.com/username：${invalidUrl}`)
+    ElMessage.warning(`存在无效仓库链接：${invalidUrl}`)
     return
   }
 
   codeAbilityEvaluating.value = true
   lastEvaluatedCodeRepoUrls.value = repoUrls
 
-  // 显示加载提示
-  const loadingInstance = ElLoading.service({
-    lock: true,
-    text: useAi ? '正在进行代码能力深度分析，预计需要 8-15 秒...' : '正在进行代码能力评估，预计需要 3-5 秒...',
-    background: 'rgba(0, 0, 0, 0.7)',
-  })
-
   try {
     const res = await evaluateCodeAbilityApi({
-      url: repoUrls.join(','),
-      use_ai: useAi,
-      cache_enabled: true
+      urls: repoUrls,
+      use_ai: useAi
     })
     const result = res.data as any
-
-    // 在浏览器控制台输出完整数据
-    console.log('%c[代码能力评估] 返回数据:', 'color: #409EFF; font-size: 14px; font-weight: bold;')
-    console.log('完整响应:', result)
-    console.log('评估数据:', result?.data)
-    console.log('平台:', result?.data?.platform)
-    console.log('用户名:', result?.data?.username)
-    console.log('综合评分:', result?.data?.composite_score)
-    console.log('等级:', result?.data?.level)
-    console.log('五维评分:', result?.data?.features?.composite?.dimension_scores)
-    console.log('AI分析:', result?.data?.ai_analysis)
 
     if (result?.code !== 200 || !result?.data) {
       throw new Error(result?.msg || '代码能力评估失败')
@@ -1376,7 +1368,6 @@ const handleCodeAbilityEvaluate = async (options?: {
     ElMessage.error(error?.message || '代码能力评估失败，请稍后重试')
   } finally {
     codeAbilityEvaluating.value = false
-    loadingInstance.close()
   }
 }
 
@@ -2369,6 +2360,15 @@ const resetForm = () => {
             <el-icon><Folder /></el-icon>
             <span>导出简历</span>
           </button>
+          <button
+            type="button"
+            class="career-section-tab"
+            :class="{ 'is-active': route.path.includes('/career-form/voice') }"
+            @click="switchCareerSection('voice')"
+          >
+            <el-icon><DataAnalysis /></el-icon>
+            <span>语音输入</span>
+          </button>
         </div>
 
         <template v-if="activeProfileTab === 'resume'">
@@ -2448,6 +2448,7 @@ const resetForm = () => {
             </div>
           </div>
         </template>
+
       </el-aside>
 
       <!-- 主内容区 -->
@@ -2660,7 +2661,7 @@ const resetForm = () => {
                   <div class="code-ability-row">
                     <el-input
                       v-model="formData.codeAbility.links"
-                      placeholder="请输入 GitHub / Gitee 用户主页链接，如 https://github.com/username"
+                      placeholder="请输入 GitHub / Gitee 仓库链接，如 https://github.com/user/repo"
                       style="flex: 1"
                     />
                     <el-button
@@ -2957,6 +2958,9 @@ const resetForm = () => {
             <div class="form-actions">
               <el-button class="form-action-btn" @click="resetForm" :icon="RefreshRight">
                 重置表单
+              </el-button>
+              <el-button class="form-action-btn" @click="switchCareerSection('voice')" :icon="DataAnalysis">
+                语音输入
               </el-button>
               <el-button class="form-action-btn form-action-btn--template" @click="switchCareerSection('template')" :icon="Document">
                 前往简历模板
@@ -3693,7 +3697,6 @@ const resetForm = () => {
     <el-dialog v-model="codeAbilityResultVisible" title="代码能力评估结果" width="920px" destroy-on-close
       class="code-ability-result-dialog">
       <template v-if="codeAbilityResult">
-        <!-- 顶部概览 -->
         <div class="code-result-hero">
           <div class="hero-topline">
             <span class="hero-eyebrow">代码仓库评估报告</span>
@@ -3703,312 +3706,169 @@ const resetForm = () => {
           </div>
           <div class="hero-main">
             <div class="code-result-score">
-              <div class="score-value">{{ codeAbilityResult.features?.composite?.total_score ?? codeAbilityResult.composite_score }}</div>
+              <div class="score-value">{{ codeAbilityResult.composite_score }}</div>
               <div class="score-label">综合评分</div>
             </div>
             <div class="hero-content">
-              <h3>{{ codeAbilityResult.username || '未知用户' }}</h3>
-              <p>平台: {{ codeAbilityResult.platform || '-' }} | 账号年限: {{ codeAbilityResult.features?.basic?.account_years || 0 }}年</p>
-              <div class="hero-link-list">
+              <h3>{{ lastEvaluatedCodeRepoUrls.length > 1 ? `${lastEvaluatedCodeRepoUrls.length} 个仓库联合评估` :
+                (getCodeRepoMeta(lastEvaluatedCodeRepoUrls[0] || '').repo || '未命名仓库') }}</h3>
+              <p>{{ lastEvaluatedCodeRepoUrls.length > 1 ? '综合多个代码仓库的结构、活跃度与工程化表现进行评估' :
+                (getCodeRepoMeta(lastEvaluatedCodeRepoUrls[0] || '').fullName || codeAbilityResult.username || '-') }}
+              </p>
+              <div v-if="lastEvaluatedCodeRepoUrls.length" class="hero-link-list">
                 <a v-for="url in lastEvaluatedCodeRepoUrls" :key="url" :href="url" target="_blank"
                   rel="noopener noreferrer" class="hero-link">
-                  {{ url }}
+                  {{ getCodeRepoMeta(url).fullName || url }}
                 </a>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- 基础信息 -->
-        <div class="code-result-section" v-if="codeAbilityResult.features?.basic">
-          <h4>基础信息</h4>
-          <div class="info-grid">
-            <div class="info-item">
-              <span class="info-label">用户名</span>
-              <span class="info-value">{{ codeAbilityResult.features.basic.username }}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">平台</span>
-              <span class="info-value">{{ codeAbilityResult.features.basic.platform }}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">账号年限</span>
-              <span class="info-value">{{ codeAbilityResult.features.basic.account_years }}年</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">公开仓库数</span>
-              <span class="info-value">{{ codeAbilityResult.features.basic.total_public_repos }}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">Followers</span>
-              <span class="info-value">{{ codeAbilityResult.features.basic.followers }}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">Following</span>
-              <span class="info-value">{{ codeAbilityResult.features.basic.following }}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">个人简介</span>
-              <span class="info-value">{{ codeAbilityResult.features.basic.has_bio ? '有' : '无' }}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">公司信息</span>
-              <span class="info-value">{{ codeAbilityResult.features.basic.has_company ? '有' : '无' }}</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- 综合评分 -->
         <div class="code-result-overview">
           <div class="code-result-meta">
             <div class="meta-line featured">
               <span class="meta-label">评估等级</span>
               <el-tag :type="getCodeAbilityTagType(codeAbilityResult.composite_score)" size="large">
-                {{ codeAbilityResult.level || codeAbilityResult.features?.composite?.level || '-' }}
+                {{ codeAbilityResult.level || '-' }}
               </el-tag>
             </div>
-            <div class="meta-line" v-if="codeAbilityResult.features?.composite?.max_score">
-              <span class="meta-label">评分上限</span>
-              <span class="meta-value">{{ codeAbilityResult.features.composite.max_score }}</span>
+            <div class="meta-line">
+              <span class="meta-label">仓库平台</span>
+              <span class="meta-value">{{ codeAbilityResult.platform || getCodeRepoMeta(lastEvaluatedCodeRepoUrls[0] ||
+                '').hostLabel || '-' }}</span>
+            </div>
+            <div class="meta-line">
+              <span class="meta-label">评估仓库数</span>
+              <span class="meta-value">{{ lastEvaluatedCodeRepoUrls.length || 0 }}</span>
+            </div>
+            <div class="meta-line" v-if="codeAbilityResult.features?.composite?.percentile !== undefined">
+              <span class="meta-label">超过用户</span>
+              <span class="meta-value">{{ codeAbilityResult.features?.composite?.percentile }}%</span>
             </div>
           </div>
 
-          <div v-if="codeAbilityResult.features?.composite?.dimension_scores" class="dimension-grid dimension-grid-hero">
+          <div v-if="codeAbilityResult.features?.composite?.dimensions" class="dimension-grid dimension-grid-hero">
             <div class="dimension-card">
               <span>项目规模</span>
-              <strong>{{ codeAbilityResult.features.composite.dimension_scores?.project_scale ?? 0 }}</strong>
+              <strong>{{ codeAbilityResult.features.composite.dimensions.project_scale }}</strong>
             </div>
             <div class="dimension-card">
               <span>技术广度</span>
-              <strong>{{ codeAbilityResult.features.composite.dimension_scores?.tech_breadth ?? 0 }}</strong>
+              <strong>{{ codeAbilityResult.features.composite.dimensions.tech_breadth }}</strong>
             </div>
             <div class="dimension-card">
               <span>活跃度</span>
-              <strong>{{ codeAbilityResult.features.composite.dimension_scores?.activity ?? 0 }}</strong>
+              <strong>{{ codeAbilityResult.features.composite.dimensions.activity }}</strong>
             </div>
             <div class="dimension-card">
               <span>工程化</span>
-              <strong>{{ codeAbilityResult.features.composite.dimension_scores?.engineering ?? 0 }}</strong>
+              <strong>{{ codeAbilityResult.features.composite.dimensions.engineering }}</strong>
             </div>
             <div class="dimension-card">
               <span>社区影响力</span>
-              <strong>{{ codeAbilityResult.features.composite.dimension_scores?.community ?? 0 }}</strong>
+              <strong>{{ codeAbilityResult.features.composite.dimensions.influence }}</strong>
             </div>
           </div>
         </div>
 
-        <!-- 仓库统计 -->
-        <div class="code-result-section" v-if="codeAbilityResult.features?.repo">
-          <h4>仓库统计</h4>
-          <div class="info-grid">
-            <div class="info-item">
-              <span class="info-label">原创仓库</span>
-              <span class="info-value">{{ codeAbilityResult.features.repo.original_repo_count }}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">Fork 仓库</span>
-              <span class="info-value">{{ codeAbilityResult.features.repo.forked_repo_count }}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">总 Stars</span>
-              <span class="info-value">{{ codeAbilityResult.features.repo.total_stars }}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">总 Forks</span>
-              <span class="info-value">{{ codeAbilityResult.features.repo.total_forks }}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">平均 Stars</span>
-              <span class="info-value">{{ codeAbilityResult.features.repo.avg_stars_per_repo }}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">小型仓库</span>
-              <span class="info-value">{{ codeAbilityResult.features.repo.small_repos }}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">中型仓库</span>
-              <span class="info-value">{{ codeAbilityResult.features.repo.medium_repos }}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">大型仓库</span>
-              <span class="info-value">{{ codeAbilityResult.features.repo.large_repos }}</span>
-            </div>
-          </div>
-          
-          <!-- 热门仓库 -->
-          <div v-if="codeAbilityResult.features.repo.top_repos?.length" class="repo-list">
-            <h5>热门仓库</h5>
-            <div v-for="repo in codeAbilityResult.features.repo.top_repos" :key="repo.full_name" class="repo-item">
-              <div class="repo-header">
-                <a :href="`https://github.com/${repo.full_name}`" target="_blank" class="repo-name">{{ repo.repo_name }}</a>
-                <span class="repo-lang" v-if="repo.language">{{ repo.language }}</span>
-                <span class="repo-stars">⭐ {{ repo.stargazers_count }}</span>
-              </div>
-              <p class="repo-desc">{{ repo.description || '暂无描述' }}</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- 编程语言 -->
-        <div class="code-result-section" v-if="codeAbilityResult.features?.language">
-          <h4>编程语言</h4>
-          <div class="info-grid">
-            <div class="info-item">
-              <span class="info-label">语言数量</span>
-              <span class="info-value">{{ codeAbilityResult.features.language.total_language_count }}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">主要语言</span>
-              <span class="info-value">{{ codeAbilityResult.features.language.primary_language || '未知' }}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">多样性</span>
-              <span class="info-value">{{ codeAbilityResult.features.language.language_diversity }}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">全栈潜力</span>
-              <span class="info-value">{{ codeAbilityResult.features.language.full_stack_potential ? '是' : '否' }}</span>
-            </div>
-          </div>
-          <div v-if="codeAbilityResult.features.language.language_distribution?.length" class="lang-distribution">
-            <div v-for="lang in codeAbilityResult.features.language.language_distribution" :key="lang.language" class="lang-item">
-              <span class="lang-name">{{ lang.language }}</span>
-              <el-progress :percentage="lang.ratio" :stroke-width="8" />
-              <span class="lang-count">{{ lang.count }}个仓库</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- 活跃度 -->
-        <div class="code-result-section" v-if="codeAbilityResult.features?.activity">
-          <h4>活跃度分析</h4>
-          <div class="info-grid">
-            <div class="info-item">
-              <span class="info-label">活跃度等级</span>
-              <el-tag :type="codeAbilityResult.features.activity.activity_level === '非常活跃' ? 'success' : codeAbilityResult.features.activity.activity_level === '较活跃' ? 'warning' : 'info'">
-                {{ codeAbilityResult.features.activity.activity_level }}
-              </el-tag>
-            </div>
-            <div class="info-item">
-              <span class="info-label">近期活跃</span>
-              <span class="info-value">{{ codeAbilityResult.features.activity?.recently_active ? '是' : '否' }}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">3月活跃仓库</span>
-              <span class="info-value">{{ codeAbilityResult.features.activity?.active_repos_3m ?? 0 }}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">6月活跃仓库</span>
-              <span class="info-value">{{ codeAbilityResult.features.activity?.active_repos_6m ?? 0 }}</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- 质量评估 -->
-        <div class="code-result-section" v-if="codeAbilityResult.features?.quality">
-          <h4>质量评估</h4>
-          <div class="info-item">
-            <span class="info-label">工程化评分</span>
-            <span class="info-value">
-              {{ codeAbilityResult.features.quality?.engineering_score ?? 0 }} 
-              <el-tag size="small">{{ codeAbilityResult.features.quality?.engineering_level ?? '-' }}</el-tag>
-            </span>
-          </div>
-          <div class="analysis-tags" v-if="codeAbilityResult.features.quality.engineering_details?.length">
-            <el-tag v-for="item in codeAbilityResult.features.quality.engineering_details" :key="item" type="info" effect="light" size="small">
-              {{ item }}
-            </el-tag>
-          </div>
-        </div>
-
-        <!-- AI 深度分析 -->
         <div v-if="codeAbilityResult.ai_analysis" class="code-result-section">
           <h4>AI 深度分析</h4>
-          
-          <!-- AI 错误提示 -->
-          <el-alert v-if="codeAbilityResult.ai_analysis.error" :title="codeAbilityResult.ai_analysis.error" type="error" :closable="false" show-icon />
 
-          <template v-else>
-            <div v-if="codeAbilityResult.ai_analysis.overall_assessment" class="analysis-block">
-              <h5>整体评价</h5>
-              <p>{{ codeAbilityResult.ai_analysis.overall_assessment?.summary ?? '暂无评价' }}</p>
-              <div class="analysis-tags" v-if="codeAbilityResult.ai_analysis.overall_assessment?.highlights?.length">
-                <el-tag v-for="item in codeAbilityResult.ai_analysis.overall_assessment.highlights"
-                  :key="`highlight-${item}`" type="success" effect="light">
-                  {{ item }}
-                </el-tag>
-              </div>
-              <div class="analysis-tags" v-if="codeAbilityResult.ai_analysis.overall_assessment?.concerns?.length">
-                <el-tag v-for="item in codeAbilityResult.ai_analysis.overall_assessment.concerns"
-                  :key="`concern-${item}`" type="danger" effect="light">
-                  {{ item }}
-                </el-tag>
-              </div>
+          <div v-if="codeAbilityResult.ai_analysis.overall_assessment" class="analysis-block">
+            <h5>整体评价</h5>
+            <p>{{ codeAbilityResult.ai_analysis.overall_assessment.summary }}</p>
+            <div class="analysis-tags" v-if="codeAbilityResult.ai_analysis.overall_assessment.strengths?.length">
+              <el-tag v-for="item in codeAbilityResult.ai_analysis.overall_assessment.strengths"
+                :key="`strength-${item}`" type="success" effect="light">
+                {{ item }}
+              </el-tag>
             </div>
+            <div class="analysis-tags" v-if="codeAbilityResult.ai_analysis.overall_assessment.weaknesses?.length">
+              <el-tag v-for="item in codeAbilityResult.ai_analysis.overall_assessment.weaknesses"
+                :key="`weakness-${item}`" type="danger" effect="light">
+                {{ item }}
+              </el-tag>
+            </div>
+          </div>
 
-            <div v-if="codeAbilityResult.ai_analysis.tech_stack_analysis" class="analysis-block">
-              <h5>技术栈分析</h5>
-              <p>{{ codeAbilityResult.ai_analysis.tech_stack_analysis?.breadth_assessment ?? '暂无分析' }}</p>
-              <div class="analysis-list-grid">
-                <div v-if="codeAbilityResult.ai_analysis.tech_stack_analysis?.primary_languages?.length">
-                  <div class="list-title">主要语言</div>
-                  <ul>
-                    <li v-for="item in codeAbilityResult.ai_analysis.tech_stack_analysis.primary_languages"
-                      :key="`lang-${item}`">{{ item }}</li>
-                  </ul>
-                </div>
-                <div v-if="codeAbilityResult.ai_analysis.tech_stack_analysis?.tech_domains?.length">
-                  <div class="list-title">技术领域</div>
-                  <ul>
-                    <li v-for="item in codeAbilityResult.ai_analysis.tech_stack_analysis.tech_domains"
-                      :key="`domain-${item}`">{{ item }}</li>
-                  </ul>
-                </div>
+          <div v-if="codeAbilityResult.ai_analysis.tech_stack_analysis" class="analysis-block">
+            <h5>技术栈分析</h5>
+            <p>{{ codeAbilityResult.ai_analysis.tech_stack_analysis.stack_maturity }}</p>
+            <div class="analysis-list-grid">
+              <div>
+                <div class="list-title">主技术栈</div>
+                <ul>
+                  <li v-for="item in codeAbilityResult.ai_analysis.tech_stack_analysis.primary_stack"
+                    :key="`primary-${item}`">{{ item }}</li>
+                </ul>
+              </div>
+              <div>
+                <div class="list-title">辅助技术栈</div>
+                <ul>
+                  <li v-for="item in codeAbilityResult.ai_analysis.tech_stack_analysis.secondary_stack"
+                    :key="`secondary-${item}`">{{ item }}</li>
+                </ul>
               </div>
             </div>
-
-            <div v-if="codeAbilityResult.ai_analysis.project_quality_analysis" class="analysis-block">
-              <h5>项目质量分析</h5>
-              <p>{{ codeAbilityResult.ai_analysis.project_quality_analysis?.quality_rating ?? '暂无分析' }}</p>
+            <div v-if="codeAbilityResult.ai_analysis.tech_stack_analysis.stack_recommendations?.length"
+              class="analysis-list">
+              <div class="list-title">技术栈建议</div>
+              <ul>
+                <li v-for="item in codeAbilityResult.ai_analysis.tech_stack_analysis.stack_recommendations"
+                  :key="`stack-rec-${item}`">{{ item }}</li>
+              </ul>
             </div>
+          </div>
 
-            <div v-if="codeAbilityResult.ai_analysis.activity_analysis" class="analysis-block">
-              <h5>活跃度分析</h5>
-              <p>{{ codeAbilityResult.ai_analysis.activity_analysis?.consistency ?? '暂无分析' }}</p>
-            </div>
-
-            <div v-if="codeAbilityResult.ai_analysis.career_alignment" class="analysis-block">
-              <h5>职业匹配</h5>
-              <div class="analysis-list-grid">
-                <div v-if="codeAbilityResult.ai_analysis.career_alignment?.suitable_roles?.length">
-                  <div class="list-title">适合角色</div>
-                  <ul>
-                    <li v-for="item in codeAbilityResult.ai_analysis.career_alignment.suitable_roles"
-                      :key="`role-${item}`">{{ item }}</li>
-                  </ul>
-                </div>
-                <div v-if="codeAbilityResult.ai_analysis.career_alignment?.skill_gaps?.length">
-                  <div class="list-title">技能缺口</div>
-                  <ul>
-                    <li v-for="item in codeAbilityResult.ai_analysis.career_alignment.skill_gaps"
-                      :key="`gap-${item}`">{{ item }}</li>
-                  </ul>
-                </div>
+          <div v-if="codeAbilityResult.ai_analysis.project_quality_analysis" class="analysis-block">
+            <h5>项目质量分析</h5>
+            <p>{{ codeAbilityResult.ai_analysis.project_quality_analysis.code_quality }}</p>
+            <p>{{ codeAbilityResult.ai_analysis.project_quality_analysis.architecture }}</p>
+            <div class="analysis-list-grid">
+              <div v-if="codeAbilityResult.ai_analysis.project_quality_analysis.best_practices?.length">
+                <div class="list-title">最佳实践</div>
+                <ul>
+                  <li v-for="item in codeAbilityResult.ai_analysis.project_quality_analysis.best_practices"
+                    :key="`best-${item}`">{{ item }}</li>
+                </ul>
+              </div>
+              <div v-if="codeAbilityResult.ai_analysis.project_quality_analysis.improvement_areas?.length">
+                <div class="list-title">待改进项</div>
+                <ul>
+                  <li v-for="item in codeAbilityResult.ai_analysis.project_quality_analysis.improvement_areas"
+                    :key="`improve-${item}`">{{ item }}</li>
+                </ul>
               </div>
             </div>
+          </div>
 
-            <div v-if="codeAbilityResult.ai_analysis.actionable_advice?.length" class="analysis-block">
-              <h5>行动建议</h5>
-              <div class="analysis-list">
-                <div v-for="(item, index) in codeAbilityResult.ai_analysis.actionable_advice" :key="`advice-${index}`" class="advice-item">
-                  <el-tag size="small" :type="item.priority === '高' ? 'danger' : item.priority === '中' ? 'warning' : 'info'">{{ item.priority }}</el-tag>
-                  <span class="advice-action">{{ item.action }}</span>
-                  <p class="advice-reason">{{ item.reason }}</p>
-                  <p class="advice-outcome">预期成果: {{ item.expected_outcome }}</p>
-                </div>
+          <div v-if="codeAbilityResult.ai_analysis.actionable_advice" class="analysis-block">
+            <h5>行动建议</h5>
+            <div class="analysis-list-grid">
+              <div v-if="codeAbilityResult.ai_analysis.actionable_advice.short_term?.length">
+                <div class="list-title">短期</div>
+                <ul>
+                  <li v-for="item in codeAbilityResult.ai_analysis.actionable_advice.short_term" :key="`short-${item}`">
+                    {{ item }}</li>
+                </ul>
+              </div>
+              <div v-if="codeAbilityResult.ai_analysis.actionable_advice.mid_term?.length">
+                <div class="list-title">中期</div>
+                <ul>
+                  <li v-for="item in codeAbilityResult.ai_analysis.actionable_advice.mid_term" :key="`mid-${item}`">{{
+                    item }}</li>
+                </ul>
+              </div>
+              <div v-if="codeAbilityResult.ai_analysis.actionable_advice.long_term?.length">
+                <div class="list-title">长期</div>
+                <ul>
+                  <li v-for="item in codeAbilityResult.ai_analysis.actionable_advice.long_term" :key="`long-${item}`">{{
+                    item }}</li>
+                </ul>
               </div>
             </div>
-          </template>
+          </div>
         </div>
 
         <el-empty v-else description="本次未开启 AI 深度分析，当前结果仅展示基础评分数据。" />
@@ -6133,129 +5993,6 @@ const resetForm = () => {
   padding-left: 18px;
   color: #4b5563;
   line-height: 1.8;
-}
-
-/* 信息网格 */
-.info-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px;
-}
-
-.info-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 12px 14px;
-  border-radius: 12px;
-  background: #fff;
-  border: 1px solid #e8eef8;
-}
-
-.info-label {
-  color: #6b7280;
-  font-size: 13px;
-}
-
-.info-value {
-  color: #1f2937;
-  font-weight: 600;
-}
-
-/* 仓库列表 */
-.repo-list {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px dashed #e8eef8;
-}
-
-.repo-list h5 {
-  margin: 0 0 12px;
-  color: #22324d;
-  font-size: 14px;
-}
-
-.repo-item {
-  padding: 12px 14px;
-  border-radius: 12px;
-  background: #fff;
-  border: 1px solid #e8eef8;
-  margin-bottom: 10px;
-}
-
-.repo-item:last-child {
-  margin-bottom: 0;
-}
-
-.repo-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 6px;
-  flex-wrap: wrap;
-}
-
-.repo-name {
-  color: #1d4ed8;
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.repo-name:hover {
-  text-decoration: underline;
-}
-
-.repo-lang {
-  padding: 2px 8px;
-  border-radius: 6px;
-  background: #e0e7ff;
-  color: #4338ca;
-  font-size: 12px;
-}
-
-.repo-stars {
-  color: #f59e0b;
-  font-size: 13px;
-  font-weight: 500;
-}
-
-.repo-desc {
-  margin: 0;
-  color: #6b7280;
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-/* 语言分布 */
-.lang-distribution {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px dashed #e8eef8;
-}
-
-.lang-item {
-  display: grid;
-  grid-template-columns: 100px 1fr 80px;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 10px;
-}
-
-.lang-item:last-child {
-  margin-bottom: 0;
-}
-
-.lang-name {
-  color: #374151;
-  font-weight: 500;
-  font-size: 13px;
-}
-
-.lang-count {
-  color: #6b7280;
-  font-size: 12px;
-  text-align: right;
 }
 
 /* 步骤切换动画 */
