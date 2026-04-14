@@ -39,11 +39,24 @@ class JobVectorStore:
         self.token = token
         self.collection_name = collection_name
         self.embedder = AliyunEmbedding(api_key=api_key)
-        # 1. 连接 Milvus（支持自动故障转移）
-        self._connect_with_failover()
+        self.is_available = True
+        self._connect_error_msg = ""
 
-        # 2. 初始化或加载 Collection
-        self.collection = self._init_collection()
+        try:
+            # 1. 连接 Milvus（支持自动故障转移）
+            self._connect_with_failover()
+
+            # 2. 初始化或加载 Collection
+            self.collection = self._init_collection()
+            log.info(f"✅ JobVectorStore 初始化完成，Milvus 可用")
+        except ConnectionError as e:
+            self.is_available = False
+            self._connect_error_msg = str(e)
+            log.warning(f"⚠️警告：Milvus连接失败，岗位匹配服务不可用: {e}")
+        except Exception as e:
+            self.is_available = False
+            self._connect_error_msg = str(e)
+            log.warning(f"⚠️警告：JobVectorStore 初始化失败，岗位匹配服务不可用: {e}")
 
     def _connect_with_failover(self):
         """
@@ -477,29 +490,29 @@ class JobVectorStore:
 
 store = JobVectorStore()
 
-if __name__ == "__main__":
-    # 1. 从数据库加载岗位画像并转换为 JDAnalysisResult 列表
-    # 注意：需要在异步环境中调用 load_all_jd_results_from_db 方法
-    async def load_and_insert():
-        from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-
-        # 创建异步数据库引擎和会话工厂
-        from ai_service.repository.connection_session import get_db_url
-        engine = create_async_engine(get_db_url(), echo=False)
-        AsyncSessionLocal = async_sessionmaker(
-            engine,
-            expire_on_commit=False,
-            class_=AsyncSession,
-        )
-
-        async with AsyncSessionLocal() as session:
-            stats = await store.load_all_jd_results_from_db(session=session)
-            log.info(
-                f"从数据库加载并转换完成！总计: {stats['db_total']}, 转换成功: {stats['convert_success']}, 转换失败: {stats['convert_failed']}")
-            await store.insert_job_async(stats["items"])
-
-
-    asyncio.run(load_and_insert())
+# if __name__ == "__main__":
+#     # 1. 从数据库加载岗位画像并转换为 JDAnalysisResult 列表
+#     # 注意：需要在异步环境中调用 load_all_jd_results_from_db 方法
+#     async def load_and_insert():
+#         from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+#
+#         # 创建异步数据库引擎和会话工厂
+#         from ai_service.repository.connection_session import get_db_url
+#         engine = create_async_engine(get_db_url(), echo=False)
+#         AsyncSessionLocal = async_sessionmaker(
+#             engine,
+#             expire_on_commit=False,
+#             class_=AsyncSession,
+#         )
+#
+#         async with AsyncSessionLocal() as session:
+#             stats = await store.load_all_jd_results_from_db(session=session)
+#             log.info(
+#                 f"从数据库加载并转换完成！总计: {stats['db_total']}, 转换成功: {stats['convert_success']}, 转换失败: {stats['convert_failed']}")
+#             await store.insert_job_async(stats["items"])
+#
+#
+#     asyncio.run(load_and_insert())
 
 if __name__ == "__main__":
     # 1. 初始化

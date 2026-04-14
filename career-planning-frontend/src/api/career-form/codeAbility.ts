@@ -11,7 +11,7 @@ export function evaluateCodeAbilityApi(data: CodeAbilityEvaluateParams) {
   }
 
   return request.post<Result<CodeAbilityEvaluateData> & { state?: string }>(
-    '/code-ability/evaluate',
+    '/codeAbility/evaluate',
     data
   )
 }

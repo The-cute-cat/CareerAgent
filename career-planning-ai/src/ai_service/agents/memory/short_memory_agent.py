@@ -52,8 +52,10 @@ class ShortMemoryAgent:
             compression_agent: 对话压缩智能体实例
         """
         self.redis = RedisService.get_instance(prefix=redis_prefix)
+        self.is_available = True
         if not self.redis.is_available:
-            raise ValueError("Redis 服务不可用，请检查配置")
+            self.is_available = False
+            logger.warning("⚠️警告：Redis 不可用，与ShortMemoryAgent相关服务不可用！")
         self.compression_agent = compression_agent or MemoryCompressionAgent()
         logger.info(f"ShortMemoryAgent 初始化完成，Redis可用: {self.redis.is_available}")
 

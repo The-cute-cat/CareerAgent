@@ -529,5 +529,5 @@ if __name__ == "__main__":
     # print(settings.milvus.cloud.token.get_secret_value())
     # print(settings.chroma_config.save_path)
     # print(settings.conversation.memory.long.model_name)
-    print(settings.conversation.agent.api_key.get_secret_value())
+    # print(settings.lite_llm.qwen)
     pass

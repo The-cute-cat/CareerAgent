@@ -57,6 +57,8 @@ class ConversationAgent:
         )
         # 初始化记忆子智能体
         self.short_memory = short_memory_agent
+        if not self.short_memory.is_available:
+            logger.warning("⚠️警告：short_memory_agent不可用，相关服务被关闭")
         self.extraction_agent = memory_extraction_agent
         self.compression_agent = memory_compression_agent
         # 长期记忆需要数据库会话
@@ -99,6 +101,9 @@ class ConversationAgent:
         Returns:
             AI 响应文本
         """
+        # 检查短期记忆服务是否可用
+        if not self.short_memory.is_available:
+            return "抱歉，对话记忆服务暂不可用，请稍后重试或联系管理员。"
         # 前置准备
         messages = await self._prepare_chat(user_id, session_id, user_message, db_session)
         # 生成响应
@@ -141,6 +146,13 @@ class ConversationAgent:
         Yields:
             AI 响应的文本片段（JSON 格式，包含 type 和 content）
         """
+        # 检查短期记忆服务是否可用
+        if not self.short_memory.is_available:
+            yield json.dumps({
+                "type": "error",
+                "content": "抱歉，对话记忆服务暂不可用，请稍后重试或联系管理员。"
+            }, ensure_ascii=False)
+            return
         # 前置准备
         messages = await self._prepare_chat(user_id, session_id, user_message, db_session)
         # 流式生成响应
@@ -210,7 +222,12 @@ class ConversationAgent:
             格式化的上下文字符串
         """
         parts = []
-        short_memories = await self.short_memory.get_context_messages(user_id, session_id)
+        # 短期记忆不可用时跳过对话历史
+        if not self.short_memory.is_available:
+            logger.warning(f"用户 {user_id} 会话 {session_id} 短期记忆不可用，跳过对话历史")
+            short_memories = []
+        else:
+            short_memories = await self.short_memory.get_context_messages(user_id, session_id)
         if short_memories:
             parts.append("[对话历史]")
             for msg in short_memories:
@@ -473,6 +490,10 @@ class ConversationAgent:
         Returns:
             提取并存储的记忆点数量
         """
+        # 检查短期记忆服务是否可用
+        if not self.short_memory.is_available:
+            logger.warning(f"短期记忆服务不可用，无法提取记忆")
+            return -1
         try:
             # 获取对话消息
             messages = await self.short_memory.get_messages(user_id, session_id)
@@ -528,8 +549,12 @@ class ConversationAgent:
             db_session: 数据库会话
 
         Returns:
-            是否成功
+            是否成功（短期记忆不可用时返回 False）
         """
+        # 检查短期记忆服务是否可用
+        if not self.short_memory.is_available:
+            logger.warning(f"短期记忆服务不可用，无法清除会话")
+            return False
         # 清除 Redis 短期记忆
         redis_cleared = await self.short_memory.clear(user_id, session_id)
 
@@ -559,8 +584,18 @@ class ConversationAgent:
             db_session: 数据库会话
 
         Returns:
-            {"sessionId": str, "title": str | None, "history": list[dict], "count": int}
+            {"sessionId": str, "title": str | None, "history": list[dict], "count": int, "available": bool, "message": str | None}
         """
+        # 检查短期记忆服务是否可用
+        if not self.short_memory.is_available:
+            return {
+                "sessionId": session_id,
+                "title": None,
+                "history": [],
+                "count": 0,
+                "available": False,
+                "message": "对话记忆服务暂不可用，无法获取历史记录"
+            }
         # 获取消息历史
         messages = await self.short_memory.get_messages(user_id, session_id)
         if limit:

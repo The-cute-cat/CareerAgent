@@ -15,9 +15,10 @@ communication:
     secret: <SECRET>
     expire: 1800
 vector:
+  base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
   model_name: text-embedding-v4
   llm_model_name: qwen-max
-  llm_long_model_name: qwen-long
+  llm_long_model_name: qwen-plus-latest
 lite_llm:
   model_name: dashscope/qwen-max
   qwen:
