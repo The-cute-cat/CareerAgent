@@ -55,6 +55,11 @@ async def job_merger(max_concurrency: int = 5) -> Dict[str, Any]:
     skipped_small_clusters = 0
     failed_clusters: List[Dict[str, Any]] = []
 
+    # 检查向量库服务是否可用
+    if not store.is_available:
+        log.warning("向量库服务不可用，跳过岗位入库")
+        return error_msg("向量库服务暂不可用，岗位合并功能暂时无法使用")
+
     try:
         async with AsyncSessionLocal() as session:
             log.info("开始岗位聚类...")

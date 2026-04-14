@@ -27,6 +27,11 @@ async def match_jobs(
     """
     传入学生画像，通过向量库召回相关岗位，并使用 LLM Agent 进行深度匹配差距分析。
     """
+    # 检查向量库服务是否可用
+    if not store.is_available:
+        from ai_service.exceptions import CommonHandleError
+        raise CommonHandleError(msg="岗位匹配服务暂不可用，请稍后重试或联系管理员")
+
     try:
         log.info(f"--- 正在为学生匹配最合适的岗位 ---")
 

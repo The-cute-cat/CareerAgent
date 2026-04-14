@@ -39,11 +39,24 @@ class JobVectorStore:
         self.token = token
         self.collection_name = collection_name
         self.embedder = AliyunEmbedding(api_key=api_key)
-        # 1. 连接 Milvus（支持自动故障转移）
-        self._connect_with_failover()
+        self.is_available = True
+        self._connect_error_msg = ""
 
-        # 2. 初始化或加载 Collection
-        self.collection = self._init_collection()
+        try:
+            # 1. 连接 Milvus（支持自动故障转移）
+            self._connect_with_failover()
+
+            # 2. 初始化或加载 Collection
+            self.collection = self._init_collection()
+            log.info(f"✅ JobVectorStore 初始化完成，Milvus 可用")
+        except ConnectionError as e:
+            self.is_available = False
+            self._connect_error_msg = str(e)
+            log.warning(f"⚠️警告：Milvus连接失败，岗位匹配服务不可用: {e}")
+        except Exception as e:
+            self.is_available = False
+            self._connect_error_msg = str(e)
+            log.warning(f"⚠️警告：JobVectorStore 初始化失败，岗位匹配服务不可用: {e}")
 
     def _connect_with_failover(self):
         """
