@@ -298,12 +298,14 @@ SYSTEM_PROMPT = """
 
 # 标准岗位命名规则
 1. 合并后的岗位必须重新命名为行业通用、表达准确、统一规范的标准岗位名称。
-2. 命名格式必须统一为：职级-领域-职称
+2. 命名格式必须严格统一为：职级-领域-职称
 3. 例如：
    - 初级后端开发工程师
    - 中级新媒体运营专员
    - 高级招聘配置经理
 4. 若无法明确判断职级，可使用更稳妥的通用表达，但仍需保持“职级-领域-职称”格式。
+5. 不能含有五险一金、股权激励，全国有岗位、周末双休这类无实际意义的描述性词汇。
+6. 不能含有符号，如“/”、“&”、“-”、“、”等。
 
 # 信息提取与推断规则
 1. 所有字段信息优先从“输入的全部职位描述内容”中提取。
@@ -411,7 +413,7 @@ PROFILE_ONLY_USER_PROMPT = """
 以下是多个职位描述（JD）文本，请你把它们视为一个待分析的岗位集合，而不是彼此独立的单条 JD。
 
 请基于全部输入内容进行横向比较和汇总提炼，只输出“岗位详细画像主体（Profiles）”本身。
-不要输出 job_id，不要输出 job_name，不要输出解释说明，不要输出 Markdown，只返回符合 Profiles 结构的 JSON 对象。
+不要输出解释说明，不要输出 Markdown，只返回符合 JDAnalysisResult 结构的 JSON 对象。
 
 职位描述集合如下：
 {jd_text}
@@ -522,23 +524,13 @@ def fix_llm_json_keys(data: dict) -> dict:
 def _build_jd_text(jobs: List[Any]) -> str:
     """
     构建发送给 LLM 的 JD 文本
+    直接将传入的所有对象/数据转为字符串拼接，不手动提取特定字段
     """
     if not jobs:
         raise ValueError("jobs 不能为空")
 
-    jd_text_parts: List[str] = []
-    for job in jobs:
-        job_info = (
-            f"ID: {getattr(job, 'id', '未知')}\n"
-            f"岗位名称: {getattr(job, 'job_title', None) or '未知'}\n"
-            f"薪资范围: {getattr(job, 'salary_range', None) or '未知'}\n"
-            f"所属行业: {getattr(job, 'industry', None) or '未知'}\n"
-            f"岗位描述: {getattr(job, 'job_desc', None) or '未知'}\n"
-        )
-        jd_text_parts.append(job_info)
-
-    separator = "\n" + "=" * 80 + "\n"
-    return separator.join(jd_text_parts)
+    separator = ""
+    return separator.join(str(job.to_json()) for job in jobs)
 
 
 # ==========================================
@@ -1043,7 +1035,7 @@ class JobProfileBuilder:
 # 5. 对外兼容函数
 # ==========================================
 async def analyze_job_description(
-    jobs: List[Any],
+    jobs: List[JobInfo],
     api_key: Optional[str] = None,
     model_name: Optional[str] = None,
     api_base: Optional[str] = None,
@@ -1062,22 +1054,78 @@ async def analyze_job_description(
 
 
 async def analyze_job_profiles(
-    jobs: List[Any],
+    jobs: List[JobInfo],
     api_key: Optional[str] = None,
     model_name: Optional[str] = None,
     api_base: Optional[str] = None,
 ) -> dict:
     """
     返回纯 Profiles 的 dict
-    """
-    builder = JobProfileBuilder()
-    result = await builder.build_profiles(
-        jobs=jobs,
-        api_key=api_key,
-        model_name=model_name,
-        api_base=api_base,
+    直接采用链式模式：
+    await (
+        builder
+        .pick_brain(model_config)
+        .set_system_role(PROFILE_SYSTEM_PROMPT)
+        .add_instruction("请提取岗位画像主体，只返回 Profiles 对象")
+        .add_text(jd_text)
+        .set_llm_params(temperature=0.1)
+        .into_struct(Profiles)
+        .do()
     )
-    return json.loads(result.model_dump_json(by_alias=True))
+    """
+    if not jobs:
+        raise ValueError("jobs 不能为空")
+
+    builder = JobProfileBuilder()
+    jd_text = _build_jd_text(jobs)
+    # print(jd_text)
+
+    resolved_model_name = model_name or _resolve_default_model_name()
+    resolved_api_key = api_key or _resolve_default_api_key()
+    resolved_api_base = api_base or _resolve_default_api_base()
+
+    if not resolved_api_key:
+        raise ValueError(
+            "未能获取可用的 api_key。"
+            "请显式传入 api_key，或修复 config/settings 配置，或设置环境变量（如 DASHSCOPE_API_KEY / OPENAI_API_KEY）。"
+        )
+
+    model_config = _create_model_config_from_name(
+        target_model_name=resolved_model_name,
+        api_key=_resolve_default_api_key(),
+        api_base=resolved_api_base,
+    )
+
+    result = await (
+                builder
+                .pick_brain(model_config)
+                .set_system_role(PROFILE_SYSTEM_PROMPT)
+                .add_instruction("请提取岗位画像主体，只返回 JDAnalysisResult 对象")
+                .add_text(jd_text)
+                .set_llm_params(temperature=0.1)
+                .into_struct(JDAnalysisResult)
+                .do()
+            )
+
+    return result.model_dump()
+
+# async def analyze_job_profiles(
+#     jobs: List[Any],
+#     api_key: Optional[str] = None,
+#     model_name: Optional[str] = None,
+#     api_base: Optional[str] = None,
+# ) -> dict:
+#     """
+#     返回纯 Profiles 的 dict
+#     """
+#     builder = JobProfileBuilder()
+#     result = await builder.build_profiles(
+#         jobs=jobs,
+#         api_key=api_key,
+#         model_name=model_name,
+#         api_base=api_base,
+#     )
+#     return json.loads(result.model_dump_json(by_alias=True))
 
 
 # ==========================================
@@ -1090,32 +1138,24 @@ if __name__ == "__main__":
     )
 
     async def main() -> None:
-        sample_text = """
-ID: 1
-岗位名称: C++开发工程师
-薪资范围: 10000-20000元/月
-所属行业: 计算机软件
-岗位描述: 负责 C++/Qt 桌面端功能开发，要求熟悉数据结构、算法、多线程、网络编程。
-        """.strip()
+        from config import settings
+        from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+        from ai_service.repository.job_info_repository import JobRepository
 
-        builder = JobProfileBuilder()
-
-        model_config = _create_model_config_from_name(
-            target_model_name=_resolve_default_model_name(),
-            api_key=_resolve_default_api_key(),
-            api_base=_resolve_default_api_base(),
+        DB_URL = (
+            f"mysql+aiomysql://{settings.database.user}:{settings.database.password}"
+            f"@{settings.database.host}:{settings.database.port}/{settings.database.database}"
+            f"?charset=utf8mb4"
         )
+        engine = create_async_engine(DB_URL, echo=False)
+        AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+        async with AsyncSessionLocal() as session:
+            job_repo = JobRepository(session)
+            job_list = await job_repo.get_by_id(1)
 
         try:
-            result1 = await (
-                builder
-                .pick_brain(model_config)
-                .set_system_role(PROFILE_SYSTEM_PROMPT)
-                .add_instruction("请提取岗位画像主体，只返回 Profiles 对象")
-                .add_text(sample_text)
-                .set_llm_params(temperature=0.1)
-                .into_struct(Profiles)
-                .do()
+            result1 = await analyze_job_profiles(
+                [job_list]
             )
         except Exception as e:
             print("异常类型:", type(e).__name__)
@@ -1124,6 +1164,6 @@ ID: 1
             raise
 
         print("=== result1: Profiles ===")
-        print(result1.model_dump_json(by_alias=True, indent=2))
+        print(result1)
 
     asyncio.run(main())

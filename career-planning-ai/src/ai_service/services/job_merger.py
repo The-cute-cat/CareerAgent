@@ -11,7 +11,7 @@ from ai_service.repository.job_info_repository import JobRepository
 from ai_service.repository.job_portrait_repository import JobPortraitRepository
 from ai_service.response.result import error_msg, success
 from ai_service.services.database_manage import get_db_url
-from ai_service.services.job_profile_builder import analyze_job_description
+from ai_service.services.job_profile_builder import analyze_job_description, analyze_job_profiles
 from ai_service.utils.HDBSCAN import cluster_standard_jobs_with_hdbscan
 from ai_service.utils.logger_handler import log
 from ai_service.utils.vector_store.job_vector_store import store
@@ -39,7 +39,8 @@ async def _analyze_cluster_with_semaphore(
     async with semaphore:
         log.info(f"开始分析簇 {cluster_id}，岗位数={len(jobs)}")
         try:
-            result = await analyze_job_description(jobs)
+            result = await analyze_job_profiles(jobs)
+            log.info(result)
             return cluster_id, jobs, result
         except Exception as e:
             log.error(f"簇 {cluster_id} 分析异常：{e}", exc_info=True)
@@ -86,17 +87,23 @@ async def job_merger(max_concurrency: int = 5) -> Dict[str, Any]:
             portraits_to_insert = []
             job_updates = []
             for cluster_id, jobs, profile_data in analysis_results:
+                # log.info(f" profile_data: {profile_data}")
                 if not isinstance(profile_data, dict) or "error" in profile_data:
                     failed_clusters.append({"cluster_id": cluster_id, "error": profile_data.get("error") if isinstance(profile_data, dict) else "invalid_result"})
                     continue
                 standard_title = profile_data.get("job_name", "未命名岗位")
+                log.info(f"jon_name: {standard_title}")
                 portraits_to_insert.append(JobPortrait(job_title=standard_title, skills_req=profile_data, is_deleted=0))
                 job_updates.append((cluster_id, jobs))
 
             # 批量创建岗位画像
-            for portrait in portraits_to_insert:
-                saved_portrait = await portrait_repo.create(portrait)
-                portrait_ids.append(saved_portrait.id)
+            try:
+                for portrait in portraits_to_insert:
+                    saved_portrait = await portrait_repo.create(portrait)
+                    portrait_ids.append(saved_portrait.id)
+            except Exception as e:
+                log.error(f"批量创建岗位画像失败：{e}", exc_info=True)
+                return error_msg(f"批量创建岗位画像失败：{str(e)}")
 
             # 批量更新 job_profile_id
             for idx, (cluster_id, jobs) in enumerate(job_updates):
