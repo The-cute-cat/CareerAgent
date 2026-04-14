@@ -490,29 +490,29 @@ class JobVectorStore:
 
 store = JobVectorStore()
 
-if __name__ == "__main__":
-    # 1. 从数据库加载岗位画像并转换为 JDAnalysisResult 列表
-    # 注意：需要在异步环境中调用 load_all_jd_results_from_db 方法
-    async def load_and_insert():
-        from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-
-        # 创建异步数据库引擎和会话工厂
-        from ai_service.repository.connection_session import get_db_url
-        engine = create_async_engine(get_db_url(), echo=False)
-        AsyncSessionLocal = async_sessionmaker(
-            engine,
-            expire_on_commit=False,
-            class_=AsyncSession,
-        )
-
-        async with AsyncSessionLocal() as session:
-            stats = await store.load_all_jd_results_from_db(session=session)
-            log.info(
-                f"从数据库加载并转换完成！总计: {stats['db_total']}, 转换成功: {stats['convert_success']}, 转换失败: {stats['convert_failed']}")
-            await store.insert_job_async(stats["items"])
-
-
-    asyncio.run(load_and_insert())
+# if __name__ == "__main__":
+#     # 1. 从数据库加载岗位画像并转换为 JDAnalysisResult 列表
+#     # 注意：需要在异步环境中调用 load_all_jd_results_from_db 方法
+#     async def load_and_insert():
+#         from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+#
+#         # 创建异步数据库引擎和会话工厂
+#         from ai_service.repository.connection_session import get_db_url
+#         engine = create_async_engine(get_db_url(), echo=False)
+#         AsyncSessionLocal = async_sessionmaker(
+#             engine,
+#             expire_on_commit=False,
+#             class_=AsyncSession,
+#         )
+#
+#         async with AsyncSessionLocal() as session:
+#             stats = await store.load_all_jd_results_from_db(session=session)
+#             log.info(
+#                 f"从数据库加载并转换完成！总计: {stats['db_total']}, 转换成功: {stats['convert_success']}, 转换失败: {stats['convert_failed']}")
+#             await store.insert_job_async(stats["items"])
+#
+#
+#     asyncio.run(load_and_insert())
 
 if __name__ == "__main__":
     # 1. 初始化
