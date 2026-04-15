@@ -268,6 +268,84 @@ class CareerRepository:
         max_hops = int(max_hops)
         if max_hops < 1:
             return []
+        if max_hops > 10:
+            max_hops = 10
+
+        limit = int(limit)
+        if limit < 1:
+            return []
+        if limit > 50:
+            limit = 50
+
+        query = """
+        MATCH (start:Job {id: $start_id})
+        MATCH p=(start)-[:EVOLVE_TO*1..__MAX_HOPS__]->(target:Job)
+        WHERE target.macro_community_id <> start.macro_community_id
+                    AND any(
+                        r IN relationships(p)
+                        WHERE coalesce(r.is_cross_macro, false) = true
+                    )
+        WITH target, p,
+                         reduce(
+                                cost=0.0,
+                                r IN relationships(p) |
+                                cost + coalesce(r.final_routing_cost, 0.0)
+                         ) AS total_cost
+        ORDER BY total_cost ASC
+        WITH target, collect({p: p, cost: total_cost})[0] AS best
+        WITH best.p AS p, best.cost AS total_cost
+        RETURN [n in nodes(p) | {
+                id: n.id,
+                job_name: n.job_name,
+                macro_cid: n.macro_community_id,
+                micro_cid: n.micro_community_id
+            }] AS path_sequence,
+            [r in relationships(p) | {
+                from_id: startNode(r).id,
+                to_id: endNode(r).id,
+                final_routing_cost: r.final_routing_cost,
+                transfer_cost: r.transfer_cost,
+                salary_gain: r.salary_gain,
+                jaccard_high: r.jaccard_high,
+                cos_low: r.cos_low,
+                pareto_rank: r.pareto_rank,
+                pareto_group_size: r.pareto_group_size,
+                pareto_front_size: r.pareto_front_size,
+                is_cross_macro: r.is_cross_macro,
+                is_cross_micro: r.is_cross_micro,
+                base_attraction: r.base_attraction,
+                rank_penalty: r.rank_penalty,
+                cross_penalty: r.cross_penalty,
+                build_run_id: r.build_run_id,
+                lineage_json: r.lineage_json
+            }] AS edge_metrics,
+            total_cost AS total_cost
+        LIMIT $limit
+        """.replace(
+            "__MAX_HOPS__", str(max_hops)
+        )
+
+        try:
+            with self.driver.session() as session:
+                result = session.run(
+                    Query(query),
+                    start_id=start_id,
+                    limit=limit,
+                )
+                rows = []
+                for record in result:
+                    total_cost = float(record["total_cost"] or 0.0)
+                    rows.append(
+                        {
+                            "path_sequence": record["path_sequence"],
+                            "edge_metrics": record["edge_metrics"],
+                            "total_cost": round(total_cost, 4),
+                        }
+                    )
+                return rows
+        except Exception as e:
+            log.error(f"❌ 跨界跃迁路径查询失败: {e}")
+            return []
 
     def find_goal_planning_paths(
         self,
@@ -359,78 +437,6 @@ class CareerRepository:
                 return rows
         except Exception as e:
             log.error(f"❌ 目标路径规划查询失败: {e}")
-            return []
-        if max_hops > 10:
-            max_hops = 10
-
-        query = """
-        MATCH (start:Job {id: $start_id})
-        MATCH p=(start)-[:EVOLVE_TO*1..__MAX_HOPS__]->(target:Job)
-        WHERE target.macro_community_id <> start.macro_community_id
-                    AND any(
-                        r IN relationships(p)
-                        WHERE coalesce(r.is_cross_macro, false) = true
-                    )
-        WITH target, p,
-                         reduce(
-                                cost=0.0,
-                                r IN relationships(p) |
-                                cost + coalesce(r.final_routing_cost, 0.0)
-                         ) AS total_cost
-        ORDER BY total_cost ASC
-        WITH target, collect({p: p, cost: total_cost})[0] AS best
-        WITH best.p AS p, best.cost AS total_cost
-        RETURN [n in nodes(p) | {
-                id: n.id,
-                job_name: n.job_name,
-                macro_cid: n.macro_community_id,
-                micro_cid: n.micro_community_id
-            }] AS path_sequence,
-            [r in relationships(p) | {
-                from_id: startNode(r).id,
-                to_id: endNode(r).id,
-                final_routing_cost: r.final_routing_cost,
-                transfer_cost: r.transfer_cost,
-                salary_gain: r.salary_gain,
-                jaccard_high: r.jaccard_high,
-                cos_low: r.cos_low,
-                pareto_rank: r.pareto_rank,
-                pareto_group_size: r.pareto_group_size,
-                pareto_front_size: r.pareto_front_size,
-                is_cross_macro: r.is_cross_macro,
-                is_cross_micro: r.is_cross_micro,
-                base_attraction: r.base_attraction,
-                rank_penalty: r.rank_penalty,
-                cross_penalty: r.cross_penalty,
-                build_run_id: r.build_run_id,
-                lineage_json: r.lineage_json
-            }] AS edge_metrics,
-            total_cost AS total_cost
-        LIMIT $limit
-        """.replace(
-            "__MAX_HOPS__", str(max_hops)
-        )
-
-        try:
-            with self.driver.session() as session:
-                result = session.run(
-                    Query(query),
-                    start_id=start_id,
-                    limit=limit,
-                )
-                rows = []
-                for record in result:
-                    total_cost = float(record["total_cost"] or 0.0)
-                    rows.append(
-                        {
-                            "path_sequence": record["path_sequence"],
-                            "edge_metrics": record["edge_metrics"],
-                            "total_cost": round(total_cost, 4),
-                        }
-                    )
-                return rows
-        except Exception as e:
-            log.error(f"❌ 跨界跃迁路径查询失败: {e}")
             return []
 
     # ==========================================
