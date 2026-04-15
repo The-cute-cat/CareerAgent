@@ -1,5 +1,5 @@
 <template>
-  <div class="tree-node" :style="{ '--depth': String(depth) }">
+  <div class="tree-node" :class="{ 'tree-node--root': depth === 0 }">
     <div class="tree-node__branch">
       <div class="tree-node__self">
         <button
@@ -7,16 +7,23 @@
           class="tree-node__label"
           :class="{
             active: activeId === node.id,
-            expandable: hasChildren,
             opened: expanded,
-            [node.status]: true,
+            'is-root': depth === 0,
           }"
           @click="emit('select', node)"
         >
-          <span class="status-dot" :class="node.status"></span>
           <span class="tree-node__text">{{ node.label }}</span>
-          <span v-if="node.difficulty" class="difficulty-tag" :class="getDifficultyClass(node.difficulty)">
-            {{ node.difficulty }}
+          <span class="tree-node__action">
+            <el-icon
+              v-if="hasChildren"
+              class="tree-node__icon"
+              :class="{ 'tree-node__icon--opened': expanded }"
+            >
+              <ArrowDownBold />
+            </el-icon>
+            <el-icon v-else class="tree-node__icon tree-node__icon--leaf">
+              <ArrowRightBold />
+            </el-icon>
           </span>
         </button>
 
@@ -26,12 +33,7 @@
           class="tree-node__toggle"
           :aria-label="expanded ? '收起下一级内容' : '展开下一级内容'"
           @click.stop="expanded = !expanded"
-        >
-          <el-icon>
-            <ArrowDownBold v-if="expanded" />
-            <ArrowRightBold v-else />
-          </el-icon>
-        </button>
+        />
       </div>
 
       <div v-if="hasChildren && expanded" class="tree-node__children">
@@ -82,17 +84,8 @@ const emit = defineEmits<{
   select: [node: KnowledgeTreeNode]
 }>()
 
-const expanded = ref(false)
+const expanded = ref(true)
 const hasChildren = computed(() => props.node.children.length > 0)
-
-function getDifficultyClass(difficulty: string): string {
-  const map: Record<string, string> = {
-    '基础': 'easy',
-    '进阶': 'medium',
-    '高级': 'hard',
-  }
-  return map[difficulty] || 'medium'
-}
 </script>
 
 <style scoped lang="scss">
@@ -103,8 +96,8 @@ function getDifficultyClass(difficulty: string): string {
 .tree-node__branch {
   display: flex;
   align-items: center;
-  gap: 20px;
-  min-height: 70px;
+  gap: 86px;
+  min-height: 96px;
 }
 
 .tree-node__self {
@@ -112,167 +105,146 @@ function getDifficultyClass(difficulty: string): string {
   z-index: 2;
   display: inline-flex;
   align-items: center;
-  gap: 10px;
 }
 
 .tree-node__label {
   min-width: 200px;
-  max-width: 260px;
-  padding: 8px 16px 8px 36px;
-  border-radius: 18px;
-  border: 1px solid #e2e8f0;
-  background: white;
-  color: #1e293b;
+  max-width: 274px;
+  padding: 13px 18px;
+  border-radius: 17px;
+  border: 1px solid #e5e7eb;
+  background: #ececec;
+  color: #3f3f46;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
+  line-height: 1.35;
   text-align: left;
   cursor: pointer;
   transition: all 0.2s ease;
   position: relative;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
-
-  .status-dot {
-    position: absolute;
-    left: 12px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    transition: all 0.2s;
-
-    &.completed {
-      background: #10b981;
-      box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
-    }
-
-    &.current {
-      background: #3b82f6;
-      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
-      animation: pulse 1.5s infinite;
-    }
-
-    &.planned {
-      background: #94a3b8;
-    }
-  }
-
-  .difficulty-tag {
-    position: absolute;
-    right: 10px;
-    top: 50%;
-    transform: translateY(-50%);
-    font-size: 10px;
-    font-weight: 700;
-    padding: 2px 8px;
-    border-radius: 30px;
-    background: #f1f5f9;
-    color: #475569;
-
-    &.easy {
-      background: #dcfce7;
-      color: #15803d;
-    }
-
-    &.medium {
-      background: #fef9c3;
-      color: #854d0e;
-    }
-
-    &.hard {
-      background: #fee2e2;
-      color: #b91c1c;
-    }
-  }
-
-  &:hover {
-    transform: translateY(-1px);
-    border-color: #93c5fd;
-    box-shadow: 0 8px 20px rgba(37, 99, 235, 0.12);
-  }
-
-  &.active {
-    border-color: #2563eb;
-    background: #eff6ff;
-    color: #1e40af;
-    box-shadow: 0 8px 20px rgba(37, 99, 235, 0.15);
-
-    .status-dot {
-      transform: translateY(-50%) scale(1.2);
-    }
-  }
-
-  &.opened {
-    background: #f8fafc;
-  }
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  box-shadow: none;
 }
 
-.tree-node__toggle {
-  width: 32px;
-  height: 32px;
-  border: none;
-  border-radius: 10px;
-  background: #f8fafc;
-  color: #64748b;
+.tree-node__label:hover {
+  background: #e7e7e7;
+  border-color: #d4d4d8;
+}
+
+.tree-node__label.active {
+  background: #e7e7e7;
+  border-color: #d4d4d8;
+  color: #27272a;
+}
+
+.tree-node__label.opened {
+  background: #e8e8e8;
+}
+
+.tree-node__label.is-root {
+  min-width: 258px;
+  max-width: 330px;
+  padding: 15px 18px;
+  border: 4px solid #0f4ab8;
+  background: #ececec;
+  color: #1f2937;
+  font-size: 18px;
+  font-weight: 700;
+  border-radius: 17px;
+}
+
+.tree-node__text {
+  display: inline-block;
+}
+
+.tree-node__action {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s;
-  border: 1px solid #e2e8f0;
+  flex-shrink: 0;
+  color: #71717a;
+}
 
-  &:hover {
-    color: #2563eb;
-    background: #eff6ff;
-    border-color: #bfdbfe;
-  }
+.tree-node__icon {
+  font-size: 12px;
+  transition: transform 0.2s ease;
+}
+
+.tree-node__icon--opened {
+  transform: rotate(0deg);
+}
+
+.tree-node__icon--leaf {
+  font-size: 11px;
+}
+
+.tree-node__toggle {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
 }
 
 .tree-node__children {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding-left: 32px;
-  margin-top: 8px;
-
-  &::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 24px;
-    bottom: 24px;
-    width: 2px;
-    background: linear-gradient(to bottom, #cbd5e1, #e2e8f0);
-    border-radius: 2px;
-  }
+  gap: 30px;
+  padding-left: 94px;
 }
 
 .tree-node__children > :deep(.tree-node) {
   position: relative;
-
-  &::before {
-    content: '';
-    position: absolute;
-    left: -32px;
-    top: 35px;
-    width: 32px;
-    height: 2px;
-    background: linear-gradient(90deg, #cbd5e1, #e2e8f0);
-    border-radius: 2px;
-  }
 }
 
-@keyframes pulse {
-  0% {
-    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
-  }
-  70% {
-    box-shadow: 0 0 0 6px rgba(59, 130, 246, 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
-  }
+.tree-node__children > :deep(.tree-node)::before {
+  content: '';
+  position: absolute;
+  left: -94px;
+  top: 50%;
+  width: 94px;
+  height: 2px;
+  border-top: 2px solid #a1a1aa;
+  border-top-left-radius: 999px;
+  border-bottom-left-radius: 999px;
+  transform: translateY(-50%);
+  opacity: 0.92;
+}
+
+.tree-node__children > :deep(.tree-node)::after {
+  content: '';
+  position: absolute;
+  left: -94px;
+  top: 0;
+  bottom: 50%;
+  width: 94px;
+  border-left: 2px solid #a1a1aa;
+  border-bottom: 2px solid #a1a1aa;
+  border-bottom-left-radius: 52px;
+  opacity: 0.92;
+}
+
+.tree-node__children > :deep(.tree-node:first-child)::after {
+  top: 50%;
+  bottom: auto;
+  height: 0;
+  border-left: 2px solid #a1a1aa;
+  border-top: 2px solid #a1a1aa;
+  border-bottom: none;
+  border-top-left-radius: 52px;
+}
+
+.tree-node__children > :deep(.tree-node:only-child)::after {
+  display: none;
+}
+
+.tree-node__children > :deep(.tree-node:last-child)::after {
+  bottom: 50%;
 }
 
 @media (max-width: 1024px) {
@@ -284,17 +256,24 @@ function getDifficultyClass(difficulty: string): string {
   }
 
   .tree-node__children {
-    padding-left: 20px;
+    padding-left: 18px;
+    gap: 14px;
+  }
 
-    &::before,
-    > :deep(.tree-node)::before {
-      display: none;
-    }
+  .tree-node__children > :deep(.tree-node)::before,
+  .tree-node__children > :deep(.tree-node)::after {
+    display: none;
   }
 
   .tree-node__label {
     min-width: 180px;
     max-width: 240px;
+  }
+
+  .tree-node__label.is-root {
+    min-width: 220px;
+    max-width: 280px;
+    font-size: 16px;
   }
 }
 </style>

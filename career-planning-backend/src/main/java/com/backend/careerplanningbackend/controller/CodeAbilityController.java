@@ -48,6 +48,7 @@ public class CodeAbilityController {
         log.info("params: {}", params);
         AiChatResponse aiChatResponse = aiServiceClient.chatWithOtherJson("/code-ability/evaluate", params, false);
         return Result.ok(aiChatResponse.getData());
+
     }
     
 }

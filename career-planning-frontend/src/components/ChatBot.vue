@@ -221,6 +221,7 @@ const quickQuestionCards = computed(() => {
     description: defaults[index]?.description || '用这个问题快速开始一次对话',
   }))
 })
+
 const assistantPresenceTone = computed(() => {
   if (sendingState.value === 'error') return 'danger'
   if (isStreaming.value) return 'info'

@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Body, Depends
 
 from ai_service.agents.career_analyst_agent import CareerAnalystAgent
+from ai_service.agents.user_job_match_analyzer import analyze_user_job_match
 from ai_service.models.struct_txt import StudentProfile
-from ai_service.response.result import success
+from ai_service.response.result import success, error_msg
 from ai_service.schemas.auth import validate_token
 from ai_service.services import log
 from ai_service.services.job_merger import job_merger
@@ -63,6 +64,37 @@ async def match_jobs(
         from ai_service.exceptions import CommonHandleError
         raise CommonHandleError(msg=f"匹配失败: {str(e)}")
 
+from fastapi import Depends, Path
+
+@router.get("/job_explain/{job_id}/{user_id}", summary="根据岗位ID和用户ID返回岗位匹配解释")
+async def job_explain(
+    job_id: int = Path(..., description="岗位画像ID", ge=1),
+    user_id: int = Path(..., description="用户ID", ge=1),
+    _: bool = Depends(validate_token),
+):
+    """
+    根据岗位画像ID和用户ID，返回该用户与目标岗位的详细匹配解释。
+    """
+    try:
+        log.info(f"--- 开始单岗位匹配解释: job_id={job_id}, user_id={user_id} ---")
+
+        result = await analyze_user_job_match(
+            job_id=job_id,
+            user_id=user_id,
+        )
+
+        if "error" in result:
+            log.warning(
+                f"单岗位匹配解释失败: job_id={job_id}, user_id={user_id}, error={result['error']}"
+            )
+            return error_msg(f"岗位匹配解释失败: {result['error']}")
+
+        log.info(f"单岗位匹配解释成功: job_id={job_id}, user_id={user_id}")
+        return success(result)
+
+    except Exception as e:
+        log.error(f"单岗位匹配解释接口异常: {e}", exc_info=True)
+        return error_msg(f"单岗位匹配解释接口异常: {str(e)}")
 
 @router.post("/job_merge", summary="合并岗位")
 async def job_merge(
