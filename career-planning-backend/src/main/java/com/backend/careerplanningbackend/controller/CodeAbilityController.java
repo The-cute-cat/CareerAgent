@@ -7,6 +7,7 @@ import com.backend.careerplanningbackend.util.AiServiceClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -39,12 +40,15 @@ public class CodeAbilityController {
      * @return 代码能力评估结果
      */
     @PostMapping("/evaluate")
-    public Result<Object> getCodeAbility(CodeAbilityDTO codeAbilityDTO) {
+    public Result<Object> getCodeAbility(@RequestBody CodeAbilityDTO codeAbilityDTO) {
         Map<String, Object> params = new HashMap<>();
         params.put("url", codeAbilityDTO.getUrl());
-        params.put("use_ai", codeAbilityDTO.getUse_ai());
-        AiChatResponse aiChatResponse = aiServiceClient.chatWithOtherJson("/codeAbility/evaluate", params, false);
+        params.put("use_ai", codeAbilityDTO.getUse_ai() != null ? codeAbilityDTO.getUse_ai() : true);
+        params.put("cache_enabled", codeAbilityDTO.getCache_enabled() != null ? codeAbilityDTO.getCache_enabled() : true);
+        log.info("params: {}", params);
+        AiChatResponse aiChatResponse = aiServiceClient.chatWithOtherJson("/code-ability/evaluate", params, false);
         return Result.ok(aiChatResponse.getData());
+
     }
     
 }

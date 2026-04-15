@@ -8,7 +8,7 @@ import {
   Star,Collection,Position,
   Fold,Expand,Guide,Connection,Calendar,
   Memo,Timer,Finished,Reading,
-  Promotion,MagicStick
+  Promotion,MagicStick,OfficeBuilding
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
@@ -68,6 +68,7 @@ const menuItems = [
     ]
   },
   { index: '/job-matching', icon: DataAnalysis, text: '人岗匹配' },
+  { index: '/knowledge-base', icon: OfficeBuilding, text: '岗位知识库' },
   { index: '/development-map', icon: Promotion, text: '发展图谱' },
   { index: '/report', icon: TrendCharts, text: '生涯报告' },
   {
@@ -96,7 +97,7 @@ defineExpose({ collapsed })
         <img src="../assets/1234.png" alt="logo" />
       </div>
       <transition name="text-fade">
-        <span v-if="!collapsed" class="logo-text">职路 Agent</span>
+        <span v-if="!collapsed" class="logo-text">职引未来</span>
       </transition>
     </div>
     

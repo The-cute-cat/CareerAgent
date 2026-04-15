@@ -1,20 +1,21 @@
 from fastapi import APIRouter, Body, Depends
 
+from ai_service.agents.career_analyst_agent import CareerAnalystAgent
+from ai_service.agents.user_job_match_analyzer import analyze_user_job_match
 from ai_service.models.struct_txt import StudentProfile
-from ai_service.response.result import success
+from ai_service.response.result import success, error_msg
 from ai_service.schemas.auth import validate_token
 from ai_service.services import log
 from ai_service.services.job_merger import job_merger
-from ai_service.agents.career_analyst_agent import CareerAnalystAgent
-from ai_service.utils.vector_store.job_vector_store import JobVectorStore
+from ai_service.utils.vector_store.job_vector_store import store
 
 __all__ = ["router"]
 
 router = APIRouter(prefix="/matching", tags=["match"])
 
 # 初始化组件 (建议在全局作用域或 lifespan 中初始化以复用连接和模型加载)
-store = JobVectorStore()
 agent = CareerAnalystAgent()
+
 
 @router.post("/jobs", summary="基于人物画像进行人岗匹配与深度分析")
 # 如果发现运行是model限流的话，就改career_analyst_agent.py这个文件
@@ -27,6 +28,11 @@ async def match_jobs(
     """
     传入学生画像，通过向量库召回相关岗位，并使用 LLM Agent 进行深度匹配差距分析。
     """
+    # 检查向量库服务是否可用
+    if not store.is_available:
+        from ai_service.exceptions import CommonHandleError
+        raise CommonHandleError(msg="岗位匹配服务暂不可用，请稍后重试或联系管理员")
+
     try:
         log.info(f"--- 正在为学生匹配最合适的岗位 ---")
 
@@ -56,8 +62,39 @@ async def match_jobs(
         # 假设你有一个错误处理机制或特定的 Error 返回格式
         # 这里可以直接抛出你项目中定义的 CommonHandleError
         from ai_service.exceptions import CommonHandleError
-        raise CommonHandleError(f"匹配失败: {str(e)}")
+        raise CommonHandleError(msg=f"匹配失败: {str(e)}")
 
+from fastapi import Depends, Path
+
+@router.get("/job_explain/{job_id}/{user_id}", summary="根据岗位ID和用户ID返回岗位匹配解释")
+async def job_explain(
+    job_id: int = Path(..., description="岗位画像ID", ge=1),
+    user_id: int = Path(..., description="用户ID", ge=1),
+    _: bool = Depends(validate_token),
+):
+    """
+    根据岗位画像ID和用户ID，返回该用户与目标岗位的详细匹配解释。
+    """
+    try:
+        log.info(f"--- 开始单岗位匹配解释: job_id={job_id}, user_id={user_id} ---")
+
+        result = await analyze_user_job_match(
+            job_id=job_id,
+            user_id=user_id,
+        )
+
+        if "error" in result:
+            log.warning(
+                f"单岗位匹配解释失败: job_id={job_id}, user_id={user_id}, error={result['error']}"
+            )
+            return error_msg(f"岗位匹配解释失败: {result['error']}")
+
+        log.info(f"单岗位匹配解释成功: job_id={job_id}, user_id={user_id}")
+        return success(result)
+
+    except Exception as e:
+        log.error(f"单岗位匹配解释接口异常: {e}", exc_info=True)
+        return error_msg(f"单岗位匹配解释接口异常: {str(e)}")
 
 @router.post("/job_merge", summary="合并岗位")
 async def job_merge(
@@ -66,4 +103,5 @@ async def job_merge(
     """
 这个接口的具体功能和实现细节不清楚，暂时留空。    """
 
-    return await job_merger()
+    result = await job_merger()
+    return result

@@ -26,7 +26,7 @@ except Exception:
 # 模型：BAAI/bge-base-zh-v1.5 或 BAAI/bge-small-zh-v1.5 或 BAAI/bge-tiny-zh-v1.5
 async def cluster_standard_jobs_with_hdbscan(
     session: AsyncSession,
-    min_cluster_size: int = 6,# 1. 形成簇的最小样本数
+    min_cluster_size: int = 8,# 1. 形成簇的最小样本数
     batch_size: int = 64,
     embedding_model: str = "BAAI/bge-base-zh-v1.5",
     hdbscan_min_samples: int = 3,    # 2. 核心点的最小邻居数 (密度敏感度)
@@ -62,6 +62,11 @@ async def cluster_standard_jobs_with_hdbscan(
         embedding_model=embedding_model,
     )
 
+    # 检查向量库服务是否可用
+    if not store.is_available:
+        log.warning(f"向量库服务不可用: {store._connect_error_msg}")
+        raise RuntimeError(f"向量库服务暂不可用，无法进行聚类: {store._connect_error_msg}")
+
     log.info("开始从 JobOriginalVectorStore 获取聚类所需向量...")
     valid_jobs, embeddings, sync_stats = await store.get_jobs_and_embeddings_for_hdbscan(
         session=session,
@@ -70,7 +75,7 @@ async def cluster_standard_jobs_with_hdbscan(
         desc_max_len=desc_max_len,
     )
 
-    log.info(f"向量同步结果：{sync_stats}")
+    # log.info(f"向量同步结果：{sync_stats}")
 
     total = len(valid_jobs)
     if total == 0:

@@ -146,15 +146,27 @@ class JobOriginalVectorStore:
         self.embedding_model = embedding_model
         self.index_type = index_type
         self.metric_type = metric_type
+        self.is_available = True
+        self._connect_error_msg = ""
 
-        self.embedder = self._load_embedder()
-        self.dim = self.embedder.get_sentence_embedding_dimension()
+        try:
+            self.embedder = self._load_embedder()
+            self.dim = self.embedder.get_sentence_embedding_dimension()
 
-        self._connect_milvus()
-        self.collection = self._init_collection()
+            self._connect_milvus()
+            self.collection = self._init_collection()
+            log.info(f"✅ JobOriginalVectorStore 初始化完成，Milvus 可用")
+        except Exception as e:
+            self.is_available = False
+            self._connect_error_msg = str(e)
+            log.warning(f"⚠️警告：JobOriginalVectorStore 初始化失败，相关服务不可用: {e}")
 
     def _connect_milvus(self) -> None:
-        """连接 Milvus / Zilliz。"""
+        """
+        智能连接 Milvus（支持自动故障转移）
+        - force_local=true: 强制使用本地配置，不进行故障转移
+        - force_local=false: 自动选择（优先本地，失败后尝试云端）
+        """
         # 增加 gRPC 接收消息大小限制 (例如 64MB)，防止查询返回数据量过大时报错
         # RESOURCE_EXHAUSTED: grpc: received message larger than max
         conn_args = {
@@ -164,12 +176,53 @@ class JobOriginalVectorStore:
             ]
         }
 
-        if self.url != "<url>" and self.token != "<token>":
-            connections.connect("default", uri=self.url, token=self.token, **conn_args)
-            log.info("✅ 已连接到 Zilliz 云服务")
+        use_cloud = (
+            self.url not in ("", "<url>", None)
+            and self.token not in ("", "<token>", None)
+        )
+        force_local = getattr(settings.milvus, 'force_local', False)
+
+        if force_local:
+            # 强制使用本地，不尝试云端
+            connected = self._try_connect("local", self.host, self.port, conn_args)
+            if not connected:
+                raise ConnectionError(
+                    f"❌ 无法连接到本地 Milvus 服务器（强制本地模式）！\n"
+                    f"  - 地址: {self.host}:{self.port}"
+                )
         else:
-            connections.connect("default", host=self.host, port=self.port, **conn_args)
-            log.info(f"✅ 已连接到本地 Milvus: {self.host}:{self.port}")
+            # 自动选择：优先本地，失败后尝试云端
+            connections_to_try = [("local", self.host, self.port)]
+            if use_cloud:
+                connections_to_try.append(("cloud", self.url, self.token))
+            connected = False
+            for i, (conn_type, param1, param2) in enumerate(connections_to_try):
+                if i > 0:
+                    log.warning(f"⚠️ 上一个服务器连接失败，尝试切换到 {conn_type} 服务器...")
+                connected = self._try_connect(conn_type, param1, param2, conn_args)
+                if connected:
+                    break
+            if not connected:
+                raise ConnectionError(
+                    f"❌ 无法连接到任何 Milvus 服务器！\n"
+                    f"  - 本地: {self.host}:{self.port}\n"
+                    f"  - 云端: {self.url if use_cloud else '未配置'}"
+                )
+
+    @staticmethod
+    def _try_connect(conn_type: str, param1, param2, conn_args: dict) -> bool:
+        """尝试连接 Milvus，返回是否成功"""
+        try:
+            if conn_type == "local":
+                connections.connect("default", host=param1, port=param2, **conn_args)
+                log.info(f"✅ 已连接到本地 Milvus: {param1}:{param2}")
+            else:
+                connections.connect("default", uri=param1, token=param2, **conn_args)
+                log.info(f"✅ 已连接到 Zilliz 云服务!")
+            return True
+        except Exception as e:
+            log.warning(f"⚠️ 连接 {conn_type} 失败: {e}")
+            return False
 
     def _load_embedder(self) -> SentenceTransformer:
         """加载本地语义模型，向量化方式与 HDBSCAN 保持一致。"""
@@ -723,9 +776,9 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
-    # store = JobOriginalVectorStore(
-    #     collection_name="job_original_embeddings",
-    #     embedding_model="BAAI/bge-base-zh-v1.5",
-    # )
-    # store.reset_collection()
+   # asyncio.run(main())
+    store = JobOriginalVectorStore(
+        collection_name="job_original_embeddings",
+        embedding_model="BAAI/bge-base-zh-v1.5",
+    )
+    store.reset_collection()

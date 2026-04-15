@@ -9,6 +9,8 @@ from pypdf import PdfReader
 from sentence_transformers import SentenceTransformer
 from pymilvus import MilvusClient, DataType
 
+from ai_service.utils.logger_handler import log
+from config import settings
 
 # =========================
 # 1. 数据结构与常量
@@ -153,27 +155,98 @@ class RAGKnowledgeBase:
 
     def __init__(
         self,
-        uri: str = "http://localhost:19530",
-        token: Optional[str] = None,
+        local_host: str = None,
+        local_port: int = 19530,
+        cloud_url: str = None,
+        cloud_token: str = None,
         db_name: str = "default",
         collection_name: str = "career_rag_kb",
         embedding_model_name: str = DEFAULT_EMBED_MODEL,
     ):
-        self.uri = uri
-        self.token = token
+        # 从配置文件读取默认值
+        self.local_host = local_host or settings.milvus.local.host
+        self.local_port = local_port or settings.milvus.local.port
+        self.cloud_url = cloud_url or settings.milvus.cloud.url
+        self.cloud_token = cloud_token or (settings.milvus.cloud.token.get_secret_value() if settings.milvus.cloud.token else None)
         self.db_name = db_name
         self.collection_name = collection_name
+        self.is_available = True
+        self._connect_error_msg = ""
+        self._connected_uri = None
 
-        self.client = MilvusClient(
-            uri=uri,
-            token=token,
-            db_name=db_name,
+        try:
+            # 智能连接（支持自动故障转移）
+            self._connect_with_failover()
+
+            self.embedding_model = SentenceTransformer(embedding_model_name)
+            self.embedding_dim = self.embedding_model.get_sentence_embedding_dimension()
+
+            self._ensure_collection()
+            log.info(f"✅ RAGKnowledgeBase 初始化完成，Milvus 可用")
+        except Exception as e:
+            self.is_available = False
+            self._connect_error_msg = str(e)
+            self.client = None
+            self.embedding_model = None
+            self.embedding_dim = 0
+            log.warning(f"⚠️警告：RAGKnowledgeBase 初始化失败，RAG知识库服务不可用: {e}")
+
+    def _connect_with_failover(self):
+        """
+        智能连接 Milvus（支持自动故障转移）
+        - force_local=true: 强制使用本地配置，不进行故障转移
+        - force_local=false: 自动选择（优先本地，失败后尝试云端）
+        """
+        use_cloud = (
+            self.cloud_url not in ("", "<url>", None)
+            and self.cloud_token not in ("", "<token>", None)
         )
+        force_local = getattr(settings.milvus, 'force_local', False)
 
-        self.embedding_model = SentenceTransformer(embedding_model_name)
-        self.embedding_dim = self.embedding_model.get_sentence_embedding_dimension()
+        if force_local:
+            # 强制使用本地，不尝试云端
+            connected, uri = self._try_connect("local", self.local_host, self.local_port)
+            if not connected:
+                raise ConnectionError(
+                    f"❌ 无法连接到本地 Milvus 服务器（强制本地模式）！\n"
+                    f"  - 地址: {self.local_host}:{self.local_port}"
+                )
+            self._connected_uri = uri
+        else:
+            # 自动选择：优先本地，失败后尝试云端
+            connections_to_try = [("local", self.local_host, self.local_port)]
+            if use_cloud:
+                connections_to_try.append(("cloud", self.cloud_url, self.cloud_token))
+            connected = False
+            for i, (conn_type, param1, param2) in enumerate(connections_to_try):
+                if i > 0:
+                    log.warning(f"⚠️ 上一个服务器连接失败，尝试切换到 {conn_type} 服务器...")
+                connected, uri = self._try_connect(conn_type, param1, param2)
+                if connected:
+                    self._connected_uri = uri
+                    break
+            if not connected:
+                raise ConnectionError(
+                    f"❌ 无法连接到任何 Milvus 服务器！\n"
+                    f"  - 本地: {self.local_host}:{self.local_port}\n"
+                    f"  - 云端: {self.cloud_url if use_cloud else '未配置'}"
+                )
 
-        self._ensure_collection()
+    def _try_connect(self, conn_type: str, param1, param2) -> tuple:
+        """尝试连接 Milvus，返回 (是否成功, uri)"""
+        try:
+            if conn_type == "local":
+                uri = f"http://{param1}:{param2}"
+                self.client = MilvusClient(uri=uri, db_name=self.db_name)
+                log.info(f"✅ 已连接到本地 Milvus: {param1}:{param2}")
+            else:
+                uri = param1
+                self.client = MilvusClient(uri=uri, token=param2, db_name=self.db_name)
+                log.info(f"✅ 已连接到 Zilliz 云服务!")
+            return True, uri
+        except Exception as e:
+            log.warning(f"⚠️ 连接 {conn_type} 失败: {e}")
+            return False, None
 
     # ---------- 基础 ----------
     def _check_category(self, category: str):
@@ -274,6 +347,8 @@ class RAGKnowledgeBase:
         chunk_size: int = 500,
         chunk_overlap: int = 100,
     ) -> Dict[str, Any]:
+        if not self.is_available:
+            return {"success": False, "message": "知识库服务暂不可用，请稍后重试", "doc_id": doc_id}
         self._check_category(category)
         metadata = metadata or {}
         doc_id = doc_id or str(uuid.uuid4())
@@ -325,6 +400,8 @@ class RAGKnowledgeBase:
         chunk_size: int = 500,
         chunk_overlap: int = 100,
     ) -> Dict[str, Any]:
+        if not self.is_available:
+            return {"success": False, "message": "知识库服务暂不可用，请稍后重试", "doc_id": doc_id}
         self._check_category(category)
 
         if not os.path.exists(file_path):
@@ -532,6 +609,8 @@ class RAGKnowledgeBase:
         filters: Optional[Dict[str, Any]] = None,
         output_fields: Optional[List[str]] = None,
     ) -> List[Dict[str, Any]]:
+        if not self.is_available:
+            return [{"error": "知识库服务暂不可用，请稍后重试"}]
         if category:
             self._check_category(category)
 

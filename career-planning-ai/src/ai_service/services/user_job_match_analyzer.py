@@ -1,21 +1,19 @@
 import asyncio
 import json
-from typing import Optional
 
 from dotenv import load_dotenv
 from langchain_community.chat_models import ChatTongyi
 from langchain_core.prompts import ChatPromptTemplate
-from pydantic import ConfigDict
+from pydantic import ConfigDict, SecretStr
 
+from ai_service.repository.connection_session import AsyncSessionLocal
 from ai_service.repository.job_portrait_repository import JobPortraitRepository
 from ai_service.repository.stu_portrait_repository import StuProfileRepository
 from ai_service.services import log
-from ai_service.services.database_manage import AsyncSessionLocal
 from ai_service.services.prompt_loader import prompt_loader
 from config import settings
 
 load_dotenv()
-
 
 # =========================
 # 1. 定义输出结构
@@ -23,6 +21,7 @@ load_dotenv()
 
 from pydantic import BaseModel, Field
 from typing import Dict, Any
+
 
 class UserJobMatchResult(BaseModel):
     overall_summary: str = Field(..., description="总体评价总结", alias="总体评价总结")
@@ -53,13 +52,12 @@ USER_PROMPT = prompt_loader.small_prompts["user_job_match_analyzer_user"]
 # =========================
 
 def _create_llm(
-    api_key: str,
-    model_name: str,
+        api_key: str | SecretStr,
+        model_name: str,
 ) -> ChatTongyi:
     return ChatTongyi(
         api_key=api_key,
         model=model_name,
-        temperature=0.2,
         streaming=True,
     )
 
@@ -84,6 +82,7 @@ def _build_profile_json_text(data: Any, default_text: str = "未提及") -> str:
     except Exception:
         log.warning(f"序列化画像失败，回退到 str: {data}")
         return str(data)
+
 
 # =========================
 # 5. 解析 JSON
@@ -114,10 +113,10 @@ def _extract_json_text(raw_content: str) -> Dict[str, Any]:
 # =========================
 
 async def analyze_user_job_match(
-    job_id: int,
-    user_id: int,
-    api_key: Optional[str] = settings.llm.api_key.get_secret_value(),
-    model_name: str = settings.vector.llm_model_name,
+        job_id: int,
+        user_id: int,
+        api_key: str | None = settings.llm.api_key.get_secret_value(),
+        model_name: str = settings.vector.llm_model_name,
 ) -> Dict[str, Any]:
     """
     根据岗位ID和用户ID，分析用户与岗位的匹配情况
@@ -198,15 +197,14 @@ async def analyze_user_job_match(
             "user_profile_text": user_profile_text,
         }
 
-
 # if __name__ == '__main__':
-    ## 简单测试
-    # test_job_id = 65  # 替换为实际 job_id
-    # test_user_id = 1  # 替换为实际 user_id
-    #
-    # result = asyncio.run(analyze_user_job_match(test_job_id, test_user_id))
-    # if "error" in result:
-    #     print(f"❌ 分析失败: {result['error']}")
-    # else:
-    #     print("✅ 分析结果:")
-    #     print(str(result.get("analysis", {})))
+## 简单测试
+# test_job_id = 65  # 替换为实际 job_id
+# test_user_id = 1  # 替换为实际 user_id
+#
+# result = asyncio.run(analyze_user_job_match(test_job_id, test_user_id))
+# if "error" in result:
+#     print(f"❌ 分析失败: {result['error']}")
+# else:
+#     print("✅ 分析结果:")
+#     print(str(result.get("analysis", {})))

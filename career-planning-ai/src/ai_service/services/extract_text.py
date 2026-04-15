@@ -19,7 +19,7 @@ async def extract_from_file(file_path: str, extension: str) -> str:
     if extension == "pdf":
         content = await pdf_extractor.get_pdf_content(file_path)
         if not content:
-            raise CommonHandleError("PDF 文件提取失败")
+            raise CommonHandleError(msg="PDF 文件提取失败")
         text = ""
         for page in content:
             if not page.get("error"):
@@ -37,4 +37,4 @@ async def extract_from_file(file_path: str, extension: str) -> str:
             return f.read()
 
     else:
-        raise CommonHandleError(f"不支持的文件类型: {extension}")
+        raise CommonHandleError(msg=f"不支持的文件类型: {extension}")

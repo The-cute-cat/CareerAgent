@@ -22,9 +22,9 @@ export interface LoginResponse {
 }
 
 export const userLoginService = (loginInfo: LoginFormDTO) => {
-  // if (ENABLE_MOCK) {
-  //   return mockUserLoginApi(loginInfo)
-  // }
+  if (ENABLE_MOCK) {
+    return mockUserLoginApi(loginInfo)
+  }
   return request.post('/user/login', loginInfo)
 }
 
