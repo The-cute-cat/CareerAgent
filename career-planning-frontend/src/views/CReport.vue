@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="career-report-page">
     <!-- 顶部导航栏 -->
     <nav class="top-nav">
@@ -11,6 +11,8 @@
         <el-button :icon="Check" @click="runCompletenessCheck">完整性检查</el-button>
         <el-button :icon="MagicStick" @click="polishAllSections">AI 润色</el-button>
         <el-button :icon="DocumentChecked" @click="handleSave">保存</el-button>
+        <el-button type="success" :icon="Document" @click="exportPdf">导出 PDF</el-button>
+        <el-button type="warning" :icon="DocumentCopy" @click="exportWord">导出 Word</el-button>
       </div>
     </nav>
 
@@ -37,13 +39,36 @@
         </div>
       </div>
 
-      <div class="hero-export">
-        <div class="export-title">导出报告</div>
-        <div class="export-actions">
-          <el-button type="success" :icon="Document" @click="exportPdf">PDF</el-button>
-          <el-button type="warning" :icon="DocumentCopy" @click="exportWord">Word</el-button>
+      <div class="hero-export hero-export--summary">
+        <div class="export-title">报告状态</div>
+        <div class="hero-summary-mini">
+          <span>目标岗位：{{ reportWorkbenchSummary.targetPosition }}</span>
+          <span>导出范围：仅正文工作区</span>
         </div>
       </div>
+    </section>
+
+    <section class="summary-strip summary-strip--workbench">
+      <article class="summary-card">
+        <span>目标岗位</span>
+        <strong>{{ reportWorkbenchSummary.targetPosition }}</strong>
+      </article>
+      <article class="summary-card">
+        <span>优势摘要</span>
+        <p>{{ reportWorkbenchSummary.advantage }}</p>
+      </article>
+      <article class="summary-card">
+        <span>关键差距</span>
+        <p>{{ reportWorkbenchSummary.gap }}</p>
+      </article>
+      <article class="summary-card">
+        <span>短期最重要行动</span>
+        <p>{{ reportWorkbenchSummary.shortAction }}</p>
+      </article>
+      <article class="summary-card">
+        <span>中期发展方向</span>
+        <p>{{ reportWorkbenchSummary.midDirection }}</p>
+      </article>
     </section>
 
     <!-- 数据概览卡片 -->
@@ -82,24 +107,59 @@
 
     <div class="report-layout">
       <main class="report-main">
-        <div ref="reportRef" class="report-canvas">
-          <section class="report-section section-grid">
+        <section class="report-outline">
+          <div class="outline-head">
+            <div>
+              <p class="section-group-kicker">Report Outline</p>
+              <h2>报告目录</h2>
+            </div>
+            <span class="section-group-desc">点击即可快速跳转到对应章节，导出时不会包含此导航。</span>
+          </div>
+          <div class="outline-links">
+            <button
+              v-for="anchor in reportSectionAnchors"
+              :key="anchor.key"
+              type="button"
+              class="outline-chip"
+              @click="scrollToReportSection(anchor.id)"
+            >
+              {{ anchor.label }}
+            </button>
+          </div>
+        </section>
+
+        <div ref="reportRef" class="report-canvas report-export-surface">
+          <div class="section-group-header">
+            <div>
+              <p class="section-group-kicker">Module 01</p>
+              <h2>职业画像</h2>
+            </div>
+            <span class="section-group-desc">聚焦目标岗位、个人画像与核心差距。</span>
+          </div>
+          <div class="section-summary-bar">
+            <div v-for="item in moduleHighlights.profile" :key="item" class="section-summary-item">
+              {{ item }}
+            </div>
+          </div>
+          <section id="report-profile" class="report-section section-grid">
             <article class="content-card content-card--wide">
               <div class="card-head">
                 <div>
                   <p class="card-kicker">Profile</p>
                   <h2>学生画像摘要</h2>
+                  <span class="card-subtitle">章节结论：明确当前背景优势与目标岗位的匹配起点。</span>
                 </div>
                 <el-button text type="primary" @click="openEditor('student_summary')">编辑</el-button>
               </div>
               <div class="rich-preview" v-html="richContent.student_summary" />
             </article>
 
-            <article class="content-card">
+            <article id="report-gap" class="content-card">
               <div class="card-head">
                 <div>
                   <p class="card-kicker">Gap</p>
                   <h2>能力差距分析</h2>
+                  <span class="card-subtitle">章节结论：先看最大差距，再看补齐路径。</span>
                 </div>
                 <div class="inline-actions">
                   <el-button text @click="polishOneSection('current_gap')">润色</el-button>
@@ -110,7 +170,19 @@
             </article>
           </section>
 
-          <section class="report-section">
+          <div class="section-group-header">
+            <div>
+              <p class="section-group-kicker">Module 02</p>
+              <h2>路径规划</h2>
+            </div>
+            <span class="section-group-desc">梳理短中期发展路径、里程碑与阶段成果。</span>
+          </div>
+          <div class="section-summary-bar">
+            <div v-for="item in moduleHighlights.short" :key="item" class="section-summary-item">
+              {{ item }}
+            </div>
+          </div>
+          <section id="report-short" class="report-section">
             <article class="content-card">
               <div class="card-head">
                 <div>
@@ -172,8 +244,7 @@
                           <div class="task-top">
                             <strong>{{ task.task_name }}</strong>
                             <el-tag :type="priorityType(task.priority)" size="small" round>
-                              {{ task.priority }}优先级
-                            </el-tag>
+                              {{ task.priority }}优先级</el-tag>
                           </div>
 
                           <div class="task-meta">
@@ -193,8 +264,7 @@
                               size="small"
                               @click="openResourceList(getTaskResources(task))"
                             >
-                              查看资源（{{ getTaskResources(task).length }}）
-                            </el-button>
+                              查看资源（{{ getTaskResources(task).length }}）</el-button>
                             <el-tag v-else size="small" type="info" round>暂无资源</el-tag>
                           </div>
                         </article>
@@ -223,7 +293,76 @@
             </article>
           </section>
 
-          <section class="report-section">
+          <section id="report-resources" class="report-section">
+            <article class="content-card">
+              <div class="card-head">
+                <div>
+                  <p class="card-kicker">Resources</p>
+                  <h2>推荐资源概览</h2>
+                  <span class="card-subtitle">章节结论：优先使用与当前里程碑直接关联的学习资源，减少无效学习。</span>
+                </div>
+                <el-tag round type="primary">{{ aggregatedResources.length }} 项资源</el-tag>
+              </div>
+
+              <div class="goal-box resource-section-note">
+                <span class="goal-label">资源说明</span>
+                <p class="detail-block">
+                  本节自动汇总短期与中期任务中已关联的推荐资源，方便在导出前统一检查学习材料是否完整。
+                </p>
+              </div>
+
+              <div v-if="aggregatedResources.length" class="resource-overview-grid">
+                <article
+                  v-for="item in aggregatedResources"
+                  :key="item.id"
+                  class="resource-card resource-overview-card"
+                >
+                  <div class="resource-card-top">
+                    <div>
+                      <h3 class="resource-title">{{ resourceTitle(item) }}</h3>
+                      <p class="resource-sub">{{ resourceType(item) }}</p>
+                    </div>
+                    <el-tag size="small" round type="info">{{ item.originLabel }}</el-tag>
+                  </div>
+
+                  <p class="resource-text">{{ item.reason || item.description || item.content || '暂无说明' }}</p>
+
+                  <div class="resource-overview-meta">
+                    <span>关联任务：{{ item.taskName || '未标注任务' }}</span>
+                    <span>阶段：{{ item.planLabel }}</span>
+                  </div>
+
+                  <div class="internship-actions">
+                    <el-button size="small" @click="openResourceList([item.raw])">查看详情</el-button>
+                    <el-button
+                      v-if="item.raw.url"
+                      size="small"
+                      type="primary"
+                      plain
+                      @click="openLink(item.raw.url)"
+                    >
+                      打开链接
+                    </el-button>
+                  </div>
+                </article>
+              </div>
+
+              <div v-else class="empty-state resource-overview-empty">
+                <el-empty description="当前里程碑中暂无推荐资源" :image-size="72">
+                  <template #description>
+                    <span>可在编辑页的任务资源中补充课程、书籍、项目仓库等学习材料。</span>
+                  </template>
+                </el-empty>
+              </div>
+            </article>
+          </section>
+
+          <div class="section-summary-bar section-summary-bar--mid">
+            <div v-for="item in moduleHighlights.mid" :key="item" class="section-summary-item">
+              {{ item }}
+            </div>
+          </div>
+          <section id="report-mid" class="report-section">
             <article class="content-card">
               <div class="card-head">
                 <div>
@@ -292,8 +431,7 @@
                           <div class="task-top">
                             <strong>{{ task.task_name }}</strong>
                             <el-tag :type="priorityType(task.priority)" size="small" round>
-                              {{ task.priority }}优先级
-                            </el-tag>
+                              {{ task.priority }}优先级</el-tag>
                           </div>
                           <div class="task-meta">
                             <span>预计时间：{{ task.estimated_time }}</span>
@@ -310,8 +448,7 @@
                               size="small"
                               @click="openResourceList(getTaskResources(task))"
                             >
-                              查看资源（{{ getTaskResources(task).length }}）
-                            </el-button>
+                              查看资源（{{ getTaskResources(task).length }}）</el-button>
                             <el-tag v-else size="small" type="info" round>暂无资源</el-tag>
                           </div>
                         </article>
@@ -332,7 +469,7 @@
                 <div class="rich-preview" v-html="richContent.career_progression" />
               </div>
 
-              <div class="internship-block">
+              <div id="report-internship" class="internship-block">
                 <span class="block-title">推荐实习岗位</span>
                 <div v-if="!report.mid_term_plan.recommended_internships.length" class="empty-state">
                   <el-empty description="暂无推荐实习" :image-size="80">
@@ -374,7 +511,6 @@
                         v-if="job.url"
                         size="small"
                         type="primary"
-                        plain
                         @click="openLink(job.url)"
                       >
                         查看岗位
@@ -386,7 +522,18 @@
               </div>
             </article>
           </section>
-
+          <div class="section-group-header">
+            <div>
+              <p class="section-group-kicker">Module 03</p>
+              <h2>行动计划</h2>
+            </div>
+            <span class="section-group-desc">用清单和建议把目标转成能立即执行的动作。</span>
+          </div>
+          <div class="section-summary-bar">
+            <div v-for="item in moduleHighlights.action" :key="item" class="section-summary-item">
+              {{ item }}
+            </div>
+          </div>
           <section class="report-section section-grid">
             <article class="content-card">
               <div class="card-head">
@@ -399,7 +546,7 @@
 
               <el-progress :percentage="progressPercent" :stroke-width="10" class="progress-bar" />
 
-              <div class="checklist-area">
+              <div id="report-actions" class="checklist-area">
                 <el-empty v-if="!report.action_checklist.length" description="暂无行动清单" :image-size="60" />
                 <el-checkbox-group v-else v-model="checkedActions">
                   <div v-for="item in report.action_checklist" :key="item" class="check-item">
@@ -420,7 +567,7 @@
                 <span class="light-text">{{ report.tips.length }} 条</span>
               </div>
 
-              <div class="tips-area">
+              <div id="report-tips" class="tips-area">
                 <el-empty v-if="!report.tips.length" description="暂无学习建议" :image-size="60" />
                 <div v-for="tip in report.tips" :key="tip" class="tip-card">
                   <span class="tip-dot"></span>
@@ -432,7 +579,8 @@
         </div>
       </main>
 
-      <aside class="assistant-panel">
+      <div v-if="assistantPanelVisible" class="assistant-overlay" @click="assistantPanelVisible = false"></div>
+      <aside class="assistant-panel" :class="{ 'is-open': assistantPanelVisible }">
         <section class="assistant-card">
           <div class="assistant-title-row">
             <div>
@@ -440,7 +588,10 @@
               <h2>智能润色助手</h2>
               <p class="assistant-subtitle">检查报告完整性，并对关键文本做措辞优化。</p>
             </div>
-            <el-tag type="success" round>可接入 AI 接口</el-tag>
+            <div class="assistant-title-actions">
+              <el-tag type="success" round>可接入 AI 接口</el-tag>
+              <el-button text class="assistant-close" @click="assistantPanelVisible = false">收起</el-button>
+            </div>
           </div>
 
           <div class="assistant-score">
@@ -465,10 +616,36 @@
           </div>
 
           <div class="tool-block">
+            <span class="tool-title">当前区块上下文</span>
+            <div class="context-card">
+              <strong>{{ sectionLabel(selectedSection) }}</strong>
+              <p>{{ htmlToText(getSectionContent(selectedSection)) || '当前区块还没有形成可导出的正文内容，建议先补充关键信息。' }}</p>
+            </div>
+          </div>
+
+          <div class="tool-block">
             <span class="tool-title">内容优化</span>
             <div class="tool-actions">
               <el-button @click="runCompletenessCheck">检查完整性</el-button>
               <el-button type="primary" @click="polishAllSections">润色整份报告</el-button>
+            </div>
+          </div>
+
+          <div class="tool-block">
+            <span class="tool-title">完整性结果</span>
+            <div class="audit-grid">
+              <div class="audit-card">
+                <span>缺失内容</span>
+                <p>{{ completenessBreakdown.missing.length ? completenessBreakdown.missing.join('、') : '暂无缺失项' }}</p>
+              </div>
+              <div class="audit-card">
+                <span>表达偏弱</span>
+                <p>{{ completenessBreakdown.weak.length ? completenessBreakdown.weak.join('、') : '当前表达较完整' }}</p>
+              </div>
+              <div class="audit-card">
+                <span>已完成项</span>
+                <p>{{ completenessBreakdown.good.length ? completenessBreakdown.good.join('、') : '暂无已完成项' }}</p>
+              </div>
             </div>
           </div>
 
@@ -491,32 +668,9 @@
       </aside>
     </div>
 
-    <el-dialog
-      v-model="editorVisible"
-      :title="`编辑：${sectionLabel(activeSection)}`"
-      width="960px"
-      top="4vh"
-      destroy-on-close
-    >
-      <div class="editor-dialog">
-        <div class="editor-dialog-head">
-          <div>
-            <p class="card-kicker">Editor</p>
-            <h3>{{ sectionLabel(activeSection) }}</h3>
-          </div>
-          <div class="inline-actions">
-            <el-button @click="polishEditorContent">先润色后保存</el-button>
-            <el-button type="primary" @click="saveEditorContent">保存修改</el-button>
-          </div>
-        </div>
-
-        <WangEditor
-          v-model="editorContent"
-          height="420px"
-          placeholder="在这里调整 AI 生成的内容"
-        />
-      </div>
-    </el-dialog>
+    <button class="assistant-fab" type="button" @click="assistantPanelVisible = true">
+      AI 助手
+    </button>
 
     <el-drawer v-model="resourceDrawerVisible" title="推荐资源" size="520px">
       <div v-if="currentResources.length" class="resource-list">
@@ -574,75 +728,19 @@ import {
   Aim,
   OfficeBuilding,
 } from '@element-plus/icons-vue'
-import WangEditor from '@/components/Person_Report/WangEditor.vue'
 import {
   exportGrowthPlanToWord,
   exportResumePreviewToPdf,
-  type GrowthPlanWordExportData,
 } from '@/utils/resume-export'
-
-type ResourceItem = {
-  id: string
-  title?: string
-  name?: string
-  author?: string
-  publisher?: string
-  isbn?: string
-  url?: string
-  duration?: string
-  content?: string
-  description?: string
-  stars?: number
-  language?: string
-  reason?: string
-}
-
-type PlanTask = {
-  task_name: string
-  description: string
-  priority: '高' | '中' | '低' | string
-  estimated_time: string
-  skill_target: string
-  success_criteria: string
-  resources: ResourceItem[]
-}
-
-// Milestone type is used implicitly through GrowthPlanData
-interface Milestone {
-  milestone_name: string
-  target_date: string
-  key_results: string[]
-  tasks: PlanTask[]
-}
-
-type InternshipItem = {
-  id: string
-  job_title: string
-  company_name: string
-  salary?: string
-  city?: string
-  degree?: string
-  days_per_week: number
-  months: number
-  job_type?: string
-  tech_stack?: string
-  url?: string
-  content?: string
-  reason?: string
-}
-
-type GrowthPlanData = GrowthPlanWordExportData & {
-  mid_term_plan: GrowthPlanWordExportData['mid_term_plan'] & {
-    recommended_internships: InternshipItem[]
-  }
-}
-
-type EditableSectionKey =
-  | 'student_summary'
-  | 'current_gap'
-  | 'short_goal'
-  | 'mid_goal'
-  | 'career_progression'
+import { useRouter } from 'vue-router'
+import {
+  createEmptyCareerReport,
+  type EditableSectionKey,
+  type GrowthPlanData,
+  type InternshipItem,
+  type PlanTask,
+  type ResourceItem,
+} from '@/types/career-report'
 
 type AssistantNote = {
   message: string
@@ -664,233 +762,87 @@ const emit = defineEmits<{
   (e: 'polish-request', payload: { section: EditableSectionKey; content: string }): void
 }>()
 
-const emptyReport = (): GrowthPlanData => ({
-  student_summary: '',
-  target_position: '待生成职业方向',
-  current_gap: '',
-  short_term_plan: {
-    duration: '1-3个月',
-    goal: '',
-    focus_areas: [],
-    milestones: [],
-    quick_wins: [],
-  },
-  mid_term_plan: {
-    duration: '3-12个月',
-    goal: '',
-    skill_roadmap: [],
-    milestones: [],
-    career_progression: '',
-    recommended_internships: [],
-  },
-  action_checklist: [],
-  tips: [],
-})
+const router = useRouter()
+
+const emptyReport = createEmptyCareerReport
 
 /**
- * 生成模拟数据用于开发和演示
- * 包含完整的职业发展报告数据结构
+ * 开发环境下的示例报告数据
  */
-const generateMockData = (): GrowthPlanData => ({  
-  student_summary: '计算机科学专业大三学生，具备扎实的编程基础，熟悉Java和Python语言。在校期间参与了多个项目开发，包括电商网站后端和数据分析工具。对软件架构设计有浓厚兴趣，希望成为一名优秀的后端工程师。',
-  target_position: 'Java后端开发工程师',
-  current_gap: '1. 缺乏大规模分布式系统实战经验\n2. 微服务架构理解较浅\n3. 性能调优经验不足\n4. 缺少云原生技术栈（Docker/K8s）实践',
+const generateMockData = (): GrowthPlanData => ({
+  student_summary: '计算机专业学生，具备基础编程能力和项目实践经历，当前目标是进入后端开发岗位。',
+  target_position: 'Java 后端开发工程师',
+  current_gap: '当前还需要继续补齐工程化经验、微服务理解、性能优化案例和真实业务项目成果。',
   short_term_plan: {
     duration: '1-3个月',
-    goal: '夯实Java基础，掌握Spring Boot核心原理，完成一个完整的微服务练手项目',
-    focus_areas: ['Java基础强化', 'Spring Boot深入', 'MySQL优化', 'Redis缓存'],
+    goal: '完成后端基础能力补强，输出一套可展示的项目成果，并开始投递实习。',
+    focus_areas: ['Java鍩虹', 'Spring Boot', 'MySQL', 'Redis'],
     milestones: [
       {
-        milestone_name: 'Java核心技术巩固',
-        target_date: '第1个月底',
-        key_results: ['完成《Effective Java》阅读', '整理Java并发编程笔记', '完成5道LeetCode困难题'],
+        milestone_name: '完成后端基础巩固',
+        target_date: '第1个月',
+        key_results: ['整理知识笔记', '完成基础项目', '补齐常见面试题'],
         tasks: [
           {
-            task_name: '阅读Effective Java',
-            description: '系统学习Java最佳实践，重点关注泛型、枚举、注解等特性',
+            task_name: '复习 Java 与集合并发',
+            description: '系统梳理核心语法、集合框架和并发基础。',
             priority: '高',
             estimated_time: '2周',
-            skill_target: 'Java高级特性掌握',
-            success_criteria: '整理出30+条实践准则',
+            skill_target: '后端基础',
+            success_criteria: '形成结构化笔记并完成练习',
             resources: [
-              { id: '1', title: 'Effective Java 第3版', author: 'Joshua Bloch', description: 'Java编程经典书籍' },
-              { id: '2', title: 'Java核心技术36讲', author: '杨晓峰', description: '极客时间专栏', duration: '20小时' },
-            ],
-          } as PlanTask,
-          {
-            task_name: '并发编程实战',
-            description: '学习Java并发包，理解线程池、锁机制、原子类',
-            priority: '高',
-            estimated_time: '1周',
-            skill_target: '并发编程能力',
-            success_criteria: '实现一个线程池监控工具',
-            resources: [
-              { id: '3', title: 'Java并发编程实战', author: 'Brian Goetz', description: '并发编程权威指南' },
-            ],
-          } as PlanTask,
-        ],
-      },
-      {
-        milestone_name: 'Spring Boot项目实战',
-        target_date: '第2-3个月',
-        key_results: ['完成用户中心微服务', '集成Redis缓存', '实现JWT认证', '部署到云服务器'],
-        tasks: [
-          {
-            task_name: '用户中心服务开发',
-            description: '开发完整的用户管理微服务，包含注册、登录、权限管理',
-            priority: '高',
-            estimated_time: '2周',
-            skill_target: 'Spring Boot熟练开发',
-            success_criteria: 'API测试通过率100%',
-            resources: [
-              { id: '4', title: 'Spring Boot实战', author: 'Craig Walls', description: 'Spring Boot入门经典' },
-              { id: '5', title: 'Spring Security实战', description: '安全框架详解', url: 'https://spring.io/guides' },
-            ],
-          } as PlanTask,
-          {
-            task_name: '缓存与性能优化',
-            description: '集成Redis缓存，优化数据库查询性能',
-            priority: '中',
-            estimated_time: '1周',
-            skill_target: 'Redis应用能力',
-            success_criteria: '接口响应时间<200ms',
-            resources: [
-              { id: '6', title: 'Redis设计与实现', author: '黄健宏', description: 'Redis源码解析' },
+              { id: 'mock-resource-1', title: 'Java 核心知识整理', description: '用于建立知识框架的学习材料', reason: '适合快速回顾' },
             ],
           } as PlanTask,
         ],
       },
     ],
-    quick_wins: [
-      '本周内搭建好Spring Boot开发环境',
-      '每天刷2道LeetCode算法题',
-      '关注3个技术博客获取最新资讯',
-      '加入Java技术交流群',
-    ],
+    quick_wins: ['完善 GitHub 项目说明', '整理一份岗位技能对照表'],
   },
   mid_term_plan: {
     duration: '3-12个月',
-    goal: '深入微服务架构，掌握云原生技术栈，具备独立设计中型系统的能力',
-    skill_roadmap: [
-      'Spring Cloud Alibaba全家桶（Nacos、Gateway、Sentinel）',
-      'Docker容器化与Kubernetes编排',
-      'MySQL分库分表与TiDB分布式数据库',
-      'RocketMQ消息队列与分布式事务',
-      'Prometheus监控与ELK日志分析',
-    ],
+    goal: '形成中型项目开发与优化能力，具备独立承接模块的经验。',
+    skill_roadmap: ['Spring Cloud', 'Docker', '消息队列', '监控与日志'],
     milestones: [
       {
-        milestone_name: '微服务架构转型',
+        milestone_name: '完成微服务项目实践',
         target_date: '第6个月',
-        key_results: ['完成单体应用拆分', '实现服务注册发现', '配置中心集中管理', 'API网关统一入口'],
+        key_results: ['拆分服务', '接入网关', '完成部署'],
         tasks: [
           {
-            task_name: 'Spring Cloud微服务改造',
-            description: '将用户中心拆分为多个微服务，实现服务治理',
-            priority: '高',
+            task_name: '搭建微服务练手项目',
+            description: '围绕用户、权限、缓存等模块完成项目拆分。',
+            priority: '中',
             estimated_time: '1个月',
-            skill_target: '微服务架构设计',
-            success_criteria: '服务调用成功率>99.9%',
-            resources: [
-              { id: '7', title: 'Spring Cloud微服务实战', description: '微服务架构指南' },
-              { id: '8', title: 'Nacos官方文档', url: 'https://nacos.io', description: '服务注册与配置中心' },
-            ],
-          } as PlanTask,
-        ],
-      },
-      {
-        milestone_name: '云原生技术掌握',
-        target_date: '第9个月',
-        key_results: ['应用容器化部署', 'K8s编排文件编写', 'CI/CD流水线搭建', '自动化运维脚本'],
-        tasks: [
-          {
-            task_name: 'Docker与K8s实战',
-            description: '学习容器化技术，在K8s集群部署微服务',
-            priority: '高',
-            estimated_time: '6周',
-            skill_target: '云原生技术栈',
-            success_criteria: '实现滚动更新零停机',
-            resources: [
-              { id: '9', title: 'Docker从入门到实践', description: '容器化技术指南' },
-              { id: '10', title: 'Kubernetes权威指南', description: 'K8s学习圣经' },
-            ],
+            skill_target: '微服务工程化',
+            success_criteria: '可以稳定运行并完成接口联调',
+            resources: [],
           } as PlanTask,
         ],
       },
     ],
-    career_progression: '通过系统学习，预计6个月内可达到初级Java工程师水平，能够独立完成模块开发；12个月内达到中级水平，具备系统设计和团队协作能力。建议优先投递互联网中厂实习岗位积累项目经验。',
+    career_progression: '先完成入门岗位胜任力，再逐步向独立负责模块和系统设计方向发展。',
     recommended_internships: [
       {
-        id: 'job-1',
-        job_title: 'Java后端开发实习生',
-        company_name: '字节跳动',
-        salary: '400-500元/天',
-        city: '北京',
-        degree: '本科及以上',
+        id: 'mock-job-1',
+        job_title: '后端开发实习生',
+        company_name: '示例科技',
+        salary: '4k-6k',
+        city: '上海',
+        degree: '本科',
         days_per_week: 4,
-        months: 6,
-        job_type: '实习',
-        tech_stack: 'Java/Go',
-        url: 'https://jobs.bytedance.com',
-        reason: '字节跳动技术栈先进，实习经历含金量高，与当前学习方向高度匹配',
-        content: '参与抖音电商后端服务开发，接触高并发场景',
-      },
-      {
-        id: 'job-2',
-        job_title: '后端开发工程师（实习）',
-        company_name: '美团',
-        salary: '350-450元/天',
-        city: '北京',
-        degree: '本科及以上',
-        days_per_week: 5,
         months: 3,
         job_type: '实习',
-        tech_stack: 'Java',
-        url: 'https://zhaopin.meituan.com',
-        reason: '美团Java技术栈成熟，有完善的培养体系，适合实习生成长',
-        content: '参与外卖业务后端开发，学习分布式系统架构',
-      },
-      {
-        id: 'job-3',
-        job_title: 'Java实习生',
-        company_name: '阿里巴巴',
-        salary: '300-400元/天',
-        city: '杭州',
-        degree: '本科及以上',
-        days_per_week: 4,
-        months: 6,
-        job_type: '实习',
-        tech_stack: 'Java',
-        url: 'https://talent.alibaba.com',
-        reason: '阿里是国内Java技术标杆，Spring Cloud Alibaba发源地',
-        content: '参与淘宝/天猫业务后端开发',
+        tech_stack: 'Java / Spring',
+        url: '',
+        content: '参与基础后端接口开发和联调工作。',
+        reason: '与当前能力提升路径高度匹配。',
       },
     ],
   },
-  action_checklist: [
-    '搭建Java开发环境（JDK+IDEA+Maven）',
-    '创建个人GitHub仓库并提交第一个项目',
-    '制定每周学习计划并坚持执行',
-    '整理技术博客记录学习心得',
-    '加入至少2个技术社群',
-    '投递5份实习简历',
-    '准备技术面试常见问题',
-    '完成一个完整的练手项目',
-  ],
-  tips: [
-    '坚持每天编码，保持手感，代码量是提升编程能力的基础',
-    '多阅读优秀开源项目源码，学习大厂的代码规范和设计思想',
-    '重视基础知识，JVM、并发、数据结构是面试重点',
-    '培养解决问题的能力，遇到Bug先独立思考再求助',
-    '关注行业动态，新技术层出不穷要保持学习热情',
-    '建立个人技术品牌，写博客、做分享都是很好的方式',
-  ],
+  action_checklist: ['完成项目复盘', '更新简历', '开始岗位投递'],
+  tips: ['每周复盘一次学习进度', '优先沉淀可展示的项目成果'],
 })
-
-/**
- * Deep clone using structured clone algorithm (faster, handles more types than JSON)
- * Falls back to JSON method for unsupported environments
- */
 function deepClone<T>(data: T): T {
   if (typeof structuredClone === 'function') {
     return structuredClone(data)
@@ -973,14 +925,14 @@ const richContent = reactive<Record<EditableSectionKey, string>>({
   career_progression: '<p>暂无内容</p>',
 })
 
-// 必须在使用前声明，避免 temporal dead zone
+// 避免在初始化阶段触发未定义引用
 const checkedActions = ref<string[]>([])
 const checklistStorageKey = computed(
   () => `career-report-checklist:${report.value.target_position || 'default'}`,
 )
 
 function syncReport(data?: GrowthPlanData) {
-  // 如果没有传入数据且不是生产环境，使用模拟数据
+  // 开发环境或显式开启 mock 时使用示例数据
   const useMock = !data && (import.meta.env.DEV || import.meta.env.VITE_USE_MOCK === 'true')
   const value = deepClone(data || (useMock ? generateMockData() : emptyReport()))
   report.value = value
@@ -1009,7 +961,18 @@ const editableSections = [
 ]
 
 const selectedSection = ref<EditableSectionKey>('student_summary')
-const activeSection = ref<EditableSectionKey>('student_summary')
+const assistantPanelVisible = ref(false)
+
+const reportSectionAnchors = [
+  { key: 'profile', label: '职业画像', id: 'report-profile' },
+  { key: 'gap', label: '差距分析', id: 'report-gap' },
+  { key: 'short', label: '短期计划', id: 'report-short' },
+  { key: 'mid', label: '中期计划', id: 'report-mid' },
+  { key: 'resources', label: '推荐资源', id: 'report-resources' },
+  { key: 'internship', label: '推荐实习', id: 'report-internship' },
+  { key: 'actions', label: '行动清单', id: 'report-actions' },
+  { key: 'tips', label: '学习建议', id: 'report-tips' },
+] as const
 
 function sectionLabel(key: EditableSectionKey) {
   return editableSections.find(item => item.key === key)?.label || key
@@ -1023,36 +986,18 @@ function setSectionContent(key: EditableSectionKey, value: string) {
   richContent[key] = value
 }
 
-const editorVisible = ref(false)
-const editorContent = ref('<p>暂无内容</p>')
-
 function openEditor(key: EditableSectionKey) {
-  activeSection.value = key
   selectedSection.value = key
-  editorContent.value = getSectionContent(key)
-  editorVisible.value = true
-}
-
-function saveEditorContent() {
-  setSectionContent(activeSection.value, editorContent.value || '<p>暂无内容</p>')
-  editorVisible.value = false
-  handleSave(false)
-  ElMessage.success('内容已保存')
-}
-
-function polishEditorContent() {
-  editorContent.value = smartPolishHtml(editorContent.value || '')
-  pushAssistantNote(`已润色「${sectionLabel(activeSection.value)}」编辑内容`, 'success')
-  emit('polish-request', {
-    section: activeSection.value,
-    content: htmlToText(editorContent.value),
+  router.push({
+    name: 'report-editor',
+    query: { section: key },
   })
 }
 
 function polishOneSection(key: EditableSectionKey) {
   const polished = smartPolishHtml(getSectionContent(key))
   setSectionContent(key, polished)
-  pushAssistantNote(`已润色「${sectionLabel(key)}」`, 'success')
+  pushAssistantNote(`已润色 ${sectionLabel(key)}`, 'success')
   emit('polish-request', {
     section: key,
     content: htmlToText(polished),
@@ -1081,7 +1026,7 @@ function handleSave(showMessage = true) {
   const payload = buildSubmitData()
   emit('save', payload)
   if (showMessage) {
-    ElMessage.success('已触发保存事件')
+    ElMessage.success('已保存当前报告')
   }
 }
 
@@ -1142,6 +1087,133 @@ const progressPercent = computed(() => {
   return Math.round((checkedActions.value.length / total) * 100)
 })
 
+const reportWorkbenchSummary = computed(() => {
+  const advantage = htmlToText(richContent.student_summary) || '建议先补充学生画像摘要，明确你的当前优势。'
+  const gap = htmlToText(richContent.current_gap) || '建议先补充关键差距，帮助快速锁定最优提升方向。'
+  const shortAction =
+    report.value.short_term_plan.quick_wins[0] ||
+    report.value.action_checklist[0] ||
+    htmlToText(richContent.short_goal) ||
+    '建议先明确一条本周可以执行的短期行动。'
+  const midDirection =
+    report.value.mid_term_plan.skill_roadmap[0] ||
+    htmlToText(richContent.mid_goal) ||
+    htmlToText(richContent.career_progression) ||
+    '建议补充中期发展方向与阶段成长路径。'
+
+  return {
+    targetPosition: report.value.target_position || '待明确目标岗位',
+    advantage: advantage.slice(0, 72),
+    gap: gap.slice(0, 72),
+    shortAction: shortAction.slice(0, 56),
+    midDirection: midDirection.slice(0, 56),
+  }
+})
+
+const moduleHighlights = computed(() => ({
+  profile: [
+    `目标岗位：${reportWorkbenchSummary.value.targetPosition}`,
+    `优势摘要：${reportWorkbenchSummary.value.advantage}`,
+    `关键差距：${reportWorkbenchSummary.value.gap}`,
+  ],
+  short: [
+    `短期优先事项：${reportWorkbenchSummary.value.shortAction}`,
+    `重点领域 ${report.value.short_term_plan.focus_areas.length} 项`,
+    `短期里程碑 ${report.value.short_term_plan.milestones.length} 个`,
+  ],
+  mid: [
+    `中期发展方向：${reportWorkbenchSummary.value.midDirection}`,
+    `技能路线 ${report.value.mid_term_plan.skill_roadmap.length} 条`,
+    `推荐实习 ${report.value.mid_term_plan.recommended_internships.length} 个`,
+  ],
+  action: [
+    `行动完成度 ${progressPercent.value}%`,
+    `待执行行动 ${Math.max(report.value.action_checklist.length - checkedActions.value.length, 0)} 项`,
+    `学习建议 ${report.value.tips.length} 条`,
+  ],
+}))
+
+const aggregatedResources = computed(() => {
+  const buckets = [
+    {
+      planLabel: '短期计划',
+      milestones: report.value.short_term_plan.milestones,
+    },
+    {
+      planLabel: '中期计划',
+      milestones: report.value.mid_term_plan.milestones,
+    },
+  ]
+
+  const items: Array<{
+    id: string
+    raw: ResourceItem
+    title: string
+    reason: string
+    description: string
+    content: string
+    planLabel: string
+    taskName: string
+    originLabel: string
+  }> = []
+
+  buckets.forEach(bucket => {
+    bucket.milestones.forEach(milestone => {
+      milestone.tasks.forEach(task => {
+        getTaskResources(task).forEach((resource, index) => {
+          items.push({
+            id: resource.id || `${bucket.planLabel}-${milestone.milestone_name}-${task.task_name}-${index}`,
+            raw: resource,
+            title: resourceTitle(resource),
+            reason: resource.reason || '',
+            description: resource.description || '',
+            content: resource.content || '',
+            planLabel: bucket.planLabel,
+            taskName: task.task_name || '',
+            originLabel: milestone.milestone_name || bucket.planLabel,
+          })
+        })
+      })
+    })
+  })
+
+  const deduped = new Map<string, (typeof items)[number]>()
+  items.forEach(item => {
+    const key = [item.title, item.raw.url || '', item.originLabel].join('::')
+    if (!deduped.has(key)) {
+      deduped.set(key, item)
+    }
+  })
+
+  return Array.from(deduped.values()).slice(0, 8)
+})
+
+const completenessBreakdown = computed(() => {
+  const missing: string[] = []
+  const weak: string[] = []
+  const good: string[] = []
+
+  if (!htmlToText(richContent.student_summary)) missing.push('职业画像摘要')
+  else good.push('职业画像摘要')
+
+  if (!htmlToText(richContent.current_gap)) missing.push('差距分析')
+  else good.push('差距分析')
+
+  if (!htmlToText(richContent.short_goal)) weak.push('短期目标表达偏弱')
+  else good.push('短期目标')
+
+  if (!htmlToText(richContent.mid_goal)) weak.push('中期目标表达偏弱')
+  else good.push('中期目标')
+
+  if (!report.value.action_checklist.length) missing.push('行动清单')
+  else good.push('行动清单')
+
+  if (!report.value.tips.length) weak.push('学习建议可继续增强')
+  else good.push('学习建议')
+
+  return { missing, weak, good }
+})
+
 function priorityType(priority: string) {
   if (priority === '高') return 'danger'
   if (priority === '中') return 'warning'
@@ -1175,6 +1247,10 @@ function resourceType(item: ResourceItem) {
   if (item.isbn) return '书籍资源'
   if (typeof item.stars === 'number') return '开源项目'
   return '学习资源'
+}
+
+function scrollToReportSection(id: string) {
+  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
 const internshipDrawerVisible = ref(false)
@@ -1307,34 +1383,38 @@ async function exportWord() {
 </script>
 
 <style scoped>
-/* ===== CSS Variables for Design System ===== */
+/* ===== CSS Variables for Design System - Unified with CReportEditor ===== */
 .career-report-page {
   --primary-gradient: linear-gradient(135deg, #0f172a 0%, #1e3a8a 55%, #2563eb 100%);
   --card-shadow: 0 16px 36px rgba(15, 23, 42, 0.06);
   --card-shadow-hover: 0 24px 48px rgba(15, 23, 42, 0.12);
   --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   --border-glow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  --radius-xl: 24px;
+  --radius-lg: 20px;
+  --radius-md: 16px;
+  --radius-sm: 12px;
 
   min-height: 100vh;
-  padding: 0;
+  padding: 24px;
   background:
-    radial-gradient(circle at top left, rgba(250, 204, 21, 0.18), transparent 24%),
+    radial-gradient(circle at top left, rgba(250, 204, 21, 0.15), transparent 24%),
     radial-gradient(circle at top right, rgba(59, 130, 246, 0.12), transparent 26%),
     linear-gradient(180deg, #fffdf8 0%, #f8fbff 100%);
 }
 
-/* ===== Top Navigation ===== */
+/* ===== Top Navigation Bar - Unified with CReportEditor ===== */
 .top-nav {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 32px;
-  background: rgba(255, 255, 255, 0.8);
+  padding: 16px 24px;
+  margin-bottom: 24px;
+  background: rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(20px);
-  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
-  position: sticky;
-  top: 0;
-  z-index: 100;
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--card-shadow);
 }
 
 .nav-brand {
@@ -1345,6 +1425,7 @@ async function exportWord() {
 
 .nav-logo {
   font-size: 24px;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
 }
 
 .nav-title {
@@ -1358,22 +1439,28 @@ async function exportWord() {
 
 .nav-actions {
   display: flex;
-  gap: 12px;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .nav-actions :deep(.el-button) {
   border-radius: 10px;
   font-weight: 500;
+  transition: var(--transition-smooth);
 }
 
+.nav-actions :deep(.el-button:hover) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+}
+
+/* ===== Hero Panel ===== */
 .hero-panel {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  gap: 40px;
-  padding: 40px 48px;
-  margin: 24px 32px 0;
-  border-radius: 24px;
+  gap: 20px;
+  padding: 32px;
+  border-radius: var(--radius-xl);
   background: var(--primary-gradient);
   color: #fff;
   box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
@@ -1392,84 +1479,16 @@ async function exportWord() {
   pointer-events: none;
 }
 
-.hero-content {
-  flex: 1;
-  position: relative;
-  z-index: 1;
-}
-
-.hero-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  background: rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(10px);
-  border-radius: 999px;
-  font-size: 13px;
-  font-weight: 500;
-  margin-bottom: 20px;
-}
-
-.hero-content h1 {
-  font-size: 36px;
-  font-weight: 800;
-  margin-bottom: 16px;
-  letter-spacing: -0.02em;
-}
-
-.hero-desc {
-  font-size: 15px;
-  line-height: 1.7;
-  color: rgba(255, 255, 255, 0.85);
-  max-width: 600px;
-  margin-bottom: 20px;
-}
-
-.hero-meta {
-  display: flex;
-  gap: 24px;
-}
-
-.meta-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.7);
-}
-
-.hero-export {
-  position: relative;
-  z-index: 1;
-  text-align: center;
-  padding: 24px;
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
-  border-radius: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-}
-
-.export-title {
-  font-size: 14px;
-  font-weight: 600;
-  margin-bottom: 16px;
-  color: rgba(255, 255, 255, 0.9);
-}
-
-.export-actions {
-  display: flex;
-  gap: 12px;
-}
-
-.export-actions :deep(.el-button) {
-  border-radius: 12px;
-  padding: 12px 24px;
-  font-weight: 600;
-}
-
 .hero-copy {
   max-width: 760px;
+}
+
+.hero-summary-mini {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 13px;
 }
 
 .eyebrow,
@@ -1529,11 +1548,12 @@ async function exportWord() {
   border: none;
 }
 
+/* ===== Stats Grid - Unified Style ===== */
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 20px;
-  margin: 24px 32px;
+  margin: 24px 0;
 }
 
 .stat-card {
@@ -1541,10 +1561,12 @@ async function exportWord() {
   align-items: center;
   gap: 16px;
   padding: 20px 24px;
-  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--card-shadow);
   transition: var(--transition-smooth);
   cursor: pointer;
-  border: 1px solid rgba(255, 255, 255, 0.5);
 }
 
 .stat-card:hover {
@@ -1579,7 +1601,7 @@ async function exportWord() {
   align-items: center;
   justify-content: center;
   background: rgba(255, 255, 255, 0.2);
-  border-radius: 16px;
+  border-radius: var(--radius-md);
   font-size: 24px;
 }
 
@@ -1604,9 +1626,16 @@ async function exportWord() {
   font-weight: 800;
 }
 
-/* 旧样式兼容 */
 .summary-strip {
-  display: none;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.summary-strip--workbench {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin-bottom: 24px;
 }
 
 @keyframes countUp {
@@ -1629,8 +1658,20 @@ async function exportWord() {
 .resource-card {
   background: rgba(255, 255, 255, 0.94);
   border: 1px solid rgba(148, 163, 184, 0.16);
-  border-radius: 24px;
-  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.06);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--card-shadow);
+  transition: var(--transition-smooth);
+}
+
+.summary-card {
+  padding: 20px 24px;
+  transition: var(--transition-smooth);
+  cursor: pointer;
+}
+
+.summary-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--card-shadow-hover);
 }
 
 .summary-card span,
@@ -1644,17 +1685,142 @@ async function exportWord() {
   font-weight: 500;
 }
 
+.summary-card strong {
+  display: block;
+  margin-top: 10px;
+  font-size: 28px;
+  font-weight: 700;
+  color: #0f172a;
+  background: linear-gradient(135deg, #0f172a 0%, #2563eb 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.summary-card p {
+  margin: 10px 0 0;
+  color: #475569;
+  line-height: 1.7;
+  font-size: 14px;
+}
+
 .report-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
-  gap: 24px;
-  margin: 0 32px 32px;
+  grid-template-columns: minmax(0, 1.9fr) minmax(320px, 0.95fr);
+  gap: 28px;
+  margin-top: 20px;
   align-items: start;
+  position: relative;
+}
+
+.report-outline {
+  margin-bottom: 18px;
+  padding: 18px 20px;
+  border-radius: var(--radius-xl);
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  box-shadow: var(--card-shadow);
+}
+
+.outline-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.outline-head h2 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 20px;
+}
+
+.outline-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.outline-chip {
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: #fff;
+  color: #334155;
+  border-radius: 999px;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.outline-chip:hover {
+  border-color: rgba(59, 130, 246, 0.3);
+  color: #1d4ed8;
+  transform: translateY(-1px);
 }
 
 .report-canvas {
   display: grid;
+  gap: 22px;
+}
+
+.report-export-surface {
+  padding: 22px;
+  border-radius: 26px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.06);
+}
+
+.section-group-header {
+  display: flex;
+  justify-content: space-between;
   gap: 20px;
+  align-items: end;
+  padding: 0 4px 4px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.section-group-kicker {
+  margin: 0 0 6px;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #2563eb;
+  font-weight: 700;
+}
+
+.section-group-header h2 {
+  margin: 0;
+  font-size: 26px;
+  color: #0f172a;
+}
+
+.section-group-desc {
+  max-width: 320px;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.section-summary-bar {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: -6px;
+  margin-bottom: 18px;
+}
+
+.section-summary-item {
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #f8fbff 0%, #ffffff 100%);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.7;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.04);
 }
 
 .section-grid {
@@ -1665,7 +1831,6 @@ async function exportWord() {
 
 .content-card {
   padding: 24px;
-  transition: var(--transition-smooth);
   position: relative;
   overflow: hidden;
 }
@@ -2047,10 +2212,38 @@ async function exportWord() {
   position: sticky;
   top: 96px;
   transition: var(--transition-smooth);
+  background: #f8f9fa;
+  border-left: 1px solid rgba(148, 163, 184, 0.18);
 }
 
 .assistant-card:hover {
   box-shadow: var(--card-shadow-hover);
+}
+
+.assistant-title-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.assistant-close {
+  display: none;
+}
+
+.assistant-quick-export {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 18px 0 6px;
+}
+
+.assistant-overlay {
+  display: none;
+}
+
+.assistant-fab {
+  display: none;
 }
 
 .assistant-score {
@@ -2090,6 +2283,43 @@ async function exportWord() {
   margin-top: 12px;
 }
 
+.context-card,
+.audit-card {
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.context-card strong {
+  display: block;
+  margin-bottom: 8px;
+  color: #0f172a;
+}
+
+.context-card p,
+.audit-card p {
+  margin: 0;
+  color: #475569;
+  line-height: 1.7;
+  font-size: 14px;
+}
+
+.audit-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.audit-card span {
+  display: block;
+  margin-bottom: 8px;
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .editor-dialog {
   display: grid;
   gap: 20px;
@@ -2118,6 +2348,34 @@ async function exportWord() {
 .resource-card {
   padding: 20px;
   transition: var(--transition-smooth);
+}
+
+.resource-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.resource-overview-card {
+  display: grid;
+  gap: 14px;
+}
+
+.resource-overview-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.resource-section-note {
+  margin-top: 0;
+}
+
+.resource-overview-empty {
+  margin-top: 18px;
 }
 
 .resource-card:hover {
@@ -2160,20 +2418,27 @@ async function exportWord() {
 @media (max-width: 1280px) {
   .report-layout {
     grid-template-columns: 1fr;
-    margin: 0 24px 24px;
   }
 
   .assistant-card {
     position: static;
   }
 
-  .hero-panel {
-    margin: 20px 24px 0;
-    padding: 32px;
+  .section-group-header {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .stats-grid {
-    margin: 20px 24px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .summary-strip--workbench {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .section-summary-bar {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -2184,55 +2449,34 @@ async function exportWord() {
     display: grid;
   }
 
+  .summary-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .outline-head {
+    flex-direction: column;
+  }
+
   .hero-panel {
     flex-direction: column;
-    margin: 16px 20px 0;
-    padding: 28px;
   }
 
-  .hero-content h1 {
-    font-size: 28px;
-  }
-
-  .hero-export {
-    width: 100%;
-  }
-
-  .stats-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    margin: 16px 20px;
-    gap: 16px;
-  }
-
-  .top-nav {
-    padding: 12px 20px;
-  }
-
-  .nav-title {
-    display: none;
-  }
-
-  .nav-actions {
-    gap: 8px;
-  }
-
-  .nav-actions :deep(.el-button span) {
-    display: none;
+  .hero-copy h1 {
+    font-size: 24px;
   }
 }
 
-@media (max-width: 640px) {
-  .career-report-page {
-    padding: 0;
-  }
-
+@media (max-width: 768px) {
   .stats-grid {
-    grid-template-columns: 1fr;
-    margin: 12px 16px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
   }
 
   .stat-card {
-    padding: 16px 20px;
+    padding: 16px;
+    flex-direction: column;
+    text-align: center;
+    gap: 12px;
   }
 
   .stat-icon {
@@ -2243,36 +2487,42 @@ async function exportWord() {
   .stat-value {
     font-size: 24px;
   }
+}
+
+@media (max-width: 640px) {
+  .career-report-page {
+    padding: 12px;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .summary-strip,
+  .section-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .summary-strip--workbench {
+    grid-template-columns: 1fr;
+  }
 
   .hero-panel {
-    margin: 12px 16px 0;
-    padding: 24px;
+    padding: 20px;
     border-radius: 20px;
   }
 
-  .hero-content h1 {
-    font-size: 24px;
+  .hero-copy h1 {
+    font-size: 20px;
   }
 
-  .hero-badge {
-    font-size: 12px;
-    padding: 6px 12px;
+  .hero-actions {
+    width: 100%;
   }
 
-  .hero-desc {
-    font-size: 14px;
-  }
-
-  .export-actions {
-    flex-direction: column;
-  }
-
-  .report-layout {
-    margin: 0 16px 16px;
-  }
-
-  .section-grid {
-    grid-template-columns: 1fr;
+  .hero-actions :deep(.el-button) {
+    flex: 1;
+    min-width: 120px;
   }
 
   .content-card,
@@ -2285,6 +2535,115 @@ async function exportWord() {
 
   .roadmap-item:hover {
     transform: translateX(4px);
+  }
+
+  .top-nav {
+    flex-direction: column;
+    gap: 16px;
+    padding: 16px 20px;
+  }
+
+  .nav-actions {
+    width: 100%;
+  }
+
+  .nav-actions :deep(.el-button) {
+    flex: 1;
+  }
+
+  .assistant-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.32);
+    z-index: 18;
+  }
+
+  .assistant-panel {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    z-index: 19;
+    transform: translateY(calc(100% + 16px));
+    transition: transform 0.28s ease;
+    pointer-events: none;
+  }
+
+  .assistant-panel.is-open {
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+
+  .assistant-card {
+    max-height: 72vh;
+    overflow: auto;
+    border-left: none;
+  }
+
+  .assistant-title-actions {
+    align-items: flex-end;
+  }
+
+  .assistant-close {
+    display: inline-flex;
+  }
+
+  .assistant-quick-export {
+    grid-template-columns: 1fr;
+  }
+
+  .assistant-fab {
+    position: fixed;
+    right: 16px;
+    bottom: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 16px;
+    border: 0;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%);
+    color: #fff;
+    font-weight: 700;
+    box-shadow: 0 16px 32px rgba(37, 99, 235, 0.28);
+    z-index: 17;
+  }
+}
+
+@media print {
+  .top-nav,
+  .hero-panel,
+  .stats-grid,
+  .report-outline,
+  .assistant-panel,
+  .assistant-fab,
+  .assistant-overlay,
+  :deep(.el-drawer__wrapper) {
+    display: none !important;
+  }
+
+  .career-report-page,
+  .report-layout,
+  .report-main,
+  .report-export-surface {
+    background: #fff !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .report-layout {
+    display: block;
+  }
+
+  .content-card,
+  .milestone-card,
+  .task-card,
+  .internship-card,
+  .resource-card {
+    break-inside: avoid;
+    box-shadow: none !important;
   }
 }
 

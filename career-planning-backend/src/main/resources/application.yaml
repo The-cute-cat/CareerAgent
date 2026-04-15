@@ -80,7 +80,7 @@ communication:
 ai:
   service:
     base-url: http://localhost:9000
-    timeout: 30000
+    timeout: 300000
     retry:
       max-attempts: 3
       delay: 1000

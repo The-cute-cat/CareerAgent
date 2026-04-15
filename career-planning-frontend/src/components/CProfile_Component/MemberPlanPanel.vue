@@ -691,9 +691,9 @@ onUnmounted(() => {
 
 .panel-header {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
-  margin-bottom: 8px;
+  margin-bottom: 24px;
   color: #0f172a;
 }
 

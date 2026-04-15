@@ -115,8 +115,7 @@ public class PayServiceImpl implements PayService {
             log.debug("biz:"+biz);
             log.debug("body:"+body);
         } catch (AlipayApiException e) {
-            log.error("orderNoPay 支付宝支付失败: {}", e.getMessage());
-            e.printStackTrace();
+            log.error("PayServiceImpl.orderNoPay 支付宝支付失败, 订单ID: {}, 错误信息: {}", paymentOrder.getId(), e.getMessage());
         }
     }
     
@@ -156,12 +155,11 @@ public class PayServiceImpl implements PayService {
             response.getWriter().close();
             log.debug("沙箱支付展示订单展示，回调");
         } catch (AlipayApiException e) {
-            log.error("pagePay 支付宝支付失败: {}", e.getMessage());
-            e.printStackTrace();
+            log.error("PayServiceImpl.pagePay 支付宝支付失败, 订单号: {}, 错误信息: {}", orderNumber, e.getMessage());
         }
     }
 
-//    @Override
+    // @Override
 //    public void pagePayByUserId(Long userId, HttpServletResponse response) throws AlipayApiException, IOException {
 //        PaymentOrder paymentOrder = paymentOrderMapper.selectOne(new LambdaQueryWrapper<PaymentOrder>()
 //                .eq(PaymentOrder::getUserId, userId)

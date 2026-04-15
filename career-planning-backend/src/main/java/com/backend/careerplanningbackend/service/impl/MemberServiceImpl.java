@@ -60,10 +60,10 @@ public class MemberServiceImpl implements MemberService {
             try {
                 payService.pagePay(pointsMembershipChangeDTO.getUserId(),response);
             } catch (AlipayApiException e) {
-                log.info("支付宝支付失败{}", e.getMessage());
+                log.error("MemberServiceImpl.vipMembership 支付宝支付失败, 用户ID: {}", pointsMembershipChangeDTO.getUserId(), e);
                 throw new RuntimeException(e);
             } catch (IOException e) {
-                log.info("支付宝支付失败{}", e.getMessage());
+                log.error("MemberServiceImpl.vipMembership IO异常, 用户ID: {}", pointsMembershipChangeDTO.getUserId(), e);
                 throw new RuntimeException(e);
             }
 

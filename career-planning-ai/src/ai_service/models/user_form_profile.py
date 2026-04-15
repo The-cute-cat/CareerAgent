@@ -129,7 +129,6 @@ class ToolDetail(BaseModel):
 class LanguageDetail(BaseModel):
     type: Literal["英语", "日语", "其他"] = Field(description="语种：英语/日语/其他")
     level: str = Field(description="水平，如 CET-6、JLPT N2、其他水平描述等")
-    level: str = Field(description="水平，如 CET-6、JLPT N2、其他水平描述等")
     other: str = Field(description="其他相关信息")
 
 
@@ -209,8 +208,8 @@ class StudentFormProfile(BaseModel):
     codeLinks: Optional[List[str]] = Field(
         None,
         alias="codeLinks",
-        description="代码仓库链接列表。仅提取明确 URL(如 GitHub/Gitee), 不同链接用逗号分隔；无链接时返回 null。"
-    )
+        description="代码仓库链接列表。仅提取明确 URL(如 GitHub/Gitee), 不同链接用逗号分隔；无链接时返回 null。",
+        )
 
     # AI 会根据 description 填充这两个列表
     projects: Optional[List[ProjectExperience]] = Field(

@@ -125,8 +125,10 @@ class _LLM(_LLMModelBase):
         if not self.base_url:
             self.base_url = llm.base_url
         else:
-            if self.base_url != llm.base_url and self.api_key.get_secret_value() in ("<API_KEY>", "<api_key>", "", None):
-                raise ValueError(f"❌️错误：{self.__class__.__name__} base_url 和 llm.base_url 不一致且 api_key 未配置，不能继承api_key！")
+            if self.base_url != llm.base_url and self.api_key.get_secret_value() in ("<API_KEY>", "<api_key>", "",
+                                                                                     None):
+                raise ValueError(
+                    f"❌️错误：{self.__class__.__name__} base_url 和 llm.base_url 不一致且 api_key 未配置，不能继承api_key！")
         if not self.api_key.get_secret_value():
             self.api_key = llm.api_key
         if not self.model_name:
@@ -410,6 +412,21 @@ class _Conversation(BaseModel):
         return self
 
 
+class _KnowledgeGraph(BaseModel):
+    class _Analysis(_LLM):
+        ...
+
+    class _Explain(_LLM):
+        ...
+
+    analysis: _Analysis = Field(default_factory=_Analysis)
+    explain: _Explain = Field(default_factory=_Explain)
+
+
+class _ReportAssistant(_LLM):
+    ...
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=abs_path(".env"),
@@ -434,9 +451,10 @@ class Settings(BaseSettings):
     code_ability: _CodeAbility = Field(default_factory=_CodeAbility)
     redis: _RedisConfig = Field(default_factory=_RedisConfig)
     neo4j: _Neo4jConfig = Field(default_factory=_Neo4jConfig)
-    neo4j: _Neo4jConfig = Field(default_factory=_Neo4jConfig)
     other: _Other = Field(default_factory=_Other)
     conversation: _Conversation = Field(default_factory=_Conversation)
+    knowledge_graph: _KnowledgeGraph = Field(default_factory=_KnowledgeGraph)
+    report_assistant: _ReportAssistant = Field(default_factory=_ReportAssistant)
 
     # noinspection PyProtectedMember
     @model_validator(mode="after")

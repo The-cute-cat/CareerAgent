@@ -8,7 +8,6 @@ import com.backend.careerplanningbackend.domain.po.Result;
 import com.backend.careerplanningbackend.domain.po.UserPoints;
 import com.backend.careerplanningbackend.domain.vo.UserPointsVO;
 import com.backend.careerplanningbackend.service.PointsReferService;
-import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -92,7 +91,6 @@ public class PointsReferController {
      * 用户可以通过充值来增加自己的积分余额
      *
      * @param dto 充值信息
-     * @param response HTTP 响应对象
      * @return 充值后的积分信息
      */
     @PostMapping("/recharge")

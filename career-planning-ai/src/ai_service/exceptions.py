@@ -36,8 +36,8 @@ class TokenValidationError(ApiException):
 class CommonHandleError(ApiException):
     """通用处理异常"""
 
-    def __init__(self, msg: str = "通用处理异常"):
-        super().__init__(code=500, msg=msg)
+    def __init__(self, code: int = 500, msg: str = "通用处理异常"):
+        super().__init__(code=code, msg=msg)
 
 
 class ConversationIDValidationError(ApiException):

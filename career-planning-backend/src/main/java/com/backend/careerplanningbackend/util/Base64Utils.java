@@ -1,5 +1,7 @@
 package com.backend.careerplanningbackend.util;
 
+import lombok.extern.slf4j.Slf4j;
+
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 
@@ -8,6 +10,7 @@ import java.util.Base64;
  *
  * <p>提供将字符串进行Base64编码以及将Base64字符串解码回原字符串的功能。</p>
  */
+@Slf4j
 public class Base64Utils {
 
     private static final Base64.Encoder encoder = Base64.getEncoder();
@@ -49,7 +52,7 @@ public class Base64Utils {
             byte[] textBytes = decoder.decode(base64Text);
             return new String(textBytes, StandardCharsets.UTF_8);
         } catch (IllegalArgumentException e) {
-            System.err.println("Invalid Base64 string input: " + base64Text);
+            log.error("Base64Utils.decode Base64解码失败, 输入字符串: {}", base64Text, e);
             throw e;
         }
     }

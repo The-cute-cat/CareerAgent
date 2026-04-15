@@ -32,7 +32,7 @@ public class Package {
      * 1-积分套餐
      * 2-会员套餐
      */
-    private Integer type;
+    private String type;
 
     /** 套餐金额 */
     private BigDecimal amount;
