@@ -1,6 +1,7 @@
 import re
 from pydantic import BaseModel, Field
 from typing import List, Optional
+from config import settings
 from ai_service.models.struct_job_txt import (
     JDAnalysisResult,
     Profiles,
@@ -16,8 +17,12 @@ class GraphNodeJob(BaseModel):
     # --- 1. 唯一标识 ---
     id: str = Field(description="岗位ID，唯一标识")
     job_name: str = Field(description="岗位名称")
-    macro_community_id: int = Field(default=0, description="第一次聚类算法分的宏观行业社区标签")
-    micro_community_id: int = Field(default=0, description="第二次聚类算法分的细分职业社区标签")
+    macro_community_id: int = Field(
+        default=0, description="第一次聚类算法分的宏观行业社区标签"
+    )
+    micro_community_id: int = Field(
+        default=0, description="第二次聚类算法分的细分职业社区标签"
+    )
 
     # --- 2. 物理过滤属性 (全部数字化/序数化，用于 Cypher WHERE) ---
     # 转为数字，方便图库里做 >= 的大小比较
@@ -53,8 +58,12 @@ class GraphNodeJob(BaseModel):
     special_reqs: str = Field(default="", description="特殊要求描述")
 
     # --- 7. 图构建血缘（离线计算 -> 在线推理） ---
-    last_build_run_id: Optional[str] = Field(default=None, description="最后一次构建图的 Run ID")
-    last_build_ts: Optional[str] = Field(default=None, description="最后一次构建图的时间戳")
+    last_build_run_id: Optional[str] = Field(
+        default=None, description="最后一次构建图的 Run ID"
+    )
+    last_build_ts: Optional[str] = Field(
+        default=None, description="最后一次构建图的时间戳"
+    )
 
     @staticmethod
     def convert_experience_to_min(experience_str: str) -> int:
@@ -76,6 +85,16 @@ class GraphNodeJob(BaseModel):
         trend_map = {"萎缩": -1, "平稳": 0, "朝阳": 1}
 
         job_profiles: Profiles = job.profiles
+
+        major_raw = (job_profiles.basic_requirements.major or "").strip()
+        if major_raw and major_raw not in {"不限", "未提及", "未知", "无", "无要求"}:
+            try:
+                from ai_service.scripts.py.major_aliger import major_aligner
+
+                major_raw = major_aligner.align(major_raw)
+            except Exception:
+                # 对齐失败时保留原值，避免影响主流程
+                pass
         job_node = {
             # --- 1. 唯一标识 ---
             "id": job.job_id,
@@ -99,6 +118,7 @@ class GraphNodeJob(BaseModel):
             "min_experience": GraphNodeJob.convert_experience_to_min(
                 job_profiles.basic_requirements.experience_years
             ),
+            "major": major_raw,
             # --- 3. 业务维度属性 (用于离线算权重 & Agent 阅读) ---
             "industry": job_profiles.job_attributes.industry,
             "career_orientation": job_profiles.development_potential.career_orientation.value,
@@ -123,8 +143,34 @@ class GraphNodeJob(BaseModel):
 
 
 class GraphNodeCompetency(BaseModel):
-    name: str
-    category: str
+    name: str = Field(description="能力节点唯一名称")
+    category: str = Field(
+        description="能力分类（如：核心专业技能/工具与平台能力/语言能力/证书要求）"
+    )
+
+    # --- 图构建血缘（离线计算 -> 在线推理） ---
+    last_build_run_id: Optional[str] = Field(
+        default=None, description="最后一次写入/更新该能力节点的 BuildRun ID"
+    )
+    last_build_ts: Optional[str] = Field(
+        default=None, description="最后一次写入/更新该能力节点的时间戳"
+    )
+
+    # --- IDF 证据（离线固化 -> 在线解释） ---
+    idf_weight: Optional[float] = Field(
+        default=None, description="该能力的全局 IDF 稀缺度权重（与 r.idf_weight 同源）"
+    )
+    df: Optional[int] = Field(default=None, description="文档频次：包含该能力的岗位数")
+    total_jobs: Optional[int] = Field(
+        default=None, description="参与本次 IDF 统计的岗位总数"
+    )
+    prevalence: Optional[float] = Field(
+        default=None, description="覆盖率：df / total_jobs"
+    )
+    idf_run_id: Optional[str] = Field(
+        default=None, description="写入 IDF 证据的 BuildRun ID（与 r.idf_run_id 一致）"
+    )
+    idf_ts: Optional[str] = Field(default=None, description="写入 IDF 证据的时间戳")
 
     # 从JDAnalysisResult中提取能力枢纽信息，并转为GraphNodeCompetency对象列表
     @staticmethod
@@ -160,31 +206,122 @@ class GraphNodeCompetency(BaseModel):
 
 
 class GraphEdgeEvolve(BaseModel):
-    jaccard_high: float  # 高区分度特征杰卡德相似度（目标 1：最大化）
-    cos_low: float  # 低区分度属性加权余弦相似度（目标 2：最大化）
-    salary_gain: float  # 薪资增长潜力（目标 3：最大化）
-    transfer_cost: float  # 换岗成本 / 难度（目标 4：可选最小化）
-    final_routing_cost: float  # 综合路由成本
-    pareto_rank: int = 0  # 新增：标记是第几层前沿
-    is_cross_macro: bool = False  # 标记是否跨行业
-    is_cross_micro: bool = False  # 标记是否跨赛道
+    jaccard_high: float = Field(
+        description="高区分度特征杰卡德相似度（目标：最大化）；来自 Competency 子图的加权 Jaccard"
+    )
+    cos_low: float = Field(
+        description="低区分度背景相似度（目标：最大化）；语义文本与结构化属性的加权余弦融合"
+    )
+    salary_gain: float = Field(
+        description="薪资增长潜力（目标：最大化）；有向指标，表示 from->to 的薪资提升趋势"
+    )
+    transfer_cost: float = Field(
+        description="换岗成本/难度（目标：最小化或作为惩罚项）；由经验/学历/行业等迁移难度综合而来"
+    )
+    final_routing_cost: float = Field(
+        description="最终路由成本；用于在线寻路（如 Dijkstra）的边权重，越小越优"
+    )
+    pareto_rank: int = Field(
+        default=0, description="局部帕累托前沿层级（0 表示最优前沿）"
+    )
+    is_cross_macro: bool = Field(default=False, description="是否跨宏观社区（跨行业）")
+    is_cross_micro: bool = Field(default=False, description="是否跨细分社区（跨赛道）")
 
     # --- Lineage / Decision Snapshot ---
-    build_run_id: Optional[str] = None
-    lineage_json: Optional[str] = None
+    build_run_id: Optional[str] = Field(
+        default=None,
+        description="生成/更新该 EVOLVE_TO 的 BuildRun ID（用于版本清理与回溯）",
+    )
+    lineage_json: Optional[str] = Field(
+        default=None,
+        description="决策血缘快照（JSON 字符串）；记录候选来源、帕累托选择理由、guardrail 命中等",
+    )
 
     # --- 关键中间量（便于在线快速解释/检索） ---
-    base_attraction: Optional[float] = None
-    rank_penalty: Optional[float] = None
-    cross_penalty: Optional[float] = None
-    pareto_group_size: Optional[int] = None
-    pareto_front_size: Optional[int] = None
+    base_attraction: Optional[float] = Field(
+        default=None, description="基础吸引力分（未叠加惩罚项前的综合相似/收益分）"
+    )
+    rank_penalty: Optional[float] = Field(
+        default=None,
+        description="社区内排序/稀疏化带来的惩罚项（用于解释 final_routing_cost）",
+    )
+    cross_penalty: Optional[float] = Field(
+        default=None, description="跨社区惩罚项（用于解释跨行业/跨赛道迁移成本）"
+    )
+    pareto_group_size: Optional[int] = Field(
+        default=None, description="帕累托分组大小（同起点边数），用于解释稀疏化强度"
+    )
+    pareto_front_size: Optional[int] = Field(
+        default=None, description="帕累托前沿保留边数（同起点），用于解释最终出边稀疏度"
+    )
+
+
+class GraphNodeBuildRun(BaseModel):
+    id: str = Field(description="离线建图 Run ID，唯一标识")
+    created_at: Optional[str] = Field(
+        default=None, description="首次创建该 Run 的时间戳"
+    )
+    updated_at: Optional[str] = Field(
+        default=None, description="该 Run 最近一次更新的时间戳"
+    )
+    status: str = Field(description="构建状态（如 running/completed/failed）")
+    meta_json: str = Field(
+        description="构建元信息快照（JSON 字符串），包含参数/统计/告警等"
+    )
+    jaccard_threshold: Optional[float] = Field(
+        default=None, description="本次构建使用的 Jaccard 阈值（候选边硬筛选）"
+    )
+    coarse_resolution: Optional[float] = Field(
+        default=None, description="粗聚类 Leiden resolution 参数（宏观社区划界）"
+    )
+    fine_resolution: Optional[float] = Field(
+        default=None, description="细聚类 Leiden resolution 参数（细分社区划界）"
+    )
 
 
 class GraphEdgeRequires(BaseModel):
-    weight: float = Field(..., ge=0, le=1.0)
-    min_score: int = Field(..., ge=1, le=5)
-    context: str  # JD里的原话
+    # 注意：当前离线建图会将 r.weight 复用为“可计算用权重”（例如写入 IDF 后 r.weight = r.idf_weight），
+    # 因此不应对 weight 设置 1.0 的上界约束。
+    weight: float = Field(
+        ..., ge=0, description="用于计算/排序的边权重（当前实现默认写入 IDF 权重）"
+    )
+    min_score: int = Field(
+        ..., ge=1, le=5, description="岗位对该能力的最低要求强度（1-5）"
+    )
+    context: str = Field(
+        description="JD/画像中对应维度的原始上下文文本（用于语义复水与解释）"
+    )
+
+    # --- 图构建血缘 ---
+    build_run_id: Optional[str] = Field(
+        default=None, description="写入该 REQUIRES 关系的 BuildRun ID"
+    )
+    build_ts: Optional[str] = Field(
+        default=None, description="写入该 REQUIRES 关系的时间戳"
+    )
+
+    # --- IDF 证据（离线固化 -> 在线解释） ---
+    local_weight: Optional[float] = Field(
+        default=None,
+        ge=0,
+        description="局部权重快照（保留写入 IDF 前的原始 weight，便于回溯）",
+    )
+    idf_weight: Optional[float] = Field(
+        default=None, ge=0, description="全局 IDF 稀缺度权重"
+    )
+    df: Optional[int] = Field(
+        default=None, ge=0, description="文档频次：包含该能力的岗位数"
+    )
+    total_jobs: Optional[int] = Field(
+        default=None, ge=0, description="参与本次 IDF 统计的岗位总数"
+    )
+    prevalence: Optional[float] = Field(
+        default=None, ge=0, description="覆盖率：df / total_jobs"
+    )
+    idf_run_id: Optional[str] = Field(
+        default=None, description="写入 IDF 证据的 BuildRun ID"
+    )
+    idf_ts: Optional[str] = Field(default=None, description="写入 IDF 证据的时间戳")
 
 
 class JobCompetency(BaseModel):
@@ -247,10 +384,20 @@ class JobCompetency(BaseModel):
                 if not context_text or context_text.strip() == "":
                     context_text = f"根据岗位画像，该职位明确要求掌握【{comp_node.category}】维度的能力：{comp_node.name}"
 
+                # Categorical Weighting：用“所属维度”作为 TF 等效权重（可在 config.yaml 调参）
+                tf_weight = float(
+                    settings.graph_build.tf.category_weights.get(
+                        comp_node.category, settings.graph_build.tf.default_weight
+                    )
+                )
+
                 edge = GraphEdgeRequires(
-                    weight=0.0,
+                    # 注意：离线建图会在后续 update_idf_weights 阶段回写 idf_weight，
+                    # 并将 r.weight 更新为 local_weight * idf_weight。
+                    weight=tf_weight,
                     min_score=1,
                     context=context_text,  # 此时 context 100% 是字符串
+                    local_weight=tf_weight,
                 )
 
                 batch_payload.append(
@@ -264,3 +411,16 @@ class JobEvolution(BaseModel):
     from_job: GraphNodeJob
     to_job: GraphNodeJob
     edge: GraphEdgeEvolve
+
+
+class GraphRequiresIdfEvidence(BaseModel):
+    """IDF 证据批量回写 payload（用于 update_idf_weights）。
+
+    说明：该模型是“写库契约”，确保回写字段与 Neo4j 存图字段一致。
+    """
+
+    comp_name: str = Field(description="能力名称（用于 MATCH (c:Competency {name})）")
+    idf_weight: float = Field(ge=0, description="全局 IDF 稀缺度权重")
+    df: int = Field(ge=0, description="文档频次：包含该能力的岗位数")
+    total_jobs: int = Field(ge=0, description="参与本次 IDF 统计的岗位总数")
+    prevalence: float = Field(ge=0, description="覆盖率：df / total_jobs")

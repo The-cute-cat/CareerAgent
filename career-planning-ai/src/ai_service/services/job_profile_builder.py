@@ -1,4 +1,4 @@
-#通过岗位元信息构建岗位画像
+# 通过岗位元信息构建岗位画像
 import asyncio
 import json
 import random
@@ -12,8 +12,14 @@ from langchain_core.prompts import ChatPromptTemplate
 
 from ai_service.models.job_info import JobInfo
 from ai_service.models.struct_job_txt import JDAnalysisResult
-from ai_service.models.struct_job_txt import Profiles, BasicRequirements, ProfessionalSkills, ProfessionalLiteracy, \
-    DevelopmentPotential, JobAttributes
+from ai_service.models.struct_job_txt import (
+    Profiles,
+    BasicRequirements,
+    ProfessionalSkills,
+    ProfessionalLiteracy,
+    DevelopmentPotential,
+    JobAttributes,
+)
 from ai_service.services import log
 from config import settings
 
@@ -93,32 +99,32 @@ jd_template = JDAnalysisResult(
     profiles=Profiles(
         basic_requirements=BasicRequirements(
             degree=cast(Any, "不限"),
-            major="",
+            major="未提及",
             certificates=cast(Any, "不限"),
             internship_requirement="",
             experience_years="",
-            special_requirements=""
+            special_requirements="",
         ),
         professional_skills=ProfessionalSkills(
             core_skills=cast(Any, "不限"),
             tool_capabilities=cast(Any, "不限"),
             domain_knowledge="",
             language_requirements=cast(Any, "不限"),
-            project_requirements=""
+            project_requirements="",
         ),
         professional_literacy=ProfessionalLiteracy(
             communication="",
             teamwork="",
             stress_management="",
             logic_thinking="",
-            ethics=""
+            ethics="",
         ),
         development_potential=DevelopmentPotential(
             learning_ability="",
             innovation="",
             leadership="",
             career_orientation="不限",
-            adaptability=""
+            adaptability="",
         ),
         job_attributes=JobAttributes(
             salary_competitiveness=cast(Any, "不限"),
@@ -127,9 +133,9 @@ jd_template = JDAnalysisResult(
             prerequisite_roles="",
             lateral_transfer_directions=cast(Any, []),
             social_demand=cast(Any, "不限"),
-            industry_trend=cast(Any, "不限")
-        )
-    )
+            industry_trend=cast(Any, "不限"),
+        ),
+    ),
 )
 
 
@@ -189,8 +195,6 @@ def _create_llm(api_key: str, model_name: str) -> ChatTongyi:
     )
 
 
-
-
 # # 4. 主分析函数，优先使用 ainvoke，失败后回退到线程池 invoke
 # async def analyze_job_description(jobs: List[JobInfo], api_key: Optional[str] = None, model_name: str = settings.vector.llm_model_name) -> dict:
 #     jd_text = _build_jd_text(jobs)
@@ -217,8 +221,6 @@ def _create_llm(api_key: str, model_name: str) -> ChatTongyi:
 #     return result
 
 
-
-
 ## 4. 主分析函数，优先使用 invoke
 async def analyze_job_description(
     jobs: List[JobInfo],
@@ -236,10 +238,17 @@ async def analyze_job_description(
     llm = _create_llm(api_key, model_name)
     parser = PydanticOutputParser(pydantic_object=JDAnalysisResult)
 
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", SYSTEM_PROMPT + "\n\n# 输出格式说明\n请严格按照以下 JSON 格式输出结果，不要包含任何其他文字或 Markdown 标记：\n" + json_template_str.replace("{", "{{").replace("}", "}}")),
-        ("user", USER_PROMPT),
-    ])
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                SYSTEM_PROMPT
+                + "\n\n# 输出格式说明\n请严格按照以下 JSON 格式输出结果，不要包含任何其他文字或 Markdown 标记：\n"
+                + json_template_str.replace("{", "{{").replace("}", "}}"),
+            ),
+            ("user", USER_PROMPT),
+        ]
+    )
     chain = prompt | llm | parser
 
     try:
@@ -253,7 +262,9 @@ async def analyze_job_description(
             except Exception as thread_e:
                 if attempt < max_retries - 1:
                     wait_time = (attempt + 1) * 2 + random.uniform(0, 1)
-                    log.warning(f"LLM 调用出错，等待 {wait_time:.2f} 秒后重试... 错误: {str(thread_e)}")
+                    log.warning(
+                        f"LLM 调用出错，等待 {wait_time:.2f} 秒后重试... 错误: {str(thread_e)}"
+                    )
                 else:
                     raise thread_e
 
