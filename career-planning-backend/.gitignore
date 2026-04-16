@@ -3,6 +3,9 @@ application-dev.yaml
 application-prod.yaml
 target/
 temp/
+temp*/
+test*/
+md/
 test/
 .mvn/
 !**/src/main/**/target/
