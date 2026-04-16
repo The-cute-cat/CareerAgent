@@ -43,7 +43,7 @@ import Quenation from '@/components/Quenation.vue'
 import { submitCareerFormApi, convertToSubmitDTO } from '@/api/career-form/formdata'
 import { evaluateCodeAbilityApi } from '@/api/career-form/codeAbility'
 import { submitQuiz, getQuestionsApi, getPersonQuizApi } from '@/api/career-form/questions'
-import type { CareerFormData, QuizDetailItem } from '@/types/careerform_report'
+import type { CareerFormData, QuizDetailItem, UploadResponse } from '@/types/careerform_report'
 import type { Question, BackendPersonData } from '@/types/careerform_question'
 import type { CodeAbilityEvaluateData } from '@/types/code-ability'
 import type { JobMatchItem } from '@/types/job-match'
@@ -1617,16 +1617,198 @@ const normalizeMajorValue = (major: unknown): string[] => {
   return []
 }
 
+const isNonEmptyString = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0
+
+const uniqueStrings = (values: string[]) => Array.from(new Set(values.map(item => item.trim()).filter(Boolean)))
+
+const uniqueBy = <T>(items: T[], getKey: (item: T) => string) => {
+  const seen = new Set<string>()
+  return items.filter((item) => {
+    const key = getKey(item)
+    if (!key || seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
+const normalizeUploadResponses = (parsedData: unknown): UploadResponse[] => {
+  if (Array.isArray(parsedData)) {
+    return parsedData.filter((item): item is UploadResponse => !!item && typeof item === 'object')
+  }
+
+  if (parsedData && typeof parsedData === 'object') {
+    return [parsedData as UploadResponse]
+  }
+
+  return []
+}
+
+const mergeUploadResponses = (responses: UploadResponse[]): UploadResponse => {
+  const merged: UploadResponse = {}
+  const certificates: string[] = []
+  const targetIndustries: string[] = []
+  const priorities: NonNullable<UploadResponse['priorities']> = []
+  const languages: NonNullable<UploadResponse['languages']> = []
+  const skills: NonNullable<UploadResponse['skills']> = []
+  const tools: NonNullable<UploadResponse['tools']> = []
+  const projects: NonNullable<UploadResponse['projects']> = []
+  const internships: NonNullable<UploadResponse['internships']> = []
+  const quizDetail: NonNullable<UploadResponse['quizDetail']> = []
+  const codeLinks: string[] = []
+
+  responses.forEach((response) => {
+    if (!merged.education && isNonEmptyString(response.education)) {
+      merged.education = response.education
+    }
+    if (!merged.educationOther && isNonEmptyString(response.educationOther)) {
+      merged.educationOther = response.educationOther
+    }
+    if ((!merged.major || merged.major.length === 0) && response.major) {
+      const normalizedMajor = normalizeMajorValue(response.major)
+      if (normalizedMajor.length > 0) {
+        merged.major = normalizedMajor
+      }
+    }
+    if (!merged.graduationDate && isNonEmptyString(response.graduationDate)) {
+      merged.graduationDate = response.graduationDate
+    }
+    if (!merged.innovation && isNonEmptyString(response.innovation)) {
+      merged.innovation = response.innovation
+    }
+    if (!merged.targetJob && isNonEmptyString(response.targetJob)) {
+      merged.targetJob = response.targetJob
+    }
+
+    if (Array.isArray(response.languages)) {
+      languages.push(...response.languages)
+    }
+    if (Array.isArray(response.certificates)) {
+      certificates.push(...response.certificates.map(item => String(item)))
+    }
+    if (!merged.certificateOther && isNonEmptyString(response.certificateOther)) {
+      merged.certificateOther = response.certificateOther
+    }
+    if (Array.isArray(response.skills)) {
+      skills.push(...response.skills)
+    }
+    if (Array.isArray(response.tools)) {
+      tools.push(...response.tools)
+    }
+    if (Array.isArray(response.projects)) {
+      projects.push(...response.projects)
+    }
+    if (Array.isArray(response.internships)) {
+      internships.push(...response.internships)
+    }
+    if (Array.isArray(response.quizDetail)) {
+      quizDetail.push(...response.quizDetail)
+    }
+    if (Array.isArray(response.targetIndustries)) {
+      targetIndustries.push(...response.targetIndustries.map(item => String(item)))
+    }
+    if (Array.isArray(response.priorities)) {
+      priorities.push(...response.priorities)
+    }
+
+    const linksValue = response.codeAbility?.links ?? response.codeLinks
+    if (Array.isArray(linksValue)) {
+      codeLinks.push(...linksValue.map(item => String(item)))
+    } else if (isNonEmptyString(linksValue)) {
+      codeLinks.push(...linksValue.split(/[\n,]/).map(item => item.trim()).filter(Boolean))
+    }
+  })
+
+  if (languages.length > 0) {
+    merged.languages = uniqueBy(
+      languages.map(item => ({
+        type: String(item.type || ''),
+        level: String(item.level || ''),
+        other: String(item.other || '')
+      })),
+      item => `${item.type}|${item.level}|${item.other}`
+    )
+  }
+
+  if (certificates.length > 0) {
+    merged.certificates = uniqueStrings(certificates)
+  }
+
+  if (skills.length > 0) {
+    merged.skills = uniqueBy(skills, item => String(item.name || '').trim().toLowerCase())
+  }
+
+  if (tools.length > 0) {
+    merged.tools = uniqueBy(tools, item => String(item.name || '').trim().toLowerCase())
+  }
+
+  if (projects.length > 0) {
+    merged.projects = uniqueBy(projects, item => `${String(item.name || '').trim()}|${String(item.desc || '').trim()}`)
+  }
+
+  if (internships.length > 0) {
+    merged.internships = uniqueBy(
+      internships,
+      item => `${String(item.company || '').trim()}|${String(item.role || '').trim()}|${String(item.desc || '').trim()}`
+    )
+  }
+
+  if (quizDetail.length > 0) {
+    merged.quizDetail = uniqueBy(
+      quizDetail,
+      item => `${String(item.type || '')}|${String(item.question || '').trim()}|${String(item.answer || '').trim()}`
+    )
+  }
+
+  if (targetIndustries.length > 0) {
+    merged.targetIndustries = uniqueStrings(targetIndustries)
+  }
+
+  if (priorities.length > 0) {
+    merged.priorities = uniqueBy(priorities, item => String(item.value || '').trim())
+  }
+
+  if (codeLinks.length > 0) {
+    merged.codeAbility = { links: uniqueStrings(codeLinks).join('\n') }
+  }
+
+  return merged
+}
+
+const hasFillableResumeData = (parsedFormData: UploadResponse) => Boolean(
+  isNonEmptyString(parsedFormData.education)
+  || isNonEmptyString(parsedFormData.educationOther)
+  || normalizeMajorValue(parsedFormData.major).length > 0
+  || isNonEmptyString(parsedFormData.graduationDate)
+  || parsedFormData.languages?.length
+  || parsedFormData.certificates?.length
+  || isNonEmptyString(parsedFormData.certificateOther)
+  || parsedFormData.skills?.length
+  || parsedFormData.tools?.length
+  || isNonEmptyString(parsedFormData.codeAbility?.links)
+  || (Array.isArray(parsedFormData.codeLinks) && parsedFormData.codeLinks.length > 0)
+  || isNonEmptyString(parsedFormData.codeLinks)
+  || parsedFormData.projects?.length
+  || parsedFormData.internships?.length
+  || parsedFormData.quizDetail?.length
+  || isNonEmptyString(parsedFormData.innovation)
+  || isNonEmptyString(parsedFormData.targetJob)
+  || parsedFormData.targetIndustries?.length
+  || parsedFormData.priorities?.length
+)
+
 /**
  * 将后端返回的表单数据填充到前端表单
  * @param parsedFormData 后端返回的解析后的表单数据
  */
-const fillFormWithParsedData = (parsedFormData: any) => {
-  if (!parsedFormData) return
+const fillFormWithParsedData = (parsedFormData: UploadResponse) => {
+  if (!parsedFormData) return 0
+
+  let appliedFieldCount = 0
 
   // 填充学历
   if (parsedFormData.education) {
     formData.education = parsedFormData.education
+    appliedFieldCount++
     if (parsedFormData.education === '其他' && parsedFormData.educationOther) {
       formData.educationOther = parsedFormData.educationOther
       showEducationInput.value = true
@@ -1635,12 +1817,17 @@ const fillFormWithParsedData = (parsedFormData: any) => {
 
   // 填充专业
   if (parsedFormData.major) {
-    formData.major = normalizeMajorValue(parsedFormData.major)
+    const normalizedMajor = normalizeMajorValue(parsedFormData.major)
+    if (normalizedMajor.length > 0) {
+      formData.major = normalizedMajor
+      appliedFieldCount++
+    }
   }
 
   // 填充毕业日期
   if (parsedFormData.graduationDate) {
     formData.graduationDate = parsedFormData.graduationDate
+    appliedFieldCount++
   }
 
   // 填充语言能力
@@ -1650,11 +1837,13 @@ const fillFormWithParsedData = (parsedFormData: any) => {
       level: l.level || '',
       other: l.other || ''
     }))
+    appliedFieldCount++
   }
 
   // 填充证书
-  if (parsedFormData.certificates && Array.isArray(parsedFormData.certificates)) {
+  if (parsedFormData.certificates && Array.isArray(parsedFormData.certificates) && parsedFormData.certificates.length > 0) {
     formData.certificates = parsedFormData.certificates
+    appliedFieldCount++
     if (parsedFormData.certificates.includes('其他') && parsedFormData.certificateOther) {
       formData.certificateOther = parsedFormData.certificateOther
       showCertificateInput.value = true
@@ -1662,20 +1851,22 @@ const fillFormWithParsedData = (parsedFormData: any) => {
   }
 
   // 填充技能
-  if (parsedFormData.skills && Array.isArray(parsedFormData.skills)) {
+  if (parsedFormData.skills && Array.isArray(parsedFormData.skills) && parsedFormData.skills.length > 0) {
     formData.skills = parsedFormData.skills.map((s: any) => ({
       name: s.name || s,
       score: s.score ?? s.credibility ?? 70
     }))
+    appliedFieldCount++
   }
 
   // 填充工具
-  if (parsedFormData.tools && Array.isArray(parsedFormData.tools)) {
+  if (parsedFormData.tools && Array.isArray(parsedFormData.tools) && parsedFormData.tools.length > 0) {
     const proficiencyMap: Record<string, number> = { '了解': 25, '熟练': 50, '精通': 75 }
     formData.tools = parsedFormData.tools.map((t: any) => ({
       name: t.name || t,
       score: t.score ?? (t.proficiency ? proficiencyMap[t.proficiency] : undefined) ?? 50
     }))
+    appliedFieldCount++
   }
 
   // 填充代码能力
@@ -1684,30 +1875,34 @@ const fillFormWithParsedData = (parsedFormData: any) => {
     formData.codeAbility.links = Array.isArray(parsedCodeLinks)
       ? parsedCodeLinks.join('\n')
       : String(parsedCodeLinks)
+    appliedFieldCount++
   }
 
   // 填充项目经历
-  if (parsedFormData.projects && Array.isArray(parsedFormData.projects)) {
+  if (parsedFormData.projects && Array.isArray(parsedFormData.projects) && parsedFormData.projects.length > 0) {
     formData.projects = parsedFormData.projects.map((p: any) => ({
       isCompetition: p.isCompetition || false,
       name: p.name || '',
       desc: p.desc || ''
     }))
+    appliedFieldCount++
   }
 
   // 填充实习经历
-  if (parsedFormData.internships && Array.isArray(parsedFormData.internships)) {
+  if (parsedFormData.internships && Array.isArray(parsedFormData.internships) && parsedFormData.internships.length > 0) {
     formData.internships = parsedFormData.internships.map((i: any) => ({
       company: i.company || '',
       role: i.role || '',
       date: i.date || [],
       desc: i.desc || ''
     }))
+    appliedFieldCount++
   }
 
   // 填充素质测评答题记录，并根据记录判断完成状态
   if (parsedFormData.quizDetail && Array.isArray(parsedFormData.quizDetail)) {
     formData.quizDetail = parsedFormData.quizDetail
+    appliedFieldCount++
     // 有答题记录即标记全部素质测评已完成
     if (parsedFormData.quizDetail.length > 0) {
       quizCompleted.communication = true
@@ -1719,16 +1914,19 @@ const fillFormWithParsedData = (parsedFormData: any) => {
   // 填充创新案例
   if (parsedFormData.innovation) {
     formData.innovation = parsedFormData.innovation
+    appliedFieldCount++
   }
 
   // 填充目标岗位
   if (parsedFormData.targetJob) {
     formData.targetJob = parsedFormData.targetJob
+    appliedFieldCount++
   }
 
   // 填充目标行业
-  if (parsedFormData.targetIndustries && Array.isArray(parsedFormData.targetIndustries)) {
+  if (parsedFormData.targetIndustries && Array.isArray(parsedFormData.targetIndustries) && parsedFormData.targetIndustries.length > 0) {
     formData.targetIndustries = parsedFormData.targetIndustries
+    appliedFieldCount++
   }
 
   // 填充职业优先级
@@ -1737,7 +1935,9 @@ const fillFormWithParsedData = (parsedFormData: any) => {
       value: p.value || 'tech',
       label: p.label || '技术成长'
     }))
+    appliedFieldCount++
   }
+  return appliedFieldCount
 }
 
 /**
@@ -1749,14 +1949,22 @@ const handleResumeParsed = (parsedData: unknown) => {
   hasUploadedResume.value = true
   showUploadDialog.value = false
 
-  const formDataFromResume = parsedData as Record<string, unknown> | null
-  if (!formDataFromResume) {
+  const parsedResponses = normalizeUploadResponses(parsedData)
+  if (parsedResponses.length === 0) {
     ElMessage.warning('简历解析结果为空，请手动填写表单')
     return
   }
 
-  fillFormWithParsedData(formDataFromResume)
-  ElMessage.success('简历解析成功！已自动填充表单信息')
+  const mergedParsedData = mergeUploadResponses(parsedResponses)
+  if (!hasFillableResumeData(mergedParsedData)) {
+    ElMessage.warning('简历解析完成，但暂未识别到可回填的表单信息，请手动补充')
+    return
+  }
+
+  const appliedFieldCount = fillFormWithParsedData(mergedParsedData)
+  if (appliedFieldCount > 0) {
+    ElMessage.success('简历解析成功！已自动填充表单信息')
+  }
 
   // 检查并提示缺失的必填字段
   const missingFields = checkRequiredFields()
