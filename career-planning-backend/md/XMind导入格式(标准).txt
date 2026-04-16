@@ -1,0 +1,215 @@
+职引未来 - 职业规划智能体系统
+	核心功能模块
+		用户管理系统
+			用户认证
+				邮箱注册登录
+				密码加密存储
+				JWT Token认证
+				验证码验证
+			用户信息
+				个人资料管理
+				头像上传(OSS)
+				账号状态管理
+		AI对话系统
+			智能聊天
+				流式对话(SSE)
+				文件上传支持
+				多轮对话记录
+				多媒体输入
+			支持格式
+				图片
+				文档
+				代码
+		职位匹配引擎
+			用户画像分析
+			职位智能推荐
+			多维度相似度计算
+			Top-K排序推荐
+		成长规划助手
+			个性化方案制定
+			缺陷补充建议
+			阶段化学习路径
+			进度跟踪反馈
+		代码能力评估
+			GitHub仓库分析
+			代码质量评分
+			技能识别
+			AI智能评估
+		知识图谱系统
+			知识点关联分析
+			岗位技能影响度
+			学习路径规划
+			流式讲解
+		简历管理与导出
+			多格式导出
+				Word文档
+				PDF文档
+				Markdown文本
+			智能润色
+			模板化设计
+		问卷测评系统
+			职业性格评估
+			职业兴趣评估
+			能力素质评估
+		支付系统
+			支付宝集成
+			订单管理
+			支付回调验证
+			交易记录
+		积分体系
+			积分获取
+			积分消费
+			积分兑换
+			交易明细
+	创新功能亮点
+		AI驱动的个性化规划
+			动态学习路径
+			实时反馈机制
+			多维度分析
+		知识图谱可视化
+			动态关联分析
+			学习路径推荐
+			交互式探索
+		代码能力自动化评估
+			GitHub集成
+			智能评分
+			技术栈识别
+		流式AI交互
+			实时响应
+			多轮对话
+			多媒体支持
+		智能简历优化
+			模板导出
+			内容润色
+			一键生成
+	系统架构
+		技术栈
+			Spring Boot 3.5.9
+			Java 21
+			MySQL 数据库
+			Redis 缓存
+			RabbitMQ 消息队列
+			阿里云OSS 存储
+		核心组件
+			Controller 控制层
+			Service 业务层
+			Mapper 数据访问层
+			Domain 实体层
+			Util 工具层
+		外部集成
+			Python AI服务
+			阿里云OSS
+			支付宝支付
+			Redis缓存
+			RabbitMQ消息队列
+	API接口体系
+		用户相关
+			POST /user/register
+			POST /user/login
+			GET /user/info
+			PUT /user/edit
+			POST /user/send-code
+			GET /user/avatar
+		对话相关
+			POST /chat/message
+			POST /chat/stream
+			POST /chat/upload
+		匹配相关
+			POST /matching/job
+		规划相关
+			POST /report/plan
+			POST /report/check
+			POST /report/polish
+		代码评估
+			POST /codeAbility/evaluate
+		知识图谱
+			POST /knowledge-graph/analyze/stream
+			POST /knowledge-graph/explain/stream
+		简历导出
+			POST /api/resume/export/{format}
+		支付相关
+			POST /alipay/pay
+			GET /alipay/return
+		积分相关
+			GET/POST /points/*
+			GET/POST /transaction/*
+	数据模型
+		User 用户表
+			用户认证信息
+			个人资料
+			头像地址
+			账号状态
+		PaymentOrder 支付订单
+			订单号
+			支付金额
+			支付状态
+			回调时间
+		PointsTransaction 积分交易
+			用户ID
+			交易类型
+			积分变化
+			交易时间
+		Package 套餐表
+			套餐名称
+			套餐描述
+			价格
+			套餐状态
+	安全性保障
+		密码安全
+			BCrypt加密存储
+		认证授权
+			JWT Token机制
+			Refresh Token刷新
+		防护措施
+			防枚举攻击
+			验证码限流
+			支付签名验证
+	性能优化
+		缓存策略
+			Redis热数据缓存
+			验证码缓存
+		异步处理
+			RabbitMQ消息队列
+			异步任务处理
+		流式传输
+			SSE流式推送
+			内存占用优化
+		连接管理
+			MySQL连接池
+			数据库性能优化
+	系统优势
+		个性化
+			多维度用户分析
+			精准职业匹配
+		智能化
+			知识图谱应用
+			AI代码分析
+		交互性
+			流式对话体验
+			多媒体支持
+		专业性
+			成长计划制定
+			简历质量提升
+		便利性
+			一键导出简历
+			开箱即用功能
+		可靠性
+			完整支付闭环
+			积分管理体系
+	后续扩展
+		推荐系统升级
+			协同过滤算法
+			内容推荐结合
+		实时数据分析
+			行业职位数据更新
+			市场需求洞察
+		社交互动
+			用户经验分享
+			职业导师制度
+		移动端适配
+			原生App开发
+			小程序
+		国际化支持
+			多语言支持
+			多地区标准
+
