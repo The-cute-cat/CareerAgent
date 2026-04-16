@@ -147,6 +147,8 @@ let subtitleTimer: number | null = null
 let subtitleFlashTimer: number | null = null
 let bounceTimer: number | null = null
 let activeRecognition: SpeechRecognitionLike | null = null
+let recognitionStoppedByUser = false
+let recognitionSessionId = 0
 
 const synth = typeof window !== 'undefined' ? window.speechSynthesis : null
 
@@ -371,9 +373,20 @@ function recognizeByBrowser(): Promise<string | null> {
   if (!RecognitionCtor) return Promise.resolve(null)
 
   return new Promise(resolve => {
+    const sessionId = ++recognitionSessionId
     const recognition = new RecognitionCtor()
     activeRecognition = recognition
+    recognitionStoppedByUser = false
     let resolved = false
+
+    const finish = (value: string | null) => {
+      if (resolved) return
+      resolved = true
+      if (activeRecognition === recognition) {
+        activeRecognition = null
+      }
+      resolve(value)
+    }
 
     recognition.lang = 'zh-CN'
     recognition.interimResults = false
@@ -381,29 +394,36 @@ function recognizeByBrowser(): Promise<string | null> {
 
     recognition.onresult = event => {
       const transcript = event.results[0]?.[0]?.transcript?.trim() ?? ''
-      if (!resolved) {
-        resolved = true
-        resolve(transcript || null)
-      }
+      finish(transcript || null)
     }
 
     recognition.onerror = () => {
-      if (!resolved) {
-        resolved = true
-        resolve(null)
-      }
+      finish(null)
     }
 
     recognition.onend = () => {
-      activeRecognition = null
-      if (!resolved) {
-        resolved = true
-        resolve(null)
+      if (recognitionStoppedByUser && sessionId === recognitionSessionId) {
+        recognitionStoppedByUser = false
+        finish('')
+        return
       }
+      finish(null)
     }
 
     recognition.start()
   })
+}
+
+function stopRecording(): void {
+  recognitionStoppedByUser = true
+  recording.value = false
+  listeningVisible.value = false
+
+  try {
+    activeRecognition?.stop()
+  } catch {
+    activeRecognition = null
+  }
 }
 
 async function onMic(): Promise<void> {
@@ -411,11 +431,20 @@ async function onMic(): Promise<void> {
     stopSpeech()
     return
   }
-  if (recording.value || thinking.value || completed.value) return
+  if (recording.value) {
+    stopRecording()
+    return
+  }
+  if (thinking.value || completed.value) return
   recording.value = true
   listeningVisible.value = true
   hideBubble()
   const browserText = await recognizeByBrowser()
+
+  if (browserText === '') {
+    return
+  }
+
   const text = browserText || (await mockRecognize())
   listeningVisible.value = false
   recording.value = false
@@ -435,6 +464,9 @@ function restartConversation(): void {
   recording.value = false
   speaking.value = false
   listeningVisible.value = false
+  recognitionStoppedByUser = false
+  activeRecognition?.stop()
+  activeRecognition = null
   subtitleVisible.value = false
   bubbleVisible.value = false
   startConversation()
@@ -448,6 +480,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   clearTimers()
+  recognitionStoppedByUser = true
   activeRecognition?.stop()
   synth?.cancel()
 })
