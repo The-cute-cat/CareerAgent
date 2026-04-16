@@ -103,36 +103,81 @@
 			Redis缓存
 			RabbitMQ消息队列
 	API接口体系
-		用户相关
-			POST /user/register
-			POST /user/login
-			GET /user/info
-			PUT /user/edit
-			POST /user/send-code
-			GET /user/avatar
-		对话相关
-			POST /chat/message
-			POST /chat/stream
-			POST /chat/upload
-		匹配相关
-			POST /matching/job
-		规划相关
-			POST /report/plan
-			POST /report/check
-			POST /report/polish
-		代码评估
-			POST /codeAbility/evaluate
+		用户管理
+			POST /user/register - 用户注册
+			POST /user/login - 用户登录
+			POST /user/send-code-register - 发送注册验证码
+			POST /user/send-code-forget - 发送重置密码验证码
+			POST /user/forget-password - 修改密码
+			GET /user/info - 获取用户信息
+			PUT /user/edit - 编辑个人资料
+			POST /user/avatar - 上传头像
+			GET /user/get-basic-info - 获取用户基础信息
+			POST /user/refreshToken - 刷新Token
+		聊天对话
+			POST /chat/message - 发送聊天消息(阻塞)
+			POST /chat/stream/message - 流式聊天消息
+			POST /chat/stream/message-and-files - 流式聊天(含文件)
+			GET /chat/get-chat-history - 获取对话历史
+			GET /chat/get-user-sessions - 获取用户对话列表
+			GET /chat/get-session-title - 获取对话标题
+			DELETE /chat/clear-session - 清除对话记录
+			PUT /chat/update-session-title - 更新对话标题
+			GET /chat/get-user-memories - 获取用户记忆
+			DELETE /chat/delete-memory - 删除记忆
+		用户数据转换
+			POST /convert/user_form_to_userprofile - 表单转用户画像
+		职位匹配
+			POST /matching/job - 智能职位匹配
+		成长规划
+			POST /report/plan - 获取成长计划
+			POST /report/check - 报告完整性检查
+			POST /report/polish - 内容智能润色
+		代码能力
+			POST /codeAbility/evaluate - 代码能力评估
 		知识图谱
-			POST /knowledge-graph/analyze/stream
-			POST /knowledge-graph/explain/stream
+			POST /knowledge-graph/analyze/stream - 流式知识分析
+			POST /knowledge-graph/explain/stream - 流式知识讲解
 		简历导出
-			POST /api/resume/export/{format}
+			POST /api/resume/export/{format} - 导出简历(word/pdf/md)
+		文件解析
+			POST /parse/file - 解析文件
+		问卷测评
+			GET /question/generate - 生成测评题目
+			POST /question/check_student_answer - 检查答案
 		支付相关
-			POST /alipay/pay
-			GET /alipay/return
-		积分相关
-			GET/POST /points/*
-			GET/POST /transaction/*
+			POST /alipay/pay/order - 创建支付订单
+			GET /alipay/pay/{orderNumber} - 页面支付
+			POST /alipay/notify - 支付宝异步回调
+		积分系统
+			GET /points/account/{id} - 获取账户积分
+			POST /points/register - 注册赠送积分
+			POST /points/invite - 邀请好友
+			POST /points/register/student - 学生认证
+			POST /points/recharge - 充值积分
+			POST /points/consume - 消耗积分
+			POST /points/delete - 删除积分
+		会员管理
+			POST /member/insert - 新用户充值会员
+			POST /member/insert/new - 新用户会员注册
+			GET /member/{id} - 获取会员信息
+			GET /member/update/{id} - 会员续费
+		交易记录
+			GET /transaction/{id} - 获取单条交易记录
+			GET /transaction/list/{id} - 获取用户交易列表
+			GET /transaction/list/points/{id} - 获取积分交易记录
+			GET /transaction/list/member/{id} - 获取会员交易记录
+		用户反馈
+			POST /feedback/submit - 提交反馈
+			GET /feedback/list - 查询反馈列表(分页)
+			GET /feedback/user/{userId}/history - 查询用户反馈历史
+			GET /feedback/{id} - 查询反馈详情
+			POST /feedback/{id}/reply - 管理员回复反馈
+			DELETE /feedback/{id} - 删除反馈
+			GET /feedback/type/{type} - 查询指定类型反馈
+			PUT /feedback/update - 更新反馈
+		搜索服务
+			GET /search/{keyword} - 关键词搜索
 	数据模型
 		User 用户表
 			用户认证信息
