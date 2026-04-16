@@ -1,0 +1,1613 @@
+{
+  "name": "职引未来_技术文档_v3.0.docx",
+  "paragraphs": [
+    {
+      "index": 6,
+      "style": "Normal",
+      "text": "职 引 未 来"
+    },
+    {
+      "index": 7,
+      "style": "Normal",
+      "text": "基于AI的大学生职业规划智能体系统"
+    },
+    {
+      "index": 8,
+      "style": "Normal",
+      "text": "技术设计文档"
+    },
+    {
+      "index": 9,
+      "style": "Normal",
+      "text": "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    },
+    {
+      "index": 15,
+      "style": "Heading 1",
+      "text": "前  言"
+    },
+    {
+      "index": 16,
+      "style": "Heading 2",
+      "text": "编写目的"
+    },
+    {
+      "index": 17,
+      "style": "List Bullet",
+      "text": "对《职引未来——基于AI的大学生职业规划智能体系统》详细设计阶段任务成果形成文档，以便阶段验收、评审。"
+    },
+    {
+      "index": 18,
+      "style": "List Bullet",
+      "text": "对概要设计阶段的文档再次确认过程，对前一阶段需求没有做充分或错误的提出修改。"
+    },
+    {
+      "index": 19,
+      "style": "List Bullet",
+      "text": "明确整个系统的功能框架和模型的编写，确定实现细节。"
+    },
+    {
+      "index": 20,
+      "style": "List Bullet",
+      "text": "明确编码规范和命名规范，统一程序界面。"
+    },
+    {
+      "index": 21,
+      "style": "Heading 2",
+      "text": "技术定义"
+    },
+    {
+      "index": 22,
+      "style": "Normal",
+      "text": "Spring Boot：由Pivotal团队提供的全新框架，其设计目的是用来简化新Spring应用的初始搭建以及开发过程。该框架使用了特定的方式来进行配置，从而使开发人员不再需要定义样板化的配置。本项目采用Spring Boot 3.5.9版本。"
+    },
+    {
+      "index": 23,
+      "style": "Normal",
+      "text": "MyBatis-Plus：MyBatis-Plus是在MyBatis基础上的增强工具，提供了通用的CRUD操作、代码生成器、分页插件等功能，极大地简化了数据库操作的开发工作。本项目采用3.5.15版本。"
+    },
+    {
+      "index": 24,
+      "style": "Normal",
+      "text": "MySQL：MySQL是一个关系型数据库管理系统，由瑞典MySQL AB公司开发，属于Oracle旗下产品。MySQL是最流行的关系型数据库管理系统之一，在WEB应用方面，MySQL是最好的RDBMS应用软件之一。本项目使用MySQL 9.6.0版本。"
+    },
+    {
+      "index": 25,
+      "style": "Normal",
+      "text": "Redis：Redis是一款内存高速缓存数据库，全称Remote Dictionary Server（远程数据服务），使用C语言编写，是一个key-value存储系统，支持丰富的数据类型。本项目使用Redis作为缓存和会话存储。"
+    },
+    {
+      "index": 26,
+      "style": "Normal",
+      "text": "RabbitMQ：云消息队列RabbitMQ版是一款基于高可用分布式架构实现的AMQP 0-9-1协议的消息产品。具备高并发、分布式、灵活扩缩容等云消息服务优势。本项目用于异步消息处理和事件驱动。"
+    },
+    {
+      "index": 27,
+      "style": "Normal",
+      "text": "JWT：JWT是基于JSON的标准，在不同的编程语言和平台之间都可以轻松传递和解析。JWT是无状态的，所有信息都被包含在令牌本身中，这使得服务端不需要保存任何状态信息，从而降低了服务端的负担。本项目用于用户认证。"
+    },
+    {
+      "index": 28,
+      "style": "Normal",
+      "text": "Vue 3：Vue.js是一套用于构建用户界面的渐进式JavaScript框架。Vue 3采用了Composition API，提供了更好的TypeScript支持和性能优化。本项目前端采用Vue 3.5.29版本。"
+    },
+    {
+      "index": 29,
+      "style": "Normal",
+      "text": "Element Plus：基于Vue 3的组件库，提供了丰富的UI组件，方便开发者快速构建美观的Web应用。本项目采用2.13.6版本。"
+    },
+    {
+      "index": 30,
+      "style": "Normal",
+      "text": "ECharts：一个使用JavaScript实现的开源可视化库，可以流畅地运行在PC和移动设备上，兼容当前绝大部分浏览器。本项目用于数据可视化展示（雷达图、柱状图等）。"
+    },
+    {
+      "index": 31,
+      "style": "Normal",
+      "text": "Axios：一个基于Promise的HTTP客户端，用于浏览器和node.js。本项目用于前端与后端的HTTP通信。"
+    },
+    {
+      "index": 32,
+      "style": "Normal",
+      "text": "阿里云OSS：对象存储服务（Object Storage Service），是云计算领域的一种存储服务模型，为用户提供高可靠性、高扩展性和低成本的数据存储解决方案。本项目用于文件上传与存储。"
+    },
+    {
+      "index": 33,
+      "style": "Normal",
+      "text": "POI-TL：基于Apache POI的Word模板引擎，使用{{}}作为占位符，支持文本、图片、表格、图表等元素的动态替换。本项目用于Word格式简历导出。"
+    },
+    {
+      "index": 34,
+      "style": "Normal",
+      "text": "OpenHTMLToPDF：一个基于iText的HTML转PDF工具，支持CSS3样式和现代Web标准。本项目用于PDF格式简历导出。"
+    },
+    {
+      "index": 35,
+      "style": "Normal",
+      "text": "Pinia：Vue 3的官方状态管理库，替代Vuex，提供了更简洁的API和更好的TypeScript支持。本项目用于前端全局状态管理。"
+    },
+    {
+      "index": 36,
+      "style": "Normal",
+      "text": "通义千问（Qwen）：阿里云开发的大语言模型，支持自然语言理解、代码生成、多轮对话等功能。本项目AI服务采用通义千问作为底层大模型。"
+    },
+    {
+      "index": 37,
+      "style": "Normal",
+      "text": "FastAPI：FastAPI是一个现代、快速（高性能）的Python Web框架，用于构建API。具有快速、高效、健壮等特点。它基于Python类型提示，使用Starlette和Pydantic构建。本项目AI服务采用此框架。"
+    },
+    {
+      "index": 38,
+      "style": "Normal",
+      "text": "LangChain：一个用于开发语言模型（LLM）驱动应用的框架，旨在帮助开发者更高效地构建复杂的应用，例如智能问答系统、聊天机器人、数据分析工具等。"
+    },
+    {
+      "index": 39,
+      "style": "Heading 2",
+      "text": "读者对象"
+    },
+    {
+      "index": 40,
+      "style": "List Bullet",
+      "text": "项目开发人员"
+    },
+    {
+      "index": 41,
+      "style": "List Bullet",
+      "text": "项目文档编写人员"
+    },
+    {
+      "index": 42,
+      "style": "List Bullet",
+      "text": "项目评审人员"
+    },
+    {
+      "index": 43,
+      "style": "List Bullet",
+      "text": "项目测试人员"
+    },
+    {
+      "index": 44,
+      "style": "List Bullet",
+      "text": "项目管理人员"
+    },
+    {
+      "index": 46,
+      "style": "Heading 1",
+      "text": "总体设计"
+    },
+    {
+      "index": 47,
+      "style": "Heading 2",
+      "text": "项目背景"
+    },
+    {
+      "index": 48,
+      "style": "Normal",
+      "text": "在当前就业竞争日益激烈的背景下，大学生面临着职业规划不清晰、求职准备不充分、信息不对称等问题。传统的职业规划指导往往依赖于有限的学校资源，无法为每位学生提供个性化、专业化的职业规划服务。"
+    },
+    {
+      "index": 49,
+      "style": "Normal",
+      "text": "\"职引未来\"系统正是在这一背景下应运而生。系统依托AI大模型的强大能力，整合职业测评、简历优化、面试准备、职业知识库、AI智能问答等多维度功能，为大学生提供全方位、个性化的职业发展支持平台。"
+    },
+    {
+      "index": 50,
+      "style": "Normal",
+      "text": "系统采用前后端分离的微服务架构，后端基于Spring Boot 3.5.9构建，AI服务基于FastAPI + Python构建，前端采用Vue 3 + TypeScript。通过整合多种AI技术和业务模块，系统旨在帮助大学生实现科学的职业规划与就业准备，提升就业竞争力。"
+    },
+    {
+      "index": 51,
+      "style": "Heading 2",
+      "text": "业务背景"
+    },
+    {
+      "index": 52,
+      "style": "Normal",
+      "text": "大学生群体在职业发展过程中普遍面临以下痛点："
+    },
+    {
+      "index": 53,
+      "style": "Normal",
+      "text": "职业规划模糊：缺乏科学的职业规划方法和工具，对职业发展方向不清晰。"
+    },
+    {
+      "index": 54,
+      "style": "Normal",
+      "text": "简历制作困难：不熟悉简历撰写技巧，无法有效展示个人优势和技能。"
+    },
+    {
+      "index": 55,
+      "style": "Normal",
+      "text": "面试准备不足：缺乏系统化的面试题库和模拟训练，面试经验不足。"
+    },
+    {
+      "index": 56,
+      "style": "Normal",
+      "text": "信息获取困难：难以获取全面、准确的职业信息和行业动态。"
+    },
+    {
+      "index": 57,
+      "style": "Normal",
+      "text": "个性化服务缺失：传统职业规划指导无法满足个性化需求。"
+    },
+    {
+      "index": 58,
+      "style": "Normal",
+      "text": "\"职引未来\"系统正是为了解决这些痛点而设计。通过AI技术赋能职业规划全流程，帮助大学生实现从自我认知、职业探索、简历制作到面试准备的全链路职业发展服务。"
+    },
+    {
+      "index": 59,
+      "style": "Heading 2",
+      "text": "需求概述"
+    },
+    {
+      "index": 60,
+      "style": "Normal",
+      "text": "用户管理用户注册与登录、个人信息管理、会员体系管理、积分系统管理。"
+    },
+    {
+      "index": 61,
+      "style": "Normal",
+      "text": "职业测评职业能力评估、技能雷达图展示、个人优势分析。"
+    },
+    {
+      "index": 62,
+      "style": "Normal",
+      "text": "简历管理简历在线编辑、简历模板选择、简历解析与智能填充、简历导出（Word/PDF）。"
+    },
+    {
+      "index": 63,
+      "style": "Normal",
+      "text": "AI智能助手AI职业规划问答、面试题智能生成、职业发展建议、用户画像分析。"
+    },
+    {
+      "index": 64,
+      "style": "Normal",
+      "text": "面试管理面试题库管理、面试日历、面试回顾与反馈。"
+    },
+    {
+      "index": 65,
+      "style": "Normal",
+      "text": "职位匹配职位搜索、智能岗位推荐、用户与岗位匹配分析。"
+    },
+    {
+      "index": 66,
+      "style": "Normal",
+      "text": "知识库职业知识图谱、行业知识浏览、发展路径导航。"
+    },
+    {
+      "index": 67,
+      "style": "Normal",
+      "text": "会员与支付会员套餐管理、在线支付（支付宝）、积分充值与消费。"
+    },
+    {
+      "index": 68,
+      "style": "Normal",
+      "text": "反馈系统用户反馈提交、反馈管理与处理。"
+    },
+    {
+      "index": 69,
+      "style": "Heading 2",
+      "text": "技术选型"
+    },
+    {
+      "index": 70,
+      "style": "Heading 2",
+      "text": "功能结构"
+    },
+    {
+      "index": 71,
+      "style": "Normal",
+      "text": "功能结构图"
+    },
+    {
+      "index": 72,
+      "style": "Normal",
+      "text": "\n                    ┌─────────────────────┐\n                    │    职引未来系统      │\n                    └──────────┬──────────┘\n           ┌───────────────────┼───────────────────┐\n           │                   │                   │\n    ┌──────┴──────┐     ┌──────┴──────┐     ┌──────┴──────┐\n    │  用户模块   │     │  业务模块   │     │  AI服务模块  │\n    └──────┬──────┘     └──────┬──────┘     └──────┬──────┘\n           │                   │                   │\n     ┌─────┼─────┐      ┌──────┼──────┐      ┌─────┼─────┐\n     │     │     │      │      │      │      │     │     │\n   注册  登录  管理   简历  面试  职位  知识库  AI  AI  AI\n   管理  认证  会员   编辑  管理  搜索  浏览   对话  面试  评估\n"
+    },
+    {
+      "index": 74,
+      "style": "Heading 1",
+      "text": "架构设计"
+    },
+    {
+      "index": 75,
+      "style": "Heading 2",
+      "text": "物理架构"
+    },
+    {
+      "index": 76,
+      "style": "Normal",
+      "text": "物理部署架构图"
+    },
+    {
+      "index": 77,
+      "style": "Normal",
+      "text": "\n              ┌─────────────────────────────────────┐\n              │          客户端 (浏览器)             │\n              └──────────────────┬──────────────────┘\n                                 │\n                                 ▼\n              ┌─────────────────────────────────────┐\n              │         Nginx 反向代理 (80/443)      │\n              │   - SSL终结    - 静态资源服务        │\n              │   - 负载均衡    - 请求转发           │\n              └──────────────────┬──────────────────┘\n                                 │\n              ┌──────────────────┼──────────────────┐\n              ▼                  ▼                  ▼\n    ┌──────────────┐   ┌──────────────┐   ┌──────────────┐\n    │  前端服务    │   │  后端服务    │   │  AI服务      │\n    │  (Nginx)     │   │ (8080)       │   │  (9000)      │\n    │  Vue SPA     │   │ Spring Boot  │   │  FastAPI     │\n    └──────────────┘   └──────┬───────┘   └──────────────┘\n                              │\n              ┌───────────────┼───────────────┐\n              ▼               ▼               ▼\n    ┌──────────────┐  ┌──────────────┐  ┌──────────────┐\n    │    MySQL     │  │    Redis     │  │   RabbitMQ   │\n    │   (3306)     │  │   (6379)     │  │   (5672)     │\n    └──────────────┘  └──────────────┘  └──────────────┘\n"
+    },
+    {
+      "index": 78,
+      "style": "Heading 2",
+      "text": "系统架构"
+    },
+    {
+      "index": 79,
+      "style": "Normal",
+      "text": "职引未来系统分为七层架构设计，分别是："
+    },
+    {
+      "index": 80,
+      "style": "Normal",
+      "text": "展示层：展示层是系统架构中的顶层，负责处理用户界面和用户体验。包括用户直接与之交互的所有元素，如Vue 3单页面应用、Element Plus组件库、ECharts数据可视化等。展示层的设计旨在使用户能够轻松使用系统，同时提供直观的交互和信息展示。"
+    },
+    {
+      "index": 81,
+      "style": "Normal",
+      "text": "接入层：接入层通常是指网络体系结构中最接近用户或客户端设备的部分。本项目使用Nginx作为反向代理服务器，提供用户接入网络的门户，涵盖了SSL终结、静态资源服务、负载均衡、请求转发等功能。接入层的设计需要考虑到用户的接入需求、安全性和网络性能的平衡。"
+    },
+    {
+      "index": 82,
+      "style": "Normal",
+      "text": "服务层：服务层是系统架构中负责提供核心服务和功能的部分。这些服务可以是应用程序接口（API）、数据处理服务、身份验证服务等。本项目使用Spring Boot作为核心服务层，提供RESTful API、JWT认证、业务逻辑处理等功能。服务层的设计目标是支持系统的核心业务逻辑，并为上层提供必要的功能支持。"
+    },
+    {
+      "index": 83,
+      "style": "Normal",
+      "text": "运算层：作为系统的核心计算中枢，整合了AI模型推理、实时数据处理和智能决策能力。该层基于通义千问(Qwen)大模型实现自然语言处理（如AI对话、简历分析、面试题生成），通过协同过滤算法完成个性化职位推荐，并集成Python AI服务实现智能分析能力。同时依托消息队列(RabbitMQ)处理异步任务流，协调简历导出、邮件通知、积分计算等任务。"
+    },
+    {
+      "index": 84,
+      "style": "Normal",
+      "text": "存储层：存储层负责管理和存储系统中的数据和信息。本项目采用多存储方案：MySQL 9.6.0作为主数据库存储业务数据（用户信息、简历数据、面试记录等），Redis作为缓存存储（会话管理、热点数据缓存），阿里云OSS作为文件存储（用户头像、简历文件等），RabbitMQ作为消息中间件。存储层的设计需考虑到数据的安全性、可扩展性和性能需求。"
+    },
+    {
+      "index": 85,
+      "style": "Normal",
+      "text": "数据层：数据层负责数据的一致性、完整性和安全性。通过MyBatis-Plus ORM框架实现数据访问层，确保数据操作的规范性和高效性。同时通过数据验证、事务管理、索引优化等手段保障数据质量。"
+    },
+    {
+      "index": 86,
+      "style": "Normal",
+      "text": "运维层：运维层是系统架构中支持和维护整个系统运行的层级。这包括了系统监控、故障排除、性能优化、更新管理等任务。运维层的设计需要确保系统能够稳定运行，并且能够快速响应和处理各种运行时的问题和挑战。"
+    },
+    {
+      "index": 88,
+      "style": "Heading 1",
+      "text": "数据库设计"
+    },
+    {
+      "index": 89,
+      "style": "Heading 2",
+      "text": "数据库概述"
+    },
+    {
+      "index": 90,
+      "style": "Heading 2",
+      "text": "核心数据表设计"
+    },
+    {
+      "index": 91,
+      "style": "Normal",
+      "text": "系统数据库包含多个核心业务表，按照功能模块可划分为以下类别："
+    },
+    {
+      "index": 92,
+      "style": "Normal",
+      "text": "用户相关表 user（用户表）、user_profile（用户档案表）、feedback（用户反馈表）"
+    },
+    {
+      "index": 93,
+      "style": "Normal",
+      "text": "简历相关表 resume（简历表）、resume_education（教育经历表）、resume_work_experience（工作经历表）、resume_project（项目经历表）、resume_skill（技能表）、resume_certificate（证书表）"
+    },
+    {
+      "index": 94,
+      "style": "Normal",
+      "text": "面试相关表 interview（面试记录表）、interview_question（面试题目表）、interview_review（面试回顾表）"
+    },
+    {
+      "index": 95,
+      "style": "Normal",
+      "text": "职位相关表 job（职位表）、job_skill（职位技能要求表）、user_job_match（用户-职位匹配表）"
+    },
+    {
+      "index": 96,
+      "style": "Normal",
+      "text": "会员相关表 member_package（会员套餐表）、member_subscription（会员订阅表）、payment_order（支付订单表）、points_transaction（积分交易表）"
+    },
+    {
+      "index": 97,
+      "style": "Normal",
+      "text": "系统相关表 file_upload（文件上传记录表）、system_config（系统配置表）、operation_log（操作日志表）"
+    },
+    {
+      "index": 98,
+      "style": "Heading 3",
+      "text": "用户表（user）"
+    },
+    {
+      "index": 99,
+      "style": "Heading 3",
+      "text": "简历表（resume）"
+    },
+    {
+      "index": 100,
+      "style": "Heading 3",
+      "text": "面试记录表（interview）"
+    },
+    {
+      "index": 101,
+      "style": "Heading 2",
+      "text": "实体关系图"
+    },
+    {
+      "index": 102,
+      "style": "Normal",
+      "text": "核心实体关系图"
+    },
+    {
+      "index": 103,
+      "style": "Normal",
+      "text": "\n┌─────────┐      1:N     ┌──────────┐\n│  User   │──────────────▶│ Resume   │\n└────┬────┘              └────┬─────┘\n     │                        │\n     │ 1:N          ┌─────────┼──────────┐\n     ▼              ▼         ▼          ▼\n┌─────────┐    ┌────────┐ ┌──────┐ ┌────────┐\n│Interview│    │Educatn │ │ Work │ │Project │\n└────┬────┘    └────────┘ └──────┘ └────────┘\n     │\n     │ 1:N              ┌──────────┐\n     ▼                  │  Skill   │\n┌──────────────┐        └──────────┘\n│Intvw Question│\n└──────────────┘\n"
+    },
+    {
+      "index": 105,
+      "style": "Heading 1",
+      "text": "系统详细设计"
+    },
+    {
+      "index": 106,
+      "style": "Heading 2",
+      "text": "系统总功能设计"
+    },
+    {
+      "index": 107,
+      "style": "Normal",
+      "text": "系统基于多智能体协同架构思想，将复杂的职业规划任务分解为一系列定义清晰、功能独立的子任务。系统通过RESTful API接口提供服务，各模块独立运行、相互协作，实现了用户管理、简历管理、面试管理、职位匹配、AI智能助手、会员支付等核心功能。"
+    },
+    {
+      "index": 108,
+      "style": "Heading 2",
+      "text": "基本功能设计"
+    },
+    {
+      "index": 109,
+      "style": "Heading 3",
+      "text": "用户基本操作"
+    },
+    {
+      "index": 110,
+      "style": "Normal",
+      "text": "[功能说明] 支持用户的注册、登录、信息查询、信息修改等基本操作。提供RESTful风格的API接口。"
+    },
+    {
+      "index": 111,
+      "style": "Normal",
+      "text": "[输入] 用户名、邮箱、密码、验证码等"
+    },
+    {
+      "index": 112,
+      "style": "Normal",
+      "text": "[处理] 对应请求执行对应的操作，包括密码BCrypt加密、JWT Token生成、Redis会话管理等"
+    },
+    {
+      "index": 113,
+      "style": "Normal",
+      "text": "[返回] 返回用户操作信息（Token、用户信息等）"
+    },
+    {
+      "index": 114,
+      "style": "Heading 3",
+      "text": "简历基本操作"
+    },
+    {
+      "index": 115,
+      "style": "Normal",
+      "text": "[功能说明] 支持简历的创建、编辑、查看、删除、导出等基本操作。提供在线简历编辑器，支持多种简历模板。"
+    },
+    {
+      "index": 116,
+      "style": "Normal",
+      "text": "[输入] 简历标题、模板选择、各模块内容（教育经历、工作经历、项目经历、技能等）"
+    },
+    {
+      "index": 117,
+      "style": "Normal",
+      "text": "[处理] 通过AI服务解析简历内容并智能填充，用户编辑后保存为JSON格式存储，支持导出为Word或PDF格式"
+    },
+    {
+      "index": 118,
+      "style": "Normal",
+      "text": "[返回] 返回简历操作信息、导出文件流"
+    },
+    {
+      "index": 119,
+      "style": "Heading 3",
+      "text": "面试基本操作"
+    },
+    {
+      "index": 120,
+      "style": "Normal",
+      "text": "[功能说明] 支持面试记录的创建、查看、编辑、删除、回顾等基本操作。支持面试日历视图。"
+    },
+    {
+      "index": 121,
+      "style": "Normal",
+      "text": "[输入] 公司名称、职位、面试时间、面试类型、状态等"
+    },
+    {
+      "index": 122,
+      "style": "Normal",
+      "text": "[处理] 对应请求执行对应的操作，支持AI生成面试题目"
+    },
+    {
+      "index": 123,
+      "style": "Normal",
+      "text": "[返回] 返回面试操作信息"
+    },
+    {
+      "index": 124,
+      "style": "Heading 3",
+      "text": "职位搜索操作"
+    },
+    {
+      "index": 125,
+      "style": "Normal",
+      "text": "[功能说明] 支持职位的搜索、查看、收藏等基本操作。支持关键词搜索、城市筛选、薪资范围筛选等。"
+    },
+    {
+      "index": 126,
+      "style": "Normal",
+      "text": "[输入] 关键词、城市、薪资范围、经验要求等"
+    },
+    {
+      "index": 127,
+      "style": "Normal",
+      "text": "[处理] 根据搜索条件在数据库中检索匹配的职位，支持分页返回结果"
+    },
+    {
+      "index": 128,
+      "style": "Normal",
+      "text": "[返回] 返回职位列表及匹配度信息"
+    },
+    {
+      "index": 129,
+      "style": "Heading 3",
+      "text": "AI智能助手操作"
+    },
+    {
+      "index": 130,
+      "style": "Normal",
+      "text": "[功能说明] 支持用户与AI职业规划助手进行智能对话。提供职业咨询、面试准备、发展建议等功能。"
+    },
+    {
+      "index": 131,
+      "style": "Normal",
+      "text": "[输入] 用户提问内容、对话历史、用户画像信息"
+    },
+    {
+      "index": 132,
+      "style": "Normal",
+      "text": "[处理] 调用AI服务（FastAPI + 通义千问大模型），结合用户画像和对话历史生成个性化回答"
+    },
+    {
+      "index": 133,
+      "style": "Normal",
+      "text": "[返回] 返回AI回答内容"
+    },
+    {
+      "index": 134,
+      "style": "Heading 3",
+      "text": "会员与支付操作"
+    },
+    {
+      "index": 135,
+      "style": "Normal",
+      "text": "[功能说明] 支持会员套餐购买、支付、积分充值等操作的完整流程。集成支付宝支付SDK。"
+    },
+    {
+      "index": 136,
+      "style": "Normal",
+      "text": "[输入] 套餐ID、支付方式、充值金额等"
+    },
+    {
+      "index": 137,
+      "style": "Normal",
+      "text": "[处理] 创建支付订单，调用支付宝支付接口，处理异步回调通知，更新会员状态和积分余额"
+    },
+    {
+      "index": 138,
+      "style": "Normal",
+      "text": "[返回] 返回支付链接、订单状态信息"
+    },
+    {
+      "index": 140,
+      "style": "Heading 1",
+      "text": "接口设计"
+    },
+    {
+      "index": 141,
+      "style": "Heading 2",
+      "text": "接口规范"
+    },
+    {
+      "index": 142,
+      "style": "Normal",
+      "text": "系统采用RESTful API设计风格，所有接口返回统一的JSON格式响应。基础URL为 http://localhost:8080/api，认证方式为JWT Bearer Token。"
+    },
+    {
+      "index": 143,
+      "style": "Heading 3",
+      "text": "统一响应格式"
+    },
+    {
+      "index": 144,
+      "style": "Normal",
+      "text": "{\n  \"code\": 200,\n  \"state\": true,\n  \"msg\": \"操作成功\",\n  \"data\": {\n    // 业务数据\n  },\n  \"timestamp\": 1712995200000\n}"
+    },
+    {
+      "index": 145,
+      "style": "Heading 3",
+      "text": "错误码说明"
+    },
+    {
+      "index": 146,
+      "style": "Heading 2",
+      "text": "核心接口列表"
+    },
+    {
+      "index": 147,
+      "style": "Heading 3",
+      "text": "用户模块接口"
+    },
+    {
+      "index": 148,
+      "style": "Heading 3",
+      "text": "简历模块接口"
+    },
+    {
+      "index": 149,
+      "style": "Heading 3",
+      "text": "职位匹配接口"
+    },
+    {
+      "index": 150,
+      "style": "Heading 3",
+      "text": "AI智能助手接口"
+    },
+    {
+      "index": 151,
+      "style": "Heading 3",
+      "text": "会员与支付接口"
+    },
+    {
+      "index": 153,
+      "style": "Heading 1",
+      "text": "AI智能体设计"
+    },
+    {
+      "index": 154,
+      "style": "Heading 2",
+      "text": "设计理念与架构"
+    },
+    {
+      "index": 155,
+      "style": "Normal",
+      "text": "为构建高效、灵活且功能强大的\"职引未来\"AI职业规划智能体系统，我们采用了模块化、路由编排、工具调用与专门化模型相结合的设计理念。其核心思想体现为一种多智能体协同工作的模式，旨在将复杂的职业规划任务分解为一系列定义清晰、功能独立的子任务，每个子任务由一个或多个专门的功能型智能体高效处理。"
+    },
+    {
+      "index": 156,
+      "style": "Normal",
+      "text": "整个系统通过一个中央路由模型进行任务的理解、分发和调度，模拟了多位专家（智能体）协同解决一个复杂问题的过程。"
+    },
+    {
+      "index": 157,
+      "style": "Heading 3",
+      "text": "核心架构流程"
+    },
+    {
+      "index": 158,
+      "style": "Normal",
+      "text": "1. 输入接收 (Input Reception): 系统接收来自用户的文本、语音或行为指令。"
+    },
+    {
+      "index": 159,
+      "style": "Normal",
+      "text": "2. 意图理解与路由 (Intent Understanding & Routing): 中央路由模型首先对输入进行分析，理解用户意图或任务需求。"
+    },
+    {
+      "index": 160,
+      "style": "Normal",
+      "text": "3. 任务分发与协同执行 (Task Dispatching & Collaborative Execution): 路由模型根据意图，将任务或子任务精确地分发给一个或多个最适合处理该任务的功能型智能体（如职业规划师、简历优化师、面试官等）或调用必要的外部工具。"
+    },
+    {
+      "index": 161,
+      "style": "Normal",
+      "text": "4. 结果汇聚与整合 (Result Aggregation & Synthesis): 各功能型智能体完成任务后，其输出结果被传递给结果聚合与呈现模块。"
+    },
+    {
+      "index": 162,
+      "style": "Normal",
+      "text": "5. 最终输出 (Final Output): 聚合模块负责整合来自不同\"协作者\"的信息，进行必要的提炼、排序或格式化，最终生成统一、连贯且满足用户需求的响应。"
+    },
+    {
+      "index": 163,
+      "style": "Heading 2",
+      "text": "核心架构组件"
+    },
+    {
+      "index": 164,
+      "style": "Normal",
+      "text": "中央路由模型 (Central Routing Model): 作为系统的\"大脑\"和\"指挥中心\"，负责理解用户输入的多样化意图，并决策调用哪些下游智能体或工具来完成任务。基于对任务的分析，动态构建执行计划。"
+    },
+    {
+      "index": 165,
+      "style": "Normal",
+      "text": "功能型智能体 (Functional Agents): 一系列专门负责特定任务的智能体，每个智能体独立完成一个或一种功能。本项目主要包含：\n    • CareerAnalystAgent - 职业分析师：负责职业评估和能力分析\n    • GrowthPlanAgent - 成长规划师：负责制定个人发展计划\n    • ConversationAgent - 对话助手：负责日常AI对话交互\n    • TestQuestionAgent - 面试题生成器：负责生成面试题目\n    • ExplainAgent - 解释说明器：负责代码和概念的详细解释\n    • UserJobMatchAnalyzer - 岗位匹配分析器：负责分析用户与职位的匹配度"
+    },
+    {
+      "index": 166,
+      "style": "Normal",
+      "text": "工具调用接口 (Tool Invocation Interface): 允许功能型智能体按需调用外部能力，如联网搜索、文件上传/下载（阿里云OSS）、简历解析接口、知识图谱查询等。"
+    },
+    {
+      "index": 167,
+      "style": "Normal",
+      "text": "结果聚合与呈现模块 (Result Aggregation & Presentation): 作为信息整合的\"枢纽\"，负责将分散的处理结果融合成最终面向用户的友好输出。"
+    },
+    {
+      "index": 168,
+      "style": "Heading 2",
+      "text": "智能体工作流程"
+    },
+    {
+      "index": 169,
+      "style": "Normal",
+      "text": "AI智能体协作流程图"
+    },
+    {
+      "index": 170,
+      "style": "Normal",
+      "text": "\n┌─────────────────────────────────────────────────────────────┐\n│                    用户请求                                   │\n└──────────────────────────┬──────────────────────────────────┘\n                           ▼\n┌─────────────────────────────────────────────────────────────┐\n│              中央路由模型 (Router Agent)                     │\n│         分析意图 → 决策调用 → 构建执行计划                    │\n└──────────────────────────┬──────────────────────────────────┘\n                           │\n         ┌─────────────────┼─────────────────┐\n         ▼                 ▼                 ▼\n┌───────────────┐  ┌───────────────┐  ┌───────────────┐\n│ 职业规划师    │  │ 简历优化师    │  │ 面试官        │\n│ (CareerAgent) │  │ (ResumeAgent) │  │ (InterviewAgt)│\n└───────┬───────┘  └───────┬───────┘  └───────┬───────┘\n        │                  │                  │\n        ▼                  ▼                  ▼\n┌─────────────────────────────────────────────────────────────┐\n│                    LLM 模型 (通义千问 Qwen)                   │\n│              理解 → 推理 → 生成 → 校验                        │\n└──────────────────────────┬──────────────────────────────────┘\n                           ▼\n┌─────────────────────────────────────────────────────────────┐\n│                    结果聚合与呈现                             │\n│         整合多源信息 → 格式化输出 → 返回用户                   │\n└─────────────────────────────────────────────────────────────┘\n"
+    },
+    {
+      "index": 172,
+      "style": "Heading 1",
+      "text": "亮点设计"
+    },
+    {
+      "index": 173,
+      "style": "Heading 2",
+      "text": "AI驱动的全链路职业规划"
+    },
+    {
+      "index": 174,
+      "style": "Normal",
+      "text": "职引未来系统通过AI大模型技术，实现了从自我认知、职业探索、简历制作、面试准备到职位推荐的全链路职业规划服务。"
+    },
+    {
+      "index": 175,
+      "style": "Normal",
+      "text": "自我认知：通过职业测评和能力评估，帮助用户了解自己的兴趣、能力和优势。"
+    },
+    {
+      "index": 176,
+      "style": "Normal",
+      "text": "职业探索：基于知识图谱技术，构建职位-技能-能力的关联网络，帮助用户全面了解不同职业方向。"
+    },
+    {
+      "index": 177,
+      "style": "Normal",
+      "text": "简历制作：AI智能解析用户已有信息，智能填充简历内容，并提供优化建议。"
+    },
+    {
+      "index": 178,
+      "style": "Normal",
+      "text": "面试准备：AI根据目标职位自动生成面试题目，帮助用户有针对性地进行准备。"
+    },
+    {
+      "index": 179,
+      "style": "Normal",
+      "text": "职位推荐：基于用户画像和职位需求的智能匹配分析，推荐最合适的岗位。"
+    },
+    {
+      "index": 180,
+      "style": "Heading 2",
+      "text": "智能简历系统"
+    },
+    {
+      "index": 181,
+      "style": "Normal",
+      "text": "系统提供智能化的简历管理服务："
+    },
+    {
+      "index": 182,
+      "style": "Normal",
+      "text": "在线编辑：支持富文本编辑器，用户可在线编写和修改简历内容，实时预览效果。"
+    },
+    {
+      "index": 183,
+      "style": "Normal",
+      "text": "AI解析与填充：用户上传已有简历文件，AI自动解析并智能填充到系统中，减少手动输入工作量。"
+    },
+    {
+      "index": 184,
+      "style": "Normal",
+      "text": "多格式导出：支持将简历导出为Word（基于POI-TL模板引擎）和PDF（基于OpenHTMLToPDF）格式。"
+    },
+    {
+      "index": 185,
+      "style": "Normal",
+      "text": "完整性评估：系统自动评估简历的完整度，提示用户补充缺失信息。"
+    },
+    {
+      "index": 186,
+      "style": "Normal",
+      "text": "模板选择：提供多种专业简历模板，满足不同行业和职位的需求。"
+    },
+    {
+      "index": 187,
+      "style": "Heading 2",
+      "text": "AI面试官系统"
+    },
+    {
+      "index": 188,
+      "style": "Normal",
+      "text": "系统基于AI大模型构建智能面试官服务："
+    },
+    {
+      "index": 189,
+      "style": "Normal",
+      "text": "智能题目生成：根据目标职位、难度等级和数量要求，AI自动生成针对性的面试题目。"
+    },
+    {
+      "index": 190,
+      "style": "Normal",
+      "text": "代码能力评估：用户提交代码后，AI自动评估代码质量、逻辑正确性和最佳实践遵循情况。"
+    },
+    {
+      "index": 191,
+      "style": "Normal",
+      "text": "对话式指导：用户可与AI面试官进行多轮对话，获取针对性的面试建议和职业发展指导。"
+    },
+    {
+      "index": 192,
+      "style": "Normal",
+      "text": "面试回顾：支持用户记录每次面试的经历和反馈，AI帮助分析改进方向。"
+    },
+    {
+      "index": 193,
+      "style": "Heading 2",
+      "text": "多端适配与用户体验"
+    },
+    {
+      "index": 194,
+      "style": "Normal",
+      "text": "系统提供多端适配的优质用户体验："
+    },
+    {
+      "index": 195,
+      "style": "Normal",
+      "text": "Web端完整功能：提供完整的系统功能，包括简历编辑、AI对话、面试管理等核心模块。"
+    },
+    {
+      "index": 196,
+      "style": "Normal",
+      "text": "响应式设计：采用Element Plus组件库，确保在不同屏幕尺寸下的良好显示效果。"
+    },
+    {
+      "index": 197,
+      "style": "Normal",
+      "text": "数据可视化：使用ECharts实现技能雷达图、能力评估图表等丰富的数据可视化展示。"
+    },
+    {
+      "index": 198,
+      "style": "Normal",
+      "text": "流畅交互：Vue 3单页面应用配合Pinia状态管理，提供流畅无刷新的用户体验。"
+    },
+    {
+      "index": 199,
+      "style": "Heading 2",
+      "text": "完善的会员与积分体系"
+    },
+    {
+      "index": 200,
+      "style": "Normal",
+      "text": "系统建立了完善的会员和积分激励机制："
+    },
+    {
+      "index": 201,
+      "style": "Normal",
+      "text": "会员套餐：提供月度、季度、年度会员套餐，解锁高级功能。"
+    },
+    {
+      "index": 202,
+      "style": "Normal",
+      "text": "支付宝支付：集成支付宝SDK，支持安全便捷的在线支付。"
+    },
+    {
+      "index": 203,
+      "style": "Normal",
+      "text": "积分系统：用户通过签到、完成任务、参与活动等方式获取积分，积分可用于兑换服务。"
+    },
+    {
+      "index": 204,
+      "style": "Normal",
+      "text": "权益管理：不同等级会员享有不同权益，激励用户升级会员等级。"
+    },
+    {
+      "index": 206,
+      "style": "Heading 1",
+      "text": "部署指南"
+    },
+    {
+      "index": 207,
+      "style": "Heading 2",
+      "text": "环境要求"
+    },
+    {
+      "index": 208,
+      "style": "Heading 2",
+      "text": "后端部署"
+    },
+    {
+      "index": 209,
+      "style": "Normal",
+      "text": "步骤1：构建项目"
+    },
+    {
+      "index": 210,
+      "style": "Normal",
+      "text": "# 进入后端项目目录\ncd career-planning-backend\n\n# 使用 Maven 构建\nmvn clean package -DskipTests\n\n# 构建产物位于 target/ 目录下"
+    },
+    {
+      "index": 211,
+      "style": "Normal",
+      "text": "步骤2：配置应用"
+    },
+    {
+      "index": 212,
+      "style": "Normal",
+      "text": "# 编辑 application.properties 配置文件\n# 设置数据库连接、Redis、RabbitMQ、JWT密钥、AI服务地址等\n\n# 关键配置项：\nspring.datasource.url=jdbc:mysql://localhost:3306/career_backend\nspring.data.redis.host=localhost\nspring.rabbitmq.host=localhost\njwt.secret=your_jwt_secret_key\nai.service.url=http://localhost:9000"
+    },
+    {
+      "index": 213,
+      "style": "Normal",
+      "text": "步骤3：启动服务"
+    },
+    {
+      "index": 214,
+      "style": "Normal",
+      "text": "# 方式一：直接运行\njava -jar target/career-planning-backend-0.0.1-SNAPSHOT.jar\n\n# 方式二：使用 Maven 运行（开发环境）\nmvn spring-boot:run\n\n# 方式三：使用 systemd 管理（生产环境）\nsudo systemctl enable career-backend\nsudo systemctl start career-backend"
+    },
+    {
+      "index": 215,
+      "style": "Heading 2",
+      "text": "前端部署"
+    },
+    {
+      "index": 216,
+      "style": "Normal",
+      "text": "步骤1：安装依赖并构建"
+    },
+    {
+      "index": 217,
+      "style": "Normal",
+      "text": "# 进入前端项目目录\ncd career-planning-frontend\n\n# 安装依赖\nnpm install\n\n# 配置生产环境变量\n# 编辑 .env.production 设置 API 地址\nVITE_API_BASE_URL=https://api.your-domain.com\n\n# 构建生产版本\nnpm run build"
+    },
+    {
+      "index": 218,
+      "style": "Normal",
+      "text": "步骤2：配置 Nginx"
+    },
+    {
+      "index": 219,
+      "style": "Normal",
+      "text": "server {\n    listen 80;\n    server_name www.your-domain.com;\n    return 301 https://$server_name$request_uri;\n}\n\nserver {\n    listen 443 ssl http2;\n    server_name www.your-domain.com;\n\n    ssl_certificate /etc/letsencrypt/live/your-domain.com/fullchain.pem;\n    ssl_certificate_key /etc/letsencrypt/live/your-domain.com/privkey.pem;\n\n    root /var/www/career-frontend/dist;\n    index index.html;\n\n    # SPA 路由支持\n    location / {\n        try_files $uri $uri/ /index.html;\n    }\n\n    # API 代理\n    location /api/ {\n        proxy_pass http://localhost:8080;\n        proxy_set_header Host $host;\n        proxy_set_header X-Real-IP $remote_addr;\n    }\n}"
+    },
+    {
+      "index": 220,
+      "style": "Normal",
+      "text": "步骤3：部署静态文件"
+    },
+    {
+      "index": 221,
+      "style": "Normal",
+      "text": "# 复制构建产物\nsudo mkdir -p /var/www/career-frontend\nsudo cp -r dist/* /var/www/career-frontend/\n\n# 设置权限\nsudo chown -R nginx:nginx /var/www/career-frontend\n\n# 重载 Nginx\nsudo nginx -t\nsudo systemctl reload nginx"
+    },
+    {
+      "index": 223,
+      "style": "Heading 1",
+      "text": "结语"
+    },
+    {
+      "index": 224,
+      "style": "Normal",
+      "text": "\"职引未来——基于AI的大学生职业规划智能体系统\"以\"大模型+微服务\"架构重构了大学生职业规划的全链路服务流程，通过AI智能体中枢（职业规划师、简历优化师、面试官等）破解了职业规划服务中的个性化难题，结合智能简历系统、AI面试官、职位匹配分析等创新功能实现了从自我认知到就业准备的全流程覆盖。"
+    },
+    {
+      "index": 225,
+      "style": "Normal",
+      "text": "系统采用前后端分离的微服务架构，后端基于Spring Boot 3.5.9构建，AI服务基于FastAPI + Python构建，前端采用Vue 3 + TypeScript + Element Plus。通过整合多种AI技术和业务模块，系统为大学生提供了全方位、个性化的职业发展支持平台。"
+    },
+    {
+      "index": 226,
+      "style": "Normal",
+      "text": "未来，系统将继续依托AI技术的持续升级，拓展更多职业发展场景，如实习推荐、行业分析、技能提升计划等，推动大学生职业规划服务的智能化转型，构建安全可信的智能职业发展生态。"
+    },
+    {
+      "index": 227,
+      "style": "Normal",
+      "text": "职引未来开发组"
+    },
+    {
+      "index": 228,
+      "style": "Normal",
+      "text": "2026年04月13日"
+    }
+  ],
+  "tables": [
+    {
+      "index": 0,
+      "rows": [
+        [
+          "版  本",
+          "V2.0"
+        ],
+        [
+          "日  期",
+          "2026年04月13日"
+        ],
+        [
+          "作  者",
+          "职引未来开发组"
+        ],
+        [
+          "状  态",
+          "正式发布"
+        ]
+      ]
+    },
+    {
+      "index": 1,
+      "rows": [
+        [
+          "类别",
+          "技术选型"
+        ],
+        [
+          "开发工具",
+          "IntelliJ IDEA + Visual Studio Code + PyCharm"
+        ],
+        [
+          "后端框架",
+          "Spring Boot 3.5.9 + Java 21 + MyBatis-Plus 3.5.15"
+        ],
+        [
+          "前端框架",
+          "Vue 3.5.29 + TypeScript + Vite + Element Plus 2.13.6"
+        ],
+        [
+          "AI服务",
+          "FastAPI + Python + LangChain + 通义千问(Qwen)"
+        ],
+        [
+          "数据库",
+          "MySQL 9.6.0 + Redis + RabbitMQ"
+        ],
+        [
+          "文件存储",
+          "阿里云OSS"
+        ],
+        [
+          "开发语言",
+          "Java + TypeScript + Python"
+        ],
+        [
+          "数据可视化",
+          "ECharts 6.0（雷达图、柱状图、折线图等）"
+        ],
+        [
+          "简历编辑器",
+          "POI-TL 1.12.2（Word导出）+ OpenHTMLToPDF（PDF导出）"
+        ],
+        [
+          "支付集成",
+          "支付宝SDK 4.9.28"
+        ],
+        [
+          "运维部署",
+          "Git + Maven + Docker + Nginx + Systemd"
+        ]
+      ]
+    },
+    {
+      "index": 2,
+      "rows": [
+        [
+          "项目",
+          "说明"
+        ],
+        [
+          "数据库类型",
+          "MySQL 9.6.0"
+        ],
+        [
+          "数据库名称",
+          "career_backend"
+        ],
+        [
+          "字符集",
+          "utf8mb4"
+        ],
+        [
+          "存储引擎",
+          "InnoDB"
+        ]
+      ]
+    },
+    {
+      "index": 3,
+      "rows": [
+        [
+          "字段名",
+          "类型",
+          "说明",
+          "约束"
+        ],
+        [
+          "id",
+          "BIGINT",
+          "用户ID",
+          "PK, AUTO_INCREMENT"
+        ],
+        [
+          "username",
+          "VARCHAR(50)",
+          "用户名",
+          "NOT NULL, UNIQUE"
+        ],
+        [
+          "password",
+          "VARCHAR(255)",
+          "密码（BCrypt加密）",
+          "NOT NULL"
+        ],
+        [
+          "email",
+          "VARCHAR(100)",
+          "邮箱",
+          "UNIQUE"
+        ],
+        [
+          "phone",
+          "VARCHAR(20)",
+          "手机号",
+          "UNIQUE"
+        ],
+        [
+          "avatar",
+          "VARCHAR(500)",
+          "头像URL"
+        ],
+        [
+          "status",
+          "TINYINT",
+          "状态：0-禁用，1-正常",
+          "DEFAULT 1"
+        ],
+        [
+          "create_time",
+          "DATETIME",
+          "创建时间",
+          "DEFAULT CURRENT_TIMESTAMP"
+        ],
+        [
+          "update_time",
+          "DATETIME",
+          "更新时间",
+          "ON UPDATE CURRENT_TIMESTAMP"
+        ]
+      ]
+    },
+    {
+      "index": 4,
+      "rows": [
+        [
+          "字段名",
+          "类型",
+          "说明",
+          "约束"
+        ],
+        [
+          "id",
+          "BIGINT",
+          "简历ID",
+          "PK, AUTO_INCREMENT"
+        ],
+        [
+          "user_id",
+          "BIGINT",
+          "用户ID",
+          "NOT NULL, INDEX"
+        ],
+        [
+          "title",
+          "VARCHAR(100)",
+          "简历标题",
+          "NOT NULL"
+        ],
+        [
+          "template_id",
+          "INT",
+          "模板ID",
+          "DEFAULT 1"
+        ],
+        [
+          "content",
+          "JSON",
+          "简历内容（JSON格式）"
+        ],
+        [
+          "is_default",
+          "TINYINT",
+          "是否默认简历",
+          "DEFAULT 0"
+        ],
+        [
+          "completeness",
+          "INT",
+          "完整度百分比",
+          "DEFAULT 0"
+        ],
+        [
+          "view_count",
+          "INT",
+          "浏览次数",
+          "DEFAULT 0"
+        ],
+        [
+          "status",
+          "TINYINT",
+          "状态：0-草稿，1-公开，2-保密",
+          "DEFAULT 1"
+        ],
+        [
+          "create_time",
+          "DATETIME",
+          "创建时间",
+          "DEFAULT CURRENT_TIMESTAMP"
+        ]
+      ]
+    },
+    {
+      "index": 5,
+      "rows": [
+        [
+          "字段名",
+          "类型",
+          "说明",
+          "约束"
+        ],
+        [
+          "id",
+          "BIGINT",
+          "面试ID",
+          "PK, AUTO_INCREMENT"
+        ],
+        [
+          "user_id",
+          "BIGINT",
+          "用户ID",
+          "NOT NULL, INDEX"
+        ],
+        [
+          "position",
+          "VARCHAR(100)",
+          "面试职位",
+          "NOT NULL"
+        ],
+        [
+          "company",
+          "VARCHAR(100)",
+          "公司名称"
+        ],
+        [
+          "interview_type",
+          "TINYINT",
+          "面试类型：1-电话，2-视频，3-现场，4-笔试",
+          "DEFAULT 1"
+        ],
+        [
+          "interview_date",
+          "DATETIME",
+          "面试时间",
+          "INDEX"
+        ],
+        [
+          "status",
+          "TINYINT",
+          "状态：0-待面试，1-已完成，2-已取消",
+          "DEFAULT 0"
+        ],
+        [
+          "remark",
+          "TEXT",
+          "备注"
+        ],
+        [
+          "create_time",
+          "DATETIME",
+          "创建时间",
+          "DEFAULT CURRENT_TIMESTAMP"
+        ]
+      ]
+    },
+    {
+      "index": 6,
+      "rows": [
+        [
+          "错误码",
+          "说明"
+        ],
+        [
+          "200",
+          "成功"
+        ],
+        [
+          "400",
+          "请求参数错误"
+        ],
+        [
+          "401",
+          "未授权/Token过期"
+        ],
+        [
+          "403",
+          "禁止访问"
+        ],
+        [
+          "404",
+          "资源不存在"
+        ],
+        [
+          "500",
+          "服务器内部错误"
+        ]
+      ]
+    },
+    {
+      "index": 7,
+      "rows": [
+        [
+          "接口路径",
+          "方法",
+          "说明",
+          "认证"
+        ],
+        [
+          "/user/login",
+          "POST",
+          "用户登录",
+          "否"
+        ],
+        [
+          "/user/register",
+          "POST",
+          "用户注册",
+          "否"
+        ],
+        [
+          "/user/forget-password",
+          "POST",
+          "忘记密码",
+          "否"
+        ],
+        [
+          "/user/send-code-register",
+          "POST",
+          "发送注册验证码",
+          "否"
+        ],
+        [
+          "/user/send-code-forget",
+          "POST",
+          "发送忘记密码验证码",
+          "否"
+        ],
+        [
+          "/user/info",
+          "GET",
+          "获取用户信息",
+          "是"
+        ],
+        [
+          "/user/edit",
+          "PUT",
+          "更新用户信息",
+          "是"
+        ],
+        [
+          "/user/avatar",
+          "POST",
+          "上传头像",
+          "是"
+        ],
+        [
+          "/user/refreshToken",
+          "POST",
+          "刷新Token",
+          "否"
+        ]
+      ]
+    },
+    {
+      "index": 8,
+      "rows": [
+        [
+          "接口路径",
+          "方法",
+          "说明",
+          "认证"
+        ],
+        [
+          "/parse/resume",
+          "POST",
+          "简历解析（AI服务）",
+          "是"
+        ],
+        [
+          "/resume/export",
+          "POST",
+          "简历导出（Word/PDF）",
+          "是"
+        ]
+      ]
+    },
+    {
+      "index": 9,
+      "rows": [
+        [
+          "接口路径",
+          "方法",
+          "说明",
+          "认证"
+        ],
+        [
+          "/match/job",
+          "POST",
+          "智能职位匹配",
+          "是"
+        ],
+        [
+          "/search/positions",
+          "GET",
+          "职位搜索",
+          "否"
+        ]
+      ]
+    },
+    {
+      "index": 10,
+      "rows": [
+        [
+          "接口路径",
+          "方法",
+          "说明",
+          "认证"
+        ],
+        [
+          "/chat/send",
+          "POST",
+          "AI对话",
+          "是"
+        ],
+        [
+          "/chat/history/{userId}",
+          "GET",
+          "获取AI对话历史",
+          "是"
+        ],
+        [
+          "/question/generate",
+          "POST",
+          "面试题生成",
+          "是"
+        ],
+        [
+          "/code/ability",
+          "POST",
+          "代码能力评估",
+          "是"
+        ]
+      ]
+    },
+    {
+      "index": 11,
+      "rows": [
+        [
+          "接口路径",
+          "方法",
+          "说明",
+          "认证"
+        ],
+        [
+          "/package/buy",
+          "POST",
+          "购买会员套餐",
+          "是"
+        ],
+        [
+          "/pay/callback",
+          "POST",
+          "支付宝异步回调",
+          "否"
+        ],
+        [
+          "/points/recharge",
+          "POST",
+          "积分充值",
+          "是"
+        ],
+        [
+          "/points/transactions",
+          "GET",
+          "获取积分明细",
+          "是"
+        ],
+        [
+          "/member/info",
+          "GET",
+          "会员信息查询",
+          "是"
+        ]
+      ]
+    },
+    {
+      "index": 12,
+      "rows": [
+        [
+          "组件",
+          "最低版本",
+          "用途"
+        ],
+        [
+          "JDK",
+          "21",
+          "后端运行环境"
+        ],
+        [
+          "Node.js",
+          "18.x",
+          "前端构建环境"
+        ],
+        [
+          "Python",
+          "3.12",
+          "AI服务运行环境"
+        ],
+        [
+          "MySQL",
+          "8.0+",
+          "主数据库"
+        ],
+        [
+          "Redis",
+          "7.x",
+          "缓存/会话存储"
+        ],
+        [
+          "RabbitMQ",
+          "3.12+",
+          "消息队列"
+        ],
+        [
+          "Nginx",
+          "1.20+",
+          "Web服务器/反向代理"
+        ]
+      ]
+    }
+  ]
+}

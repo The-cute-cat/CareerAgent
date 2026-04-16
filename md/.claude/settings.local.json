@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pandoc \"D:/develop/code/CareerAgent/md/2023400762许夏轩_会议助手智能体.docx\" -t markdown)",
+      "Bash(pip3 install:*)",
+      "Bash(python gen_doc.py)",
+      "Bash(python3:*)"
+    ]
+  }
+}

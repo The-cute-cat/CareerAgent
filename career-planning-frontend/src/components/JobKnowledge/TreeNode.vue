@@ -1,6 +1,6 @@
 <template>
   <div class="tree-node" :class="{ 'tree-node--root': depth === 0 }">
-    <div class="tree-node__branch">
+    <div class="tree-node__branch" :class="{ 'has-children': hasChildren }">
       <div class="tree-node__self">
         <button
           type="button"
@@ -37,14 +37,18 @@
       </div>
 
       <div v-if="hasChildren && expanded" class="tree-node__children">
-        <TreeNode
+        <div
           v-for="child in node.children"
           :key="child.id"
-          :node="child"
-          :depth="depth + 1"
-          :active-id="activeId"
-          @select="emit('select', $event)"
-        />
+          class="tree-node__child"
+        >
+          <TreeNode
+            :node="child"
+            :depth="depth + 1"
+            :active-id="activeId"
+            @select="emit('select', $event)"
+          />
+        </div>
       </div>
     </div>
   </div>
@@ -91,13 +95,21 @@ const hasChildren = computed(() => props.node.children.length > 0)
 <style scoped lang="scss">
 .tree-node {
   position: relative;
+  width: max-content;
 }
 
 .tree-node__branch {
+  --connector-span: 72px;
+  --connector-color: rgba(148, 163, 184, 0.72);
+  --connector-width: 1px;
+  --branch-node-height: 96px;
+  --children-gap: 34px;
+  --connector-radius: 14px;
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 86px;
-  min-height: 96px;
+  gap: 0;
+  min-height: var(--branch-node-height);
 }
 
 .tree-node__self {
@@ -194,57 +206,59 @@ const hasChildren = computed(() => props.node.children.length > 0)
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 30px;
-  padding-left: 94px;
+  gap: var(--children-gap);
+  padding-left: var(--connector-span);
 }
 
-.tree-node__children > :deep(.tree-node) {
-  position: relative;
-}
-
-.tree-node__children > :deep(.tree-node)::before {
+.tree-node__children::after {
   content: '';
   position: absolute;
-  left: -94px;
+  left: 0;
   top: 50%;
-  width: 94px;
-  height: 2px;
-  border-top: 2px solid #a1a1aa;
-  border-top-left-radius: 999px;
-  border-bottom-left-radius: 999px;
+  width: var(--connector-span);
+  border-top: var(--connector-width) solid var(--connector-color);
   transform: translateY(-50%);
-  opacity: 0.92;
+  opacity: 0.55;
 }
 
-.tree-node__children > :deep(.tree-node)::after {
+.tree-node__children::before {
   content: '';
   position: absolute;
-  left: -94px;
-  top: 0;
-  bottom: 50%;
-  width: 94px;
-  border-left: 2px solid #a1a1aa;
-  border-bottom: 2px solid #a1a1aa;
-  border-bottom-left-radius: 52px;
-  opacity: 0.92;
+  left: 0;
+  top: calc(var(--branch-node-height) / 2);
+  bottom: calc(var(--branch-node-height) / 2);
+  border-left: var(--connector-width) solid var(--connector-color);
+  border-top-left-radius: var(--connector-radius);
+  border-bottom-left-radius: var(--connector-radius);
+  opacity: 0.55;
 }
 
-.tree-node__children > :deep(.tree-node:first-child)::after {
-  top: 50%;
-  bottom: auto;
-  height: 0;
-  border-left: 2px solid #a1a1aa;
-  border-top: 2px solid #a1a1aa;
-  border-bottom: none;
-  border-top-left-radius: 52px;
-}
-
-.tree-node__children > :deep(.tree-node:only-child)::after {
+.tree-node__children:has(.tree-node__child:first-child:last-child)::before {
   display: none;
 }
 
-.tree-node__children > :deep(.tree-node:last-child)::after {
-  bottom: 50%;
+.tree-node__child {
+  position: relative;
+  min-height: var(--branch-node-height);
+  display: flex;
+  align-items: center;
+}
+
+.tree-node__child::before {
+  content: '';
+  position: absolute;
+  left: calc(-1 * var(--connector-span));
+  top: 50%;
+  width: var(--connector-span);
+  border-top: var(--connector-width) solid var(--connector-color);
+  transform: translateY(-50%);
+  opacity: 0.48;
+}
+
+.tree-node__children:has(.tree-node__child:first-child:last-child)::after {
+  width: calc(var(--connector-span) - 10px);
+  top: calc(var(--branch-node-height) / 2);
+  transform: none;
 }
 
 @media (max-width: 1024px) {
@@ -260,8 +274,9 @@ const hasChildren = computed(() => props.node.children.length > 0)
     gap: 14px;
   }
 
-  .tree-node__children > :deep(.tree-node)::before,
-  .tree-node__children > :deep(.tree-node)::after {
+  .tree-node__children::before,
+  .tree-node__children::after,
+  .tree-node__child::before {
     display: none;
   }
 
