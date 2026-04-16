@@ -1,4 +1,5 @@
 import atexit
+import json
 import os.path
 import shutil
 import tempfile
@@ -31,7 +32,7 @@ class _Database(BaseModel):
     port: int = 0
     database: str = ""
     user: str = ""
-    password: str = ""
+    password: SecretStr = SecretStr("")
     pool_size: int = 10
     max_overflow: int = 20
     pool_pre_ping: bool = True
@@ -74,9 +75,7 @@ class _LLMModelBase(BaseModel):
 
     _skip_verify: bool = PrivateAttr(default=False)
     _name: str = ""
-    api_key: SecretStr = SecretStr(
-        ""
-    )  # 敏感信息，使用时调用 .get_secret_value() 方法获取
+    api_key: SecretStr = SecretStr("")  # 敏感信息，使用时调用 .get_secret_value() 方法获取
     base_url: str = ""
     model_name: str = ""
     timeout: float = -1
@@ -85,7 +84,7 @@ class _LLMModelBase(BaseModel):
     extra: dict[str, Any] = {}
 
     def __repr__(self):
-        return f"{self.__class__.__name__}(api_key={self.api_key}, base_url={self.base_url}, model_name={self.model_name}, timeout={self.timeout}, max_retries={self.max_retries},max_concurrent_requests={self.max_concurrent_requests}, extra={self.extra})"
+        return f"{self.__class__.__name__}(_name={self._name}, api_key={self.api_key}, base_url={self.base_url}, model_name={self.model_name}, timeout={self.timeout}, max_retries={self.max_retries},max_concurrent_requests={self.max_concurrent_requests}, extra={self.extra})"
 
     def __str__(self):
         return self.__repr__()
@@ -139,10 +138,10 @@ class _LLM(_LLMModelBase):
             self.base_url = llm.base_url
         else:
             if self.base_url != llm.base_url and self.api_key.get_secret_value() in (
-                "<API_KEY>",
-                "<api_key>",
-                "",
-                None,
+                    "<API_KEY>",
+                    "<api_key>",
+                    "",
+                    None,
             ):
                 raise ValueError(
                     f"❌️错误：{self.__class__.__name__} base_url 和 llm.base_url 不一致且 api_key 未配置，不能继承api_key！"
@@ -163,23 +162,19 @@ class _LLM(_LLMModelBase):
 
 class _LiteLLM(_LLM):
     _name: str = "LiteLLM"
-    model_name: str = ""
 
     class _Qwen(_LLM):
         _name: str = "LLM_Qwen"
-        model_name: str = ""
 
     qwen: _Qwen = Field(default_factory=_Qwen)
 
     class _Deepseek(_LLM):
         _name: str = "LLM_Deepseek"
-        model_name: str = ""
 
     deepseek: _Deepseek = Field(default_factory=_Deepseek)
 
     class _Image(_LLM):
         _name: str = "LLM_Image"
-        model_name: str = ""
 
     image: _Image = Field(default_factory=_Image)
 
@@ -191,27 +186,21 @@ class _LiteLLM(_LLM):
 
 
 class _PDF(_LLM):
-    model_name: str = ""
-    extra: dict[str, Any] = {}
+    suffix: list[str] = ["PDF"]
 
 
 class _Image(_LLM):
-    model_name: str = ""
-    extra: dict[str, Any] = {}
     suffix: list[str] = []
     max_size: int = 0  # 单位 MB
     max_dimension: int = 0  # 单位 px
 
 
 class _TestQuestion(_LLM):
-    model_name: str = ""
-    timeout: float = 30
-    extra: dict[str, Any] = {}
+    ...
 
 
 class _GrowthPlanAgent(_LLM):
-    model_name: str = ""
-    extra: dict[str, Any] = {}
+    ...
 
 
 class _PathConfig(BaseModel):
@@ -287,8 +276,6 @@ class _Milvus(BaseModel):
 
 class _ChromaConfig(_LLM):
     _name: str = "Chroma"
-    model_name: str = ""
-    extra: dict[str, Any] = {}
     save_path: str = ""
     k: int = 5
 
@@ -303,9 +290,9 @@ class _ChromaConfig(_LLM):
 
     def _set_default_path(self, path: str):
         if (
-            self.save_path == "<SAVE_PATH>"
-            or not self.save_path
-            or not Path(self.save_path).exists()
+                self.save_path == "<SAVE_PATH>"
+                or not self.save_path
+                or not Path(self.save_path).exists()
         ):
             if path and path != "" and Path(path).exists():
                 save_path = os.path.join(path, "chroma")
@@ -317,8 +304,6 @@ class _ChromaConfig(_LLM):
 
 class _CodeAbility(_LLM):
     _name: str = "CodeAbility"
-    model_name: str = ""
-    extra: dict[str, Any] = {}
     github_token: SecretStr = SecretStr("")
     gitee_token: SecretStr = SecretStr("")
 
@@ -344,7 +329,7 @@ class _CodeAbility(_LLM):
 
 
 class _MatchAnalyzer(_LLM):
-    extra: dict[str, Any] = {}
+    ...
 
 
 class _RedisConfig(BaseModel):
@@ -388,6 +373,8 @@ class _Neo4jConfig(BaseModel):
 
 class _Other(BaseModel):
     ssl_verify: bool | str = True
+    text_file_suffix: list[str] = ["txt", "md"]
+    word_file_suffix: list[str] = ["doc", "docx"]
 
     @model_validator(mode="after")
     def set_default_value(self):
@@ -403,19 +390,17 @@ class _Conversation(BaseModel):
             max_tokens: int = 5000
             compression_trigger_raito: float = 0.8
             keep_recent_messages: int = 8
-            extra: dict[str, Any] = {}
 
         class _Long(_LLM):
             max_memory_count: int = 50
             min_score: float = 0.6
             collection_name: str = "user_memories"
-            extra: dict[str, Any] = {}
 
         class _Extraction(_LLM):
-            extra: dict[str, Any] = {}
+            ...
 
         class _Compression(_LLM):
-            extra: dict[str, Any] = {}
+            ...
 
         short: _Short = Field(default_factory=_Short)
         long: _Long = Field(default_factory=_Long)
@@ -423,8 +408,7 @@ class _Conversation(BaseModel):
         compression: _Compression = Field(default_factory=_Compression)
 
     class _Agent(_LLM):
-        model_name: str = ""
-        extra: dict[str, Any] = {}
+        ...
 
     save_path: str = ""
     memory: _Memory = Field(default_factory=_Memory)
@@ -433,9 +417,9 @@ class _Conversation(BaseModel):
     @model_validator(mode="after")
     def _set_default_values(self):
         if (
-            self.save_path == "<SAVE_PATH>"
-            or not self.save_path
-            or not Path(self.save_path).exists()
+                self.save_path == "<SAVE_PATH>"
+                or not self.save_path
+                or not Path(self.save_path).exists()
         ):
             self.save_path = os.path.join(get_project_root(), "data", "conversation")
             os.makedirs(self.save_path, exist_ok=True)
@@ -568,12 +552,12 @@ class Settings(BaseSettings):
 
     @classmethod
     def settings_customise_sources(
-        cls,
-        settings_cls,
-        init_settings,  # 显式传递给 Settings() 的值
-        env_settings,  # 环境变量（不包括 dotenv）
-        dotenv_settings,  # 从 .env 文件加载的数据
-        file_secret_settings,  # 从文件加载的密钥（如有）
+            cls,
+            settings_cls,
+            init_settings,  # 显式传递给 Settings() 的值
+            env_settings,  # 环境变量（不包括 dotenv）
+            dotenv_settings,  # 从 .env 文件加载的数据
+            file_secret_settings,  # 从文件加载的密钥（如有）
     ):
         yaml_file = Path(abs_path("config.yaml"))
         if yaml_file.exists():
@@ -620,4 +604,7 @@ if __name__ == "__main__":
     # print(settings.chroma_config.save_path)
     # print(settings.conversation.memory.long.model_name)
     # print(settings.lite_llm.qwen)
+    os.makedirs("./temp", exist_ok=True)
+    with open("./temp/settings.json", "w", encoding="utf-8") as f:  # 导出配置到文件
+        json.dump(settings.model_dump(mode="json"), f, indent=2, ensure_ascii=False)
     pass

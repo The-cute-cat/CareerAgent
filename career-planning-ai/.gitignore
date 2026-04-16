@@ -6,6 +6,7 @@ node_modules/
 logs/
 tests/
 temp/
+temp*/
 poetry.lock
 package-lock.json
 *.pyc
