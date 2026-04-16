@@ -1,22 +1,19 @@
 import asyncio
 import json
-from typing import Optional, Dict, Any
 
 from dotenv import load_dotenv
 from langchain_community.chat_models import ChatTongyi
 from langchain_core.prompts import ChatPromptTemplate
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import ConfigDict, SecretStr
 
-from ai_service.models.stu_profile import StuProfile
+from ai_service.repository.connection_session import AsyncSessionLocal
 from ai_service.repository.job_portrait_repository import JobPortraitRepository
 from ai_service.repository.stu_portrait_repository import StuProfileRepository
 from ai_service.services import log
+from ai_service.services.prompt_loader import prompt_loader
 from config import settings
 
-from ai_service.repository.connection_session import AsyncSessionLocal
-
 load_dotenv()
-
 
 # =========================
 # 1. 定义输出结构
@@ -24,6 +21,7 @@ load_dotenv()
 
 from pydantic import BaseModel, Field
 from typing import Dict, Any
+
 
 class UserJobMatchResult(BaseModel):
     overall_summary: str = Field(..., description="总体评价总结", alias="总体评价总结")
@@ -44,70 +42,9 @@ class UserJobMatchResult(BaseModel):
 # 2. Prompt
 # =========================
 
-SYSTEM_PROMPT = """
-你是一位资深职业规划顾问、招聘专家、技术面试辅导师。
+SYSTEM_PROMPT = prompt_loader.user_job_match_analyzer
 
-你的任务是：根据【岗位画像】和【用户画像】，详细分析该用户与目标岗位的匹配情况，并以以下 JSON 格式返回结果：
-
-{{
-  "总体评价总结": "简短总结整体匹配情况",
-  "匹配等级": "高/中/低",
-  "优势分析": {{
-    "技能优势": ["具体优势描述"],
-    "经验优势": ["具体优势描述"],
-    "能力优势": ["具体优势描述"]
-  }},
-  "不足分析": {{
-    "技能不足": ["具体不足描述"],
-    "经验不足": ["具体不足描述"],
-    "能力不足": ["具体不足描述"]
-  }},
-  "改进建议": {{
-    "技能提升": ["具体学习建议"],
-    "项目补充": ["具体项目建议"],
-    "实习建议": ["具体实习建议"],
-    "工具学习": ["具体工具建议"]
-  }},
-  "面试风险点": {{
-    "风险点1": "具体风险描述",
-    "风险点2": "具体风险描述"
-  }},
-  "最终建议": "整体建议总结"
-}}
-
-分析维度：
-1. 技能匹配情况
-2. 工具使用能力匹配情况
-3. 实习经历匹配情况
-4. 项目经历匹配情况
-5. 能力素质匹配情况
-6. 用户的优势
-7. 用户的不足
-8. 明确的改进方向
-9. 求职和面试风险点
-10. 最终提升建议
-
-要求：
-1. 评价必须具体，不能空泛。
-2. 要明确指出"为什么是优势 / 为什么是不足"。
-3. 改进建议必须可执行，尽量细化到学习方向、补项目方向、补实习方向、补工具方向。
-4. 输出必须是合法 JSON，严格按照上述格式。
-5. 不要输出 Markdown，不要输出代码块，不要输出额外解释文字。
-6. 所有输出必须使用简体中文。
-7. 如果某项信息不足，请明确说明"用户画像未体现"或"岗位画像未明确要求"，不要胡乱编造。
-"""
-
-USER_PROMPT = """
-请根据以下内容进行岗位匹配分析：
-
-【岗位画像】
-{job_profile_text}
-
-【用户画像】
-{user_profile_text}
-
-请严格输出 JSON。
-"""
+USER_PROMPT = prompt_loader.small_prompts["user_job_match_analyzer_user"]
 
 
 # =========================
@@ -115,13 +52,12 @@ USER_PROMPT = """
 # =========================
 
 def _create_llm(
-    api_key: str,
-    model_name: str,
+        api_key: str | SecretStr,
+        model_name: str,
 ) -> ChatTongyi:
     return ChatTongyi(
         api_key=api_key,
         model=model_name,
-        temperature=0.2,
         streaming=True,
     )
 
@@ -146,6 +82,7 @@ def _build_profile_json_text(data: Any, default_text: str = "未提及") -> str:
     except Exception:
         log.warning(f"序列化画像失败，回退到 str: {data}")
         return str(data)
+
 
 # =========================
 # 5. 解析 JSON
@@ -176,10 +113,10 @@ def _extract_json_text(raw_content: str) -> Dict[str, Any]:
 # =========================
 
 async def analyze_user_job_match(
-    job_id: int,
-    user_id: int,
-    api_key: Optional[str] = settings.llm.api_key.get_secret_value(),
-    model_name: str = settings.vector.llm_model_name,
+        job_id: int,
+        user_id: int,
+        api_key: str | None = settings.llm.api_key.get_secret_value(),
+        model_name: str = settings.vector.llm_model_name,
 ) -> Dict[str, Any]:
     """
     根据岗位ID和用户ID，分析用户与岗位的匹配情况
@@ -260,15 +197,14 @@ async def analyze_user_job_match(
             "user_profile_text": user_profile_text,
         }
 
-
 # if __name__ == '__main__':
-    ## 简单测试
-    # test_job_id = 65  # 替换为实际 job_id
-    # test_user_id = 1  # 替换为实际 user_id
-    #
-    # result = asyncio.run(analyze_user_job_match(test_job_id, test_user_id))
-    # if "error" in result:
-    #     print(f"❌ 分析失败: {result['error']}")
-    # else:
-    #     print("✅ 分析结果:")
-    #     print(str(result.get("analysis", {})))
+## 简单测试
+# test_job_id = 65  # 替换为实际 job_id
+# test_user_id = 1  # 替换为实际 user_id
+#
+# result = asyncio.run(analyze_user_job_match(test_job_id, test_user_id))
+# if "error" in result:
+#     print(f"❌ 分析失败: {result['error']}")
+# else:
+#     print("✅ 分析结果:")
+#     print(str(result.get("analysis", {})))

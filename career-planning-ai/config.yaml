@@ -15,9 +15,10 @@ communication:
     secret: <SECRET>
     expire: 1800
 vector:
+  base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
   model_name: text-embedding-v4
   llm_model_name: qwen-max
-  llm_long_model_name: qwen-long
+  llm_long_model_name: qwen-plus-latest
 lite_llm:
   model_name: dashscope/qwen-max
   qwen:
@@ -151,3 +152,43 @@ knowledge_graph:
 report_assistant:
   extra:
     temperature: 0.3
+
+# 离线建图超参（权重/阈值/惩罚项等）
+graph_build:
+  tf:
+    # 以 Competency.category（中文）为 key 的 TF 等效权重
+    category_weights:
+      核心专业技能: 1.0
+      工具与平台能力: 0.7
+      语言能力: 0.5
+      证书要求: 0.6
+    # 未命中任何 category 时的默认 TF
+    default_weight: 0.7
+  cos_low:
+    text_weight: 0.7
+    attr_weight: 0.3
+  jaccard:
+    threshold: 0.1
+    # 大规模时启用 blocking（避免 O(N^2) 全对全）
+    blocking_min_jobs: 3000
+    blocking_top_m: 20
+  clustering:
+    coarse_resolution: 0.1
+    coarse_isolation_threshold: 0.1
+    fine_resolution: 1.0
+    fine_isolation_threshold: 0.05
+    # 细聚类使用的“成本->相似”变换： (1/(cost+offset))**power
+    fine_weight_transform_offset: 0.1
+    fine_weight_transform_power: 2.0
+  pareto:
+    keep_fronts: 2
+    cross_community_penalty: 0.5
+  routing:
+    attraction_weights:
+      jaccard_high: 0.5
+      cos_low: 0.3
+      salary_gain: 0.2
+    rank_penalty_per_rank: 0.15
+    cross_penalty: 0.5
+  degree_zero_fallback:
+    top_k: 3

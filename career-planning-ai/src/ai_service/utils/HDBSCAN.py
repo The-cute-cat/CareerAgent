@@ -62,6 +62,11 @@ async def cluster_standard_jobs_with_hdbscan(
         embedding_model=embedding_model,
     )
 
+    # 检查向量库服务是否可用
+    if not store.is_available:
+        log.warning(f"向量库服务不可用: {store._connect_error_msg}")
+        raise RuntimeError(f"向量库服务暂不可用，无法进行聚类: {store._connect_error_msg}")
+
     log.info("开始从 JobOriginalVectorStore 获取聚类所需向量...")
     valid_jobs, embeddings, sync_stats = await store.get_jobs_and_embeddings_for_hdbscan(
         session=session,

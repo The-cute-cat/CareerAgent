@@ -54,3 +54,6 @@ tests/
 test/
 
 et --*
+md/
+/AGENTS.md
+/config.toml
