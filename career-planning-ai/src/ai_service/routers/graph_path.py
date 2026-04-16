@@ -7,12 +7,17 @@ from ai_service.response.result import success
 from ai_service.models.career_graph import CareerPathBundle
 from ai_service.services.graph_planner import GraphPlanner
 from ai_service.repository.career_repository import CareerRepository
+from ai_service.schemas.auth import validate_token
 from ai_service.services import log
 from config import settings
 
 
 __all__ = ["router"]
-router = APIRouter(prefix="/graph_path", tags=["graph_path"])
+router = APIRouter(
+    prefix="/graph_path",
+    tags=["graph_path"],
+    dependencies=[Depends(validate_token)],
+)
 
 
 class JobIdRequest(BaseModel):
