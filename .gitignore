@@ -1,16 +1,9 @@
-HELP.md
-application-dev.yaml
-application-prod.yaml
-target/
-temp/
-temp*/
-test*/
-md/
-test/
 .mvn/
 !**/src/main/**/target/
+.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
 !**/src/test/**/target/
-src/main/java/com/backend/careerplanningbackend/http/
+
 ### STS ###
 .apt_generated
 .classpath
@@ -21,8 +14,7 @@ src/main/java/com/backend/careerplanningbackend/http/
 .sts4-cache
 
 ### IntelliJ IDEA ###
-.idea
-logs
+.idea/
 *.iws
 *.iml
 *.ipr
@@ -39,3 +31,29 @@ build/
 
 ### VS Code ###
 .vscode/
+
+
+.venv/
+.jbeval/
+logs/
+*.pyc
+__pycache__/
+node_modules/
+
+.env
+.env.local
+.env.*.local
+
+# 环境变量文件模板
+!.env.example
+
+HELP.md
+application-dev.yaml
+target/
+tests/
+test/
+
+et --*
+md/
+/AGENTS.md
+/config.toml

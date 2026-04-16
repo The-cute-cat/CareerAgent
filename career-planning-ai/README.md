@@ -32,10 +32,26 @@
 
 ## API 文档
 
-详细接口文档请参阅：
+### 接口文档 (docs/api/)
 
-- [API 接口文档](./docs/API_DOCUMENT.md) - 除对话外的所有 AI 服务接口
-- [对话接口文档](./docs/CHAT_API.md) - 智能对话相关接口
+| 文档 | 说明 |
+|------|------|
+| [chat.md](docs/api/chat.md) | 智能对话接口（多轮对话、SSE 流式输出） |
+| [parse.md](docs/api/parse.md) | 文件解析接口（PDF/DOCX/图片/纯文本） |
+| [code_ability.md](docs/api/code_ability.md) | 代码能力评估（GitHub/Gitee 仓库分析） |
+| [knowledge_tutor.md](docs/api/knowledge_tutor.md) | 知识导师接口（SSE 流式输出） |
+| [question.md](docs/api/question.md) | 题目生成与答案评估 |
+| [report.md](docs/api/report.md) | 报告服务（成长计划、完整性检查、智能润色） |
+| [matching.md](docs/api/matching.md) | 人岗匹配接口 |
+
+### 设计文档 (docs/design/)
+
+| 文档 | 说明 |
+|------|------|
+| [graph_design.md](docs/design/graph_design.md) | 知识图谱设计文档 |
+| [graph_lineage.md](docs/design/graph_lineage.md) | 图谱血缘关系设计 |
+| [matching_overview.md](docs/design/matching_overview.md) | 人岗匹配思路汇总（详细版） |
+| [matching_summary.md](docs/design/matching_summary.md) | 人岗匹配思路简介（简洁版） |
 
 ## 项目结构
 
@@ -57,6 +73,8 @@ career-planning-ai/
 ├── data/                   # 数据文件（向量库、模型等）
 ├── logs/                   # 日志文件
 ├── docs/                   # 项目文档
+│   ├── api/                # API 接口文档
+│   └── design/             # 设计文档
 └── tests/                  # 测试文件
 ```
 
