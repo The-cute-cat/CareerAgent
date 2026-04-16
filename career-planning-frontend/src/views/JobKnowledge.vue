@@ -47,22 +47,68 @@
           <button type="button" class="back-btn" @click="pageMode = 'list'">
             <el-icon><ArrowLeft /></el-icon>
           </button>
-          <h1>{{ selectedRole?.title }}</h1>
+          <div class="detail-title">
+            <p>{{ selectedRole?.trackLabel || '岗位知识图谱' }}</p>
+            <h1>{{ selectedRole?.title }}</h1>
+          </div>
           <div class="detail-actions">
-            <button type="button" class="icon-btn"><el-icon><FullScreen /></el-icon></button>
+            <button type="button" class="icon-btn" @click="resetTreeViewport" title="回到中心">
+              <el-icon><FullScreen /></el-icon>
+            </button>
             <button type="button" class="icon-btn"><el-icon><Share /></el-icon></button>
           </div>
         </header>
 
+        <section class="detail-overview">
+          <article class="overview-card overview-card--primary">
+            <span>学习周期</span>
+            <strong>{{ selectedRole?.cycle || '待补充' }}</strong>
+            <p>{{ selectedRole?.description }}</p>
+          </article>
+          <article class="overview-card">
+            <span>核心方向</span>
+            <strong>{{ selectedRole?.focus || '待补充' }}</strong>
+            <p>围绕当前目标岗位优先拆解核心知识域、阶段任务与项目实践方向。</p>
+          </article>
+          <article class="overview-card">
+            <span>实践建议</span>
+            <strong>{{ selectedRole?.projectHint || '待补充' }}</strong>
+            <p>点击节点查看详细说明，拖动空白区域可移动整张图谱。</p>
+          </article>
+        </section>
+
         <div class="detail-body">
           <div class="tree-stage">
-            <div class="tree-scroll">
-              <TreeNode
-                v-if="detailRoot"
-                :node="detailRoot"
-                :active-id="activeKnowledge?.id"
-                @select="handleNodeSelect"
-              />
+            <div class="tree-toolbar">
+              <div class="tree-toolbar__hint">
+                <span class="tree-toolbar__dot"></span>
+                按住空白区域拖动图谱，点击节点查看详情
+              </div>
+              <button type="button" class="tree-toolbar__action" @click="resetTreeViewport">重置位置</button>
+            </div>
+
+            <div
+              ref="treeViewportRef"
+              class="tree-viewport"
+              :class="{ 'is-dragging': isDraggingTree }"
+              @pointerdown="startTreeDrag"
+              @pointermove="handleTreeDrag"
+              @pointerup="endTreeDrag"
+              @pointerleave="endTreeDrag"
+              @pointercancel="endTreeDrag"
+            >
+              <div class="tree-grid"></div>
+              <div
+                class="tree-scroll"
+                :style="{ transform: `translate(${treeOffset.x}px, ${treeOffset.y}px)` }"
+              >
+                <TreeNode
+                  v-if="detailRoot"
+                  :node="detailRoot"
+                  :active-id="activeKnowledge?.id"
+                  @select="handleNodeSelect"
+                />
+              </div>
             </div>
           </div>
 
@@ -153,6 +199,13 @@ const searchQuery = ref('')
 const activeTrack = ref<'all' | JobKnowledgeRole['track']>('all')
 const selectedRoleId = ref('')
 const activeKnowledge = ref<KnowledgeTreeNode | null>(null)
+const treeViewportRef = ref<HTMLElement | null>(null)
+const treeOffset = ref({ x: 36, y: 84 })
+const dragPointerId = ref<number | null>(null)
+const isDraggingTree = ref(false)
+const dragStartPoint = ref({ x: 0, y: 0 })
+const dragStartOffset = ref({ x: 120, y: 48 })
+
 
 const trackOptions = [
   { label: '推荐', value: 'all' },
@@ -476,6 +529,7 @@ watch(
       return
     }
     activeKnowledge.value = detailRoot.value
+    resetTreeViewport()
   },
   { immediate: true },
 )
@@ -496,18 +550,58 @@ function openRole(roleId: string): void {
 function handleNodeSelect(node: KnowledgeTreeNode): void {
   activeKnowledge.value = node
 }
+
+function resetTreeViewport(): void {
+  treeOffset.value = { x: 36, y: 84 }
+}
+
+function isInteractiveElement(target: EventTarget | null): boolean {
+  return target instanceof HTMLElement
+    && Boolean(target.closest('button, a, input, textarea, select, .tree-node__label, .tree-node__toggle'))
+}
+
+function startTreeDrag(event: PointerEvent): void {
+  if (isInteractiveElement(event.target)) return
+
+  dragPointerId.value = event.pointerId
+  isDraggingTree.value = true
+  dragStartPoint.value = { x: event.clientX, y: event.clientY }
+  dragStartOffset.value = { ...treeOffset.value }
+  treeViewportRef.value?.setPointerCapture(event.pointerId)
+}
+
+function handleTreeDrag(event: PointerEvent): void {
+  if (!isDraggingTree.value || dragPointerId.value !== event.pointerId) return
+
+  const deltaX = event.clientX - dragStartPoint.value.x
+  const deltaY = event.clientY - dragStartPoint.value.y
+  treeOffset.value = {
+    x: dragStartOffset.value.x + deltaX,
+    y: dragStartOffset.value.y + deltaY,
+  }
+}
+
+function endTreeDrag(event?: PointerEvent): void {
+  if (event && dragPointerId.value !== null && dragPointerId.value === event.pointerId) {
+    treeViewportRef.value?.releasePointerCapture(event.pointerId)
+  }
+  isDraggingTree.value = false
+  dragPointerId.value = null
+}
 </script>
 
 <style scoped lang="scss">
 .job-knowledge-page {
   min-height: 100%;
-  background: #efefef;
+  background:
+    radial-gradient(circle at top left, rgba(37, 99, 235, 0.08), transparent 24%),
+    linear-gradient(180deg, #f7f8fb 0%, #eef2f7 100%);
 }
 
 .list-shell {
   max-width: 1060px;
   margin: 0 auto;
-  padding: 14px 0 32px;
+  padding: 18px 0 40px;
 }
 
 .search-bar {
@@ -516,8 +610,10 @@ function handleNodeSelect(node: KnowledgeTreeNode): void {
   gap: 14px;
   height: 72px;
   padding: 0 22px;
-  background: rgba(255, 255, 255, 0.68);
-  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 22px;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.06);
 }
 
 .search-icon {
@@ -549,18 +645,18 @@ function handleNodeSelect(node: KnowledgeTreeNode): void {
   min-height: 48px;
   padding: 0 24px;
   border-radius: 999px;
-  border: 1.5px solid #c9ced6;
-  background: #f7f7f7;
-  color: #333;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(255, 255, 255, 0.78);
+  color: #334155;
   font-size: 16px;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .category-chip.active {
-  color: #1658d3;
-  border-color: #1658d3;
-  background: #e9f0ff;
+  color: #1d4ed8;
+  border-color: rgba(37, 99, 235, 0.3);
+  background: linear-gradient(180deg, #eff6ff 0%, #ffffff 100%);
   font-weight: 700;
 }
 
@@ -578,7 +674,9 @@ function handleNodeSelect(node: KnowledgeTreeNode): void {
   padding: 20px 24px;
   border: none;
   border-radius: 22px;
-  background: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.05);
   text-align: left;
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -629,42 +727,67 @@ function handleNodeSelect(node: KnowledgeTreeNode): void {
 }
 
 .detail-shell {
-  min-height: 100vh;
-  padding: 10px 18px 18px;
+  min-height: 100%;
+  padding: 16px 18px 24px;
 }
 
 .detail-header {
-  position: sticky;
-  top: 0;
-  z-index: 12;
+  z-index: 40;
   display: grid;
   grid-template-columns: 48px 1fr auto;
   align-items: center;
   gap: 16px;
-  height: 54px;
+  min-height: 84px;
+  padding: 12px 18px;
+  margin-bottom: 18px;
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(226, 232, 240, 0.92);
+  box-shadow:
+    0 10px 24px rgba(15, 23, 42, 0.04),
+    0 2px 10px rgba(15, 23, 42, 0.04);
+}
+
+.detail-title p {
+  margin: 0 0 6px;
+  color: #0f766e;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
 }
 
 .detail-header h1 {
   margin: 0;
   text-align: center;
-  color: #1658d3;
-  font-size: 18px;
+  color: #0f172a;
+  font-size: 22px;
   font-weight: 800;
 }
 
 .back-btn,
 .icon-btn,
 .panel-close {
-  width: 40px;
-  height: 40px;
-  border: none;
+  width: 48px;
+  height: 48px;
+  border: 1px solid rgba(226, 232, 240, 0.92);
   border-radius: 999px;
-  background: transparent;
-  color: #1658d3;
+  background: rgba(255, 255, 255, 0.96);
+  color: #2563eb;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.back-btn:hover,
+.icon-btn:hover,
+.panel-close:hover {
+  transform: translateY(-1px);
+  border-color: rgba(191, 219, 254, 0.95);
+  box-shadow: 0 12px 22px rgba(37, 99, 235, 0.12);
 }
 
 .back-btn {
@@ -677,23 +800,139 @@ function handleNodeSelect(node: KnowledgeTreeNode): void {
   gap: 8px;
 }
 
+.detail-overview {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin: 18px 0 20px;
+}
+
+.overview-card {
+  padding: 18px 20px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.84);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.05);
+}
+
+.overview-card span {
+  display: block;
+  margin-bottom: 10px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.overview-card strong {
+  display: block;
+  color: #0f172a;
+  font-size: 18px;
+}
+
+.overview-card p {
+  margin: 10px 0 0;
+  color: #475569;
+  line-height: 1.75;
+  font-size: 14px;
+}
+
+.overview-card--primary {
+  background: linear-gradient(180deg, #eff6ff 0%, #ffffff 100%);
+  border-color: rgba(59, 130, 246, 0.16);
+}
+
 .detail-body {
   position: relative;
   display: flex;
   gap: 24px;
-  min-height: calc(100vh - 80px);
+  min-height: calc(100vh - 160px);
 }
 
 .tree-stage {
   flex: 1;
   min-width: 0;
+  display: grid;
+  gap: 14px;
+}
+
+.tree-toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.05);
+}
+
+.tree-toolbar__hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: #475569;
+  font-size: 14px;
+}
+
+.tree-toolbar__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #3b82f6;
+  box-shadow: 0 0 0 6px rgba(59, 130, 246, 0.14);
+}
+
+.tree-toolbar__action {
+  min-height: 38px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: #fff;
+  color: #1d4ed8;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.tree-viewport {
+  position: relative;
+  min-height: calc(100vh - 208px);
   overflow: hidden;
+  border-radius: 28px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(248, 250, 252, 0.92)),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.08) 1px, transparent 1px),
+    linear-gradient(rgba(148, 163, 184, 0.08) 1px, transparent 1px);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  box-shadow: 0 24px 50px rgba(15, 23, 42, 0.08);
+  cursor: grab;
+  user-select: none;
+}
+
+.tree-viewport.is-dragging {
+  cursor: grabbing;
+}
+
+.tree-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(90deg, rgba(148, 163, 184, 0.08) 1px, transparent 1px),
+    linear-gradient(rgba(148, 163, 184, 0.08) 1px, transparent 1px);
+  background-size: 28px 28px;
+  pointer-events: none;
 }
 
 .tree-scroll {
-  min-height: calc(100vh - 90px);
-  padding: 180px 90px 80px 280px;
-  overflow: auto;
+  position: relative;
+  min-width: max-content;
+  min-height: 100%;
+  padding: 54px 72px 72px;
+  transform-origin: top left;
+  transition: transform 0.08s linear;
+  will-change: transform;
 }
 
 .knowledge-panel {
@@ -705,7 +944,8 @@ function handleNodeSelect(node: KnowledgeTreeNode): void {
   padding: 26px 24px 24px;
   border-radius: 28px;
   background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.14);
   overflow: auto;
 }
 
@@ -833,13 +1073,20 @@ function handleNodeSelect(node: KnowledgeTreeNode): void {
 }
 
 @media (max-width: 1200px) {
+  .detail-overview {
+    grid-template-columns: 1fr;
+  }
+
   .detail-body {
     flex-direction: column;
   }
 
+  .tree-viewport {
+    min-height: 560px;
+  }
+
   .tree-scroll {
-    padding: 90px 24px 40px 24px;
-    min-height: auto;
+    padding: 40px 24px 56px;
   }
 
   .knowledge-panel {
@@ -881,10 +1128,21 @@ function handleNodeSelect(node: KnowledgeTreeNode): void {
   .detail-header {
     grid-template-columns: 40px 1fr auto;
     gap: 8px;
+    min-height: 74px;
+    padding: 10px 12px;
   }
 
   .detail-header h1 {
     font-size: 16px;
+  }
+
+  .tree-toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .tree-toolbar__action {
+    width: 100%;
   }
 }
 </style>

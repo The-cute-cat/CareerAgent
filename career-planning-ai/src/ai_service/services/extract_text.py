@@ -16,25 +16,25 @@ async def extract_from_file(file_path: str, extension: str) -> str:
     Returns:
         提取的文本内容
     """
-    if extension == "pdf":
+    if extension.lower() == [suffix.lower() for suffix in settings.pdf.suffix]:
         content = await pdf_extractor.get_pdf_content(file_path)
         if not content:
-            raise CommonHandleError("PDF 文件提取失败")
+            raise CommonHandleError(msg="PDF 文件提取失败")
         text = ""
         for page in content:
             if not page.get("error"):
                 text += f"第{page['page']}页：{page['content']}\n"
         return text
 
-    elif extension in ["doc", "docx"]:
+    elif extension.lower() in [suffix.lower() for suffix in settings.other.word_file_suffix]:
         return await word_extractor.detect_word_to_enhance_text(file_path)
 
     elif extension.lower() in [suffix.lower() for suffix in settings.image.suffix]:
         return await image_extractor.extract_text(image_path=file_path)
 
-    elif extension in ["txt"]:
+    elif extension.lower() in [suffix.lower() for suffix in settings.other.text_file_suffix]:
         with open(file_path, "r", encoding="utf-8") as f:
             return f.read()
 
     else:
-        raise CommonHandleError(f"不支持的文件类型: {extension}")
+        raise CommonHandleError(msg=f"不支持的文件类型: {extension}")

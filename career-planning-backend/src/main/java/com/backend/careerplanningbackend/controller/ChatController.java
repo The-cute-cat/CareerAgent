@@ -1,5 +1,4 @@
 package com.backend.careerplanningbackend.controller;
-
 import com.backend.careerplanningbackend.domain.dto.AiChatResponse;
 import com.backend.careerplanningbackend.domain.po.Result;
 import com.backend.careerplanningbackend.util.AiServiceClient;

@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { ChatDotRound, UserFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'

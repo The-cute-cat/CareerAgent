@@ -27,6 +27,7 @@ ENV PYTHONPATH="/app/src:/app"
 
 COPY main.py config.py config.yaml ./
 COPY src ./src
+COPY data ./data
 
 RUN mkdir -p /app/data /app/logs
 

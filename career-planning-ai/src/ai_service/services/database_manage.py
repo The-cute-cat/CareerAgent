@@ -1,11 +1,11 @@
 from typing import AsyncGenerator
-
+from contextlib import asynccontextmanager
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 
 from config import settings
 
 DATABASE_URL = (
-    f"mysql+aiomysql://{settings.database.user}:{settings.database.password}"
+    f"mysql+aiomysql://{settings.database.user}:{settings.database.password.get_secret_value()}"
     f"@{settings.database.host}:{settings.database.port}/{settings.database.database}"
     "?charset=utf8mb4"
 )
@@ -34,6 +34,7 @@ def get_db_url() -> str:
     return DATABASE_URL
 
 
+@asynccontextmanager
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """
     提供数据库会话。

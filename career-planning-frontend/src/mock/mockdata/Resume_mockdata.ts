@@ -187,7 +187,7 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
  * @param delayMs 延迟时间（毫秒）
  */
 export async function mockUploadResumeApi(
-  fileName: string,
+  fileName: string | string[],
   scenario: 'success' | 'partial' | 'processing' | 'failed' = 'success',
   delayMs: number = 1500
 ): Promise<AxiosResponse<Result<UploadResponse>>> {
