@@ -727,34 +727,33 @@ function endTreeDrag(event?: PointerEvent): void {
 }
 
 .detail-shell {
-  min-height: 100vh;
+  min-height: 100%;
   padding: 16px 18px 24px;
 }
 
 .detail-header {
-  position: sticky;
-  top: 0;
-  z-index: 12;
+  z-index: 40;
   display: grid;
   grid-template-columns: 48px 1fr auto;
   align-items: center;
   gap: 16px;
-  min-height: 72px;
-  padding: 10px 14px;
-  border-radius: 22px;
-  background: rgba(255, 255, 255, 0.82);
-  backdrop-filter: blur(16px);
-  border: 1px solid rgba(148, 163, 184, 0.14);
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.05);
+  min-height: 84px;
+  padding: 12px 18px;
+  margin-bottom: 18px;
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(226, 232, 240, 0.92);
+  box-shadow:
+    0 10px 24px rgba(15, 23, 42, 0.04),
+    0 2px 10px rgba(15, 23, 42, 0.04);
 }
 
 .detail-title p {
-  margin: 0 0 4px;
-  color: #64748b;
-  font-size: 12px;
+  margin: 0 0 6px;
+  color: #0f766e;
+  font-size: 13px;
   font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
   text-align: center;
 }
 
@@ -762,23 +761,33 @@ function endTreeDrag(event?: PointerEvent): void {
   margin: 0;
   text-align: center;
   color: #0f172a;
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 800;
 }
 
 .back-btn,
 .icon-btn,
 .panel-close {
-  width: 40px;
-  height: 40px;
-  border: 1px solid rgba(148, 163, 184, 0.14);
+  width: 48px;
+  height: 48px;
+  border: 1px solid rgba(226, 232, 240, 0.92);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.92);
-  color: #1d4ed8;
+  background: rgba(255, 255, 255, 0.96);
+  color: #2563eb;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.back-btn:hover,
+.icon-btn:hover,
+.panel-close:hover {
+  transform: translateY(-1px);
+  border-color: rgba(191, 219, 254, 0.95);
+  box-shadow: 0 12px 22px rgba(37, 99, 235, 0.12);
 }
 
 .back-btn {
@@ -1119,6 +1128,8 @@ function endTreeDrag(event?: PointerEvent): void {
   .detail-header {
     grid-template-columns: 40px 1fr auto;
     gap: 8px;
+    min-height: 74px;
+    padding: 10px 12px;
   }
 
   .detail-header h1 {
