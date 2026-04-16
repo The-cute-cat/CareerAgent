@@ -51,8 +51,13 @@
         from user_stu
         where id = #{id}
     </select>
+<!--    <select id="getUserInfo" resultType="com.backend.careerplanningbackend.domain.dto.UserDTO">-->
+<!--        select id, username, nickname, email, avatar, info-->
+<!--        from user_stu-->
+<!--        where id = #{id}-->
+<!--    </select>-->
     <select id="getUserInfo" resultType="com.backend.careerplanningbackend.domain.dto.UserDTO">
-        select id, username, nickname, email, avatar, info
+        select *
         from user_stu
         where id = #{id}
     </select>

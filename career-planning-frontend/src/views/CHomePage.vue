@@ -159,7 +159,7 @@ const initRadarChart = () => {
               <div class="alert-icon">✨</div>
               <div class="alert-text">
                 <h4>欢迎使用 AI 职业规划</h4>
-                <p>请先上传简历以生成智能画像并获取专属建议。</p>
+                <p>请先上传资料以生成智能画像并获取专属建议。</p>
               </div>
             </div>
             
@@ -168,7 +168,7 @@ const initRadarChart = () => {
               <div class="step-item">
                 <div class="step-num">1</div>
                 <div class="step-desc">
-                  <strong>上传简历</strong>
+                  <strong>上传资料</strong>
                   <span>支持 PDF/Word 格式的个人简历解析</span>
                 </div>
               </div>

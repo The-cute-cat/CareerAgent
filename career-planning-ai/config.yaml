@@ -37,6 +37,7 @@ llm:
     temperature: 0.7
 pdf:
   model_name: qwen-vl-plus
+  suffix: [ "PDF" ]
   extra:
     temperature: 0.1
 image:
@@ -113,6 +114,8 @@ neo4j:
   password: <PASSWORD>
 other:
   ssl_verify: false
+  text_file_suffix: [ "txt", "md", "json", "csv", "xml", "html", "htm", "log", "yml", "yaml", "ini", "conf" ]
+  word_file_suffix: [ "doc", "docx" ]
 conversation:
   memory:
     save_path: <SAVE_PATH>

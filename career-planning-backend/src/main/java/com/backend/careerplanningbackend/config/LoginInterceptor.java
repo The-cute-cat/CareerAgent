@@ -20,7 +20,7 @@ public class LoginInterceptor implements HandlerInterceptor {
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
         log.debug("===== LoginInterceptor 开始处理请求 =====");
-        log.debug("请求路径: {}", request.getRequestURI());
+        log.info("请求路径: {}", request.getRequestURI());
         String accessToken = request.getHeader("Authorization");
 
         if (StrUtil.isBlank(accessToken)) {

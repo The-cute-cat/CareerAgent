@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime
 import numpy as np
 from config import settings
+from config import settings
 from ai_service.models.struct_job_txt import (
     JDAnalysisResult,
     Profiles,
@@ -20,6 +21,8 @@ from ai_service.models.graph import (
     JobEvolution,
     GraphRequiresIdfEvidence,
     GraphNodeBuildRun,
+    GraphRequiresIdfEvidence,
+    GraphNodeBuildRun,
 )
 from collections import defaultdict
 from typing import Literal, Dict, Tuple, List, Any
@@ -30,7 +33,11 @@ from ai_service.services import log
 
 class GraphRepository:
     def __init__(self, url: str, user: str, password: str, *, load_model: bool = True):
+    def __init__(self, url: str, user: str, password: str, *, load_model: bool = True):
         self.driver = GraphDatabase.driver(url, auth=(user, password))
+        self.model = (
+            SentenceTransformer("all-MiniLM-L6-v2") if load_model else None
+        )  # 用于文本Embedding的轻量级模型（可按需加载）
         self.model = (
             SentenceTransformer("all-MiniLM-L6-v2") if load_model else None
         )  # 用于文本Embedding的轻量级模型（可按需加载）
@@ -74,8 +81,30 @@ class GraphRepository:
             exclude={"id", "created_at"}, exclude_none=True
         )
 
+
+        # 通过 graph.py 的模型约束写入字段，避免 BuildRun 节点属性漂移
+        run_node = GraphNodeBuildRun(
+            id=run_id,
+            created_at=ts,
+            updated_at=ts,
+            status=status,
+            meta_json=meta_json,
+            jaccard_threshold=meta.get("params", {}).get("jaccard_threshold"),
+            coarse_resolution=meta.get("params", {}).get("coarse_resolution"),
+            fine_resolution=meta.get("params", {}).get("fine_resolution"),
+        )
+
+        created_at = run_node.model_dump(include={"created_at"}, exclude_none=True).get(
+            "created_at"
+        )
+        update_props = run_node.model_dump(
+            exclude={"id", "created_at"}, exclude_none=True
+        )
+
         cypher = """
         MERGE (r:BuildRun {id: $run_id})
+        ON CREATE SET r.created_at = $created_at
+        SET r += $update_props
         ON CREATE SET r.created_at = $created_at
         SET r += $update_props
         """
@@ -84,6 +113,8 @@ class GraphRepository:
             session.run(
                 cypher,
                 run_id=run_id,
+                created_at=created_at,
+                update_props=update_props,
                 created_at=created_at,
                 update_props=update_props,
             )
@@ -271,6 +302,12 @@ class GraphRepository:
         SET e.pareto_rank = coalesce(e.pareto_rank, 0),
             e.pareto_group_size = coalesce(e.pareto_group_size, 0),
             e.pareto_front_size = coalesce(e.pareto_front_size, 0)
+        SET e += data.edge_props
+
+        // 缺省保护（部分字段可能不存在于 edge_props；缺省时写入 0）
+        SET e.pareto_rank = coalesce(e.pareto_rank, 0),
+            e.pareto_group_size = coalesce(e.pareto_group_size, 0),
+            e.pareto_front_size = coalesce(e.pareto_front_size, 0)
         """
 
         # 3. 执行 Cypher
@@ -309,10 +346,29 @@ class GraphRepository:
                 exclude={"id", "macro_community_id", "micro_community_id"},
                 exclude_none=True,
             )
+            # 注意：社区标签由后续聚类阶段产出；此处不应把旧标签重置为 0，否则会破坏跨 Run 的稳定性对比。
+            job_props = jc.from_job.model_dump(
+                exclude={"id", "macro_community_id", "micro_community_id"},
+                exclude_none=True,
+            )
             if build_run_id:
                 job_props["last_build_run_id"] = build_run_id
             if build_ts:
                 job_props["last_build_ts"] = build_ts
+
+            comp_props = jc.to_competency.model_dump(
+                exclude={"name"}, exclude_none=True
+            )
+
+            edge = jc.edge
+            if build_run_id or build_ts:
+                edge = edge.model_copy(
+                    update={
+                        "build_run_id": build_run_id,
+                        "build_ts": build_ts,
+                    }
+                )
+            edge_props = edge.model_dump(exclude_none=True)
 
             comp_props = jc.to_competency.model_dump(
                 exclude={"name"}, exclude_none=True
@@ -336,6 +392,8 @@ class GraphRepository:
                     "comp_name": jc.to_competency.name,
                     "comp_props": comp_props,
                     "edge_props": edge_props,
+                    "comp_props": comp_props,
+                    "edge_props": edge_props,
                 }
             )
 
@@ -355,9 +413,13 @@ class GraphRepository:
         SET c += row.comp_props,
             c.last_build_run_id = coalesce($build_run_id, c.last_build_run_id),
             c.last_build_ts = coalesce($build_ts, c.last_build_ts)
+        SET c += row.comp_props,
+            c.last_build_run_id = coalesce($build_run_id, c.last_build_run_id),
+            c.last_build_ts = coalesce($build_ts, c.last_build_ts)
 
         // 3. MERGE 关系并写入长文本与权重
         MERGE (j)-[r:REQUIRES]->(c)
+        SET r += row.edge_props
         SET r += row.edge_props
         """
 
@@ -371,6 +433,14 @@ class GraphRepository:
                 chunk = batch_data[i : i + batch_size]
 
                 # 推荐使用 execute_write 来管理写入事务（比 run 更安全）
+                session.execute_write(
+                    lambda tx: tx.run(
+                        cypher,
+                        batch=chunk,
+                        build_run_id=build_run_id,
+                        build_ts=build_ts,
+                    )
+                )
                 session.execute_write(
                     lambda tx: tx.run(
                         cypher,
@@ -416,6 +486,12 @@ class GraphRepository:
             for item in idf_weights
         ]
 
+        # 将算法输出的 dict 规范化为“写库契约模型”，避免字段漂移
+        idf_payload = [
+            GraphRequiresIdfEvidence.model_validate(item).model_dump()
+            for item in idf_weights
+        ]
+
         # 批量回写到 Neo4j (将权重固化到 [:REQUIRES] 边上)
         # 注意：这里我们把全局 IDF 存到线上。
         # 如果边上原来有 AI 提取的 local_weight，你可以在 Cypher 里直接相乘！
@@ -440,6 +516,9 @@ class GraphRepository:
         // 2) 最终用于 Jaccard 的权重：TF(=local_weight) * IDF
         // local_weight 在离线 payload 阶段写入（Categorical TF），若缺失则按 1.0 兜底。
         SET r.weight = row.idf_weight * coalesce(r.local_weight, 1.0)
+        // 2) 最终用于 Jaccard 的权重：TF(=local_weight) * IDF
+        // local_weight 在离线 payload 阶段写入（Categorical TF），若缺失则按 1.0 兜底。
+        SET r.weight = row.idf_weight * coalesce(r.local_weight, 1.0)
         """
 
         # 批量执行更新
@@ -447,6 +526,7 @@ class GraphRepository:
             # 分批提交防止事务内存炸裂 (这里假设几千个技能，一次性提交也行)
             session.run(
                 update_cypher,
+                batch=idf_payload,
                 batch=idf_payload,
                 build_run_id=build_run_id,
                 build_ts=build_ts,
@@ -470,7 +550,19 @@ class GraphRepository:
         # ======================================================================
         #  cos_low 加权融合逻辑（语义+结构化）
         #  P0 优化：不再构建 NxN 相似度矩阵；只在候选边上计算。
+        #  P0 优化：不再构建 NxN 相似度矩阵；只在候选边上计算。
         # ======================================================================
+        text_w = float(settings.graph_build.cos_low.text_weight)
+        attr_w = float(settings.graph_build.cos_low.attr_weight)
+        w_sum = text_w + attr_w
+        if w_sum <= 0:
+            text_w, attr_w = 0.7, 0.3
+            w_sum = 1.0
+        text_w /= w_sum
+        attr_w /= w_sum
+        print(
+            f"🧮 计算综合背景相似度 cos_low（语义{text_w:.2f} + 属性{attr_w:.2f}）..."
+        )
         text_w = float(settings.graph_build.cos_low.text_weight)
         attr_w = float(settings.graph_build.cos_low.attr_weight)
         w_sum = text_w + attr_w
@@ -485,6 +577,8 @@ class GraphRepository:
 
         # 1) 拼接软素质文本
         all_texts: list[str] = []
+        # 1) 拼接软素质文本
+        all_texts: list[str] = []
         for jid in all_job_ids:
             txt = " ".join(
                 [
@@ -497,7 +591,18 @@ class GraphRepository:
         # 2) 批量生成文本 Embedding（离线计算，用完即弃）
         if self.model is None:
             self.model = SentenceTransformer("all-MiniLM-L6-v2")
+        # 2) 批量生成文本 Embedding（离线计算，用完即弃）
+        if self.model is None:
+            self.model = SentenceTransformer("all-MiniLM-L6-v2")
         embeddings = self.model.encode(all_texts, convert_to_numpy=True)
+        embeddings = embeddings.astype(np.float32, copy=False)
+
+        # 3) 预归一化：cosine = dot(u, v)
+        norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
+        norms = np.maximum(norms, 1e-12)
+        emb_norm = embeddings / norms
+
+        # 4) 结构化属性归一化（仅 3 维，后续逐边计算 L1 相似度）
         embeddings = embeddings.astype(np.float32, copy=False)
 
         # 3) 预归一化：cosine = dot(u, v)
@@ -528,8 +633,22 @@ class GraphRepository:
                 np.mean(np.abs(attr_matrix[idx_a] - attr_matrix[idx_b]))
             )
             return (text_cos * text_w) + (attr_sim * attr_w)
+            ],
+            dtype=np.float32,
+        )
+
+        def _pair_cos_low(idx_a: int, idx_b: int) -> float:
+            text_cos = float(np.dot(emb_norm[idx_a], emb_norm[idx_b]))
+            # 平均绝对差异 -> 相似度
+            attr_sim = 1.0 - float(
+                np.mean(np.abs(attr_matrix[idx_a] - attr_matrix[idx_b]))
+            )
+            return (text_cos * text_w) + (attr_sim * attr_w)
 
         complete_edges = {}
+        print(
+            f"⚡ 开始批量处理 {len(jaccard_map)} 个无向候选对（将展开为双向有向候选边）..."
+        )
         print(
             f"⚡ 开始批量处理 {len(jaccard_map)} 个无向候选对（将展开为双向有向候选边）..."
         )
@@ -543,12 +662,17 @@ class GraphRepository:
 
             # ======================
             # 指标1：最终版 cos_low（O(1) 取值，双向一致）
+            # 指标1：最终版 cos_low（O(1) 取值，双向一致）
             # ======================
             idx_a = job_id_to_idx[job_a]
             idx_b = job_id_to_idx[job_b]
             cos_low = round(float(_pair_cos_low(idx_a, idx_b)), 4)
+            cos_low = round(float(_pair_cos_low(idx_a, idx_b)), 4)
 
             # ======================
+            # 指标2：salary_gain（有向）
+            # 说明：相似度本身无向，但“演化/跃迁”应具有方向性；
+            # 因此对每个无向候选对，生成 (a->b) 与 (b->a) 两条候选边。
             # 指标2：salary_gain（有向）
             # 说明：相似度本身无向，但“演化/跃迁”应具有方向性；
             # 因此对每个无向候选对，生成 (a->b) 与 (b->a) 两条候选边。
@@ -557,12 +681,24 @@ class GraphRepository:
             salary_gain_ab = round(max(raw_gain_ab, 0.0) / 2.0, 4)
             raw_gain_ba = job_a_info["salary_rank"] - job_b_info["salary_rank"]
             salary_gain_ba = round(max(raw_gain_ba, 0.0) / 2.0, 4)
+            raw_gain_ab = job_b_info["salary_rank"] - job_a_info["salary_rank"]
+            salary_gain_ab = round(max(raw_gain_ab, 0.0) / 2.0, 4)
+            raw_gain_ba = job_a_info["salary_rank"] - job_b_info["salary_rank"]
+            salary_gain_ba = round(max(raw_gain_ba, 0.0) / 2.0, 4)
 
             # ======================
+            # 指标3：transfer_cost（双向一致）
             # 指标3：transfer_cost（双向一致）
             # ======================
             exp_diff = abs(job_a_info["min_experience"] - job_b_info["min_experience"])
             degree_diff = abs(job_a_info["min_degree"] - job_b_info["min_degree"])
+            major_a = str(job_a_info.get("major") or "").strip()
+            major_b = str(job_b_info.get("major") or "").strip()
+            major_unknown = {"", "未提及", "未知"}
+            if major_a in major_unknown or major_b in major_unknown:
+                major_diff = 1
+            else:
+                major_diff = 0 if major_a == major_b else 1
             major_a = str(job_a_info.get("major") or "").strip()
             major_b = str(job_b_info.get("major") or "").strip()
             major_unknown = {"", "未提及", "未知"}
@@ -582,8 +718,102 @@ class GraphRepository:
                 "jaccard_high": jaccard_score,
                 "cos_low": cos_low,
                 "salary_gain": salary_gain_ba,
+                "salary_gain": salary_gain_ab,
                 "transfer_cost": transfer_cost,
             }
+            complete_edges[(job_b, job_a)] = {
+                "jaccard_high": jaccard_score,
+                "cos_low": cos_low,
+                "salary_gain": salary_gain_ba,
+                "transfer_cost": transfer_cost,
+            }
+
+        # 兜底：如果某些岗位在 Jaccard 阈值下没有任何候选边，会导致聚类出现大量孤立社区，
+        # 也会让“跨社区边保留”无从谈起。
+        # 这里对 degree=0 的岗位，按 cos_low(语义+属性) 取 TopK 近邻补充候选边。
+        from collections import defaultdict
+
+        undirected_degree = defaultdict(int)
+        for a, b in jaccard_map.keys():
+            undirected_degree[a] += 1
+            undirected_degree[b] += 1
+
+        degree_zero_jobs = [
+            jid for jid in all_job_ids if undirected_degree.get(jid, 0) == 0
+        ]
+        if degree_zero_jobs:
+            log.warning(
+                f"⚠️ Jaccard候选边过稀疏：degree=0 的岗位数={len(degree_zero_jobs)}/{len(all_job_ids)}；"
+                "将用 cos_low TopK 近邻补充候选边以降低孤立社区。"
+            )
+
+            top_k = int(settings.graph_build.degree_zero_fallback.top_k)
+            for jid in degree_zero_jobs:
+                i = job_id_to_idx.get(jid)
+                if i is None:
+                    continue
+
+                # 仅为 degree=0 的点做 TopK 文本近邻检索（避免 NxN 矩阵）
+                if emb_norm.shape[0] <= 1:
+                    continue
+
+                sims = np.dot(emb_norm, emb_norm[int(i)])
+                sims[int(i)] = -1.0
+
+                k = min(top_k, int(sims.shape[0] - 1))
+                nbr_idx = np.argpartition(sims, -k)[-k:]
+                nbr_idx = nbr_idx[np.argsort(-sims[nbr_idx])]
+
+                for j in nbr_idx:
+                    other = all_job_ids[int(j)]
+                    if other == jid:
+                        continue
+
+                    # 最终 cos_low 仍按“语义+属性”融合（邻居候选按语义检索得到）
+                    cos_low = round(float(_pair_cos_low(int(i), int(j))), 4)
+
+                    a_info = job_data[jid]
+                    b_info = job_data[other]
+
+                    exp_diff = abs(a_info["min_experience"] - b_info["min_experience"])
+                    degree_diff = abs(a_info["min_degree"] - b_info["min_degree"])
+                    major_a = str(a_info.get("major") or "").strip()
+                    major_b = str(b_info.get("major") or "").strip()
+                    major_unknown = {"", "未提及", "未知"}
+                    if major_a in major_unknown or major_b in major_unknown:
+                        major_diff = 1
+                    else:
+                        major_diff = 0 if major_a == major_b else 1
+                    transfer_cost = round(
+                        (exp_diff + degree_diff + major_diff) / 10.0, 4
+                    )
+
+                    raw_gain_ab = b_info["salary_rank"] - a_info["salary_rank"]
+                    salary_gain_ab = round(max(raw_gain_ab, 0.0) / 2.0, 4)
+                    raw_gain_ba = a_info["salary_rank"] - b_info["salary_rank"]
+                    salary_gain_ba = round(max(raw_gain_ba, 0.0) / 2.0, 4)
+
+                    # 对兜底边：如果 Jaccard 阈值下未命中，则置为 0.0（仍可作为跨社区“保底可走边”）
+                    jaccard_high = 0.0
+
+                    complete_edges.setdefault(
+                        (jid, other),
+                        {
+                            "jaccard_high": jaccard_high,
+                            "cos_low": cos_low,
+                            "salary_gain": salary_gain_ab,
+                            "transfer_cost": transfer_cost,
+                        },
+                    )
+                    complete_edges.setdefault(
+                        (other, jid),
+                        {
+                            "jaccard_high": jaccard_high,
+                            "cos_low": cos_low,
+                            "salary_gain": salary_gain_ba,
+                            "transfer_cost": transfer_cost,
+                        },
+                    )
 
         # 兜底：如果某些岗位在 Jaccard 阈值下没有任何候选边，会导致聚类出现大量孤立社区，
         # 也会让“跨社区边保留”无从谈起。

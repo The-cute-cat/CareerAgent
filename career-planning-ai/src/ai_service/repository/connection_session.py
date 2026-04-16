@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sess
 
 def get_db_url() -> str:
     DB_URL = (
-        f"mysql+aiomysql://{settings.database.user}:{settings.database.password}"
+        f"mysql+aiomysql://{settings.database.user}:{settings.database.password.get_secret_value()}"
         f"@{settings.database.host}:{settings.database.port}/{settings.database.database}"
         f"?charset=utf8mb4"
     )

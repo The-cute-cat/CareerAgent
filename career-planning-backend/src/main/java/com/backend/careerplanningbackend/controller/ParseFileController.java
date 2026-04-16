@@ -44,17 +44,24 @@ public class ParseFileController {
 
     /**
      * parseFile
-     * 解析单个文件
+     * 解析单个文件（统一使用多文件传输形式）
      *
-     * @param file 文件数据
+     * @param files 文件列表（单文件时也以列表形式传输）
      */
     @PostMapping("/file")
     public Result<Object> parseFile(
-            @RequestPart("file") MultipartFile file,// 文件数据
-            @RequestParam(value = "overwrite", defaultValue = "false") boolean overwrite //是否覆盖
+            @RequestPart("files") List<MultipartFile> files,
+            @RequestParam(value = "overwrite", defaultValue = "false") boolean overwrite
     ) throws IOException {
-        log.info("name: {}, size: {} bytes, leixing: {}",
+        if (files == null || files.isEmpty()) {
+            return Result.fail("文件不能为空");
+        }
+
+        // 取第一个文件处理（单文件场景）
+        MultipartFile file = files.get(0);
+        log.info("parse-file接收到的文件: name={}, size={} bytes, type={}",
                 file.getOriginalFilename(), file.getSize(), file.getContentType());
+
         Long userId = ThreadLocalUtil.getCurrentUserId();
         String upload = aliOSSUtils.upload(file);
         FileUpload fileUpload = new FileUpload();
@@ -63,10 +70,11 @@ public class ParseFileController {
         fileUpload.setFileUrl(upload);
         fileUploadMapper.insert(fileUpload);
 
+        // 统一使用多文件形式传递给Python端
         Map<String, Object> params = new HashMap<>();
-        params.put("file", file);
-        AiChatResponse aiChatResponse = aiServiceClient.chatWithOther("/parse/file", params, true);
-        log.info("parse-file接收到的参数: {}", aiChatResponse.toString());
+        params.put("files", files);
+        AiChatResponse aiChatResponse = aiServiceClient.chatWithOther("/parse/files", params, true);
+        log.info("parse-file接收到的响应: {}", aiChatResponse.toString());
         System.out.println("python端传来的数据:" + aiChatResponse.getData());
         System.out.println("user_id:" + userId);
         System.out.println("overwrite:" + overwrite);
@@ -81,15 +89,22 @@ public class ParseFileController {
      * parseFiles
      * 解析多个文件
      *
-     * @param file 文件数据
+     * @param files 文件列表
      */
-    @PostMapping("/files")
-    public Result<Object> parseFiles(@RequestPart("file") MultipartFile file) {
-        log.info("parse-resume接收到的参数: {}", file.toString());
-        Map<String, Object> params = new HashMap<>();
-        params.put("files", List.of(file));
-        AiChatResponse aiChatResponse = aiServiceClient.chatWithOther("/parse/files", params, true);
-        log.info("parse-file接收到的参数: {}", aiChatResponse.toString());
-        return Result.ok(aiChatResponse.getData());
-    }
+//    @PostMapping("/files")
+//    public Result<Object> parseFiles(@RequestPart("files") List<MultipartFile> files) {
+//        log.info("parse-files接收到的文件数量: {}", files.size());
+//
+//        // 记录每个文件的信息
+//        for (MultipartFile file : files) {
+//            log.info("文件: {}, 大小: {} bytes, 类型: {}",
+//                    file.getOriginalFilename(), file.getSize(), file.getContentType());
+//        }
+//
+//        Map<String, Object> params = new HashMap<>();
+//        params.put("files", files);
+//        AiChatResponse aiChatResponse = aiServiceClient.chatWithOther("/parse/files", params, true);
+//        log.info("parse-files接收到的响应: {}", aiChatResponse.toString());
+//        return Result.ok(aiChatResponse.getData());
+//    }
 }
