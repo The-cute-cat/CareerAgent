@@ -52,7 +52,7 @@ class RedisService:
         self._client: Redis | None = None
 
         if not self._is_available:
-            logger.warning("⚠️ Redis 服务不可用，请检查配置")
+            logger.warning("⚠️警告：Redis 服务不可用，请检查配置")
             return
 
         try:

@@ -323,7 +323,11 @@ class GraphAlgorithms:
     # 计算加权杰卡德相似度
     @staticmethod
     def calculate_weighted_jaccard(
-        data: List[dict], threshold: float = 0.1
+        data: List[dict],
+        threshold: float = 0.1,
+        *,
+        blocking_min_jobs: int = 3000,
+        blocking_top_m: int = 20,
     ) -> Dict[Tuple[str, str], float]:
         # 构建内存结构：job_id → {comp_name: weight}
         job_comp_weights = defaultdict(dict)
@@ -336,66 +340,142 @@ class GraphAlgorithms:
             all_job_ids.add(j_id)
 
         all_jobs = list(all_job_ids)
+        n_jobs = len(all_jobs)
 
-        # --- 提纯版：极致优化的加权 Jaccard 计算 ---
+        # --- 提纯版：加权 Jaccard 计算 ---
+        # P0：当岗位规模很大时，避免全对全 O(N^2)；改为 blocking 候选生成 + 精确 Jaccard。
         log.info("开始计算加权杰卡德相似度 (Min/Max 算法)...")
-        jaccard_map = {}
+        jaccard_map: Dict[Tuple[str, str], float] = {}
 
-        # 【优化 1】预先计算每个岗位的所有技能权重之和 (空间换时间)
+        # 预先计算每个岗位的所有技能权重之和 (空间换时间)
         job_sum_weights = {
-            job: sum(comps.values()) for job, comps in job_comp_weights.items()
+            job: float(sum(comps.values())) for job, comps in job_comp_weights.items()
         }
 
         # 记录有效边数
         valid_edges = 0
 
-        for i in range(len(all_jobs)):
-            job_a = all_jobs[i]
-            comps_a = job_comp_weights[job_a]
-            sum_a = job_sum_weights[job_a]
+        # 小规模：保持原始全对全精确算法（结果不变）
+        if n_jobs < int(blocking_min_jobs):
+            for i in range(n_jobs):
+                job_a = all_jobs[i]
+                comps_a = job_comp_weights[job_a]
+                sum_a = job_sum_weights[job_a]
 
-            # 性能追踪打印
-            if i % 1000 == 0 and i > 0:
-                log.info(
-                    f"  已处理 {i}/{len(all_jobs)} 个岗位，当前有效边数：{valid_edges}..."
-                )
+                if i % 1000 == 0 and i > 0:
+                    log.info(
+                        f"  已处理 {i}/{n_jobs} 个岗位，当前有效边数：{valid_edges}..."
+                    )
 
-            for j in range(i + 1, len(all_jobs)):
-                job_b = all_jobs[j]
-                comps_b = job_comp_weights[job_b]
-                sum_b = job_sum_weights[job_b]
+                for j in range(i + 1, n_jobs):
+                    job_b = all_jobs[j]
+                    comps_b = job_comp_weights[job_b]
+                    sum_b = job_sum_weights[job_b]
 
-                sum_intersect = 0.0
+                    sum_intersect = 0.0
 
-                # 【优化 3】只遍历较小的字典，寻找交集 (极大减少循环次数)
-                smaller_comps, larger_comps = (
-                    (comps_a, comps_b)
-                    if len(comps_a) < len(comps_b)
-                    else (comps_b, comps_a)
-                )
+                    smaller_comps, larger_comps = (
+                        (comps_a, comps_b)
+                        if len(comps_a) < len(comps_b)
+                        else (comps_b, comps_a)
+                    )
 
-                # 计算标准的 Min 交集
-                for c, weight_small in smaller_comps.items():
-                    if c in larger_comps:
-                        sum_intersect += min(weight_small, larger_comps[c])
+                    for c, weight_small in smaller_comps.items():
+                        if c in larger_comps:
+                            sum_intersect += min(weight_small, larger_comps[c])
 
-                # 快速过滤：如果毫无交集，直接跳过
-                if sum_intersect == 0:
+                    if sum_intersect == 0:
+                        continue
+
+                    sum_union = sum_a + sum_b - sum_intersect
+                    score = round(sum_intersect / sum_union, 4)
+                    if score > threshold:
+                        jaccard_map[(job_a, job_b)] = score
+                        valid_edges += 1
+
+        # 大规模：blocking 候选生成（共享高权重技能） + 精确 Jaccard
+        else:
+            top_m = int(blocking_top_m)
+            if top_m < 1:
+                top_m = 1
+
+            log.info(
+                "岗位规模=%s >= %s，启用 blocking 候选生成（top_m=%s）以避免 O(N^2) 全对全",
+                n_jobs,
+                blocking_min_jobs,
+                top_m,
+            )
+
+            job_to_idx = {jid: idx for idx, jid in enumerate(all_jobs)}
+
+            # 1) 每个岗位选 top_m 个最高权重技能作为 blocking key
+            job_top_comps: Dict[str, List[str]] = {}
+            comp_to_jobs: Dict[str, List[str]] = defaultdict(list)
+
+            for jid in all_jobs:
+                comps = job_comp_weights.get(jid, {})
+                if not comps:
+                    job_top_comps[jid] = []
                     continue
 
-                # 【优化 4】利用数学恒等式瞬间算出并集 Max 之和：
-                # Sum(Max) = Sum(A) + Sum(B) - Sum(Min)
-                sum_union = sum_a + sum_b - sum_intersect
+                # 取 top_m（按权重降序）
+                top = sorted(comps.items(), key=lambda kv: kv[1], reverse=True)[:top_m]
+                keys = [c for c, _w in top]
+                job_top_comps[jid] = keys
+                for c in keys:
+                    comp_to_jobs[c].append(jid)
 
-                score = round(sum_intersect / sum_union, 4)
+            # 2) 对每个岗位，仅对候选集合做精确 Jaccard
+            for i, job_a in enumerate(all_jobs):
+                comps_a = job_comp_weights[job_a]
+                sum_a = job_sum_weights[job_a]
 
-                # 【优化 5】内存保护：只保留有演化价值的边
-                if score > threshold:
-                    jaccard_map[(job_a, job_b)] = score
-                    valid_edges += 1
+                if i % 500 == 0 and i > 0:
+                    log.info(
+                        f"  已处理 {i}/{n_jobs} 个岗位（blocking），当前有效边数：{valid_edges}..."
+                    )
+
+                # 候选集合：共享至少一个 blocking key
+                candidates: set[str] = set()
+                for c in job_top_comps.get(job_a, []):
+                    for job_b in comp_to_jobs.get(c, []):
+                        j = job_to_idx.get(job_b)
+                        if j is None or j <= i:
+                            continue
+                        candidates.add(job_b)
+
+                if not candidates:
+                    continue
+
+                for job_b in candidates:
+                    comps_b = job_comp_weights[job_b]
+                    sum_b = job_sum_weights[job_b]
+
+                    sum_intersect = 0.0
+                    smaller_comps, larger_comps = (
+                        (comps_a, comps_b)
+                        if len(comps_a) < len(comps_b)
+                        else (comps_b, comps_a)
+                    )
+
+                    for c, weight_small in smaller_comps.items():
+                        if c in larger_comps:
+                            sum_intersect += min(weight_small, larger_comps[c])
+
+                    if sum_intersect == 0:
+                        continue
+
+                    sum_union = sum_a + sum_b - sum_intersect
+                    score = round(sum_intersect / sum_union, 4)
+                    if score > threshold:
+                        jaccard_map[(job_a, job_b)] = score
+                        valid_edges += 1
 
         if valid_edges == 0:
-            raise ValueError("硬筛选后无有效边，请调低Jaccard阈值")
+            log.warning(
+                "硬筛选后无有效 Jaccard 边：将返回空候选集（后续可用 cos_low 兜底补边）。"
+            )
+            return {}
         log.info(f"基础网生成完成，有效边数：{valid_edges}")
 
         return jaccard_map
