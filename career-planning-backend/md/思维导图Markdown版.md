@@ -1,0 +1,330 @@
+# 职引未来 - 职业规划智能体系统
+
+## 核心功能模块
+
+### 用户管理系统
+- **用户认证**
+  - 邮箱注册登录
+  - 密码加密存储
+  - JWT Token认证
+  - 验证码验证
+- **用户信息**
+  - 个人资料管理
+  - 头像上传(OSS)
+  - 账号状态管理
+
+### AI对话系统
+- **智能聊天**
+  - 流式对话(SSE)
+  - 文件上传支持
+  - 多轮对话记录
+  - 多媒体输入
+    - 图片
+    - 文档
+    - 代码
+
+### 职位匹配引擎
+- 用户画像分析
+- 职位智能推荐
+- 多维度相似度计算
+- Top-K排序推荐
+
+### 成长规划助手
+- 个性化方案制定
+- 缺陷补充建议
+- 阶段化学习路径
+- 进度跟踪反馈
+
+### 代码能力评估
+- GitHub仓库分析
+- 代码质量评分
+- 技能识别
+- AI智能评估
+
+### 知识图谱系统
+- 知识点关联分析
+- 岗位技能影响度
+- 学习路径规划
+- 流式讲解
+
+### 简历管理与导出
+- **多格式导出**
+  - Word文档
+  - PDF文档
+  - Markdown文本
+- 智能润色
+- 模板化设计
+
+### 问卷测评系统
+- 职业性格评估
+- 职业兴趣评估
+- 能力素质评估
+
+### 支付系统
+- 支付宝集成
+- 订单管理
+- 支付回调验证
+- 交易记录
+
+### 积分体系
+- 积分获取
+- 积分消费
+- 积分兑换
+- 交易明细
+
+---
+
+## 创新功能亮点
+
+### AI驱动的个性化规划
+- 动态学习路径
+- 实时反馈机制
+- 多维度分析
+
+### 知识图谱可视化
+- 动态关联分析
+- 学习路径推荐
+- 交互式探索
+
+### 代码能力自动化评估
+- GitHub集成
+- 智能评分
+- 技术栈识别
+
+### 流式AI交互
+- 实时响应
+- 多轮对话
+- 多媒体支持
+
+### 智能简历优化
+- 模板导出
+- 内容润色
+- 一键生成
+
+---
+
+## 系统架构
+
+### 技术栈
+- Spring Boot 3.5.9
+- Java 21
+- MySQL 数据库
+- Redis 缓存
+- RabbitMQ 消息队列
+- 阿里云OSS 存储
+
+### 核心组件
+- Controller 控制层
+- Service 业务层
+- Mapper 数据访问层
+- Domain 实体层
+- Util 工具层
+
+### 外部集成
+- Python AI服务
+- 阿里云OSS
+- 支付宝支付
+- Redis缓存
+- RabbitMQ消息队列
+
+---
+
+## API接口体系
+
+### 用户管理（11个接口）
+- POST /user/register - 用户注册
+- POST /user/login - 用户登录
+- POST /user/send-code-register - 发送注册验证码
+- POST /user/send-code-forget - 发送重置密码验证码
+- POST /user/forget-password - 修改密码
+- GET /user/info - 获取用户信息
+- PUT /user/edit - 编辑个人资料
+- POST /user/avatar - 上传头像
+- GET /user/get-basic-info - 获取用户基础信息
+- POST /user/refreshToken - 刷新Token
+
+### 聊天对话（10个接口）
+- POST /chat/message - 发送聊天消息(阻塞)
+- POST /chat/stream/message - 流式聊天消息
+- POST /chat/stream/message-and-files - 流式聊天(含文件)
+- GET /chat/get-chat-history - 获取对话历史
+- GET /chat/get-user-sessions - 获取用户对话列表
+- GET /chat/get-session-title - 获取对话标题
+- DELETE /chat/clear-session - 清除对话记录
+- PUT /chat/update-session-title - 更新对话标题
+- GET /chat/get-user-memories - 获取用户记忆
+- DELETE /chat/delete-memory - 删除记忆
+
+### 用户数据转换（1个接口）
+- POST /convert/user_form_to_userprofile - 表单转用户画像
+
+### 职位匹配（1个接口）
+- POST /matching/job - 智能职位匹配
+
+### 成长规划（3个接口）
+- POST /report/plan - 获取成长计划
+- POST /report/check - 报告完整性检查
+- POST /report/polish - 内容智能润色
+
+### 代码能力（1个接口）
+- POST /codeAbility/evaluate - 代码能力评估
+
+### 知识图谱（2个接口）
+- POST /knowledge-graph/analyze/stream - 流式知识分析
+- POST /knowledge-graph/explain/stream - 流式知识讲解
+
+### 简历导出（1个接口）
+- POST /api/resume/export/{format} - 导出简历(word/pdf/md)
+
+### 文件解析（1个接口）
+- POST /parse/file - 解析文件
+
+### 问卷测评（2个接口）
+- GET /question/generate - 生成测评题目
+- POST /question/check_student_answer - 检查答案
+
+### 支付相关（3个接口）
+- POST /alipay/pay/order - 创建支付订单
+- GET /alipay/pay/{orderNumber} - 页面支付
+- POST /alipay/notify - 支付宝异步回调
+
+### 积分系统（7个接口）
+- GET /points/account/{id} - 获取账户积分
+- POST /points/register - 注册赠送积分
+- POST /points/invite - 邀请好友
+- POST /points/register/student - 学生认证
+- POST /points/recharge - 充值积分
+- POST /points/consume - 消耗积分
+- POST /points/delete - 删除积分
+
+### 会员管理（4个接口）
+- POST /member/insert - 新用户充值会员
+- POST /member/insert/new - 新用户会员注册
+- GET /member/{id} - 获取会员信息
+- GET /member/update/{id} - 会员续费
+
+### 交易记录（4个接口）
+- GET /transaction/{id} - 获取单条交易记录
+- GET /transaction/list/{id} - 获取用户交易列表
+- GET /transaction/list/points/{id} - 获取积分交易记录
+- GET /transaction/list/member/{id} - 获取会员交易记录
+
+### 用户反馈（8个接口）
+- POST /feedback/submit - 提交反馈
+- GET /feedback/list - 查询反馈列表(分页)
+- GET /feedback/user/{userId}/history - 查询用户反馈历史
+- GET /feedback/{id} - 查询反馈详情
+- POST /feedback/{id}/reply - 管理员回复反馈
+- DELETE /feedback/{id} - 删除反馈
+- GET /feedback/type/{type} - 查询指定类型反馈
+- PUT /feedback/update - 更新反馈
+
+### 搜索服务（1个接口）
+- GET /search/{keyword} - 关键词搜索
+
+---
+
+## 数据模型
+
+### User 用户表
+- 用户认证信息
+- 个人资料
+- 头像地址
+- 账号状态
+
+### PaymentOrder 支付订单
+- 订单号
+- 支付金额
+- 支付状态
+- 回调时间
+
+### PointsTransaction 积分交易
+- 用户ID
+- 交易类型
+- 积分变化
+- 交易时间
+
+### Package 套餐表
+- 套餐名称
+- 套餐描述
+- 价格
+- 套餐状态
+
+---
+
+## 安全性保障
+
+### 密码安全
+- BCrypt加密存储
+
+### 认证授权
+- JWT Token机制
+- Refresh Token刷新
+
+### 防护措施
+- 防枚举攻击
+- 验证码限流
+- 支付签名验证
+
+---
+
+## 性能优化
+
+### 缓存策略
+- Redis热数据缓存
+- 验证码缓存
+
+### 异步处理
+- RabbitMQ消息队列
+- 异步任务处理
+
+### 流式传输
+- SSE流式推送
+- 内存占用优化
+
+### 连接管理
+- MySQL连接池
+- 数据库性能优化
+
+---
+
+## 系统优势
+
+| 维度 | 优势 |
+|------|------|
+| 个性化 | 多维度用户分析 + 精准职业匹配 |
+| 智能化 | 知识图谱应用 + AI代码分析 |
+| 交互性 | 流式对话体验 + 多媒体支持 |
+| 专业性 | 成长计划制定 + 简历质量提升 |
+| 便利性 | 一键导出简历 + 开箱即用 |
+| 可靠性 | 完整支付闭环 + 积分管理 |
+
+---
+
+## 后续扩展方向
+
+### 推荐系统升级
+- 协同过滤算法
+- 内容推荐结合
+
+### 实时数据分析
+- 行业职位数据更新
+- 市场需求洞察
+
+### 社交互动
+- 用户经验分享
+- 职业导师制度
+
+### 移动端适配
+- 原生App开发
+- 小程序
+
+### 国际化支持
+- 多语言支持
+- 多地区标准
+
+---
+
+**生成日期**: 2026-04-16
+**项目版本**: v0.0.1
+
