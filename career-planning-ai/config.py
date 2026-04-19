@@ -17,6 +17,14 @@ from pydantic import (
     model_validator,
     PrivateAttr,
 )
+from pydantic import (
+    BaseModel,
+    field_validator,
+    SecretStr,
+    Field,
+    model_validator,
+    PrivateAttr,
+)
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic_settings.sources import InitSettingsSource
 
@@ -73,6 +81,7 @@ class _Communication(BaseModel):
 class _LLMModelBase(BaseModel):
     """模型配置基类"""
 
+
     _skip_verify: bool = PrivateAttr(default=False)
     _name: str = ""
     api_key: SecretStr = SecretStr("")  # 敏感信息，使用时调用 .get_secret_value() 方法获取
@@ -127,10 +136,14 @@ class _LLMModelBase(BaseModel):
 class _LLM(_LLMModelBase):
     """大模型通用配置"""
 
+
     _skip_verify: bool = PrivateAttr(default=True)
 
     def _set_default_value(self, llm: _LLMModelBase):
         if self.api_key.get_secret_value() == "<api_key>":
+            raise ValueError(
+                f"{self.__class__.__name__} api_key 应该是需要配置的但现在未配置"
+            )
             raise ValueError(
                 f"{self.__class__.__name__} api_key 应该是需要配置的但现在未配置"
             )
@@ -144,6 +157,8 @@ class _LLM(_LLMModelBase):
                     None,
             ):
                 raise ValueError(
+                    f"❌️错误：{self.__class__.__name__} base_url 和 llm.base_url 不一致且 api_key 未配置，不能继承api_key！"
+                )
                     f"❌️错误：{self.__class__.__name__} base_url 和 llm.base_url 不一致且 api_key 未配置，不能继承api_key！"
                 )
         if not self.api_key.get_secret_value():
@@ -314,6 +329,8 @@ class _CodeAbility(_LLM):
             print(
                 "⚠️警告：请在.env文件中配置github个人访问令牌，否则可能因github访问速率限制，导致无法获取github仓库信息。"
             )
+                "⚠️警告：请在.env文件中配置github个人访问令牌，否则可能因github访问速率限制，导致无法获取github仓库信息。"
+            )
             return SecretStr("")
         return v
 
@@ -322,6 +339,8 @@ class _CodeAbility(_LLM):
     def _validate_gitee_token(cls, v):
         if v.get_secret_value() in ("<GITEE_TOKEN>", "<token>", "", None):
             print(
+                "⚠️警告：请在.env文件中配置gitee个人访问令牌，否则可能因gitee访问速率限制，导致无法获取gitee仓库信息。"
+            )
                 "⚠️警告：请在.env文件中配置gitee个人访问令牌，否则可能因gitee访问速率限制，导致无法获取gitee仓库信息。"
             )
             return SecretStr("")
@@ -428,13 +447,80 @@ class _Conversation(BaseModel):
 
 class _KnowledgeGraph(BaseModel):
     class _Analysis(_LLM): ...
+    class _Analysis(_LLM): ...
 
+    class _Explain(_LLM): ...
     class _Explain(_LLM): ...
 
     analysis: _Analysis = Field(default_factory=_Analysis)
     explain: _Explain = Field(default_factory=_Explain)
 
 
+class _ReportAssistant(_LLM): ...
+
+
+class _GraphBuild(BaseModel):
+    """离线建图超参（权重/阈值/惩罚项等）。
+
+    说明：该配置仅影响离线建图结果（Neo4j 图结构与边权），在线查询逻辑保持兼容。
+    """
+
+    class _Tf(BaseModel):
+        # 以“Competency.category”（中文）为 key 的 TF 等效权重
+        category_weights: dict[str, float] = Field(
+            default_factory=lambda: {
+                "核心专业技能": 1.0,
+                "工具与平台能力": 0.7,
+                "语言能力": 0.5,
+                "证书要求": 0.6,
+            }
+        )
+        default_weight: float = 0.7
+
+    class _CosLow(BaseModel):
+        text_weight: float = 0.7
+        attr_weight: float = 0.3
+
+    class _Jaccard(BaseModel):
+        threshold: float = 0.1
+        blocking_min_jobs: int = 3000
+        blocking_top_m: int = 20
+
+    class _Clustering(BaseModel):
+        coarse_resolution: float = 0.1
+        coarse_isolation_threshold: float = 0.1
+        fine_resolution: float = 1.0
+        fine_isolation_threshold: float = 0.05
+        fine_weight_transform_offset: float = 0.1
+        fine_weight_transform_power: float = 2.0
+
+    class _Pareto(BaseModel):
+        keep_fronts: int = 2
+        cross_community_penalty: float = 0.5
+
+    class _Routing(BaseModel):
+        attraction_weights: dict[str, float] = Field(
+            default_factory=lambda: {
+                "jaccard_high": 0.5,
+                "cos_low": 0.3,
+                "salary_gain": 0.2,
+            }
+        )
+        rank_penalty_per_rank: float = 0.15
+        cross_penalty: float = 0.5
+
+    class _DegreeZeroFallback(BaseModel):
+        top_k: int = 3
+
+    tf: _Tf = Field(default_factory=_Tf)
+    cos_low: _CosLow = Field(default_factory=_CosLow)
+    jaccard: _Jaccard = Field(default_factory=_Jaccard)
+    clustering: _Clustering = Field(default_factory=_Clustering)
+    pareto: _Pareto = Field(default_factory=_Pareto)
+    routing: _Routing = Field(default_factory=_Routing)
+    degree_zero_fallback: _DegreeZeroFallback = Field(
+        default_factory=_DegreeZeroFallback
+    )
 class _ReportAssistant(_LLM): ...
 
 
@@ -531,6 +617,7 @@ class Settings(BaseSettings):
     knowledge_graph: _KnowledgeGraph = Field(default_factory=_KnowledgeGraph)
     report_assistant: _ReportAssistant = Field(default_factory=_ReportAssistant)
     graph_build: _GraphBuild = Field(default_factory=_GraphBuild)
+    graph_build: _GraphBuild = Field(default_factory=_GraphBuild)
 
     # noinspection PyProtectedMember
     @model_validator(mode="after")
@@ -544,9 +631,11 @@ class Settings(BaseSettings):
     def _set_llm_default_values(self, obj):
         """递归设置所有_LLM类型字段的默认值"""
         if hasattr(obj, "__dict__"):
+        if hasattr(obj, "__dict__"):
             for key, value in obj.__dict__.items():
                 if isinstance(value, _LLM):
                     value._set_default_value(self.llm)
+                elif hasattr(value, "__dict__"):
                 elif hasattr(value, "__dict__"):
                     self._set_llm_default_values(value)
 
@@ -561,6 +650,7 @@ class Settings(BaseSettings):
     ):
         yaml_file = Path(abs_path("config.yaml"))
         if yaml_file.exists():
+            with open(yaml_file, "r", encoding="utf-8") as f:
             with open(yaml_file, "r", encoding="utf-8") as f:
                 yaml_data = yaml.safe_load(f) or {}
             yaml_source = InitSettingsSource(settings_cls, yaml_data)
