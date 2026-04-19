@@ -605,6 +605,6 @@ if __name__ == "__main__":
     # print(settings.conversation.memory.long.model_name)
     # print(settings.lite_llm.qwen)
     os.makedirs("./temp", exist_ok=True)
-    with open("./temp/settings.json", "w", encoding="utf-8") as f:  # 导出配置到文件
-        json.dump(settings.model_dump(mode="json"), f, indent=2, ensure_ascii=False)
+    with open("./temp/settings.json", "w", encoding="utf-8") as file:  # 导出配置到文件
+        json.dump(settings.model_dump(mode="json"), file, indent=2, ensure_ascii=False)
     pass
