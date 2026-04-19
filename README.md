@@ -76,6 +76,7 @@ CareerAgent/
 | FastAPI + Uvicorn | Web API 框架 |
 | Python 3.12 | 运行环境 |
 | Poetry | 依赖管理 |
+| Docker | 容器化部署 |
 | LangChain + OpenAI + DashScope | LLM 集成 (通义千问/DeepSeek) |
 | Milvus / ChromaDB | 向量检索 |
 | Neo4j | 知识图谱 |
@@ -124,6 +125,8 @@ CareerAgent/
 
 ### 1. AI 服务
 
+#### 方式一：本地运行
+
 ```bash
 cd career-planning-ai
 
@@ -138,6 +141,32 @@ cp .env.example .env
 poetry run python main.py
 # 服务运行在 http://localhost:9000
 ```
+
+#### 方式二：Docker 部署
+
+```bash
+cd career-planning-ai
+
+# 配置环境变量
+cp .env.example .env
+# 编辑 .env 填入 API Keys 等敏感配置
+
+# 构建并运行容器
+docker build -t career-planning-ai .
+docker run -d \
+  --name career-ai \
+  -p 9000:9000 \
+  -v $(pwd)/.env:/app/.env \
+  -v $(pwd)/data:/app/data \
+  -v $(pwd)/logs:/app/logs \
+  career-planning-ai
+
+# 查看日志
+docker logs -f career-ai
+# 服务运行在 http://localhost:9000
+```
+
+> Docker 部署详情请参考 [career-planning-ai/docs/docker.md](career-planning-ai/docs/docker.md)
 
 ### 2. 业务后端
 
@@ -298,6 +327,7 @@ proxy: {
 | [docs/AI_SERVICE_API.md](docs/AI_SERVICE_API.md) | AI 服务 API 文档 |
 | [docs/CONFIGURATION.md](docs/CONFIGURATION.md) | 配置详解 |
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | 部署指南 |
+| [career-planning-ai/docs/docker.md](career-planning-ai/docs/docker.md) | AI 服务 Docker 部署指南 |
 | [career-planning-backend/README.md](career-planning-backend/README.md) | 后端详细文档 |
 | [career-planning-frontend/README.md](career-planning-frontend/README.md) | 前端详细文档 |
 
