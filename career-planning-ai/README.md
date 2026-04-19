@@ -63,6 +63,7 @@ career-planning-ai/
 ├── .env                    # 敏感配置文件（需自行创建）
 ├── pyproject.toml          # Poetry 依赖配置
 ├── Dockerfile              # Docker 构建文件
+├── entrypoint.sh           # Docker 启动脚本（自动安装依赖）
 ├── src/
 │   └── ai_service/         # 核心服务模块
 │       ├── routers/        # API 路由定义
@@ -70,11 +71,12 @@ career-planning-ai/
 │       ├── schemas/        # Pydantic 数据模型
 │       ├── utils/          # 工具函数
 │       └── ...
-├── data/                   # 数据文件（向量库、模型等）
+├── data/                   # 数据文件（向量库、模型等，运行时挂载）
 ├── logs/                   # 日志文件
 ├── docs/                   # 项目文档
 │   ├── api/                # API 接口文档
-│   └── design/             # 设计文档
+│   ├── design/             # 设计文档
+│   └── docker.md           # Docker 部署指南
 └── tests/                  # 测试文件
 ```
 
@@ -400,29 +402,63 @@ python -m uvicorn main:app --host 0.0.0.0 --port 9000 --reload
 
 ### 方法4: Docker 部署
 
-```bash
-# 构建镜像
-docker build -t career-planning-ai:latest .
+详细文档请参考 [Docker 部署指南](docs/docker.md)。
 
-# 运行容器（需要挂载配置文件）
+**快速开始：**
+
+```bash
+# 1. 构建镜像
+docker build -t career-planning-ai .
+
+# 2. 运行容器（首次运行自动安装依赖，约5-10分钟）
 docker run -d \
   --name career-ai \
   -p 9000:9000 \
-  -v $(pwd)/config.yaml:/app/config.yaml \
   -v $(pwd)/.env:/app/.env \
   -v $(pwd)/data:/app/data \
   -v $(pwd)/logs:/app/logs \
-  career-planning-ai:latest
+  career-planning-ai
 
-# 或使用环境变量传递敏感配置
-docker run -d \
-  --name career-ai \
-  -p 9000:9000 \
-  -v $(pwd)/config.yaml:/app/config.yaml \
-  -e LLM__API_KEY=your_api_key \
-  -e DATABASE__USER=your_user \
-  -e DATABASE__PASSWORD=your_password \
-  career-planning-ai:latest
+# 3. 查看日志
+docker logs -f career-ai
+```
+
+**参数说明：**
+
+| 参数 | 说明 |
+|------|------|
+| `.env` | 环境变量文件（API密钥等敏感配置） |
+| `data` | 数据目录（向量库、模型文件） |
+| `logs` | 日志目录 |
+
+**常用命令：**
+
+```bash
+# 停止容器
+docker stop career-ai
+
+# 启动容器
+docker start career-ai
+
+# 删除容器
+docker rm -f career-ai
+
+# 一键重建
+docker rm -f career-ai && docker run -d --name career-ai -p 9000:9000 \
+  -v $(pwd)/.env:/app/.env \
+  -v $(pwd)/data:/app/data \
+  -v $(pwd)/logs:/app/logs \
+  career-planning-ai
+```
+
+**镜像分享（离线部署）：**
+
+```bash
+# 导出镜像
+docker save career-planning-ai | gzip > career-planning-ai.tar.gz
+
+# 导入镜像（部署机器上）
+gunzip -c career-planning-ai.tar.gz | docker load
 ```
 
 ## 四、验证服务

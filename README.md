@@ -2,6 +2,10 @@
 
 > **职引未来** —— 基于 AI 的全方位职业发展规划平台，为大学生提供智能对话、人岗匹配、职业路径规划、能力评估等一站式职业发展服务。
 
+## 项目预览
+
+![CareerAgent 封面]
+
 ## 项目架构
 
 ```
@@ -72,6 +76,7 @@ CareerAgent/
 | FastAPI + Uvicorn | Web API 框架 |
 | Python 3.12 | 运行环境 |
 | Poetry | 依赖管理 |
+| Docker | 容器化部署 |
 | LangChain + OpenAI + DashScope | LLM 集成 (通义千问/DeepSeek) |
 | Milvus / ChromaDB | 向量检索 |
 | Neo4j | 知识图谱 |
@@ -84,7 +89,7 @@ CareerAgent/
 | Spring Boot 3.5.9 | Web 框架 |
 | Java 21 | 运行环境 |
 | MyBatis-Plus 3.5.15 | ORM 框架 |
-| MySQL 9.6.0 | 关系数据库 |
+| MySQL 8.0+ | 关系数据库 |
 | Redis | 缓存 (验证码/会话) |
 | RabbitMQ | 消息队列 |
 | JWT (jjwt) | 认证授权 |
@@ -108,15 +113,19 @@ CareerAgent/
 
 ### 环境要求
 
-- **Java** 21+
-- **Python** 3.12+
-- **Node.js** 18+
-- **MySQL** 8.0+
-- **Redis** 6.0+
-- **Neo4j** 5.0+ (可选，用于知识图谱功能)
-- **Milvus** 或 Zilliz Cloud 账号 (可选，用于向量检索)
+| 环境 | 版本要求 |
+|------|----------|
+| Java | 21+ |
+| Python | 3.12+ |
+| Node.js | 18+ |
+| MySQL | 8.0+ |
+| Redis | 6.0+ |
+| Neo4j | 5.0+ (可选) |
+| Milvus | 可选，向量检索 |
 
 ### 1. AI 服务
+
+#### 方式一：本地运行
 
 ```bash
 cd career-planning-ai
@@ -133,6 +142,32 @@ poetry run python main.py
 # 服务运行在 http://localhost:9000
 ```
 
+#### 方式二：Docker 部署
+
+```bash
+cd career-planning-ai
+
+# 配置环境变量
+cp .env.example .env
+# 编辑 .env 填入 API Keys 等敏感配置
+
+# 构建并运行容器
+docker build -t career-planning-ai .
+docker run -d \
+  --name career-ai \
+  -p 9000:9000 \
+  -v $(pwd)/.env:/app/.env \
+  -v $(pwd)/data:/app/data \
+  -v $(pwd)/logs:/app/logs \
+  career-planning-ai
+
+# 查看日志
+docker logs -f career-ai
+# 服务运行在 http://localhost:9000
+```
+
+> Docker 部署详情请参考 [career-planning-ai/docs/docker.md](career-planning-ai/docs/docker.md)
+
 ### 2. 业务后端
 
 ```bash
@@ -142,7 +177,7 @@ cd career-planning-backend
 # 编辑 src/main/resources/application-dev.yaml
 
 # 使用 Maven 启动
-mvn spring-boot:run
+mvn spring-boot:run -Dspring-boot.run.profiles=dev
 # 服务运行在 http://localhost:8080
 ```
 
@@ -187,6 +222,8 @@ career-planning-ai/
 ```
 career-planning-backend/
 ├── pom.xml                   # Maven 依赖配置
+├── README.md                 # 后端文档
+├── docs/                     # 后端相关文档
 └── src/main/
     ├── java/com/backend/careerplanningbackend/
     │   ├── config/           # 配置类 (拦截器/Web/AI服务/支付宝)
@@ -208,18 +245,19 @@ career-planning-backend/
 career-planning-frontend/
 ├── package.json              # npm 依赖配置
 ├── vite.config.ts            # Vite 配置
-├── src/
-│   ├── main.ts               # 应用入口
-│   ├── App.vue               # 根组件
-│   ├── api/                  # API 请求层
-│   ├── components/           # 公共组件
-│   ├── views/                # 页面视图 (17 个)
-│   ├── router/               # 路由配置
-│   ├── stores/               # Pinia 状态管理
-│   ├── utils/                # 工具函数
-│   ├── types/                # TypeScript 类型定义
-│   └── assets/               # 静态资源
-└── public/                   # 公共静态资源
+├── README.md                 # 前端文档
+├── docs/                     # 前端相关文档
+└── src/
+    ├── main.ts               # 应用入口
+    ├── App.vue               # 根组件
+    ├── api/                  # API 请求层
+    ├── components/           # 公共组件
+    ├── views/                # 页面视图 (17 个)
+    ├── router/               # 路由配置
+    ├── stores/               # Pinia 状态管理
+    ├── utils/                # 工具函数
+    ├── types/                # TypeScript 类型定义
+    └── assets/               # 静态资源
 ```
 
 ## API 概览
@@ -289,9 +327,19 @@ proxy: {
 | [docs/AI_SERVICE_API.md](docs/AI_SERVICE_API.md) | AI 服务 API 文档 |
 | [docs/CONFIGURATION.md](docs/CONFIGURATION.md) | 配置详解 |
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | 部署指南 |
-| [career-planning-ai/README.md](career-planning-ai/README.md) | AI 服务详细文档 |
-| [career-planning-backend/docs/BACKEND_DOC.md](career-planning-backend/docs/BACKEND_DOC.md) | 后端技术文档 |
-| [career-planning-frontend/README.md](career-planning-frontend/README.md) | 前端文档 |
+| [career-planning-ai/docs/docker.md](career-planning-ai/docs/docker.md) | AI 服务 Docker 部署指南 |
+| [career-planning-backend/README.md](career-planning-backend/README.md) | 后端详细文档 |
+| [career-planning-frontend/README.md](career-planning-frontend/README.md) | 前端详细文档 |
+
+## 贡献指南
+
+欢迎提交 Pull Request 或 Issue！
+
+1. Fork 本仓库
+2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 创建 Pull Request
 
 ## License
 

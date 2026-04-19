@@ -99,8 +99,8 @@ match_analyzer:
 redis:
   host: <HOST>
   port: 0
-  username: <USERNAME>
-  password: <PASSWORD>
+  username: <USERNAME> # 用户名，默认为空，非必填
+  password: <PASSWORD> # 密码，默认为空，非必填
   connect_timeout: 2000 # 连接超时时间，单位毫秒
   cache_timeout:
     default: 86400 # 默认缓存超时时间，单位秒
@@ -113,7 +113,7 @@ neo4j:
   username: 3f0cb79d
   password: <PASSWORD>
 other:
-  ssl_verify: false
+  ssl_verify: false # 是否验证SSL证书
   text_file_suffix: [ "txt", "md", "json", "csv", "xml", "html", "htm", "log", "yml", "yaml", "ini", "conf" ]
   word_file_suffix: [ "doc", "docx" ]
 conversation:
