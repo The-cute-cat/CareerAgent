@@ -1,24 +1,8 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Application } from 'pixi.js'
 import * as PIXI from 'pixi.js'
 import mascotFallback from '@/assets/Mascot.png'
-
-/**
- * 兼容性说明
- * 当前项目 package-lock / node_modules 实际安装的是：
- * - pixi.js: 6.5.10
- * - pixi-live2d-display: 0.4.0
- *
- * 这组依赖本身是兼容的，因此本组件现在优先兼容 PixiJS v6，
- * 同时保留对 PixiJS v8 Application.init() 的分支支持。
- *
-
- * 若后续你再次升级到 Pixi v8：
- * - 本组件会优先尝试 app.init()
- * - 但 pixi-live2d-display 0.4.0 官方仍主要面向 Pixi v6
- * - 正式方案依然建议同步升级/替换 Live2D 库，而不是只升 Pixi
- */
 
 declare global {
   interface Window {
@@ -80,17 +64,22 @@ const loadFailed = ref(false)
 let app: Application | null = null
 let model: Live2DModelLike | null = null
 let resizeObserver: ResizeObserver | null = null
+let intersectionObserver: IntersectionObserver | null = null
+let lazyInitialized = false
+let disposed = false
+let activeInitId = 0
 let idleTimer: number | null = null
 let mouthTimer: number | null = null
-let activeInitId = 0
-let disposed = false
-
-let isDragging = false
+let visibilityPaused = false
+let dragPointerId: number | null = null
 let dragOffsetX = 0
 let dragOffsetY = 0
+let lastExpressionAt = 0
+let throttledSpeakTimer: number | null = null
 
 const CUBISM4_CORE_URL = 'https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js'
 const CUBISM2_CORE_URL = 'https://cdn.jsdelivr.net/gh/dylanNew/live2d/webgl/Live2D/lib/live2d.min.js'
+const EXPRESSION_THROTTLE = 260
 
 function supportsPixiInit(instance: Application): instance is Application & {
   init: (options: Record<string, unknown>) => Promise<void>
@@ -104,14 +93,8 @@ function resolvePixiView(instance: Application): HTMLCanvasElement | null {
     view?: HTMLCanvasElement
   }
 
-  if (appWithCanvas.canvas instanceof HTMLCanvasElement) {
-    return appWithCanvas.canvas
-  }
-
-  if (appWithCanvas.view instanceof HTMLCanvasElement) {
-    return appWithCanvas.view
-  }
-
+  if (appWithCanvas.canvas instanceof HTMLCanvasElement) return appWithCanvas.canvas
+  if (appWithCanvas.view instanceof HTMLCanvasElement) return appWithCanvas.view
   return null
 }
 
@@ -119,62 +102,26 @@ function isCubism2Model(modelUrl: string): boolean {
   return /\.model\.json(?:[?#].*)?$/i.test(modelUrl)
 }
 
-function clearTimers() {
-  if (idleTimer !== null) {
-    window.clearInterval(idleTimer)
-    idleTimer = null
-  }
-
-  if (mouthTimer !== null) {
-    window.clearInterval(mouthTimer)
-    mouthTimer = null
-  }
-}
-
-function stopDrag() {
-  isDragging = false
-}
-
-function startDrag(event: MouseEvent | TouchEvent) {
-  if (!props.draggable || !containerRef.value) return
-
-  const point = 'touches' in event ? event.touches[0] : event
-  if (!point) return
-
-  isDragging = true
-  const rect = containerRef.value.getBoundingClientRect()
-  dragOffsetX = point.clientX - rect.left
-  dragOffsetY = point.clientY - rect.top
-
-  containerRef.value.style.left = `${rect.left}px`
-  containerRef.value.style.top = `${rect.top}px`
-}
-
-function drag(event: MouseEvent | TouchEvent) {
-  if (!props.draggable || !isDragging || !containerRef.value) return
-
-  const point = 'touches' in event ? event.touches[0] : event
-  if (!point) return
-
-  containerRef.value.style.left = `${point.clientX - dragOffsetX}px`
-  containerRef.value.style.top = `${point.clientY - dragOffsetY}px`
+function clearTimers(): void {
+  if (idleTimer !== null) window.clearInterval(idleTimer)
+  if (mouthTimer !== null) window.clearInterval(mouthTimer)
+  if (throttledSpeakTimer !== null) window.clearTimeout(throttledSpeakTimer)
+  idleTimer = null
+  mouthTimer = null
+  throttledSpeakTimer = null
 }
 
 function loadScript(src: string, runtimeType: 'cubism2' | 'cubism4') {
   return new Promise<void>((resolve, reject) => {
-    // 只允许加载白名单内的 CDN 脚本，防止 XSS
-    const allowedDomains = [
-      'cubism.live2d.com',
-      'cdn.jsdelivr.net',
-    ]
+    const allowedDomains = ['cubism.live2d.com', 'cdn.jsdelivr.net']
     try {
       const url = new URL(src)
       if (!allowedDomains.includes(url.hostname)) {
-        reject(new Error(`不安全的脚本源: ${src}`))
+        reject(new Error(`Unsafe script source: ${src}`))
         return
       }
     } catch {
-      reject(new Error(`无效的脚本 URL: ${src}`))
+      reject(new Error(`Invalid script url: ${src}`))
       return
     }
 
@@ -186,11 +133,8 @@ function loadScript(src: string, runtimeType: 'cubism2' | 'cubism4') {
         resolve()
         return
       }
-
       existing.addEventListener('load', () => resolve(), { once: true })
-      existing.addEventListener('error', () => reject(new Error(`Failed to load runtime script: ${src}`)), {
-        once: true,
-      })
+      existing.addEventListener('error', () => reject(new Error(`Failed to load runtime script: ${src}`)), { once: true })
       return
     }
 
@@ -199,9 +143,8 @@ function loadScript(src: string, runtimeType: 'cubism2' | 'cubism4') {
     script.async = true
     script.dataset.live2dCore = src
 
-    // 添加加载超时处理
     const timeoutId = window.setTimeout(() => {
-      reject(new Error(`脚本加载超时: ${src}`))
+      reject(new Error(`Script load timeout: ${src}`))
       script.remove()
     }, 30000)
 
@@ -219,38 +162,26 @@ function loadScript(src: string, runtimeType: 'cubism2' | 'cubism4') {
 
 async function resolveLive2DFactory(modelUrl: string): Promise<Live2DModelFactory> {
   if (isCubism2Model(modelUrl)) {
-    if (!window.Live2D) {
-      await loadScript(CUBISM2_CORE_URL, 'cubism2')
-    }
-
+    if (!window.Live2D) await loadScript(CUBISM2_CORE_URL, 'cubism2')
     const module = await import('pixi-live2d-display/cubism2')
     return module.Live2DModel as unknown as Live2DModelFactory
   }
 
-  if (!window.Live2DCubismCore) {
-    await loadScript(CUBISM4_CORE_URL, 'cubism4')
-  }
-
+  if (!window.Live2DCubismCore) await loadScript(CUBISM4_CORE_URL, 'cubism4')
   const module = await import('pixi-live2d-display/cubism4')
   return module.Live2DModel as unknown as Live2DModelFactory
 }
 
-function fitModel() {
+function fitModel(): void {
   const container = containerRef.value
-
-  if (!container || !app || !app.renderer || !model) {
-    return
-  }
+  if (!container || !app || !app.renderer || !model) return
 
   const width = Math.max(container.clientWidth || 0, 1)
   const height = Math.max(container.clientHeight || 0, 1)
 
   app.renderer.resize(width, height)
-
   model.scale.set(1, 1)
-  if (model.anchor?.set) {
-    model.anchor.set(0.5, 1)
-  }
+  if (model.anchor?.set) model.anchor.set(0.5, 1)
   model.alpha = 1
   model.visible = true
 
@@ -266,9 +197,8 @@ function fitModel() {
   model.position.set(width / 2, height * 0.98)
 }
 
-function tryMotion(names: string[]) {
-  if (!model?.motion) return
-
+function tryMotion(names: string[]): void {
+  if (!model?.motion || visibilityPaused) return
   for (const name of names) {
     try {
       model.motion(name)
@@ -279,9 +209,8 @@ function tryMotion(names: string[]) {
   }
 }
 
-function tryExpression(names: string[]) {
-  if (!model?.expression) return
-
+function tryExpression(names: string[]): void {
+  if (!model?.expression || visibilityPaused) return
   for (const name of names) {
     try {
       model.expression(name)
@@ -292,50 +221,56 @@ function tryExpression(names: string[]) {
   }
 }
 
-function randomExpression() {
+function randomExpression(): void {
   const expressions = [
     ['Happy', 'happy', 'F01'],
     ['Angry', 'angry', 'F02'],
     ['Sad', 'sad', 'F03'],
     ['Neutral', 'neutral', 'F04'],
   ]
-
   const picked = expressions[Math.floor(Math.random() * expressions.length)]!
   tryExpression(picked)
 }
 
-function hoverEffect() {
-  tryExpression(['Happy', 'happy', 'F01', 'f01'])
-}
+function speakExpression(text: string): void {
+  const run = () => {
+    if (!text) return
+    const normalized = text.toLowerCase()
 
-function clickAction() {
-  tryMotion(['TapBody', 'tap_body', 'Idle', 'idle'])
-  randomExpression()
-}
+    if (normalized.includes('高兴') || normalized.includes('喜欢') || normalized.includes('完成')) {
+      tryExpression(['Happy', 'happy', 'F01'])
+      return
+    }
+    if (normalized.includes('压力') || normalized.includes('困难') || normalized.includes('生气')) {
+      tryExpression(['Angry', 'angry', 'F02'])
+      return
+    }
+    if (normalized.includes('难过') || normalized.includes('失落')) {
+      tryExpression(['Sad', 'sad', 'F03'])
+      return
+    }
+    tryExpression(['Neutral', 'neutral', 'F04'])
+  }
 
-function speakExpression(text: string) {
-  if (!text) return
-
-  if (text.includes('高兴') || text.includes('开心') || text.includes('喜欢')) {
-    tryExpression(['Happy', 'happy', 'F01'])
+  const now = Date.now()
+  const delta = now - lastExpressionAt
+  if (delta >= EXPRESSION_THROTTLE) {
+    lastExpressionAt = now
+    run()
     return
   }
 
-  if (text.includes('生气') || text.includes('压力') || text.includes('困难')) {
-    tryExpression(['Angry', 'angry', 'F02'])
-    return
-  }
-
-  if (text.includes('难过') || text.includes('失落')) {
-    tryExpression(['Sad', 'sad', 'F03'])
-    return
-  }
-
-  tryExpression(['Neutral', 'neutral', 'F04'])
+  if (throttledSpeakTimer !== null) window.clearTimeout(throttledSpeakTimer)
+  throttledSpeakTimer = window.setTimeout(() => {
+    lastExpressionAt = Date.now()
+    throttledSpeakTimer = null
+    run()
+  }, EXPRESSION_THROTTLE - delta)
 }
 
-function startIdleLoop() {
+function startIdleLoop(): void {
   clearTimers()
+  if (visibilityPaused) return
 
   idleTimer = window.setInterval(() => {
     tryMotion(['Idle', 'idle'])
@@ -344,10 +279,10 @@ function startIdleLoop() {
 
   mouthTimer = window.setInterval(() => {
     tryMotion(['TapBody', 'tap_body'])
-  }, 6000)
+  }, 6500)
 }
 
-function teardownLive2D() {
+function teardownLive2D(): void {
   clearTimers()
   resizeObserver?.disconnect()
   resizeObserver = null
@@ -356,7 +291,7 @@ function teardownLive2D() {
     try {
       model.destroy?.({ children: true })
     } catch (error) {
-      console.warn('[Live2D] 模型销毁时出现警告:', error)
+      console.warn('[Live2D] model destroy warning:', error)
     }
     model = null
   }
@@ -365,15 +300,13 @@ function teardownLive2D() {
     try {
       app.destroy(true)
     } catch (error) {
-      console.warn('[Live2D] Pixi 实例销毁时出现警告:', error)
+      console.warn('[Live2D] app destroy warning:', error)
     }
     app = null
   }
 
   const container = containerRef.value
-  if (container) {
-    container.querySelector('canvas')?.remove()
-  }
+  if (container) container.querySelector('canvas')?.remove()
 }
 
 async function initPixiApp(container: HTMLDivElement, initId: number) {
@@ -390,66 +323,43 @@ async function initPixiApp(container: HTMLDivElement, initId: number) {
   }
 
   let instance: Application | undefined
-
   try {
-    /**
-     * Pixi v8: new Application(); await app.init(options)
-     * Pixi v6: new Application(options)
-     */
     const testApp = new Application()
     const isV8 = supportsPixiInit(testApp)
     testApp.destroy(true)
-
     instance = isV8 ? new Application() : new Application(baseOptions as ConstructorParameters<typeof Application>[0])
-
-    if (supportsPixiInit(instance)) {
-      await instance.init(baseOptions)
-    }
+    if (supportsPixiInit(instance)) await instance.init(baseOptions)
   } catch (error) {
-    if (instance) {
-      try {
-        instance.destroy(true)
-      } catch {
-        // 忽略销毁时的错误
-      }
-    }
-    console.error('[Live2D] Pixi 初始化失败:', error)
-    throw new Error('Pixi 初始化失败')
+    instance?.destroy(true)
+    throw error
   }
 
   if (disposed || initId !== activeInitId) {
     instance.destroy(true)
-    throw new Error('组件已销毁或初始化已过期')
+    throw new Error('Live2D init expired')
   }
 
   const canvasElement = resolvePixiView(instance)
   if (!canvasElement) {
     instance.destroy(true)
-    throw new Error('Pixi 画布创建失败：未获取到 app.view / app.canvas')
+    throw new Error('Canvas create failed')
   }
 
   container.appendChild(canvasElement)
   canvasElement.classList.add('live2d-canvas')
-
   return instance
 }
 
-async function initLive2D() {
+async function initLive2D(): Promise<void> {
   const container = containerRef.value
   const initId = ++activeInitId
-
   loadFailed.value = false
   teardownLive2D()
 
-  if (!container) {
-    console.error('[Live2D] 初始化终止: 组件容器不存在')
-    loadFailed.value = true
-    return
-  }
+  if (!container) return
 
   try {
     window.PIXI = PIXI
-
     const factory = await resolveLive2DFactory(props.modelUrl)
     if (disposed || initId !== activeInitId) return
 
@@ -460,48 +370,103 @@ async function initLive2D() {
     }
 
     app = pixiApp
-
-    let live2DModel: Live2DModelLike
-    try {
-      live2DModel = await factory.from(props.modelUrl)
-    } catch (error) {
-      console.error('[Live2D] 模型加载失败:', error)
-      teardownLive2D()
-      loadFailed.value = true
-      return
-    }
-
-    if (disposed || initId !== activeInitId || !app || !app.stage) {
+    const live2DModel = await factory.from(props.modelUrl)
+    if (disposed || initId !== activeInitId || !app?.stage) {
       live2DModel.destroy?.({ children: true })
       return
     }
 
     model = live2DModel
     app.stage.addChild(model as never)
-
     fitModel()
-    resizeObserver = new ResizeObserver(() => {
-      fitModel()
-    })
-    resizeObserver.observe(container)
 
+    resizeObserver = new ResizeObserver(() => fitModel())
+    resizeObserver.observe(container)
     startIdleLoop()
   } catch (error) {
-    console.error('[Live2D] 初始化失败:', error)
+    console.error('[Live2D] init failed:', error)
     loadFailed.value = true
     teardownLive2D()
   }
 }
 
-onMounted(async () => {
+function maybeInitLive2D(): void {
+  if (lazyInitialized || !containerRef.value) return
+  lazyInitialized = true
+  nextTick(() => {
+    initLive2D()
+  })
+}
+
+function handleVisibilityChange(): void {
+  visibilityPaused = document.hidden
+  if (visibilityPaused) {
+    clearTimers()
+    return
+  }
+  if (model) {
+    startIdleLoop()
+    if (props.active) tryMotion(['TapBody', 'tap_body', 'Idle', 'idle'])
+  } else {
+    maybeInitLive2D()
+  }
+}
+
+function updateDragPosition(clientX: number, clientY: number): void {
+  const container = containerRef.value
+  if (!container) return
+  container.style.left = `${clientX - dragOffsetX}px`
+  container.style.top = `${clientY - dragOffsetY}px`
+}
+
+function onPointerDown(event: PointerEvent): void {
+  if (!props.draggable || !containerRef.value) return
+  dragPointerId = event.pointerId
+  const rect = containerRef.value.getBoundingClientRect()
+  dragOffsetX = event.clientX - rect.left
+  dragOffsetY = event.clientY - rect.top
+  containerRef.value.style.left = `${rect.left}px`
+  containerRef.value.style.top = `${rect.top}px`
+  containerRef.value.setPointerCapture(event.pointerId)
+}
+
+function onPointerMove(event: PointerEvent): void {
+  if (!props.draggable || dragPointerId !== event.pointerId) return
+  updateDragPosition(event.clientX, event.clientY)
+}
+
+function endPointerDrag(event?: PointerEvent): void {
+  if (event && dragPointerId === event.pointerId) {
+    containerRef.value?.releasePointerCapture(event.pointerId)
+  }
+  dragPointerId = null
+}
+
+onMounted(() => {
   disposed = false
-  await initLive2D()
+
+  if ('IntersectionObserver' in window) {
+    intersectionObserver = new IntersectionObserver((entries) => {
+      if (entries.some(entry => entry.isIntersecting)) {
+        maybeInitLive2D()
+        intersectionObserver?.disconnect()
+        intersectionObserver = null
+      }
+    }, { threshold: 0.15 })
+
+    if (containerRef.value) intersectionObserver.observe(containerRef.value)
+  } else {
+    maybeInitLive2D()
+  }
+
+  document.addEventListener('visibilitychange', handleVisibilityChange)
 })
 
 watch(
   () => props.modelUrl,
   async (nextUrl, prevUrl) => {
     if (nextUrl === prevUrl) return
+    lazyInitialized = true
     await initLive2D()
   },
 )
@@ -518,6 +483,9 @@ watch(
   (active) => {
     if (active) {
       tryMotion(['TapBody', 'tap_body', 'Idle', 'idle'])
+      randomExpression()
+    } else if (!visibilityPaused) {
+      startIdleLoop()
     }
   },
 )
@@ -525,7 +493,10 @@ watch(
 onBeforeUnmount(() => {
   disposed = true
   activeInitId += 1
-  stopDrag()
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
+  intersectionObserver?.disconnect()
+  intersectionObserver = null
+  endPointerDrag()
   teardownLive2D()
 })
 </script>
@@ -535,15 +506,11 @@ onBeforeUnmount(() => {
     ref="containerRef"
     class="live2d-container"
     :class="{ draggable }"
-    @mousedown="startDrag"
-    @mouseup="stopDrag"
-    @mouseleave="stopDrag"
-    @mousemove="drag"
-    @touchstart="startDrag"
-    @touchmove="drag"
-    @touchend="stopDrag"
-    @mouseenter="hoverEffect"
-    @click="clickAction"
+    @pointerdown="onPointerDown"
+    @pointermove="onPointerMove"
+    @pointerup="endPointerDrag"
+    @pointercancel="endPointerDrag"
+    @pointerleave="endPointerDrag"
   >
     <img v-if="loadFailed" :src="mascotFallback" alt="Pixie" class="live2d-fallback" />
   </div>
@@ -555,7 +522,6 @@ onBeforeUnmount(() => {
   width: 220px;
   height: 280px;
   overflow: hidden;
-  cursor: default;
   user-select: none;
 }
 
@@ -563,8 +529,13 @@ onBeforeUnmount(() => {
   position: fixed;
   left: 10px;
   top: 10px;
-  cursor: grab;
   z-index: 9999;
+  touch-action: none;
+  cursor: grab;
+}
+
+.live2d-container.draggable:active {
+  cursor: grabbing;
 }
 
 .live2d-container:deep(.live2d-canvas),

@@ -1,5 +1,5 @@
 /**
- * Profile.vue 模拟数据
+ * Profile.vue 测试数据
  */
 
 /**
@@ -28,7 +28,7 @@ export const graduationYearOptions = Array.from({ length: 12 }, (_, i) => {
   }
 })
 
-/** 个人档案表单模拟数据 */
+/** 个人档案表单测试数据 */
 export const profileFormData = {
   id: 1001,
   userId: 1001,
@@ -45,7 +45,7 @@ export const profileFormData = {
   bio: '985 院校背景，GPA 前 5%，热爱编程和技术研究',
 }
 
-/** 隐私设置模拟数据 */
+/** 隐私设置测试数据 */
 export const privacySettingsData = {
   resumeVisibility: 'private' as const,
   profileVisibility: 'private' as const,

@@ -3,6 +3,7 @@ import { computed, inject, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/modules/user'
 import { useAppStore } from '@/stores/modules/app'
+import { useCareerModeStore, type CareerMode } from '@/stores/careerMode'
 import { getAccountPointsService, getUserInfoService } from '@/api/points'
 import { ArrowDown, User, SwitchButton, Menu as MenuIcon, Sunny, Moon } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -14,6 +15,7 @@ const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 const appStore = useAppStore()
+const careerModeStore = useCareerModeStore()
 
 const currentTitle = computed(() => route.meta.title || '欢迎使用职业规划智能体')
 const isLoggedIn = computed(() => userStore.isLoggedIn)
@@ -57,9 +59,20 @@ const memberBadgeClass = computed(() => {
   return classMap[memberType.value] || 'is-normal'
 })
 
+const currentMode = computed(() => careerModeStore.mode)
+const currentModeLabel = computed(() => currentMode.value === 'learning' ? '学习模式' : '就业模式')
+const currentModeHint = computed(() => currentMode.value === 'learning'
+  ? '展示学习路径、能力盘点与阶段规划'
+  : '展示简历优化、岗位匹配与求职推进')
+
 const handleLogout = () => {
   userStore.clearUserInfo()
   router.push('/login')
+}
+
+const switchCareerMode = (mode: CareerMode) => {
+  if (currentMode.value === mode) return
+  careerModeStore.setMode(mode)
 }
 
 const syncAccountPoints = async () => {
@@ -139,6 +152,7 @@ const confirmLogout = () => {
 }
 
 onMounted(() => {
+  careerModeStore.initMode()
   syncAccountPoints()
   syncUserInfo()
 })
@@ -167,6 +181,31 @@ watch(
       </div>
     </div>
     <div class="header-right">
+      <div class="mode-toggle-shell">
+        <div class="mode-toggle-copy">
+          <strong>{{ currentModeLabel }}</strong>
+          <small>{{ currentModeHint }}</small>
+        </div>
+        <div class="mode-toggle">
+          <button
+            type="button"
+            class="mode-toggle-btn"
+            :class="{ 'is-active': currentMode === 'learning' }"
+            @click="switchCareerMode('learning')"
+          >
+            学习
+          </button>
+          <button
+            type="button"
+            class="mode-toggle-btn"
+            :class="{ 'is-active': currentMode === 'job' }"
+            @click="switchCareerMode('job')"
+          >
+            就业
+          </button>
+        </div>
+      </div>
+
       <!-- 环境背景色与主题切换 -->
       <div class="theme-switch-wrapper">
         <el-tooltip content="自定义背景色" placement="bottom">
@@ -274,6 +313,73 @@ watch(
   display: flex;
   align-items: center;
   gap: 16px;
+}
+
+.mode-toggle {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-background);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.mode-toggle-shell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 18px;
+  border: 1px solid var(--color-border);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(248, 250, 252, 0.92));
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.05);
+}
+
+.mode-toggle-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 156px;
+}
+
+.mode-toggle-label {
+  color: #409eff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.mode-toggle-copy strong {
+  color: var(--color-heading);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.mode-toggle-copy small {
+  color: #6b7280;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.mode-toggle-btn {
+  min-width: 58px;
+  height: 30px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mode-toggle-btn.is-active {
+  background: linear-gradient(135deg, #409eff 0%, #1677ff 100%);
+  color: #fff;
+  box-shadow: 0 4px 10px rgba(64, 158, 255, 0.22);
 }
 
 .theme-switch-wrapper {
@@ -513,6 +619,19 @@ watch(
 
   .user-info {
     padding: 8px 12px;
+  }
+
+  .mode-toggle {
+    order: -1;
+  }
+
+  .mode-toggle-shell {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .mode-toggle-copy {
+    min-width: 0;
   }
 
   .user-name {

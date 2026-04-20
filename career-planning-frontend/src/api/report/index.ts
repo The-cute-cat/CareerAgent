@@ -3,7 +3,7 @@ import type { GrowthPlanData } from '@/types/career-report'
 import type { Result } from '@/types/type'
 
 export interface GetReportPlanParams {
-  jobId: number
+  jobId: string | number
   cacheEnabled?: boolean
 }
 

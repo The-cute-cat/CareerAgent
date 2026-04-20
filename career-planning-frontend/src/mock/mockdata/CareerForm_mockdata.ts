@@ -658,8 +658,8 @@ export interface MockFormData {
 }
 
 /**
- * 模拟计算六维能力分数
- * 基于表单数据计算各项能力得分（前端模拟版本，用于调试预览）
+ * 计算六维能力分数
+ * 基于表单数据计算各项能力得分（本地版本，用于预览）
  * @param formData 表单数据
  * @returns 六维能力分数
  */
@@ -707,10 +707,10 @@ export const calculateRadarScores = (formData: MockFormData): RadarScores => {
 }
 
 /**
- * 模拟生成能力评估报告数据
- * 用于前端调试预览，模拟后端返回的报告数据结构
+ * 生成能力评估报告数据
+ * 用于本地预览，生成报告数据结构
  * @param formData 表单数据
- * @returns 模拟的报告数据（包含能力分数）
+ * @returns 报告数据（包含能力分数）
  */
 export const generateMockAbilityReport = (formData: MockFormData) => {
   const scores = calculateRadarScores(formData)

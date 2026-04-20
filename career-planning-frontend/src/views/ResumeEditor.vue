@@ -6,6 +6,8 @@ import { useRouter } from 'vue-router'
 import { useJsonResumeStore } from '@/stores/modules/jsonResume'
 import { loadCareerFormData } from '@/utils/career-runtime'
 import { exportManualResumeToWord, exportResumePreviewToPdf } from '@/utils/resume-export'
+import demoAvatarImage from '@/assets/Mascot.png'
+import { usePoints } from '@/composables/usePoints'
 
 type ResumeWorkItem = { company: string; position: string; date: string; desc: string }
 type ResumeProjectItem = { name: string; tech: string; date: string; desc: string }
@@ -30,6 +32,21 @@ type ValidationError = { field: string; label: string; message: string }
 const router = useRouter()
 const jsonResumeStore = useJsonResumeStore()
 const previewRef = ref<HTMLElement | null>(null)
+
+// 积分系统
+const { consumePoints } = usePoints()
+
+// 导出简历（带积分检查）
+const requestExportWithPoints = async (type: 'pdf' | 'word') => {
+  // 扣除积分（简历一键生成：60积分）
+  const pointsResult = await consumePoints('resumeGenerate', type === 'pdf' ? '导出PDF简历' : '导出Word简历')
+  if (!pointsResult.success) {
+    // 积分不足，已弹出提示
+    return
+  }
+  // 积分扣除成功，继续导出
+  requestExport(type)
+}
 const exportingPdf = ref(false)
 const exportingWord = ref(false)
 const templateDialogVisible = ref(false)
@@ -41,6 +58,8 @@ const validationErrors = ref<ValidationError[]>([])
 const completenessScore = ref(0)
 const workExpanded = ref([true, true])
 const projectExpanded = ref([true, true])
+const avatarFileInputRef = ref<HTMLInputElement | null>(null)
+const uploadedAvatar = ref('')
 
 // 标签页完成状态检查
 const isTabCompleted = (tab: string) => {
@@ -92,6 +111,27 @@ const demo: ResumeEditorState = {
     { name: '智能客服系统', tech: 'Spring Boot, WebSocket, NLP', date: '2022.07 - 2022.12', desc: '- 项目背景：降低人工客服成本，提升响应效率\n- 核心职责：设计会话管理模块，对接第三方 NLP 服务\n- 项目成果：自动回复准确率提升，人工压力明显下降' }
   ]
 }
+const demoAvatar = demoAvatarImage
+
+const createEmptyWork = (): ResumeWorkItem => ({ company: '', position: '', date: '', desc: '' })
+const createEmptyProject = (): ResumeProjectItem => ({ name: '', tech: '', date: '', desc: '' })
+const uniqueStrings = (values: Array<string | undefined | null>) => Array.from(new Set(values.map(item => trim(item)).filter(Boolean)))
+const joinIfText = (values: Array<string | undefined | null>, separator: string) => uniqueStrings(values).join(separator)
+const normalizeDateText = (value: unknown) => {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString().slice(0, 10)
+  const text = trim(value)
+  if (!text) return ''
+  const parsed = new Date(text)
+  return Number.isNaN(parsed.getTime()) ? text : parsed.toISOString().slice(0, 10)
+}
+const buildDateRange = (value: unknown) => Array.isArray(value)
+  ? value.map(item => normalizeDateText(item)).filter(Boolean).join(' - ')
+  : ''
+const padItems = <T>(items: T[], size: number, factory: () => T) => {
+  const result = items.slice(0, size)
+  while (result.length < size) result.push(factory())
+  return result
+}
 
 const trim = (v: unknown) => typeof v === 'string' ? v.trim() : ''
 const hasText = (v: unknown) => trim(v).length > 0
@@ -104,6 +144,51 @@ const languages = computed(() => splitLines(form.languages))
 const works = computed(() => form.work.filter(i => [i.company, i.position, i.date, i.desc].some(hasText)))
 const projects = computed(() => form.projects.filter(i => [i.name, i.tech, i.date, i.desc].some(hasText)))
 const templateLabel = computed(() => ({ professional: '专业模板', modern: '现代模板', compact: '紧凑模板' }[selectedTemplate.value]))
+
+const portraitAvatar = computed(() =>
+  uploadedAvatar.value ||
+  trim(jsonResumeStore.resume?.basics.image) ||
+  trim(jsonResumeStore.profileExtras.basics.image)
+)
+const avatarInitial = computed(() => trim(form.name).slice(0, 1) || '空')
+
+const openAvatarPicker = () => {
+  avatarFileInputRef.value?.click()
+}
+
+const handleAvatarChange = (event: Event) => {
+  const input = event.target as HTMLInputElement | null
+  const file = input?.files?.[0]
+  if (!file) return
+
+  if (!file.type.startsWith('image/')) {
+    ElMessage.warning('请选择图片文件作为头像')
+    input.value = ''
+    return
+  }
+
+  const reader = new FileReader()
+  reader.onload = () => {
+    const result = typeof reader.result === 'string' ? reader.result : ''
+    if (!result) {
+      ElMessage.error('头像加载失败，请重新选择图片')
+      return
+    }
+
+    uploadedAvatar.value = result
+    ElMessage.success('头像已加载，可直接用于预览和导出')
+  }
+  reader.onerror = () => {
+    ElMessage.error('头像加载失败，请重新选择图片')
+  }
+  reader.readAsDataURL(file)
+  input.value = ''
+}
+
+const applyDemo = () => {
+  uploadedAvatar.value = demoAvatar
+  fill(demo)
+}
 
 const fill = (data: ResumeEditorState) => {
   Object.assign(form, {
@@ -194,6 +279,97 @@ const hydrate = () => {
   ElMessage.success('已从能力画像载入当前简历信息')
 }
 
+const importPortrait = () => {
+  const cached = loadCareerFormData()
+  const resume = jsonResumeStore.resume
+  const extras = jsonResumeStore.profileExtras
+
+  const workItems = [
+    ...(resume?.work?.map((item: { name?: string; position?: string; startDate?: string; endDate?: string; summary?: string; highlights?: string[] }) => ({
+      company: trim(item.name),
+      position: trim(item.position),
+      date: [trim(item.startDate), trim(item.endDate) || '鑷充粖'].filter(Boolean).join(' - '),
+      desc: uniqueStrings([trim(item.summary), ...(item.highlights || [])]).join('\n')
+    })) || []),
+    ...(extras.workHistory?.map(item => ({
+      company: trim(item.name),
+      position: trim(item.position),
+      date: [normalizeDateText(item.startDate), normalizeDateText(item.endDate) || '鑷充粖'].filter(Boolean).join(' - '),
+      desc: uniqueStrings([trim(item.summary), ...(item.highlights || [])]).join('\n')
+    })) || []),
+    ...(cached?.internships?.map(item => ({
+      company: trim(item.company),
+      position: trim(item.role),
+      date: buildDateRange(item.date),
+      desc: trim(item.desc)
+    })) || [])
+  ].filter(item => Object.values(item).some(hasText))
+
+  const projectItems = [
+    ...(resume?.projects?.map((item: { name?: string; keywords?: string[]; startDate?: string; endDate?: string; description?: string; highlights?: string[] }) => ({
+      name: trim(item.name),
+      tech: (item.keywords || []).map(keyword => trim(keyword)).filter(Boolean).join(', '),
+      date: [trim(item.startDate), trim(item.endDate)].filter(Boolean).join(' - '),
+      desc: uniqueStrings([trim(item.description), ...(item.highlights || [])]).join('\n')
+    })) || []),
+    ...(extras.projectHistory?.map(item => ({
+      name: trim(item.name),
+      tech: (item.keywords || []).map(keyword => trim(keyword)).filter(Boolean).join(', '),
+      date: [normalizeDateText(item.startDate), normalizeDateText(item.endDate)].filter(Boolean).join(' - '),
+      desc: uniqueStrings([trim(item.description), ...(item.highlights || [])]).join('\n')
+    })) || []),
+    ...(cached?.projects?.map(item => ({
+      name: trim(item.name),
+      tech: item.isCompetition ? '竞赛项目' : '',
+      date: '',
+      desc: trim(item.desc)
+    })) || [])
+  ].filter(item => Object.values(item).some(hasText))
+
+  const payload: ResumeEditorState = {
+    name: trim(resume?.basics.name) || trim(extras.basics.name),
+    title: trim(resume?.basics.label) || trim(extras.basics.label) || trim(cached?.targetJob),
+    phone: trim(resume?.basics.phone) || trim(extras.basics.phone),
+    email: trim(resume?.basics.email) || trim(extras.basics.email),
+    location: joinIfText([
+      trim(resume?.basics.location?.city) || trim(extras.basics.city),
+      trim(resume?.basics.location?.region) || trim(extras.basics.region)
+    ], ' / '),
+    education: [trim(resume?.education?.[0]?.studyType) || trim(extras.educationHistory?.[0]?.studyType) || trim(cached?.education), trim(resume?.education?.[0]?.area) || trim(extras.educationHistory?.[0]?.area) || cached?.major?.join(' / ') || ''].filter(Boolean).join(' / '),
+    school: trim(resume?.education?.[0]?.institution) || trim(extras.educationHistory?.[0]?.institution),
+    summary: trim(resume?.basics.summary) || trim(extras.basics.summary) || trim(cached?.innovation),
+    skills: uniqueStrings([
+      ...(resume?.skills?.flatMap((item: { keywords?: string[] }) => item.keywords || []) || []),
+      ...(extras.customSkillGroups?.flatMap(item => item.keywords || []) || []),
+      ...(cached?.skills?.map((item: { name: string }) => item.name) || []),
+      ...(cached?.tools?.map((item: { name: string }) => item.name) || [])
+    ]).join(', '),
+    awards: uniqueStrings([
+      ...(resume?.certificates?.map((item: { name: string }) => item.name) || []),
+      ...(extras.certificates?.map(item => item.name) || []),
+      ...(cached?.certificates || []),
+      trim(cached?.certificateOther)
+    ]).join('\n'),
+    languages: uniqueStrings([
+      ...(resume?.languages?.map((item: { language: string; fluency?: string }) => [item.language, item.fluency].filter(Boolean).join(' ')) || []),
+      ...(extras.languages?.map(item => [item.language, item.fluency].filter(Boolean).join(' ')) || []),
+      ...(cached?.languages?.map((item: { type: string; level?: string; other?: string }) => [item.type, item.level || item.other].filter(Boolean).join(' ')) || [])
+    ]).join('\n'),
+    portfolio: joinIfText([
+      trim(resume?.basics.profiles?.[0]?.url),
+      trim(resume?.basics.url),
+      trim(extras.basics.profiles?.[0]?.url),
+      trim(extras.basics.url),
+      trim(cached?.codeAbility?.links)
+    ], '\n'),
+    work: padItems(workItems, 2, createEmptyWork),
+    projects: padItems(projectItems, 2, createEmptyProject)
+  }
+
+  fill(payload)
+  ElMessage.success('已从能力画像载入当前简历信息')
+}
+
 const completeness = () => {
   const checks = [hasText(form.name), hasText(form.phone), hasText(form.email), hasText(form.school), hasText(form.education), hasText(form.summary), skills.value.length > 0, works.value.length > 0, projects.value.length > 0]
   return Math.round(checks.filter(Boolean).length / checks.length * 100)
@@ -243,7 +419,7 @@ const confirmExport = async () => {
   if (pendingExportAction.value === 'word') {
     exportingWord.value = true
     try {
-      await exportManualResumeToWord(form, { fileName: `${form.name || 'resume-editor'}.docx` })
+      await exportManualResumeToWord({ ...form, avatar: portraitAvatar.value }, { fileName: `${form.name || 'resume-editor'}.docx` })
       ElMessage.success('Word 导出成功')
     } catch (error) {
       console.error(error)
@@ -260,10 +436,17 @@ const selectTemplate = (template: 'professional' | 'modern' | 'compact') => {
   ElMessage.success(`已切换为${templateLabel.value}`)
 }
 
-onMounted(hydrate)
+onMounted(importPortrait)
 </script>
 <template>
   <div class="resume-editor-page">
+    <input
+      ref="avatarFileInputRef"
+      type="file"
+      accept="image/*"
+      class="avatar-file-input"
+      @change="handleAvatarChange"
+    >
     <!-- 顶部导航栏 -->
     <header class="editor-header">
       <div class="editor-header__brand">
@@ -289,19 +472,19 @@ onMounted(hydrate)
         <el-divider direction="vertical" class="header-divider" />
 
         <el-button-group>
-          <el-button :icon="UploadFilled" @click="hydrate">导入画像</el-button>
-          <el-button :icon="RefreshRight" @click="fill(demo)">示例数据</el-button>
+          <el-button :icon="UploadFilled" @click="importPortrait">导入画像</el-button>
+          <el-button :icon="RefreshRight" @click="applyDemo">示例数据</el-button>
           <el-button :icon="Files" @click="templateDialogVisible = true">切换模板</el-button>
         </el-button-group>
 
         <el-divider direction="vertical" class="header-divider" />
 
-        <el-dropdown split-button type="primary" :loading="exportingPdf || exportingWord" @click="requestExport('pdf')">
+        <el-dropdown split-button type="primary" :loading="exportingPdf || exportingWord" @click="requestExportWithPoints('pdf')">
           <el-icon class="export-icon"><Download /></el-icon>
           <span class="export-text">导出 PDF</span>
           <template #dropdown>
             <el-dropdown-menu>
-              <el-dropdown-item :icon="Download" @click="requestExport('word')" :disabled="exportingWord">
+              <el-dropdown-item :icon="Download" @click="requestExportWithPoints('word')" :disabled="exportingWord">
                 {{ exportingWord ? '导出中...' : '导出 Word' }}
               </el-dropdown-item>
             </el-dropdown-menu>
@@ -618,9 +801,9 @@ onMounted(hydrate)
 
       <section class="preview-panel">
         <div ref="previewRef" class="resume-paper" :class="`template-${selectedTemplate}`"><div class="resume-template-badge">{{ templateLabel }}</div>
-          <template v-if="selectedTemplate === 'professional'"><header class="resume-header professional-header"><div><div class="resume-name">{{ form.name || '你的姓名' }}</div><div v-if="form.title" class="resume-title">{{ form.title }}</div></div><div v-if="contacts.length" class="resume-contact resume-contact--stacked"><span v-for="item in contacts" :key="item">{{ item }}</span></div></header><section v-if="form.summary" class="resume-section"><div class="resume-section-title">个人简介</div><div class="resume-item-content">{{ form.summary }}</div></section><section v-if="form.education || form.school" class="resume-section"><div class="resume-section-title">教育背景</div><div class="resume-item"><div class="resume-item-title">{{ form.school }}</div><div class="resume-item-subtitle">{{ form.education }}</div></div></section><section v-if="works.length" class="resume-section"><div class="resume-section-title">工作经历</div><div v-for="(item, index) in works" :key="`pw-${index}`" class="resume-item"><div class="resume-item-header"><span class="resume-item-title">{{ item.company }}<template v-if="item.position"> / {{ item.position }}</template></span><span class="resume-item-date">{{ item.date }}</span></div><div class="resume-item-content">{{ item.desc }}</div></div></section><section v-if="projects.length" class="resume-section"><div class="resume-section-title">项目经验</div><div v-for="(item, index) in projects" :key="`pp-${index}`" class="resume-item"><div class="resume-item-header"><span class="resume-item-title">{{ item.name }}<template v-if="item.tech"> ({{ item.tech }})</template></span><span class="resume-item-date">{{ item.date }}</span></div><div class="resume-item-content">{{ item.desc }}</div></div></section><section v-if="skills.length" class="resume-section"><div class="resume-section-title">专业技能</div><div class="tag-wrap"><span v-for="item in skills" :key="item" class="resume-skill-tag">{{ item }}</span></div></section></template>
-          <template v-else-if="selectedTemplate === 'modern'"><div class="modern-layout"><aside class="modern-sidebar"><div class="modern-profile"><div class="resume-name modern-name">{{ form.name || '你的姓名' }}</div><div v-if="form.title" class="resume-title modern-title">{{ form.title }}</div></div><section v-if="contacts.length" class="modern-section"><div class="resume-section-title modern-section-title">联系方式</div><div class="modern-list"><span v-for="item in contacts" :key="item">{{ item }}</span></div></section><section v-if="skills.length" class="modern-section"><div class="resume-section-title modern-section-title">专业技能</div><div class="tag-wrap"><span v-for="item in skills" :key="item" class="resume-skill-tag modern-tag">{{ item }}</span></div></section><section v-if="awards.length" class="modern-section"><div class="resume-section-title modern-section-title">荣誉证书</div><div class="resume-item-content modern-copy">{{ awards.join('\n') }}</div></section><section v-if="languages.length || form.portfolio" class="modern-section"><div class="resume-section-title modern-section-title">其他信息</div><div v-if="languages.length" class="resume-item-content modern-copy">{{ languages.join('\n') }}</div><div v-if="form.portfolio" class="resume-item-content modern-link">{{ form.portfolio }}</div></section></aside><main class="modern-main"><section v-if="form.summary" class="resume-section"><div class="resume-section-title">个人简介</div><div class="resume-item-content">{{ form.summary }}</div></section><section v-if="works.length" class="resume-section"><div class="resume-section-title">工作经历</div><div v-for="(item, index) in works" :key="`mw-${index}`" class="resume-item"><div class="resume-item-header"><span class="resume-item-title">{{ item.company }}<template v-if="item.position"> / {{ item.position }}</template></span><span class="resume-item-date">{{ item.date }}</span></div><div class="resume-item-content">{{ item.desc }}</div></div></section><section v-if="projects.length" class="resume-section"><div class="resume-section-title">项目经验</div><div v-for="(item, index) in projects" :key="`mp-${index}`" class="resume-item"><div class="resume-item-header"><span class="resume-item-title">{{ item.name }}<template v-if="item.tech"> ({{ item.tech }})</template></span><span class="resume-item-date">{{ item.date }}</span></div><div class="resume-item-content">{{ item.desc }}</div></div></section><section v-if="form.education || form.school" class="resume-section"><div class="resume-section-title">教育背景</div><div class="resume-item"><div class="resume-item-title">{{ form.school }}</div><div class="resume-item-subtitle">{{ form.education }}</div></div></section></main></div></template>
-          <template v-else><header class="resume-header compact-header"><div><div class="resume-name compact-name">{{ form.name || '你的姓名' }}</div><div v-if="form.title" class="resume-title compact-title">{{ form.title }}</div></div><div v-if="contacts.length" class="resume-contact compact-contact"><span v-for="item in contacts" :key="item">{{ item }}</span></div></header><div class="compact-layout"><aside class="compact-side"><section v-if="form.summary" class="resume-section compact-block"><div class="resume-section-title compact-section-title">个人简介</div><div class="resume-item-content">{{ form.summary }}</div></section><section v-if="skills.length" class="resume-section compact-block"><div class="resume-section-title compact-section-title">专业技能</div><div class="tag-wrap"><span v-for="item in skills" :key="item" class="resume-skill-tag compact-tag">{{ item }}</span></div></section><section v-if="languages.length" class="resume-section compact-block"><div class="resume-section-title compact-section-title">语言能力</div><div class="resume-item-content">{{ languages.join('\n') }}</div></section><section v-if="awards.length" class="resume-section compact-block"><div class="resume-section-title compact-section-title">荣誉证书</div><div class="resume-item-content">{{ awards.join('\n') }}</div></section></aside><main class="compact-main"><section v-if="works.length" class="resume-section compact-block"><div class="resume-section-title compact-section-title">工作经历</div><div v-for="(item, index) in works" :key="`cw-${index}`" class="resume-item"><div class="resume-item-header"><span class="resume-item-title">{{ item.company }}<template v-if="item.position"> / {{ item.position }}</template></span><span class="resume-item-date">{{ item.date }}</span></div><div class="resume-item-content">{{ item.desc }}</div></div></section><section v-if="projects.length" class="resume-section compact-block"><div class="resume-section-title compact-section-title">项目经验</div><div v-for="(item, index) in projects" :key="`cp-${index}`" class="resume-item"><div class="resume-item-header"><span class="resume-item-title">{{ item.name }}<template v-if="item.tech"> ({{ item.tech }})</template></span><span class="resume-item-date">{{ item.date }}</span></div><div class="resume-item-content">{{ item.desc }}</div></div></section><section v-if="form.education || form.school || form.portfolio" class="resume-section compact-block"><div class="resume-section-title compact-section-title">教育与链接</div><div v-if="form.school || form.education" class="resume-item"><div class="resume-item-title">{{ form.school }}</div><div class="resume-item-subtitle">{{ form.education }}</div></div><div v-if="form.portfolio" class="resume-item-content resume-item-link">{{ form.portfolio }}</div></section></main></div></template>
+          <template v-if="selectedTemplate === 'professional'"><header class="resume-header professional-header"><div class="resume-header__identity"><div class="resume-avatar-frame resume-avatar-frame--interactive" role="button" tabindex="0" @click="openAvatarPicker" @keydown.enter.prevent="openAvatarPicker"><img v-if="portraitAvatar" :src="portraitAvatar" alt="头像" class="resume-avatar-image"><span v-else class="resume-avatar-fallback">{{ avatarInitial }}</span></div><div><div class="resume-name">{{ form.name || '你的姓名' }}</div><div v-if="form.title" class="resume-title">{{ form.title }}</div></div></div><div v-if="contacts.length" class="resume-contact resume-contact--stacked"><span v-for="item in contacts" :key="item">{{ item }}</span></div></header><section v-if="form.summary" class="resume-section"><div class="resume-section-title">个人简介</div><div class="resume-item-content">{{ form.summary }}</div></section><section v-if="form.education || form.school" class="resume-section"><div class="resume-section-title">教育背景</div><div class="resume-item"><div class="resume-item-title">{{ form.school }}</div><div class="resume-item-subtitle">{{ form.education }}</div></div></section><section v-if="works.length" class="resume-section"><div class="resume-section-title">工作经历</div><div v-for="(item, index) in works" :key="`pw-${index}`" class="resume-item"><div class="resume-item-header"><span class="resume-item-title">{{ item.company }}<template v-if="item.position"> / {{ item.position }}</template></span><span class="resume-item-date">{{ item.date }}</span></div><div class="resume-item-content">{{ item.desc }}</div></div></section><section v-if="projects.length" class="resume-section"><div class="resume-section-title">项目经验</div><div v-for="(item, index) in projects" :key="`pp-${index}`" class="resume-item"><div class="resume-item-header"><span class="resume-item-title">{{ item.name }}<template v-if="item.tech"> ({{ item.tech }})</template></span><span class="resume-item-date">{{ item.date }}</span></div><div class="resume-item-content">{{ item.desc }}</div></div></section><section v-if="skills.length" class="resume-section"><div class="resume-section-title">专业技能</div><div class="tag-wrap"><span v-for="item in skills" :key="item" class="resume-skill-tag">{{ item }}</span></div></section></template>
+          <template v-else-if="selectedTemplate === 'modern'"><div class="modern-layout"><aside class="modern-sidebar"><div class="modern-profile"><div class="resume-avatar-frame resume-avatar-frame--sidebar resume-avatar-frame--interactive" role="button" tabindex="0" @click="openAvatarPicker" @keydown.enter.prevent="openAvatarPicker"><img v-if="portraitAvatar" :src="portraitAvatar" alt="头像" class="resume-avatar-image"><span v-else class="resume-avatar-fallback">{{ avatarInitial }}</span></div><div class="resume-name modern-name">{{ form.name || '你的姓名' }}</div><div v-if="form.title" class="resume-title modern-title">{{ form.title }}</div></div><section v-if="contacts.length" class="modern-section"><div class="resume-section-title modern-section-title">联系方式</div><div class="modern-list"><span v-for="item in contacts" :key="item">{{ item }}</span></div></section><section v-if="skills.length" class="modern-section"><div class="resume-section-title modern-section-title">专业技能</div><div class="tag-wrap"><span v-for="item in skills" :key="item" class="resume-skill-tag modern-tag">{{ item }}</span></div></section><section v-if="awards.length" class="modern-section"><div class="resume-section-title modern-section-title">荣誉证书</div><div class="resume-item-content modern-copy">{{ awards.join('\n') }}</div></section><section v-if="languages.length || form.portfolio" class="modern-section"><div class="resume-section-title modern-section-title">其他信息</div><div v-if="languages.length" class="resume-item-content modern-copy">{{ languages.join('\n') }}</div><div v-if="form.portfolio" class="resume-item-content modern-link">{{ form.portfolio }}</div></section></aside><main class="modern-main"><section v-if="form.summary" class="resume-section"><div class="resume-section-title">个人简介</div><div class="resume-item-content">{{ form.summary }}</div></section><section v-if="works.length" class="resume-section"><div class="resume-section-title">工作经历</div><div v-for="(item, index) in works" :key="`mw-${index}`" class="resume-item"><div class="resume-item-header"><span class="resume-item-title">{{ item.company }}<template v-if="item.position"> / {{ item.position }}</template></span><span class="resume-item-date">{{ item.date }}</span></div><div class="resume-item-content">{{ item.desc }}</div></div></section><section v-if="projects.length" class="resume-section"><div class="resume-section-title">项目经验</div><div v-for="(item, index) in projects" :key="`mp-${index}`" class="resume-item"><div class="resume-item-header"><span class="resume-item-title">{{ item.name }}<template v-if="item.tech"> ({{ item.tech }})</template></span><span class="resume-item-date">{{ item.date }}</span></div><div class="resume-item-content">{{ item.desc }}</div></div></section><section v-if="form.education || form.school" class="resume-section"><div class="resume-section-title">教育背景</div><div class="resume-item"><div class="resume-item-title">{{ form.school }}</div><div class="resume-item-subtitle">{{ form.education }}</div></div></section></main></div></template>
+          <template v-else><header class="resume-header compact-header"><div class="resume-header__identity"><div class="resume-avatar-frame resume-avatar-frame--interactive" role="button" tabindex="0" @click="openAvatarPicker" @keydown.enter.prevent="openAvatarPicker"><img v-if="portraitAvatar" :src="portraitAvatar" alt="头像" class="resume-avatar-image"><span v-else class="resume-avatar-fallback">{{ avatarInitial }}</span></div><div><div class="resume-name compact-name">{{ form.name || '你的姓名' }}</div><div v-if="form.title" class="resume-title compact-title">{{ form.title }}</div></div></div><div v-if="contacts.length" class="resume-contact compact-contact"><span v-for="item in contacts" :key="item">{{ item }}</span></div></header><div class="compact-layout"><aside class="compact-side"><section v-if="form.summary" class="resume-section compact-block"><div class="resume-section-title compact-section-title">个人简介</div><div class="resume-item-content">{{ form.summary }}</div></section><section v-if="skills.length" class="resume-section compact-block"><div class="resume-section-title compact-section-title">专业技能</div><div class="tag-wrap"><span v-for="item in skills" :key="item" class="resume-skill-tag compact-tag">{{ item }}</span></div></section><section v-if="languages.length" class="resume-section compact-block"><div class="resume-section-title compact-section-title">语言能力</div><div class="resume-item-content">{{ languages.join('\n') }}</div></section><section v-if="awards.length" class="resume-section compact-block"><div class="resume-section-title compact-section-title">荣誉证书</div><div class="resume-item-content">{{ awards.join('\n') }}</div></section></aside><main class="compact-main"><section v-if="works.length" class="resume-section compact-block"><div class="resume-section-title compact-section-title">工作经历</div><div v-for="(item, index) in works" :key="`cw-${index}`" class="resume-item"><div class="resume-item-header"><span class="resume-item-title">{{ item.company }}<template v-if="item.position"> / {{ item.position }}</template></span><span class="resume-item-date">{{ item.date }}</span></div><div class="resume-item-content">{{ item.desc }}</div></div></section><section v-if="projects.length" class="resume-section compact-block"><div class="resume-section-title compact-section-title">项目经验</div><div v-for="(item, index) in projects" :key="`cp-${index}`" class="resume-item"><div class="resume-item-header"><span class="resume-item-title">{{ item.name }}<template v-if="item.tech"> ({{ item.tech }})</template></span><span class="resume-item-date">{{ item.date }}</span></div><div class="resume-item-content">{{ item.desc }}</div></div></section><section v-if="form.education || form.school || form.portfolio" class="resume-section compact-block"><div class="resume-section-title compact-section-title">教育与链接</div><div v-if="form.school || form.education" class="resume-item"><div class="resume-item-title">{{ form.school }}</div><div class="resume-item-subtitle">{{ form.education }}</div></div><div v-if="form.portfolio" class="resume-item-content resume-item-link">{{ form.portfolio }}</div></section></main></div></template>
         </div>
       </section>
     </main>
@@ -831,6 +1014,7 @@ onMounted(hydrate)
 /* 导航标签 */
 .panel-nav {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 20px;
   padding: 4px;
@@ -1333,6 +1517,63 @@ textarea.form-input {
   padding-bottom: 18px;
   margin-bottom: 22px;
   border-bottom: 1px solid #dfe7f2;
+}
+
+.resume-header__identity {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-width: 0;
+}
+
+.avatar-file-input {
+  display: none;
+}
+
+.resume-avatar-frame {
+  width: 78px;
+  height: 78px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 22px;
+  background: linear-gradient(145deg, #f7fbff 0%, #e8f0fb 100%);
+  border: 1px solid #d7e3f6;
+  box-shadow: inset 0 0 0 4px rgba(255, 255, 255, 0.82);
+  overflow: hidden;
+}
+
+.resume-avatar-frame--interactive {
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.resume-avatar-frame--interactive:hover,
+.resume-avatar-frame--interactive:focus-visible {
+  transform: translateY(-1px);
+  border-color: #8aa8d4;
+  box-shadow: 0 10px 24px rgba(88, 121, 166, 0.18), inset 0 0 0 4px rgba(255, 255, 255, 0.82);
+  outline: none;
+}
+
+.resume-avatar-frame--sidebar {
+  width: 92px;
+  height: 92px;
+  margin-bottom: 16px;
+}
+
+.resume-avatar-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.resume-avatar-fallback {
+  font-size: 28px;
+  font-weight: 800;
+  color: #5e7ca2;
+  letter-spacing: 0.04em;
 }
 
 .resume-name {

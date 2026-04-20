@@ -19,6 +19,7 @@ import {
 import VueMarkdown from 'vue-markdown-render'
 import { ElMessage } from 'element-plus'
 import { streamChatbotMessage } from '@/api/chatbot'
+import { usePoints } from '@/composables/usePoints'
 
 interface ChatConfig {
   userId?: string
@@ -135,6 +136,9 @@ const isDragOver = ref(false)
 const moreMenuVisible = ref(false)
 const resizeDirection = ref<ResizeDirection | null>(null)
 const userInput = ref('')
+
+// 积分系统
+const { consumePoints } = usePoints()
 const uploadedFiles = ref<UploadedFileItem[]>([])
 const expandedMessageIds = ref<string[]>([])
 const sendingState = ref<'idle' | 'sending' | 'error'>('idle')
@@ -896,6 +900,13 @@ async function sendMessage(snapshot?: RequestSnapshot) {
 
   if ((!text && files.length === 0) || isStreaming.value) return
 
+  // 扣除积分（AI问答：10积分/次）
+  const pointsResult = await consumePoints('aiChat', 'AI问答')
+  if (!pointsResult.success) {
+    // 积分不足，已弹出提示
+    return
+  }
+
   const conversationId = ensureConversationId()
   const effectiveText = text || 'Please analyze the uploaded file'
   lastRequestSnapshot.value = {
@@ -1176,7 +1187,7 @@ onUnmounted(() => {
 
                   <div class="message-main">
                     <div class="message-meta-line">
-                      <span class="message-author">{{ message.role === 'assistant' ? 'AI 助手' : '你' }}</span>
+                      <span class="message-author">{{ message.role === 'assistant' ? 'AI 助手' : '用户' }}</span>
                       <span class="message-time">{{ message.time }}</span>
                     </div>
 
@@ -1205,14 +1216,14 @@ onUnmounted(() => {
                       </template>
                       <template v-else>
                         <div class="typing-placeholder">
+                          <span>AI 思考中</span>
                           <span class="typing-dot"></span>
                           <span class="typing-dot"></span>
                           <span class="typing-dot"></span>
-                          <span>AI 正在输入…</span>
                         </div>
                       </template>
 
-                      <span v-if="message.streaming" class="stream-cursor" aria-hidden="true"></span>
+                     
 
                       <button v-if="shouldCollapseMessage(message)" class="expand-btn" type="button" @click="toggleMessageExpand(message.id)">
                         {{ isExpanded(message.id) ? '收起' : '展开完整内容' }}
@@ -1231,11 +1242,6 @@ onUnmounted(() => {
                         <el-icon v-else><CircleCheckFilled /></el-icon>
                         <span>{{ message.error ? '请求未成功完成，请检查网络或稍后重试。' : '本次回答已手动停止。' }}</span>
                         <button v-if="lastRequestSnapshot" class="inline-action" type="button" @click="regenerateLastReply">重新生成</button>
-                      </div>
-
-                      <div v-if="message.streaming" class="message-stream-tag">
-                        <el-icon class="rotating"><Loading /></el-icon>
-                        <span>正在生成回答</span>
                       </div>
                     </div>
                   </div>
