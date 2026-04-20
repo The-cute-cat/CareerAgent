@@ -1,11 +1,16 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import CareerFormVoice from '@/components/CareerForm_Voice.vue'
-import { loadCareerFormData } from '@/utils/career-runtime'
+import { JOB_MATCH_STORAGE_KEY, loadCareerFormData, saveCareerFormData } from '@/utils/career-runtime'
 import type { CareerFormData } from '@/types/careerform_report'
+import { buildDemoJobMatchResult, mergeVoiceAnswersToForm, type VoiceCollectedAnswers } from '@/utils/voice-career-demo'
+import { useCareerModeStore } from '@/stores/careerMode'
 
 const router = useRouter()
+const careerModeStore = useCareerModeStore()
+const isLearningMode = computed(() => careerModeStore.isLearningMode)
 const cachedFormData = ref<CareerFormData | null>(loadCareerFormData())
 
 const formProgress = computed(() => {
@@ -112,6 +117,26 @@ const resumeUploaded = computed(() => {
 function handleBack(): void {
   router.push('/career-form/resume')
 }
+
+async function handleSaveToForm(collectedAnswers: VoiceCollectedAnswers): Promise<void> {
+  const mergedFormData = mergeVoiceAnswersToForm(collectedAnswers, cachedFormData.value)
+  saveCareerFormData(mergedFormData)
+  cachedFormData.value = mergedFormData
+  ElMessage.success('语音信息已模拟回填到表单')
+  await router.push('/career-form/resume')
+}
+
+async function handleGenerateMatching(collectedAnswers: VoiceCollectedAnswers): Promise<void> {
+  const mergedFormData = mergeVoiceAnswersToForm(collectedAnswers, cachedFormData.value)
+  saveCareerFormData(mergedFormData)
+  cachedFormData.value = mergedFormData
+
+  const mockMatchResult = await buildDemoJobMatchResult(mergedFormData, isLearningMode.value)
+  localStorage.setItem(JOB_MATCH_STORAGE_KEY, JSON.stringify(mockMatchResult))
+
+  ElMessage.success('已根据语音信息生成人岗匹配结果')
+  await router.push('/job-matching')
+}
 </script>
 
 <template>
@@ -123,6 +148,8 @@ function handleBack(): void {
       :resume-uploaded="resumeUploaded"
       :form-snapshot="formSnapshot"
       @back="handleBack"
+      @save-to-form="handleSaveToForm"
+      @generate-matching="handleGenerateMatching"
     />
   </div>
 </template>

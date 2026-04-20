@@ -354,10 +354,32 @@ import {
 } from '@element-plus/icons-vue'
 import type { JobMatchItem } from '@/types/job-match'
 import { mockJobMatchItems } from '@/mock/mockdata/JobMatch_mockdata'
+import { mockLearningJobMatchItems } from '@/mock/mockdata/LearningMode_mockdata'
+import { usePoints } from '@/composables/usePoints'
+import { useCareerModeStore } from '@/stores/careerMode'
 
 const router = useRouter()
 const matchItems = ref<JobMatchItem[]>([])
 const loading = ref(false)
+
+// 积分系统
+const { consumePoints, showConsumeConfirmDialog } = usePoints()
+
+// 职业模式
+const careerModeStore = useCareerModeStore()
+const isLearningMode = computed(() => careerModeStore.isLearningMode)
+
+// 加载匹配结果（带积分检查）
+const loadMatchResultWithPoints = async () => {
+  // 先检查/扣除积分
+  const result = await consumePoints('jobMatching', '岗位推荐分析')
+  if (!result.success) {
+    // 积分不足，已弹出提示
+    return
+  }
+  // 积分扣除成功，加载数据
+  loadMatchResult()
+}
 
 const sortedJobs = computed<JobMatchItem[]>(() => {
   return [...matchItems.value].sort((a, b) => (b.score || 0) * 100 - (a.score || 0) * 100)
@@ -388,11 +410,16 @@ const loadMatchResult = () => {
   loading.value = true
   try {
     const stored = localStorage.getItem('jobMatchResult')
-    matchItems.value = stored ? JSON.parse(stored) as JobMatchItem[] : []
+    if (stored) {
+      matchItems.value = JSON.parse(stored) as JobMatchItem[]
+    } else {
+      // 没有存储数据时，根据模式使用对应的模拟数据
+      matchItems.value = isLearningMode.value ? mockLearningJobMatchItems : mockJobMatchItems
+    }
   } catch (e) {
     console.error('加载匹配结果失败:', e)
     ElMessage.error('数据加载失败，已使用示例数据')
-    matchItems.value = mockJobMatchItems
+    matchItems.value = isLearningMode.value ? mockLearningJobMatchItems : mockJobMatchItems
   } finally {
     loading.value = false
   }
@@ -434,6 +461,9 @@ const refreshData = () => {
 }
 
 onMounted(() => {
+  // 初始化职业模式
+  careerModeStore.initMode()
+  // 页面加载时只加载已有数据，不消耗积分
   loadMatchResult()
 })
 </script>

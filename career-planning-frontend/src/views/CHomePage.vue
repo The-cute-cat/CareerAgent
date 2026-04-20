@@ -3,12 +3,20 @@ import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import * as echarts from 'echarts'
 import { Warning, DataLine } from '@element-plus/icons-vue'
-import { quickActions, homeRadarData } from '@/mock/data'
+import { learningQuickActions, jobQuickActions, homeRadarData } from '@/mock/data'
 import { useUserStore } from '@/stores/modules/user'
+import { useCareerModeStore } from '@/stores/careerMode'
+import LearningModePanel from '@/components/career/LearningModePanel.vue'
+import JobModePanel from '@/components/career/JobModePanel.vue'
+import LearningRecommendPanel from '@/components/career/LearningRecommendPanel.vue'
+import PointsDemoButtons from '@/components/PointsDemo/PointsDemoButtons.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
+const careerModeStore = useCareerModeStore()
 const radarChartRef = ref<HTMLElement | null>(null)
+const isLearningMode = computed(() => careerModeStore.isLearningMode)
+const quickActions = computed(() => (isLearningMode.value ? learningQuickActions : jobQuickActions))
 
 // 计算登录状态
 const userName = computed(() => userStore.userInfo?.nickname || userStore.userInfo?.username || '用户')
@@ -96,7 +104,7 @@ const initRadarChart = () => {
       <p class="subtitle">今天你想如何规划你的职业生涯？</p>
     </div>
 
-    <!-- 第一行：快捷功能卡 -->
+    <!-- 快捷功能卡 -->
     <div class="quick-actions-grid">
       <div
         v-for="action in quickActions"
@@ -122,7 +130,15 @@ const initRadarChart = () => {
       </div>
     </div>
 
-    <!-- 第二行：能力概览 + 系统公告 -->
+    <!-- 模式面板 -->
+    <div class="home-mode-panel">
+      <LearningModePanel v-if="isLearningMode" />
+      <JobModePanel v-else />
+    </div>
+
+    <LearningRecommendPanel v-if="isLearningMode" class="home-learning-panel" />
+
+    <!-- 能力概览 + 系统公告 -->
     <el-row :gutter="24" class="card-row">
       <!-- 能力概览卡 -->
       <el-col :xs="24" :sm="24" :md="14">
@@ -198,6 +214,13 @@ const initRadarChart = () => {
         </div>
       </el-col>
     </el-row>
+    
+    <!-- 积分系统演示 -->
+    <el-row :gutter="24" class="card-row" style="margin-top: 24px;">
+      <el-col :span="24">
+        <PointsDemoButtons />
+      </el-col>
+    </el-row>
   </div>
 </template>
 
@@ -209,6 +232,14 @@ const initRadarChart = () => {
 
 .welcome-header {
   margin-bottom: 32px;
+}
+
+.home-mode-panel {
+  margin-bottom: 28px;
+}
+
+.home-learning-panel {
+  margin-bottom: 28px;
 }
 
 .greeting {
