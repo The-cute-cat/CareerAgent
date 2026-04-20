@@ -1144,7 +1144,7 @@ if __name__ == "__main__":
         from ai_service.repository.job_info_repository import JobRepository
 
         DB_URL = (
-            f"mysql+aiomysql://{settings.database.user}:{settings.database.password}"
+            f"mysql+aiomysql://{settings.database.user}:{settings.database.password.get_secret_value()}"
             f"@{settings.database.host}:{settings.database.port}/{settings.database.database}"
             f"?charset=utf8mb4"
         )

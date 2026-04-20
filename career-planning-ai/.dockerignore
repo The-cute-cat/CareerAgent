@@ -52,6 +52,8 @@ logs/
 node_modules/
 npm-debug.log
 package-lock.json
+jsconfig.json
+package.json
 
 
 # 其他

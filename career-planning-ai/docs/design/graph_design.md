@@ -422,7 +422,7 @@ $$
   - `routing`（base_attraction、组件权重、rank_penalty、cross_penalty、transfer_cost、final_routing_cost）
   - `communities`（coarse/fine 的 from/to）
 
-该结构与 [docs/GRAPH_LINEAGE.md](GRAPH_LINEAGE.md) 保持一致。
+该结构与 [docs/GRAPH_LINEAGE.md](graph_lineage.md) 保持一致。
 
 ### 4.13 阶段 10：写入 EVOLVE_TO 与版本清理
 
@@ -457,7 +457,7 @@ DELETE e
 
 更细的说明与示例见：
 
-- [docs/GRAPH_LINEAGE.md](GRAPH_LINEAGE.md)
+- [docs/GRAPH_LINEAGE.md](graph_lineage.md)
 
 ---
 
@@ -626,5 +626,5 @@ RETURN c.idf_weight, c.df, c.total_jobs, c.prevalence, c.idf_run_id
 ## 11. 与其它文档的关系
 
 - 证据闭环与字段示例：
-  - [docs/GRAPH_LINEAGE.md](GRAPH_LINEAGE.md)
+  - [docs/GRAPH_LINEAGE.md](graph_lineage.md)
 - 若需要把“路径接口”作为提交材料的一部分，可结合项目的 API 文档补充接口输入/输出。
