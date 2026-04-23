@@ -1,5 +1,4 @@
-from typing import AsyncGenerator
-from contextlib import asynccontextmanager
+from collections.abc import AsyncGenerator
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 
 from config import settings
@@ -34,7 +33,6 @@ def get_db_url() -> str:
     return DATABASE_URL
 
 
-@asynccontextmanager
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """
     提供数据库会话。
