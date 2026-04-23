@@ -284,7 +284,7 @@ export const mockJobMatchItems: JobMatchItem[] = [
     score: 0.7234567890123456,
     raw_data: {
       job_id: "job_004",
-      job_name: "Java后端开发工程师（校招）",
+      job_name: "Java后端工程师（校招）",
       profiles: {
         basic_requirements: {
           degree: "本科",

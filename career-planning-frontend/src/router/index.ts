@@ -34,6 +34,11 @@ const routes = [
     component: () => import('../views/CareerFormVoice.vue'),
   },
   {
+    path: '/ws-test',
+    name: 'ws-test',
+    component: () => import('../components/WebSocketTest.vue'),
+  },
+  {
     path: '/',
     component: () => import('../components/Layout.vue'), // 布局组件
     children: [
@@ -104,10 +109,22 @@ const routes = [
         meta: { title: '设置中心' }
       },
       {
+        path: 'interviews/ai-avatar',
+        name: 'ai-interview-avatar',
+        component: () => import('../components/CInterviews_Component/AIInterviewAvatar.vue'),
+        meta: { title: 'AI 智能面试' }
+      },
+      {
         path: 'interviews/:type?',
         name: 'interviews',
         component: () => import('../views/CInterviews.vue'),
         meta: { title: '我的面试' }
+      },
+      {
+        path: 'interview-report/:id',
+        name: 'interview-report',
+        component: () => import('../views/InterviewReport.vue'),
+        meta: { title: '面试报告' }
       },
       {
         path: 'admin',

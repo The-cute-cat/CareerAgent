@@ -171,7 +171,7 @@ export const mockLearningDirections: LearningDirectionItem[] = [
     suggestedFirstStep: '先用 Java 完成一个控制台 CRUD 小系统，感受后端开发的基本流程',
     difficulty: '有挑战',
     timeToBasic: '3-4 个月',
-    relatedCareers: ['Java 开发工程师', '后端开发工程师', '全栈工程师'],
+    relatedCareers: ['Java 开发工程师', 'Java后端工程师', '全栈工程师'],
     resources: ['《Java 核心技术》', 'Spring Boot 入门', 'MySQL 实战45讲', 'LeetCode 刷题'],
     roadmapSummary: 'Java 语言基础 → Spring Boot 入门 → MySQL 实践 → 微服务概念了解 → 分布式基础',
   },

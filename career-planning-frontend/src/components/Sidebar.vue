@@ -8,7 +8,8 @@ import {
   Star,Collection,Position,
   Fold,Expand,Guide,Connection,Calendar,
   Memo,Timer,Finished,Reading,
-  Promotion,MagicStick,OfficeBuilding
+  Promotion,MagicStick,OfficeBuilding,
+  VideoCamera
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
@@ -77,6 +78,7 @@ const menuItems = [
     text: '我的面试',
     children: [
       { index: '/interviews/calendar', icon: Memo, text: '面试日历' },
+      { index: '/interviews/ai-avatar', icon: VideoCamera, text: 'AI 智能面试' },
       { index: '/interviews/ongoing', icon: Timer, text: '进行中' },
       { index: '/interviews/finished', icon: Finished, text: '已结束' },
       { index: '/interviews/review', icon: Reading, text: '面试复盘' }
