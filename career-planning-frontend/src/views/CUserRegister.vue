@@ -6,6 +6,7 @@ import type { LoginFormDTO } from '@/types/user'
 import { userRegisterService, userSendCodeRegisterService } from '@/api/user/user'
 import { useUserStore } from '@/stores'
 import { ArrowRight, Hide, Lock, Message, User, View, Key, Ticket } from '@element-plus/icons-vue'
+import { mockRechargePointsApi } from '@/mock/mockdata/Points_mockdata'
 
 const form = ref<LoginFormDTO>({})
 const router = useRouter()
@@ -71,8 +72,20 @@ const handleRegister = async () => {
       ElMessage.error(res.data.msg || '注册失败')
       return
     }
+    
+    // 获取新注册用户ID
+    const newUserId = res.data.data?.id || res.data.data?.userId || Date.now()
+    
+    // 为新用户赠送500积分（模拟）
+    await mockRechargePointsApi(newUserId, 500, '新用户注册奖励')
+    
     userStore.clearUserALLInfo()
-    ElMessage.success('注册成功，已赠送 500 新人积分，请登录后查看')
+    
+    // 设置标志，登录后显示欢迎弹窗
+    localStorage.setItem('showWelcomeGift', 'true')
+    localStorage.setItem('welcomeGiftPoints', '500')
+    
+    ElMessage.success('注册成功！已赠送 500 新人积分')
     await new Promise((resolve) => setTimeout(resolve, 1000))
     router.push('/login')
   } catch (error) {

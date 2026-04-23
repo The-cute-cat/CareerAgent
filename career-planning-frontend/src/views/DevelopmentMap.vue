@@ -1,5 +1,5 @@
 <template>
-  <div class="page" :class="{ 'has-detail-panel': visible }">
+  <div class="page" :class="{ 'has-detail-panel': visible && hasActiveJobContext && activeView === 'map' }">
     <section class="hero">
       <div class="hero-copy">
         <p class="eyebrow">Career Development Map</p>
@@ -15,20 +15,157 @@
       </div>
 
       <div class="actions">
+        <div class="hero-action-row">
+          <el-button
+            v-if="hasActiveJobContext"
+            plain
+            @click="switchMapView(activeView === 'map' ? 'jobs' : 'map')"
+          >
+            {{ activeView === 'map' ? '切换岗位界面' : '返回图谱界面' }}
+          </el-button>
+        </div>
         <el-radio-group v-model="viewType" size="large" @change="handleViewChange">
           <el-radio-button label="vertical">纵向晋升图谱</el-radio-button>
           <el-radio-button label="lateral">横向转岗图谱</el-radio-button>
         </el-radio-group>
 
-        <el-input v-model="keyword" class="search" clearable placeholder="搜索岗位名称" @input="renderChart">
-          <template #prefix>
-            <el-icon><Search /></el-icon>
-          </template>
-        </el-input>
       </div>
     </section>
 
-    <section class="stats">
+    <section
+      v-if="showJobSwitcherPanel"
+      class="job-picker-panel"
+      :class="{ 'job-picker-panel--compact': hasActiveJobContext }"
+    >
+      <div class="job-picker-head">
+        <div>
+          <p class="section-group-kicker">Select Target</p>
+          <h2>{{ hasActiveJobContext ? '切换查看其他推荐岗位图谱' : '先选择要查看的岗位图谱' }}</h2>
+          <p class="job-picker-desc">
+            {{
+              hasActiveJobContext
+                ? '当前正在查看其中一个推荐岗位的发展图谱。你可以切换到其他人岗匹配岗位，快速比较不同目标岗位的发展路径。'
+                : '发展图谱中的岗位列表来自人岗匹配结果，请先选择一个岗位作为图谱分析对象。'
+            }}
+          </p>
+        </div>
+        <div class="job-picker-actions">
+          <el-button v-if="hasActiveJobContext" @click="switchMapView('map')">返回图谱界面</el-button>
+          <el-button @click="loadJobOptions">刷新岗位列表</el-button>
+          <el-button type="primary" @click="goToJobMatching">去人岗匹配页</el-button>
+        </div>
+      </div>
+
+      <div v-if="availableJobs.length" class="job-picker-list">
+        <article
+          v-if="currentJobOption"
+          :key="currentJobOption.jobId"
+          class="job-picker-row is-active"
+        >
+          <div class="job-picker-index">
+            <span>当前</span>
+          </div>
+          <div class="job-picker-main">
+            <div class="job-picker-card-head">
+              <div>
+                <h3>{{ currentJobOption.jobName }}</h3>
+                <p>{{ currentJobOption.jobIdLabel }}</p>
+              </div>
+              <div class="job-picker-tags">
+                <el-tag v-if="currentJobOption.scoreLabel" round type="primary">{{ currentJobOption.scoreLabel }}</el-tag>
+              </div>
+            </div>
+            <p class="job-picker-summary">{{ currentJobOption.summary }}</p>
+            <div class="job-picker-meta">
+              <span>{{ currentJobOption.sourceLabel }}</span>
+            </div>
+            <div class="job-picker-preview">
+              <div class="job-picker-preview-item">
+                <span>纵向目标</span>
+                <p>{{ currentJobOption.previewTarget }}</p>
+              </div>
+              <div class="job-picker-preview-item">
+                <span>能力差距</span>
+                <p>{{ currentJobOption.previewGap }}</p>
+              </div>
+              <div class="job-picker-preview-item">
+                <span>横向方向</span>
+                <p>{{ currentJobOption.previewAction }}</p>
+              </div>
+            </div>
+          </div>
+          <div class="job-picker-actions-col">
+            <div class="job-picker-card-actions">
+              <el-button type="primary" plain disabled>当前图谱</el-button>
+            </div>
+          </div>
+        </article>
+
+        <el-collapse v-if="otherJobOptions.length" v-model="jobCollapsePanels" class="job-picker-collapse">
+          <el-collapse-item :name="'other-jobs'" :title="`更多推荐岗位（${otherJobOptions.length}）`">
+            <div class="job-picker-list job-picker-list--nested">
+              <article
+                v-for="(item, index) in otherJobOptions"
+                :key="item.jobId"
+                class="job-picker-row"
+              >
+                <div class="job-picker-index">
+                  <span>{{ index + 1 }}</span>
+                </div>
+                <div class="job-picker-main">
+                  <div class="job-picker-card-head">
+                    <div>
+                      <h3>{{ item.jobName }}</h3>
+                      <p>{{ item.jobIdLabel }}</p>
+                    </div>
+                    <div class="job-picker-tags">
+                      <el-tag v-if="item.scoreLabel" round type="primary">{{ item.scoreLabel }}</el-tag>
+                    </div>
+                  </div>
+                  <p class="job-picker-summary">{{ item.summary }}</p>
+                  <div class="job-picker-meta">
+                    <span>{{ item.sourceLabel }}</span>
+                  </div>
+                  <div class="job-picker-preview">
+                    <div class="job-picker-preview-item">
+                      <span>纵向目标</span>
+                      <p>{{ item.previewTarget }}</p>
+                    </div>
+                    <div class="job-picker-preview-item">
+                      <span>能力差距</span>
+                      <p>{{ item.previewGap }}</p>
+                    </div>
+                    <div class="job-picker-preview-item">
+                      <span>横向方向</span>
+                      <p>{{ item.previewAction }}</p>
+                    </div>
+                  </div>
+                </div>
+                <div class="job-picker-actions-col">
+                  <div class="job-picker-card-actions">
+                    <el-button
+                      type="primary"
+                      :loading="generatingJobId === item.jobId"
+                      @click="selectJobContext(item.jobId)"
+                    >
+                      {{ generatedJobIds.has(item.jobId) ? '切换查看' : '生成并查看' }}
+                    </el-button>
+                  </div>
+                </div>
+              </article>
+            </div>
+          </el-collapse-item>
+        </el-collapse>
+      </div>
+
+      <el-empty v-else description="暂未找到可用的人岗匹配岗位">
+        <template #description>
+          <span>请先完成人岗匹配，再进入发展图谱选择目标岗位。</span>
+        </template>
+      </el-empty>
+    </section>
+
+    <section v-if="hasActiveJobContext && activeView === 'map'" class="stats">
       <div class="stat-card">
         <span>当前起点</span>
         <strong>{{ activeData.startJobName }}</strong>
@@ -51,7 +188,7 @@
       </div>
     </section>
 
-    <section class="chart-panel">
+    <section v-if="hasActiveJobContext && activeView === 'map'" class="chart-panel">
       <div class="panel-head">
         <div>
           <h2>{{ chartHeadline }}</h2>
@@ -108,7 +245,7 @@
       </div>
     </section>
 
-    <section class="route-panel">
+    <section v-if="hasActiveJobContext && activeView === 'map'" class="route-panel">
       <div class="route-header">
         <div>
           <h3>{{ viewType === 'vertical' ? '路线概览入口' : '转岗路线概览' }}</h3>
@@ -381,10 +518,18 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import * as echarts from 'echarts'
 import { Search } from '@element-plus/icons-vue'
+import { useRoute, useRouter } from 'vue-router'
+import type { JobMatchItem } from '@/types/job-match'
+import { mockJobMatchItems } from '@/mock/mockdata/JobMatch_mockdata'
+import { mockLearningJobMatchItems } from '@/mock/mockdata/LearningMode_mockdata'
+import { useCareerReportStore } from '@/stores/modules/careerReport'
+import { usePoints } from '@/composables/usePoints'
+import { useCareerModeStore } from '@/stores/careerMode'
 
 type ViewType = 'vertical' | 'lateral'
 type PathType = 'vertical' | 'lateral'
 type Mode = 'node' | 'edge'
+type MapViewMode = 'map' | 'jobs'
 
 interface SkillGap {
   actionableAdvice: string
@@ -421,6 +566,23 @@ interface CareerData {
   paths: Path[]
   startJobid: string
   startJobName: string
+}
+
+interface CareerMapDataset {
+  lateral: CareerData
+  vertical: CareerData
+}
+
+interface JobOption {
+  jobId: string
+  jobIdLabel: string
+  jobName: string
+  previewAction: string
+  previewGap: string
+  previewTarget: string
+  scoreLabel: string
+  sourceLabel: string
+  summary: string
 }
 
 interface GraphNodeData {
@@ -464,6 +626,22 @@ const chartRef = ref<HTMLElement | null>(null)
 const chart = ref<echarts.ECharts | null>(null)
 const detailChartRef = ref<HTMLElement | null>(null)
 const detailChart = ref<echarts.ECharts | null>(null)
+const route = useRoute()
+const router = useRouter()
+const reportStore = useCareerReportStore()
+
+// 积分系统
+const { consumePoints } = usePoints()
+
+// 职业模式
+const careerModeStore = useCareerModeStore()
+const isLearningMode = computed(() => careerModeStore.isLearningMode)
+
+// 根据模式获取对应的模拟数据
+const getMockJobMatchItems = () => {
+  return isLearningMode.value ? mockLearningJobMatchItems : mockJobMatchItems
+}
+
 let chartResizeObserver: ResizeObserver | null = null
 const loading = ref(false)
 const viewType = ref<ViewType>('vertical')
@@ -477,6 +655,185 @@ const selectedPathId = ref('')
 const graphZoom = ref(1)
 const graphCenter = ref<[number, number] | null>(null)
 const lastScrollY = ref(0)
+const activeView = ref<MapViewMode>('jobs')
+const jobMatchItems = ref<JobMatchItem[]>([])
+const availableJobs = ref<JobOption[]>([])
+const jobCollapsePanels = ref<string[]>(['other-jobs'])
+const generatedJobIds = ref<Set<string>>(new Set())
+const generatingJobId = ref<string>('')
+
+function deepClone<T>(data: T): T {
+  return JSON.parse(JSON.stringify(data))
+}
+
+function getRouteJobIdString() {
+  const raw = route.query.jobId ?? route.query.job_id
+  if (Array.isArray(raw)) return raw[0] || ''
+  return typeof raw === 'string' ? raw : ''
+}
+
+function splitByCommonDelimiters(value: string | undefined) {
+  if (!value) return []
+  return value
+    .split(/[,\uFF0C\u3001/|>]+/)
+    .map(item => item.trim())
+    .filter(Boolean)
+}
+
+function normalizeJobName(name: string) {
+  return name.replace(/（.*?）|\(.*?\)/g, '').replace(/\s+/g, '')
+}
+
+function stripJobLevel(name: string) {
+  return normalizeJobName(name).replace(/^(初级|中级|高级|资深|主任|专家级)/, '')
+}
+
+function slugify(text: string) {
+  return text.toLowerCase().replace(/[^a-z0-9\u4e00-\u9fa5]+/gi, '-').replace(/^-+|-+$/g, '')
+}
+
+function getSafeJobMatchItems() {
+  try {
+    const stored = localStorage.getItem('jobMatchResult')
+    const parsed = stored ? JSON.parse(stored) as JobMatchItem[] : []
+    return parsed.length ? parsed : getMockJobMatchItems()
+  } catch (error) {
+    console.error('加载岗位匹配结果失败:', error)
+    return getMockJobMatchItems()
+  }
+}
+
+function buildJobOptions() {
+  const parsedItems = getSafeJobMatchItems()
+  jobMatchItems.value = parsedItems
+
+  // 同步人岗匹配页已生成的报告岗位
+  const newlyGeneratedIds = new Set<string>()
+  parsedItems.forEach((item) => {
+    const jobId = String(item.job_id || item.raw_data?.job_id || '')
+    if (jobId && reportStore.getReportByJob(jobId)) {
+      newlyGeneratedIds.add(jobId)
+    }
+  })
+  // 合并到已生成集合
+  newlyGeneratedIds.forEach(id => generatedJobIds.value.add(id))
+
+  availableJobs.value = parsedItems
+    .map((item) => {
+      const jobId = String(item.job_id || item.raw_data?.job_id || '')
+      if (!jobId) return null
+
+      const directions = splitByCommonDelimiters(item.raw_data?.profiles?.job_attributes?.lateral_transfer_directions)
+      const scorePercent = typeof item.score === 'number' ? Math.round(item.score * 100) : null
+
+      return {
+        jobId,
+        jobName: item.raw_data?.job_name || `岗位 ${jobId}`,
+        summary:
+          item.deep_analysis?.actionable_advice ||
+          item.deep_analysis?.all_analysis ||
+          '可基于当前人岗匹配结果查看该岗位的发展图谱。',
+        scoreLabel: scorePercent !== null ? `匹配度 ${scorePercent}%` : '',
+        sourceLabel: item.deep_analysis?.can_apply ? '来自人岗匹配结果' : '建议先补齐关键能力后推进',
+        jobIdLabel: `job_id: ${jobId}`,
+        previewTarget: `${stripJobLevel(item.raw_data?.job_name || '目标岗位')}成长路线`,
+        previewGap: item.deep_analysis?.missing_key_skills?.[0] || '进入图谱后查看该岗位的关键能力差距',
+        previewAction: directions[0] || '进入图谱后查看横向转岗方向',
+      } satisfies JobOption
+    })
+    .filter((item): item is JobOption => !!item)
+}
+
+function loadJobOptions() {
+  buildJobOptions()
+}
+
+const activeJobId = computed(() => getRouteJobIdString())
+const hasActiveJobContext = computed(() => !!activeJobId.value)
+const showJobSwitcherPanel = computed(() => !hasActiveJobContext.value || activeView.value === 'jobs')
+
+const currentJobOption = computed(() => {
+  if (!activeJobId.value) return null
+  return availableJobs.value.find(item => item.jobId === activeJobId.value) || null
+})
+
+const otherJobOptions = computed(() => {
+  if (!activeJobId.value) return availableJobs.value
+  return availableJobs.value.filter(item => item.jobId !== activeJobId.value)
+})
+
+const selectedJobMatch = computed(() => {
+  const fromRoute = jobMatchItems.value.find(item => item.job_id === activeJobId.value)
+  if (fromRoute) return fromRoute
+  // 如果 jobMatchItems 中没有，直接从 mock 数据中查找
+  const mockItems = getMockJobMatchItems()
+  const fromMock = mockItems.find(item => item.job_id === activeJobId.value)
+  if (fromMock) return fromMock
+  return jobMatchItems.value[0] || mockItems[0] || null
+})
+
+function switchMapView(view: MapViewMode) {
+  activeView.value = view
+}
+
+function goToJobMatching() {
+  router.push('/job-matching')
+}
+
+async function selectJobContext(jobId: string) {
+  // 确保岗位列表已加载
+  if (!availableJobs.value.length) {
+    loadJobOptions()
+  }
+
+  // 如果未生成过，先消耗积分再执行生成
+  if (!generatedJobIds.value.has(jobId)) {
+    // 扣除积分（职业发展图谱：80积分）
+    const pointsResult = await consumePoints('developmentMap', '生成职业发展图谱')
+    if (!pointsResult.success) {
+      // 积分不足，已弹出提示
+      return
+    }
+
+    generatingJobId.value = jobId
+    // 模拟生成过程（可替换为实际API调用）
+    await new Promise(resolve => setTimeout(resolve, 800))
+    generatedJobIds.value.add(jobId)
+    generatingJobId.value = ''
+
+    // 同步到 reportStore（标记为已生成，即使报告数据为空对象）
+    const existingReport = reportStore.getReportByJob(jobId)
+    if (!existingReport) {
+      reportStore.setReportForJob(jobId, { target_position: '' } as any)
+    }
+  }
+
+  // 确保 jobMatchItems 包含目标岗位数据
+  const targetJob = availableJobs.value.find(job => job.jobId === jobId)
+  if (targetJob && !jobMatchItems.value.find(item => item.job_id === jobId)) {
+    // 从 mock 数据中找到对应岗位并添加到列表
+    const mockItems = getMockJobMatchItems()
+    const mockJob = mockItems.find(item => item.job_id === jobId)
+    if (mockJob) {
+      jobMatchItems.value = [...jobMatchItems.value, mockJob]
+    }
+  }
+
+  activeView.value = 'map'
+  await router.replace({
+    name: 'development-map',
+    query: { jobId },
+  })
+
+  // 强制重新渲染图表（完全重置视图）
+  nextTick(() => {
+    // 销毁旧图表实例并重新初始化
+    chart.value?.dispose()
+    chart.value = null
+    resetMapState(true)
+    initChart()
+  })
+}
 
 const verticalData: CareerData = {
   startJobid: 'job_002',
@@ -792,7 +1149,282 @@ const lateralData: CareerData = {
   ]
 }
 
-const activeData = computed(() => (viewType.value === 'vertical' ? verticalData : lateralData))
+function createSkillGap(
+  competencyName: string,
+  originalContext: string,
+  actionableAdvice: string,
+  category = '核心专业技能',
+  targetScore = 3,
+): SkillGap {
+  return {
+    actionableAdvice,
+    category,
+    competencyName,
+    originalContext,
+    targetScore,
+  }
+}
+
+function buildVerticalTitles(jobName: string) {
+  const base = stripJobLevel(jobName)
+  return {
+    mid: `中级${base}`,
+    senior: `高级${base}`,
+    expert: base.includes('工程师') ? base.replace('工程师', '架构师') : `${base}专家`,
+    lead: base.includes('工程师') ? base.replace('工程师', '技术主管') : `${base}技术主管`,
+    director: base.includes('工程师') ? base.replace('工程师', '技术负责人') : `${base}技术负责人`,
+  }
+}
+
+function buildDirectionalGap(direction: string, fallbackSkill: string, baseJobName: string) {
+  if (/产品/.test(direction)) {
+    return createSkillGap(
+      'PRD 输出',
+      `目标方向 ${direction} 更强调需求表达、业务抽象与跨团队协同。`,
+      `围绕 ${baseJobName} 当前参与的业务模块，补写一版 PRD、流程图和里程碑方案。`,
+      '产品与业务能力',
+      4,
+    )
+  }
+
+  if (/设计|UI|UX/.test(direction)) {
+    return createSkillGap(
+      'Figma / 设计系统',
+      `目标方向 ${direction} 更关注界面表达、一致性规范与用户体验设计。`,
+      `选择一个熟悉的页面模块，输出高保真方案并沉淀一套小型设计规范。`,
+      '设计工具',
+      4,
+    )
+  }
+
+  if (/数据/.test(direction)) {
+    return createSkillGap(
+      'SQL / 数据分析',
+      `目标方向 ${direction} 更看重指标拆解、数据处理与结构化结论输出。`,
+      `完成一个与 ${baseJobName} 相关的业务分析案例，输出 SQL、图表与结论建议。`,
+      '数据处理',
+      4,
+    )
+  }
+
+  if (/测试/.test(direction)) {
+    return createSkillGap(
+      '自动化测试',
+      `目标方向 ${direction} 需要补齐测试框架、质量保障流程与稳定性建设能力。`,
+      '为当前项目补充一条 E2E 自动化测试链路，并验证关键流程回归。',
+      '测试技能',
+      4,
+    )
+  }
+
+  if (/运维|DevOps|后端|架构/.test(direction)) {
+    return createSkillGap(
+      fallbackSkill || '服务端基础设施',
+      `目标方向 ${direction} 更看重服务端工程化、部署治理和系统稳定性能力。`,
+      `基于现有经验补齐 ${fallbackSkill || '服务端能力'}，完成一个可运行的服务端小项目。`,
+      '核心专业技能',
+      3,
+    )
+  }
+
+  return createSkillGap(
+    fallbackSkill || `${direction} 关键能力`,
+    `目标方向 ${direction} 与当前岗位存在一定能力跨度，需要有计划地补齐关键门槛。`,
+    `优先围绕 ${fallbackSkill || direction} 制定 2-4 周补齐计划，再推进转岗尝试。`,
+  )
+}
+
+function buildCareerMapDataset(job: JobMatchItem | null): CareerMapDataset {
+  const fallback = {
+    lateral: lateralData,
+    vertical: verticalData,
+  }
+
+  if (!job) return fallback
+
+  const startJobid = job.job_id
+  const startJobName = job.raw_data?.job_name || verticalData.startJobName
+  const titles = buildVerticalTitles(startJobName)
+  const missingSkills = job.deep_analysis?.missing_key_skills?.filter(Boolean) || []
+  const coreSkills = splitByCommonDelimiters(job.raw_data?.profiles?.professional_skills?.core_skills)
+  const lateralDirections = splitByCommonDelimiters(job.raw_data?.profiles?.job_attributes?.lateral_transfer_directions)
+  const preferredDirections = lateralDirections.length
+    ? lateralDirections.slice(0, 6)
+    : ['全栈开发', '产品经理', 'UI/UX 设计', 'DevOps', '数据分析']
+  const primarySkill = missingSkills[0] || coreSkills[0] || '核心能力'
+  const secondarySkill = missingSkills[1] || coreSkills[1] || '业务抽象'
+  const tertiarySkill = missingSkills[2] || coreSkills[2] || '系统化方案设计'
+
+  const vertical: CareerData = {
+    startJobid,
+    startJobName,
+    paths: [
+      {
+        pathid: `${startJobid}-vertical-growth`,
+        pathTitle: `${startJobName}成长主线：从当前岗位到高阶岗位`,
+        pathType: 'vertical',
+        totalSteps: 3,
+        totalRoutingCost: 0.18,
+        overallSummary: `这是围绕 ${startJobName} 构建的标准晋升主线，适合优先积累与当前岗位强相关的核心竞争力，再逐步走向更高阶岗位。`,
+        steps: [
+          {
+            stepIndex: 1,
+            fromJobid: startJobid,
+            fromJobName: startJobName,
+            toJobid: `${startJobid}-${slugify(titles.mid)}`,
+            toJobName: titles.mid,
+            jaccardHigh: 0.82,
+            cosLow: 0.88,
+            salaryGain: 0.18,
+            transitionReason: `第一步建议先完成从 ${startJobName} 到 ${titles.mid} 的自然升级，重点强化项目主导、复杂任务拆解与稳定交付能力。`,
+            skillGaps: [
+              createSkillGap(
+                primarySkill,
+                `${startJobName} 向 ${titles.mid} 演进时，需要更稳定地承担复杂任务与高质量交付。`,
+                `围绕 ${primarySkill} 做一次专题补齐，并在项目中形成可量化的成果沉淀。`,
+              ),
+            ],
+          },
+          {
+            stepIndex: 2,
+            fromJobid: `${startJobid}-${slugify(titles.mid)}`,
+            fromJobName: titles.mid,
+            toJobid: `${startJobid}-${slugify(titles.senior)}`,
+            toJobName: titles.senior,
+            jaccardHigh: 0.76,
+            cosLow: 0.84,
+            salaryGain: 0.26,
+            transitionReason: `第二步从 ${titles.mid} 进阶到 ${titles.senior}，会更强调复杂方案设计、跨模块协同以及关键问题兜底能力。`,
+            skillGaps: [
+              createSkillGap(
+                secondarySkill,
+                `${titles.senior} 需要你不只是能完成任务，还要能主导方案与推动跨角色协作。`,
+                `把 ${secondarySkill} 转化为可复用的方法论或规范沉淀，提升岗位上限。`,
+                '进阶能力',
+                4,
+              ),
+            ],
+          },
+          {
+            stepIndex: 3,
+            fromJobid: `${startJobid}-${slugify(titles.senior)}`,
+            fromJobName: titles.senior,
+            toJobid: `${startJobid}-${slugify(titles.expert)}`,
+            toJobName: titles.expert,
+            jaccardHigh: 0.7,
+            cosLow: 0.86,
+            salaryGain: 0.4,
+            transitionReason: `从 ${titles.senior} 进入 ${titles.expert}，关键在于建立体系化视角、技术影响力和更强的业务抽象能力。`,
+            skillGaps: [
+              createSkillGap(
+                tertiarySkill,
+                `${titles.expert} 阶段更关注体系化建设、跨团队影响力与长期演进能力。`,
+                `围绕 ${tertiarySkill} 沉淀一套方案评审或演进路线，形成更强的话语权。`,
+                '战略能力',
+                4,
+              ),
+            ],
+          },
+        ],
+      },
+      {
+        pathid: `${startJobid}-vertical-lead`,
+        pathTitle: `${startJobName}管理进阶：从个人贡献到团队带动`,
+        pathType: 'vertical',
+        totalSteps: 2,
+        totalRoutingCost: 0.28,
+        overallSummary: `如果你希望围绕 ${startJobName} 进一步承担团队职责，这条路径会更强调带人、推进与技术治理能力。`,
+        steps: [
+          {
+            stepIndex: 1,
+            fromJobid: startJobid,
+            fromJobName: startJobName,
+            toJobid: `${startJobid}-${slugify(titles.lead)}`,
+            toJobName: titles.lead,
+            jaccardHigh: 0.68,
+            cosLow: 0.82,
+            salaryGain: 0.3,
+            transitionReason: `从 ${startJobName} 转向 ${titles.lead}，需要从“完成任务”升级为“带动他人完成任务”。`,
+            skillGaps: [
+              createSkillGap(
+                '任务拆解与协同推进',
+                `${titles.lead} 对节奏管理、风险识别和带教能力有更高要求。`,
+                '主动承担一次多人协作模块，练习任务拆解、节奏跟进和复盘输出。',
+                '协同能力',
+                3,
+              ),
+            ],
+          },
+          {
+            stepIndex: 2,
+            fromJobid: `${startJobid}-${slugify(titles.lead)}`,
+            fromJobName: titles.lead,
+            toJobid: `${startJobid}-${slugify(titles.director)}`,
+            toJobName: titles.director,
+            jaccardHigh: 0.6,
+            cosLow: 0.8,
+            salaryGain: 0.45,
+            transitionReason: `${titles.director} 阶段更强调资源协调、技术规划和团队中长期演进方向的制定。`,
+            skillGaps: [
+              createSkillGap(
+                '技术规划',
+                `${titles.director} 需要你能够从单项目视角升级到团队视角，制定阶段性路线。`,
+                '输出一版季度演进计划，包含优先级、风险、收益和推进节奏。',
+                '战略能力',
+                4,
+              ),
+            ],
+          },
+        ],
+      },
+    ],
+  }
+
+  const lateral: CareerData = {
+    startJobid,
+    startJobName,
+    paths: preferredDirections.map((direction, index) => {
+      const fallbackSkill = missingSkills[index] || coreSkills[index % Math.max(coreSkills.length, 1)] || '岗位迁移能力'
+      const targetJobName = direction.includes('工程师') || direction.includes('经理') || direction.includes('设计')
+        ? direction
+        : `${direction}方向`
+      const cost = Number((0.28 + index * 0.08).toFixed(2))
+      const overlap = Math.max(0.28, 0.66 - index * 0.07)
+      const softFit = Math.max(0.62, 0.86 - index * 0.03)
+
+      return {
+        pathid: `${startJobid}-lateral-${index + 1}`,
+        pathTitle: `${startJobName} -> ${targetJobName}：横向发展路线`,
+        pathType: 'lateral' as const,
+        totalSteps: 1,
+        totalRoutingCost: cost,
+        overallSummary: `这条路线围绕 ${startJobName} 向 ${targetJobName} 的迁移展开，适合结合当前能力基础评估转岗门槛与投入产出比。`,
+        steps: [
+          {
+            stepIndex: 1,
+            fromJobid: startJobid,
+            fromJobName: startJobName,
+            toJobid: `${startJobid}-${slugify(targetJobName)}`,
+            toJobName: targetJobName,
+            jaccardHigh: Number(overlap.toFixed(2)),
+            cosLow: Number(softFit.toFixed(2)),
+            salaryGain: index < 2 ? 0.1 : index > 3 ? -0.05 : 0,
+            transitionReason: `${targetJobName} 与 ${startJobName} 在一部分能力上可以直接迁移，但仍需要补齐该方向的关键门槛后再推进。`,
+            skillGaps: [buildDirectionalGap(targetJobName, fallbackSkill, startJobName)],
+          },
+        ],
+      }
+    }),
+  }
+
+  return {
+    lateral,
+    vertical,
+  }
+}
+
+const careerDataset = computed(() => buildCareerMapDataset(selectedJobMatch.value))
+const activeData = computed(() => (viewType.value === 'vertical' ? careerDataset.value.vertical : careerDataset.value.lateral))
 
 const stats = computed(() => ({
   totalPaths: activeData.value.paths.length,
@@ -981,7 +1613,9 @@ function handleViewChange() {
   visible.value = false
   selectedNode.value = null
   selectedEdge.value = null
-  renderChart()
+  graphZoom.value = 1
+  graphCenter.value = null
+  renderChart(true)
 }
 
 function closeDetailPanel() {
@@ -1237,18 +1871,20 @@ function buildGraph(data: CareerData) {
   return { nodes, edges }
 }
 
-function renderChart() {
+function renderChart(forceReset = false) {
   if (!chart.value) return
 
-  const currentOption = chart.value.getOption() as any
-  const currentSeries = currentOption?.series?.[0]
+  if (!forceReset) {
+    const currentOption = chart.value.getOption() as any
+    const currentSeries = currentOption?.series?.[0]
 
-  if (typeof currentSeries?.zoom === 'number') {
-    graphZoom.value = currentSeries.zoom
-  }
+    if (typeof currentSeries?.zoom === 'number') {
+      graphZoom.value = currentSeries.zoom
+    }
 
-  if (Array.isArray(currentSeries?.center) && currentSeries.center.length === 2) {
-    graphCenter.value = [currentSeries.center[0], currentSeries.center[1]]
+    if (Array.isArray(currentSeries?.center) && currentSeries.center.length === 2) {
+      graphCenter.value = [currentSeries.center[0], currentSeries.center[1]]
+    }
   }
 
   const { nodes, edges } = buildGraph(activeData.value)
@@ -1371,8 +2007,50 @@ function scheduleChartResize() {
   })
 }
 
-onMounted(() => {
+function resetMapState(resetView = true) {
   selectedPathId.value = activeData.value.paths[0]?.pathid ?? ''
+  visible.value = false
+  selectedNode.value = null
+  selectedEdge.value = null
+  if (resetView) {
+    graphZoom.value = 1
+    graphCenter.value = null
+  }
+}
+
+watch(
+  () => route.query.jobId ?? route.query.job_id,
+  () => {
+    activeView.value = getRouteJobIdString() ? 'map' : 'jobs'
+  },
+  { immediate: true },
+)
+
+watch(
+  [() => activeJobId.value, () => viewType.value, () => jobMatchItems.value.length],
+  (newValues, oldValues) => {
+    // 如果是 jobId 发生变化，强制重置视图并重新初始化图表
+    const isJobIdChanged = newValues[0] !== oldValues?.[0]
+    resetMapState(isJobIdChanged)
+    nextTick(() => {
+      if (isJobIdChanged && chartRef.value) {
+        // 销毁旧图表实例并重新初始化
+        chart.value?.dispose()
+        chart.value = null
+        initChart()
+      } else {
+        renderChart(isJobIdChanged)
+      }
+    })
+  },
+  { immediate: true },
+)
+
+onMounted(() => {
+  // 初始化职业模式
+  careerModeStore.initMode()
+  loadJobOptions()
+  resetMapState()
   initChart()
 
   if (chartRef.value && typeof ResizeObserver !== 'undefined') {
@@ -1498,8 +2176,192 @@ h1 {
   min-width: 320px;
 }
 
+.hero-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
 .search {
   width: 100%;
+}
+
+.job-picker-panel {
+  margin-bottom: 20px;
+  padding: 22px 24px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.08);
+}
+
+.job-picker-panel--compact {
+  padding-top: 18px;
+}
+
+.section-group-kicker {
+  margin: 0 0 8px;
+  color: #b45309;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.job-picker-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: flex-start;
+  margin-bottom: 18px;
+}
+
+.job-picker-head h2 {
+  margin: 0;
+  color: #111827;
+}
+
+.job-picker-desc {
+  margin: 10px 0 0;
+  max-width: 820px;
+  color: #64748b;
+  line-height: 1.7;
+}
+
+.job-picker-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.job-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.job-picker-list--nested {
+  margin-top: 14px;
+}
+
+.job-picker-row {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+  gap: 16px;
+  padding: 18px;
+  border-radius: 20px;
+  border: 1px solid rgba(219, 231, 245, 0.96);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 250, 255, 0.96));
+}
+
+.job-picker-row.is-active {
+  border-color: rgba(59, 130, 246, 0.3);
+  box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.14);
+}
+
+.job-picker-index {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.job-picker-index span {
+  min-width: 44px;
+  padding: 8px 10px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.job-picker-main {
+  min-width: 0;
+}
+
+.job-picker-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.job-picker-card-head h3 {
+  margin: 0;
+  color: #111827;
+}
+
+.job-picker-card-head p,
+.job-picker-summary,
+.job-picker-meta span,
+.job-picker-preview-item span {
+  color: #64748b;
+}
+
+.job-picker-card-head p {
+  margin: 6px 0 0;
+  font-size: 12px;
+}
+
+.job-picker-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.job-picker-summary {
+  margin: 12px 0 0;
+  line-height: 1.7;
+}
+
+.job-picker-meta {
+  margin-top: 10px;
+  font-size: 13px;
+}
+
+.job-picker-preview {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.job-picker-preview-item {
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(248, 250, 252, 0.95);
+  border: 1px solid rgba(226, 232, 240, 0.95);
+}
+
+.job-picker-preview-item span {
+  display: block;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.job-picker-preview-item p {
+  margin: 0;
+  color: #1f2937;
+  line-height: 1.6;
+}
+
+.job-picker-actions-col {
+  display: flex;
+  align-items: center;
+}
+
+.job-picker-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.job-picker-collapse :deep(.el-collapse-item__header) {
+  font-weight: 700;
 }
 
 .stats {
@@ -2172,6 +3034,7 @@ h1 {
 
 @media (max-width: 1100px) {
   .hero,
+  .job-picker-head,
   .chart-toolbar__row,
   .panel-head,
   .route-header {
@@ -2185,6 +3048,20 @@ h1 {
 
   .stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .job-picker-row {
+    grid-template-columns: 1fr;
+  }
+
+  .job-picker-actions,
+  .job-picker-card-actions,
+  .hero-action-row {
+    justify-content: flex-start;
+  }
+
+  .job-picker-preview {
+    grid-template-columns: 1fr;
   }
 
   .chart-stage-hints,
@@ -2208,6 +3085,14 @@ h1 {
 
   .stats {
     grid-template-columns: 1fr;
+  }
+
+  .hero,
+  .job-picker-panel,
+  .chart-panel,
+  .route-panel {
+    padding: 16px;
+    border-radius: 20px;
   }
 
   .chart {
@@ -2256,6 +3141,10 @@ h1 {
   .gap-summary-bar {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .job-picker-row {
+    padding: 14px;
   }
 
   .detail-slide-enter-from,

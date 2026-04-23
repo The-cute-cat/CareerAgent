@@ -1,626 +1,726 @@
-# AI 职业规划系统 - 前端功能文档
+# 前端功能文档
 
-## 📖 项目简介
+## 1. 项目概述
 
-AI 职业规划系统是一个基于人工智能的职业规划辅助平台,帮助用户进行职业生涯规划、能力评估、岗位匹配等。前端采用现代化的技术栈,提供友好的用户交互体验。
+本项目是一个面向大学生/求职用户的 AI 职业规划前端系统，核心目标是把“用户画像采集、岗位匹配、职业报告、发展路径、简历生成、会员积分、AI 助手”串成一个完整闭环。
 
-## 🛠️ 技术栈
+当前前端技术栈：
 
-### 核心框架
+- Vue 3 + TypeScript
+- Vite
+- Element Plus
+- Pinia + pinia-plugin-persistedstate
+- Axios
+- ECharts
 
-- **Vue 3.5.29** - 采用 Composition API 开发模式
-- **TypeScript 5.9.3** - 提供类型安全保障
-- **Vite 7.3.1** - 快速的前端构建工具
+当前代码中同时存在两条主线模式：
 
-### UI 组件库
+- 学习模式：偏学习方向、能力补齐、成长规划
+- 求职模式：偏岗位匹配、职业报告、简历与投递准备
 
-- **Element Plus 2.13.5** - 企业级 Vue 3 组件库
-- **@element-plus/icons-vue 2.3.2** - Element Plus 图标库
-- **Bootstrap 5.3.8** - 辅助样式框架
+模式状态由 `career-mode` 持久化保存，首页、职业表单等页面会根据模式切换文案和功能入口。
 
-### 状态管理与路由
+## 2. 核心业务闭环
 
-- **Pinia 3.0.4** - Vue 官方推荐的状态管理库
-- **pinia-plugin-persistedstate 4.7.1** - Pinia 持久化插件
-- **Vue Router 4.6.4** - 官方路由管理器
+系统前端围绕以下业务链路组织：
 
-### 数据可视化
+1. 未登录用户进入欢迎页，了解产品能力并进入登录/注册。
+2. 登录后进入首页，可切换学习/求职模式并进入对应主流程。
+3. 用户在职业表单页上传简历、补充教育/技能/经历/测评/职业意向信息。
+4. 前端将表单转换为后端 DTO，提交后生成岗位匹配结果。
+5. 岗位匹配结果进入“岗位匹配页”和“岗位详情页”，并可继续生成职业发展报告。
+6. 报告支持本地按岗位缓存、编辑、AI 完整性检查、AI 润色、导出 PDF / Word。
+7. 用户可继续查看职业发展地图、知识图谱、面试管理、个人中心、积分会员与支付能力。
+8. AI 助手贯穿全局，支持流式对话和文件上传问答。
 
-- **ECharts 6.0.0** - 强大的数据可视化库
-- **@antv/x6 3.1.6** - 图编辑引擎,用于绘制职业发展图谱
-- **@antv/x6-vue-shape 3.0.2** - X6 的 Vue 形状组件
+## 3. 路由与页面功能
 
-### 工具库
+### 3.1 公开页面
 
-- **Axios 1.13.6** - HTTP 请求库
-- **html2canvas 1.4.1** - 将 DOM 转换为 Canvas
-- **jspdf 4.2.0** - 生成 PDF 文件
+#### `/welcome`
 
-### 开发工具
+欢迎落地页，主要用于产品介绍和转化。
 
-- **ESLint 10.0.2** - 代码质量检查
-- **Prettier 3.8.1** - 代码格式化
-- **Vitest 4.0.18** - 单元测试框架
+功能点：
 
-## 📁 项目结构
+- 展示产品定位、核心能力、使用步骤、FAQ
+- 展示职业规划、岗位匹配、职业路径等能力卖点
+- 提供跳转登录入口
 
-```
-career-planning-frontend/
-├── public/                 # 静态资源目录
-├── src/
-│   ├── api/               # API 接口层
-│   │   ├── po/           # 数据对象定义
-│   │   └── user/         # 用户相关 API
-│   ├── assets/           # 静态资源(图片、样式等)
-│   ├── components/       # 公共组件
-│   │   ├── ChatBot.vue      # AI 助手悬浮窗
-│   │   ├── CHeader.vue       # 顶部导航栏
-│   │   ├── Layout.vue       # 整体布局组件
-│   │   └── Sidebar.vue      # 侧边导航栏
-│   ├── router/           # 路由配置
-│   │   └── index.ts
-│   ├── stores/           # Pinia 状态管理
-│   │   ├── modules/      # Store 模块
-│   │   │   └── user.ts   # 用户状态管理
-│   │   └── index.ts
-│   ├── types/            # TypeScript 类型定义
-│   ├── utils/            # 工具函数
-│   ├── views/            # 页面组件
-│   │   ├── 404.vue                  # 404 错误页面
-│   │   ├── CUserForgetPassword.vue  # 忘记密码页面
-│   │   ├── CUserLogin.vue          # 登录页面
-│   │   ├── CUserRegister.vue       # 注册页面
-│   │   ├── DevelopmentMap.vue      # 职业发展地图
-│   │   ├── HomePage.vue            # 首页/仪表盘
-│   │   ├── CProfile.vue             # 个人中心
-│   │   ├── CReport.vue              # 分析报告
-│   │   └── Upload.vue              # 简历上传页面
-│   ├── App.vue            # 根组件
-│   ├── main.ts            # 应用入口
-│   └── main.js            # JS 兼容入口
-├── index.html
-├── package.json
-├── vite.config.ts
-└── tsconfig.json
-```
+对应页面：
 
-## 🎯 核心功能模块
+- `src/views/LandingPage.vue`
 
-### 1. 用户认证模块
+#### `/login`
 
-#### 1.1 用户登录 (`/login`)
+登录页。
 
-**功能描述**: 提供用户登录功能,支持"记住我"选项
-
-**主要特性**:
+功能点：
 
 - 用户名/邮箱 + 密码登录
-- "记住我"功能,选择后可保持登录状态
-- 登录状态持久化存储
-- 自动重定向到目标页面或首页
-- 已登录用户访问登录页自动重定向
+- 登录成功后写入 `accessToken`、`refreshToken`、`userInfo`
+- 登录成功后跳转首页
+- 错误提示与成功通知
 
-**技术实现**:
+对应页面：
 
-- 使用 Pinia Store (`useUserStore`) 管理用户状态
-- Token 存储在 Pinia 中,通过插件自动持久化
-- 路由守卫检查登录状态
+- `src/views/CUserLogin.vue`
 
-**关键代码位置**:
+#### `/register`
 
-- 页面组件: `src/views/CUserLogin.vue`
-- 状态管理: `src/stores/modules/user.ts`
-- 路由守卫: `src/router/index.ts` (62-94行)
+注册页。
 
-#### 1.2 用户注册 (`/register`)
+功能点：
 
-**功能描述**: 新用户账号注册
+- 用户名、邮箱、密码、确认密码、验证码、邀请码
+- 发送邮箱验证码倒计时
+- 注册成功后清空本地登录信息并跳转登录页
+- 注册成功提示赠送新人积分
 
-**主要特性**:
+对应页面：
 
-- 用户名、邮箱、密码、确认密码输入
-- 表单验证(邮箱格式、密码强度、密码一致性)
-- 注册成功后自动跳转登录页
+- `src/views/CUserRegister.vue`
 
-**关键代码位置**:
+#### `/forgot-password`
 
-- 页面组件: `src/views/CUserRegister.vue`
+忘记密码页。
 
-#### 1.3 忘记密码 (`/forgot-password`)
+功能点：
 
-**功能描述**: 帮助用户找回密码
+- 邮箱找回密码
+- 与用户模块接口联动
 
-**主要特性**:
+对应页面：
 
-- 通过邮箱验证找回密码
-- 邮箱格式验证
-- 发送重置密码链接
+- `src/views/CUserForgetPassword.vue`
 
-**关键代码位置**:
+### 3.2 登录后主框架页面
 
-- 页面组件: `src/views/CUserForgetPassword.vue`
+登录后默认进入 `Layout` 容器，整体由侧边栏、顶部栏、主内容区、全局 AI 助手组成。
 
----
+对应组件：
 
-### 2. 首页仪表盘 (`/`)
+- `src/components/Layout.vue`
+- `src/components/Sidebar.vue`
+- `src/components/CHeader.vue`
+- `src/components/ChatBot.vue`
 
-**功能描述**: 用户登录后的首页,展示个人能力和快捷操作入口
+#### `/`
 
-**主要特性**:
+首页/工作台。
 
-#### 2.1 快捷功能卡片
+功能点：
 
-提供四个主要功能的快速入口:
+- 根据学习模式/求职模式切换首页入口内容
+- 展示快捷操作卡片
+- 展示能力雷达图
+- 展示系统使用指引
+- 首页模式卡片与推荐面板联动
 
-1. **上传简历**
-   - 图标: `Upload`
-   - 颜色: #409eff (蓝色)
-   - 路由: `/upload`
-   - 描述: 点击上传简历
+对应页面：
 
-2. **查看匹配**
-   - 图标: `DocumentChecked`
-   - 颜色: #67c23a (绿色)
-   - 路由: `/report`
-   - 描述: 岗位匹配
+- `src/views/CHomePage.vue`
 
-3. **生成报告**
-   - 图标: `DataLine`
-   - 颜色: #e6a23c (橙色)
-   - 路由: `/report`
-   - 描述: 生成我的生涯报告
+#### `/career-form/resume`
+#### `/career-form/template`
 
-4. **职业地图**
-   - 图标: `MapLocation`
-   - 颜色: #f56c6c (红色)
-   - 路由: `/development-map`
-   - 描述: 查看岗位晋升路线
+职业画像采集与简历生成入口页，项目当前最重的业务页面之一。
 
-#### 2.2 能力概览雷达图
+功能点：
 
-- 使用 ECharts 绘制六维能力雷达图
-- 能力维度: 沟通能力、专业技能、团队协作、学习能力、领导力、创新思维
-- 基于简历分析生成的能力评估数据
-- 响应式设计,自动适配屏幕大小
+- 五步式信息采集
+- 支持学习模式与求职模式两套文案
+- 简历上传与解析
+- 缺失字段提醒与补录聊天
+- 语言、证书、技能、工具、项目、实习动态增删
+- 素质测评与问卷
+- 代码仓库链接录入
+- GitHub/Gitee 代码能力评估
+- 表单进度、画像完整度、步骤完成度计算
+- 本地缓存职业表单数据
+- 提交前转换 DTO
+- 提交后生成人岗匹配结果并供后续页面消费
+- 生成 JSON Resume
+- 选择简历模板预览
+- 导出简历 PDF / Word
+- 跳转到独立简历编辑器
 
-**技术实现**:
+对应页面与组件：
 
-- ECharts 初始化在 `onMounted` 钩子中
-- 数据动态渲染,可接入后端 API
-- 窗口 resize 时自动调整图表尺寸
+- `src/views/CareerForm.vue`
+- `src/components/CareerForm_Upload.vue`
+- `src/components/ResumeMissingFieldsChat.vue`
+- `src/components/Quenation.vue`
+- `src/components/career/*`
 
-#### 2.3 系统公告
+#### `/career-form/voice`
 
-- 显示系统使用指南
-- 引导用户完成主要功能流程:
-  1. 上传简历
-  2. 系统分析能力特点
-  3. 查看匹配岗位和生涯报告
-  4. 探索职业地图
+语音/对话式职业表单辅助入口。
 
-**关键代码位置**:
+功能点：
 
-- 页面组件: `src/views/HomePage.vue`
+- 读取当前缓存表单快照
+- 展示表单进度、画像完整度、已完成步骤数
+- 将数据传给语音表单组件
 
----
+对应页面：
 
-### 3. 简历上传模块 (`/upload`)
+- `src/views/CareerFormVoice.vue`
+- `src/components/CareerForm_Voice.vue`
 
-**功能描述**: 上传个人简历,系统将进行 AI 分析
+#### `/resume-template`
 
-**主要特性**:
+简历模板展示页。
 
-- 支持 PDF、Word 等常见简历格式
-- 拖拽上传功能
-- 文件大小限制
-- 上传进度显示
-- 上传成功后自动分析简历内容
+功能点：
 
-**技术实现**:
+- 展示三类简历模板卡片
+- 提供预览、下载、使用模板入口
+- 跳转独立简历编辑器
 
-- 使用 Element Plus 的 `el-upload` 组件
-- 通过 Axios 发送文件到后端 API
-- 支持文件类型和大小验证
+说明：
 
-**关键代码位置**:
+- 当前更偏展示与跳转入口，真正的编辑与导出能力在 `/resume-editor` 和职业表单页内实现。
 
-- 页面组件: `src/views/Upload.vue`
+对应页面：
 
----
+- `src/views/ResumeTemplate.vue`
 
-### 4. 分析报告模块 (`/report`)
+#### `/resume-editor`
 
-**功能描述**: 展示基于简历分析生成的职业生涯报告
+独立简历编辑器。
 
-**主要特性**:
+功能点：
 
-- 用户画像分析
-- 能力评估详情
-- 岗位匹配推荐
-- 职业发展建议
-- 报告导出功能(PDF 格式)
+- 从职业表单缓存和 JSON Resume store 自动回填数据
+- 支持示例数据一键填充
+- 支持三种简历模板切换
+- 基本信息、工作经历、项目经历、其他信息多标签编辑
+- 实时简历预览
+- 简历完整度校验
+- 导出 PDF
+- 导出 Word
 
-**技术实现**:
+对应页面：
 
-- 使用 ECharts 展示多维数据
-- `html2canvas` + `jspdf` 生成 PDF
-- Markdown 渲染展示文本内容
+- `src/views/ResumeEditor.vue`
 
-**关键代码位置**:
+#### `/job-matching`
 
-- 页面组件: `src/views/CReport.vue`
+岗位匹配结果页。
 
----
+功能点：
 
-### 5. 职业发展地图 (`/development-map`)
+- 从本地 `jobMatchResult` 读取匹配结果
+- 按匹配分排序
+- 顶部展示最佳匹配岗位
+- 展示平均分、推荐投递比例、岗位数量
+- 展示推荐岗位列表
+- 每个岗位展示岗位画像、匹配分、可投递判断、技能差距、行动建议
+- 跳转岗位详情页
+- 可返回职业评估页重新生成结果
 
-**功能描述**: 可视化展示职业发展路径和晋升路线
+对应页面：
 
-**主要特性**:
+- `src/views/JobMatching.vue`
 
-- 使用 @antv/x6 绘制职业图谱
-- 交互式节点和连线
-- 支持节点拖拽
-- 展示岗位层级关系
-- 高亮当前所在岗位
-- 显示能力要求和晋升条件
+#### `/job-position`
 
-**技术实现**:
+单个岗位详情页。
 
-- X6 图编辑引擎
-- Vue 自定义节点组件 (`@antv/x6-vue-shape`)
-- 图谱数据动态渲染
+功能点：
 
-**关键代码位置**:
+- 查看岗位细节、匹配信息和分析结果
 
-- 页面组件: `src/views/DevelopmentMap.vue`
+说明：
 
----
+- 当前路由直接挂载组件而不是视图文件。
 
-### 6. 个人中心 (`/profile`)
+对应组件：
 
-**功能描述**: 用户个人信息管理
+- `src/components/JobMatching_Position.vue`
 
-**主要特性**:
+#### `/report`
 
+职业发展报告页。
+
+这是当前第二个核心业务页面。
+
+功能点：
+
+- 如果已有人岗匹配结果，先选择/切换目标岗位
+- 按岗位维度读取本地缓存报告
+- 可为某个岗位生成并切换职业报告
+- 报告分章节展示：
+  - 学生画像摘要
+  - 能力差距分析
+  - 目标岗位画像摘要
+  - 短期行动计划
+  - 中期发展规划
+  - 行动清单
+  - 资源与建议
+- 报告工作台概览与章节导航
+- 本地勾选行动完成度
+- 章节编辑
+- 单段 AI 润色
+- 整体 AI 润色
+- AI 完整性检查
+- 保存报告到本地 store
+- 导出 PDF
+- 导出 Word
+
+对应页面与组件：
+
+- `src/views/CReport.vue`
+- `src/components/CReport_Component/CReportEditor.vue`
+
+#### `/report/edit`
+
+报告编辑器页面。
+
+功能点：
+
+- 对报告指定章节进行富文本/结构化编辑
+
+对应组件：
+
+- `src/components/CReport_Component/CReportEditor.vue`
+
+#### `/development-map`
+
+职业发展地图页。
+
+功能点：
+
+- 支持纵向晋升图谱与横向转岗图谱切换
+- 使用 ECharts Graph 展示职业路径
+- 支持节点搜索
+- 支持缩放、拖拽、重置、回到起点
+- 支持路径快捷切换与高亮
+- 点击节点查看岗位详情
+- 点击边查看迁移分析
+- 侧边详情面板展示：
+  - 路径总结
+  - 关键指标
+  - 技能缺口
+  - JD 原文上下文
+  - 行动建议
+
+对应页面：
+
+- `src/views/DevelopmentMap.vue`
+
+#### `/knowledge-base`
+
+岗位知识图谱/学习路线页。
+
+功能点：
+
+- 列表态展示不同岗位学习路径
+- 按分类筛选与关键字搜索
+- 进入岗位详情后展示知识树
+- 支持拖动画布
+- 支持点击节点查看详情
+- 详情侧栏展示知识说明、难度、学习时长、标签、资源、里程碑
+
+当前数据状态：
+
+- 以本地静态数据为主，Java 方向内容最完整，部分岗位树为空占位。
+
+对应页面：
+
+- `src/views/JobKnowledge.vue`
+
+#### `/interviews/:type?`
+
+面试管理页。
+
+功能点：
+
+- 面试日历
+- 今日面试摘要
+- 面试列表
+- 面试复盘
+- 根据路径参数切换全部/进行中/已完成/复盘/日历子视图
+
+当前数据状态：
+
+- 使用本地 mock 面试数据
+
+对应页面与组件：
+
+- `src/views/CInterviews.vue`
+- `src/components/CInterviews_Component/*`
+
+#### `/profile`
+#### `/settings`
+
+个人中心/设置中心。
+
+功能点：
+
+- 个人首页 Dashboard
 - 个人资料编辑
-- 头像上传
-- 密码修改
-- 账号设置
-- 登录历史查看
+- 会员积分面板
+- 邀请好友
+- 反馈建议
+- 更多设置
+- 移动端左侧菜单/右侧内容切换
+- 拉取账户积分和邀请码
+- 支持退出登录
+- 支付成功后刷新用户信息与积分状态
 
-**关键代码位置**:
+对应页面与组件：
 
-- 页面组件: `src/views/CProfile.vue`
+- `src/views/CProfile.vue`
+- `src/components/CProfile_Component/*`
 
----
+#### `/admin`
 
-### 7. 公共组件
+后台管理页。
 
-#### 7.1 布局组件 (`Layout.vue`)
+功能点：
 
-**功能描述**: 整体页面布局框架
+- 反馈管理
+- 使用记录管理
 
-**主要特性**:
+对应组件：
 
-- 左侧固定宽度侧边栏 (220px)
-- 顶部导航栏
-- 中间主内容区
-- 响应式设计
-- 页面切换过渡动画
-- 滚动条自定义样式
+- `src/components/AdminManager/AdminPanel.vue`
+- `src/components/AdminManager/FeedbackManager.vue`
+- `src/components/AdminManager/UsageRecordManager.vue`
 
-**布局结构**:
+## 4. 全局 AI 助手
 
-```vue
-<el-container class="layout-container">
-  <el-aside class="sidebar-wrapper">    <!-- 左侧侧边栏 -->
-    <Sidebar />
-  </el-aside>
+全局悬浮聊天窗口挂载在主布局中，属于全站级能力。
 
-  <el-container class="main-wrapper">   <!-- 右侧主内容区 -->
-    <CHeader />                           <!-- 顶部 CHeader -->
-    <el-main class="main-content">      <!-- 页面内容 -->
-      <router-view />
-    </el-main>
-  </el-container>
+核心能力：
 
-  <ChatBot />                            <!-- AI 助手悬浮窗 -->
-</el-container>
-```
+- 流式对话
+- 自动创建/复用 conversationId
+- 支持文件上传
+- 支持 PDF、DOCX、图片等文件问答
+- 支持显示思考过程开关
+- 支持消息复制、折叠展开、重试
+- 支持拖拽移动窗口、缩放窗口、全屏
+- 支持对话窗口和悬浮按钮位置持久化
+- 支持自动打开、滚动触发、退出触发等配置项
 
-#### 7.2 侧边栏 (`Sidebar.vue`)
+接口说明：
 
-**功能描述**: 导航菜单,提供各功能模块的快速访问
+- 文本消息走 `/chat/stream/message`
+- 文本+文件走 `/chat/stream/message-and-files`
+- 前端内置了 SSE / JSON 对象流解析逻辑
 
-**主要特性**:
+对应文件：
 
-- 深色渐变背景 (`#1a1f36` → `#243042`)
-- 导航菜单:
-  - 首页
-  - 上传简历
-  - 分析报告
-  - 职业地图
-  - 个人中心
-- 当前路由高亮显示
-- 图标 + 文字展示
+- `src/components/ChatBot.vue`
+- `src/api/chatbot/index.ts`
 
-#### 7.3 顶部导航栏 (`CHeader.vue`)
+## 5. 状态管理
 
-**功能描述**: 顶部工具栏,显示用户信息和操作入口
+### 5.1 用户状态 `useUserStore`
 
-**主要特性**:
+职责：
 
-- 用户头像和昵称显示
-- 消息通知
-- 退出登录
-- 响应式设计
+- 保存 `accessToken`
+- 保存 `refreshToken`
+- 保存 `userInfo`
+- 计算 `isLoggedIn`
+- 提供登录写入、清空用户信息等方法
 
-#### 7.4 AI 助手 (`ChatBot.vue`)
+特点：
 
-**功能描述**: 悬浮窗形式的 AI 对话助手
+- 整个 store 持久化
 
-**主要特性**:
+对应文件：
 
-- 固定在页面右下角
-- 可展开/收起
-- 实时对话功能
-- 职业规划咨询
-- 智能问答
+- `src/stores/modules/user.ts`
 
----
+### 5.2 职业模式状态 `useCareerModeStore`
 
-### 8. 路由与状态管理
+职责：
 
-#### 8.1 路由配置
+- 保存当前模式 `learning | job`
+- 初始化并持久化模式
 
-**路由结构**:
+对应文件：
 
-```
-/login              - 登录页
-/register           - 注册页
-/forgot-password    - 忘记密码
-/                   - 首页(需登录)
-/upload             - 上传简历(需登录)
-/report             - 分析报告(需登录)
-/development-map    - 职业地图(需登录)
-/profile            - 个人中心(需登录)
-/:pathMatch(.*)*    - 404 页面
-```
+- `src/stores/careerMode.ts`
 
-**路由守卫**:
+### 5.3 报告状态 `useCareerReportStore`
 
-- 自动检查用户登录状态
-- 未登录访问需认证页面自动跳转登录页
-- 已登录访问登录页自动跳转首页
-- 支持重定向参数
+职责：
 
-**关键代码**: `src/router/index.ts`
+- 保存当前报告
+- 按岗位 ID 分报告缓存
+- 按岗位记录上次编辑章节
+- 支持当前岗位切换与本地恢复
 
-#### 8.2 用户状态管理 (Pinia)
+对应文件：
 
-**Store 模块**: `useUserStore`
+- `src/stores/modules/careerReport.ts`
 
-**State**:
+### 5.4 JSON Resume 状态 `useJsonResumeStore`
 
-- `accessToken`: 访问令牌
-- `refreshToken`: 刷新令牌
-- `userInfo`: 用户信息对象
-- `isLoggedIn`: 是否已登录 (computed)
+职责：
 
-**Actions**:
+- 保存简历额外资料
+- 保存 JSON Resume 生成结果
+- 提供从职业表单构建标准化简历的能力
 
-- `setTokens(access, refresh)`: 设置 Token
-- `clearTokens()`: 清除 Token
-- `setUserALLInfo(access, refresh, user)`: 设置所有用户信息
-- `clearUserALLInfo()`: 清除所有用户信息
-- `clearUserInfo()`: 清除用户信息
+对应文件：
 
-**持久化配置**:
+- `src/stores/modules/jsonResume.ts`
 
-- 使用 `pinia-plugin-persistedstate` 插件
-- 整个 store 自动持久化到 localStorage
-- 刷新页面不丢失登录状态
+## 6. 路由守卫与登录态
 
-**关键代码**: `src/stores/modules/user.ts`
+路由守卫实现于 `src/router/index.ts`。
 
----
+当前行为：
 
-## 🎨 UI/UX 特性
+- 已登录用户访问登录页或欢迎页时，自动跳转首页
+- 未登录用户访问首页时，自动跳转欢迎页
+- 若 store 标记已登录但缺少 `userInfo`，会主动调用接口补拉用户信息
+- 支持读取 `redirect` 参数
 
-### 设计风格
+说明：
 
-- **主色调**: 蓝色系 (#409eff) - 体现专业、科技感
-- **侧边栏**: 深色渐变背景,突出内容区
-- **卡片式设计**: 内容模块化,层次分明
-- **圆角设计**: 12px 统一圆角,现代感强
-- **阴影效果**: hover 时提供视觉反馈
+- 当前代码中大多数业务页面没有统一声明 `meta.requiresAuth`
+- 但首页与登录/欢迎页之间已有基础登录跳转逻辑
 
-### 交互特性
+## 7. 接口分层
 
-- **过渡动画**: 页面切换淡入淡出效果
-- **Hover 效果**: 卡片悬停上浮 + 阴影增强
-- **响应式布局**: 支持桌面端、平板、手机
-- **加载状态**: 操作时显示加载提示
-- **消息提示**: Element Plus `el-message` 全局提示
+### 7.1 用户模块
 
-### 响应式断点
+能力：
 
-- **桌面端**: > 1200px (快捷功能 4 列)
-- **平板端**: 768px - 1200px (快捷功能 2 列)
-- **移动端**: < 768px (快捷功能 1 列,侧边栏可能折叠)
+- 注册
+- 登录
+- 获取用户信息
+- 登出
+- 忘记密码
+- 更新头像
 
----
+对应目录：
 
-## 🔐 安全特性
+- `src/api/user/*`
 
-1. **Token 管理**
-   - Access Token 和 Refresh Token 双 Token 机制
-   - Token 存储在 Pinia 中,自动持久化
-   - 支持自动刷新 Token
+### 7.2 职业表单模块
 
-2. **路由守卫**
-   - 所有需认证页面自动检查登录状态
-   - 未登录用户自动跳转登录页
-   - 防止越权访问
+能力：
 
-3. **数据验证**
-   - 前端表单验证
-   - 文件上传类型和大小限制
-   - API 请求参数验证
+- 提交职业画像表单
+- 表单转 DTO
+- 代码能力评估
+- 问卷获取与提交
+- 简历上传与解析
 
----
+对应目录：
 
-## 📦 构建与部署
+- `src/api/career-form/*`
 
-### 开发环境
+### 7.3 报告模块
 
-```bash
-# 安装依赖
-npm install
+能力：
 
-# 启动开发服务器
-npm run dev
-```
+- 生成职业发展报告
+- 完整性检查
+- 段落润色
 
-### 生产构建
+对应目录：
 
-```bash
-# 类型检查
-npm run type-check
+- `src/api/report/index.ts`
 
-# 构建生产版本
-npm run build
+### 7.4 积分/会员模块
 
-# 预览生产构建
-npm run preview
-```
+能力：
 
-### 代码规范
+- 获取积分账户
+- 消费积分
+- 积分充值
+- 获取套餐
+- 获取邀请码
+- 注册邀请大使
 
-```bash
-# 运行 ESLint
-npm run lint
+对应目录：
 
-# 代码格式化
-npm run format
-```
+- `src/api/points/*`
 
-### 测试
+### 7.5 支付模块
 
-```bash
-# 运行单元测试
-npm run test
+能力：
 
-# 测试 UI 界面
-npm run test:ui
+- 创建支付订单
+- 构建支付宝支付页
+- 查询订单状态
+- 处理本地当前订单号
 
-# 生成测试覆盖率报告
-npm run test:coverage
-```
+特点：
 
----
+- 支持 mock 模式
+- 兼容后端返回 HTML 或 JSON 两种支付响应
 
-## 🔧 配置文件说明
+对应目录：
 
-### vite.config.ts
+- `src/api/payment/index.ts`
 
-- Vite 构建配置
-- 路径别名配置 (@ 指向 src)
-- 插件配置 (Vue、TypeScript、自动导入等)
-- 开发服务器配置 (端口、代理等)
+### 7.6 反馈模块
 
-### tsconfig.json
+能力：
 
-- TypeScript 编译配置
-- 模块解析策略
-- 类型检查严格模式
+- 提交反馈
+- 查看用户反馈历史
+- 查看反馈详情
+- 更新反馈
+- 图片上传
+- 管理员查看反馈列表
 
-### eslint.config.ts
+对应目录：
 
-- ESLint 规则配置
-- Vue 3 最佳实践
-- TypeScript 类型检查集成
+- `src/api/feedback/index.ts`
 
----
+### 7.7 管理后台模块
 
-## 📝 开发注意事项
+能力：
 
-### 1. 组件开发规范
+- 使用记录查询
 
-- 使用 `<script setup>` 语法糖
-- 使用 TypeScript 定义类型
-- Props 必须定义类型
-- 事件命名使用 kebab-case
+对应目录：
 
-### 2. 状态管理规范
+- `src/api/admin/usage.ts`
 
-- 使用 Pinia 进行状态管理
-- 复杂逻辑拆分为多个 Store 模块
-- 使用 computed 定义派生状态
-- 使用 actions 处理异步操作
+## 8. 请求封装与鉴权
 
-### 3. 路由规范
+统一请求实例位于 `src/utils/request.ts`。
 
-- 使用路由懒加载提升性能
-- 路由命名使用 kebab-case
-- 需认证的路由添加 `meta.requiresAuth`
-- 合理使用路由守卫
+主要机制：
 
-### 4. API 调用规范
+- 基础路径为 `/api`
+- 自动注入 `Authorization: Bearer <token>`
+- POST/PUT/PATCH 默认 `application/json`
+- 401 时自动尝试刷新 token
+- 刷新失败后清空用户信息并跳转登录页
 
-- API 统一放在 `src/api` 目录
-- 使用 TypeScript 接口定义返回数据类型
-- 统一错误处理
-- 请求和响应拦截器配置
+## 9. 本地缓存与前端数据流
 
-### 5. 样式规范
+当前前端大量使用本地持久化/缓存，保证流程连续性。
 
-- 使用 scoped 样式避免污染
-- 优先使用 Element Plus 组件样式
-- 自定义样式使用语义化类名
-- 响应式使用媒体查询
+主要缓存点：
 
----
+- 用户登录态：Pinia persist
+- 职业模式：localStorage
+- 报告按岗位缓存：Pinia persist
+- JSON Resume 附加资料：Pinia persist
+- 职业表单临时数据：`career-runtime`
+- 岗位匹配结果：localStorage `jobMatchResult`
+- AI 对话 conversationId：localStorage
+- AI 助手窗口布局：localStorage
+- 当前支付订单号：localStorage
 
-## 🚀 未来优化方向
+这意味着：
 
-1. **性能优化**
-   - 路由懒加载全部实施
-   - 组件按需引入
-   - 图片懒加载和压缩
-   - 代码分割优化
+- 页面刷新后，用户大多数中间状态可恢复
+- 岗位匹配和报告存在较强的“前端本地工作台”特征
 
-2. **用户体验**
-   - PWA 支持,可离线访问
-   - 骨架屏加载优化
-   - 更多动画过渡效果
-   - 暗色模式支持
+## 10. 当前页面级数据来源说明
 
-3. **功能扩展**
-   - 国际化 (i18n) 支持
-   - 多语言切换
-   - 数据可视化更多图表类型
-   - 职业地图更丰富的交互
+### 10.1 主要依赖真实接口的模块
 
-4. **测试覆盖**
-   - 增加单元测试覆盖率
-   - E2E 端到端测试
-   - 性能测试
+- 登录/注册/忘记密码/用户信息
+- 职业表单提交
+- 问卷接口
+- 代码能力评估
+- 职业报告生成、检查、润色
+- 反馈
+- 积分/会员/支付
+- AI 助手
 
-5. **监控与分析**
-   - 埋点统计
-   - 错误监控 (Sentry)
-   - 性能分析
+### 10.2 主要依赖本地 mock 或本地缓存的模块
 
----
+- 首页雷达图与快捷入口配置
+- 面试管理
+- 部分知识图谱内容
+- 岗位匹配页默认从本地缓存结果读取
+- 简历模板页的模板预览图
 
-## 📞 联系与支持
+## 11. 关键组件模块
 
-如有问题或建议,请联系开发团队。
+### 布局类
 
----
+- `Layout.vue`：登录后主框架
+- `Sidebar.vue`：左侧导航
+- `CHeader.vue`：顶部栏
+- `MobileTabBar.vue`：移动端辅助导航
 
-**文档版本**: v1.0  
-**最后更新**: 2026-03-15  
-**维护者**: CareerAgent 开发团队
+### 职业表单类
+
+- `CareerForm_Upload.vue`：简历上传
+- `ResumeMissingFieldsChat.vue`：补录聊天
+- `CareerForm_Radar.vue`：能力雷达
+- `Quenation.vue`：问卷组件
+
+### 首页模式类
+
+- `LearningModePanel.vue`
+- `JobModePanel.vue`
+- `LearningRecommendPanel.vue`
+- `ModeSwitchCard.vue`
+
+### 报告/图谱类
+
+- `CReportEditor.vue`
+- `CareerGraphCanvas.vue`
+- `CareerGraphPanel.vue`
+- `CareerGraphDetail.vue`
+
+### 个人中心类
+
+- `ProfileDashboard.vue`
+- `ProfileInfoPanel.vue`
+- `MemberPlanPanel.vue`
+- `InviteFriendsPanel.vue`
+- `FeedbackPanel.vue`
+- `MoreSettingsPanel.vue`
+
+## 12. 已知实现特点与维护建议
+
+### 12.1 特点
+
+- 业务页面较重，尤其是 `CareerForm.vue`、`CReport.vue`、`ChatBot.vue`
+- 交互链路完整，但部分页面仍保留 mock 或展示占位内容
+- 页面视觉较丰富，已明显偏“产品化页面”而非纯后台
+- 文档、业务状态和本地缓存关系较强，适合继续完善流程闭环
+
+### 12.2 当前值得关注的点
+
+- 路由 `meta.requiresAuth` 使用不统一，认证策略更多依赖首页和用户状态判断
+- 岗位匹配页强依赖本地 `jobMatchResult`，如果直接访问且无缓存会显示空态
+- 知识图谱页部分路线只有列表卡片，详情树内容尚未补齐
+- 面试管理页目前仍是 mock 数据驱动
+- 文本中存在少量历史编码痕迹，但不影响主逻辑识别
+
+## 13. 建议的测试重点
+
+建议后续联调或回归时重点覆盖以下流程：
+
+1. 注册 -> 登录 -> 首页 -> 职业表单 -> 岗位匹配 -> 报告生成完整链路
+2. token 过期后的自动刷新与登出跳转
+3. 简历上传解析、缺失字段补录、JSON Resume 导出
+4. 岗位切换时报告缓存是否正确按岗位隔离
+5. 支付成功后积分/会员状态刷新
+6. AI 助手的文件上传、流式中断、重试、布局持久化
+7. 移动端下个人中心、AI 助手、报告页、图谱页的布局稳定性
+
+## 14. 文档对应代码范围
+
+本文件基于当前仓库的以下范围整理：
+
+- `src/views`
+- `src/components`
+- `src/stores`
+- `src/api`
+- `src/utils/request.ts`
+- `src/router/index.ts`
+
+更新时间：2026-04-16

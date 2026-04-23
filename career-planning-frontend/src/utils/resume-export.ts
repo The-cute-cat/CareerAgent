@@ -3,16 +3,22 @@ import { jsPDF } from 'jspdf'
 import { saveAs } from 'file-saver'
 import {
   AlignmentType,
+  BorderStyle,
   Document,
   HeadingLevel,
+  ImageRun,
   Packer,
   Paragraph,
-  TextRun
+  TextRun,
+  Footer as DocxFooter,
+  Header as DocxHeader,
+  PageNumber,
 } from 'docx'
 
 import type { JsonResume } from '@/types/json-resume'
 
 export interface ManualResumeEditorData {
+  avatar?: string
   name: string
   title: string
   phone: string
@@ -61,6 +67,61 @@ type HeadingLevelValue = (typeof HeadingLevel)[keyof typeof HeadingLevel]
 /** 将任意值标准化为文本。 */
 function asText(value?: string | null): string {
   return typeof value === 'string' ? value.trim() : ''
+}
+
+async function resolveImageToUint8Array(image?: string | null): Promise<Uint8Array | null> {
+  const value = asText(image)
+  if (!value) return null
+
+  if (value.startsWith('data:image/')) {
+    const payload = value.split(',', 2)[1]
+    if (!payload) return null
+
+    try {
+      const binary = atob(payload)
+      return Uint8Array.from(binary, char => char.charCodeAt(0))
+    } catch {
+      return null
+    }
+  }
+
+  try {
+    const response = await fetch(value)
+    if (!response.ok) return null
+    const buffer = await response.arrayBuffer()
+    return new Uint8Array(buffer)
+  } catch {
+    return null
+  }
+}
+
+function createSectionHeading(text: string): Paragraph {
+  return new Paragraph({
+    text,
+    heading: HeadingLevel.HEADING_1,
+    spacing: {
+      before: 300,
+      after: 140
+    },
+    border: {
+      bottom: {
+        style: BorderStyle.SINGLE,
+        color: 'D7E3F6',
+        size: 6
+      }
+    }
+  })
+}
+
+function createBodyParagraph(text: string, options?: { after?: number; alignment?: AlignmentType }): Paragraph {
+  return new Paragraph({
+    text,
+    alignment: options?.alignment,
+    spacing: {
+      after: options?.after ?? 120,
+      line: 360
+    }
+  })
 }
 
 /** 清洗下载文件名，避免非法字符影响浏览器保存。 */
@@ -392,15 +453,33 @@ export async function exportManualResumeToWord(
   options?: ResumeWordExportOptions
 ): Promise<void> {
   const children: Paragraph[] = []
+  const avatarData = await resolveImageToUint8Array(resume.avatar)
+  const titleText = asText(resume.name) || 'Resume'
+
+  if (avatarData) {
+    children.push(
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: {
+          after: 120
+        },
+        children: [
+          new ImageRun({
+            data: avatarData,
+            transformation: {
+              width: 88,
+              height: 88
+            }
+          })
+        ]
+      })
+    )
+  }
 
   children.push(
     new Paragraph({
-      text: asText(resume.name) || '简历',
-      heading: HeadingLevel.TITLE,
-      alignment: AlignmentType.CENTER,
-      spacing: {
-        after: 160
-      }
+      text: titleText,
+      style: 'ResumeTitle'
     })
   )
 
@@ -412,30 +491,30 @@ export async function exportManualResumeToWord(
   ].filter(Boolean).join(' | ')
 
   if (metaLine) {
-    children.push(new Paragraph({
-      text: metaLine,
+    children.push(createBodyParagraph(metaLine, {
       alignment: AlignmentType.CENTER,
-      spacing: {
-        after: 240
-      }
+      after: 220
     }))
   }
 
   if (asText(resume.summary)) {
     children.push(
-      new Paragraph({ text: '个人简介', heading: HeadingLevel.HEADING_1 }),
-      new Paragraph({ text: resume.summary })
+      createSectionHeading('\u4e2a\u4eba\u7b80\u4ecb'),
+      createBodyParagraph(asText(resume.summary))
     )
   }
 
   if (asText(resume.education) || asText(resume.school)) {
     children.push(
-      new Paragraph({ text: '教育背景', heading: HeadingLevel.HEADING_1 }),
+      createSectionHeading('\u6559\u80b2\u80cc\u666f'),
       new Paragraph({
         children: [
           new TextRun({ text: asText(resume.school), bold: true }),
           new TextRun({ text: asText(resume.education) ? `  ${asText(resume.education)}` : '' })
-        ]
+        ],
+        spacing: {
+          after: 120
+        }
       })
     )
   }
@@ -445,7 +524,7 @@ export async function exportManualResumeToWord(
   )
 
   if (workItems.length) {
-    children.push(new Paragraph({ text: '工作经历', heading: HeadingLevel.HEADING_1 }))
+    children.push(createSectionHeading('\u5de5\u4f5c\u7ecf\u5386'))
 
     for (const item of workItems) {
       children.push(
@@ -455,18 +534,19 @@ export async function exportManualResumeToWord(
             new TextRun({ text: asText(item.position) ? `  ${asText(item.position)}` : '' })
           ],
           spacing: {
-            before: 120
+            before: 100,
+            after: 60
           }
         })
       )
 
       if (asText(item.date)) {
-        children.push(new Paragraph({ text: item.date }))
+        children.push(createBodyParagraph(item.date, { after: 80 }))
       }
 
-      const lines = item.desc.split('\n').map(line => line.trim()).filter(Boolean)
+      const lines = item.desc.split(/\r?\n+/).map(line => line.trim()).filter(Boolean)
       if (lines.length <= 1 && asText(item.desc)) {
-        children.push(new Paragraph({ text: item.desc }))
+        children.push(createBodyParagraph(asText(item.desc)))
       } else {
         children.push(...toBulletParagraphs(lines))
       }
@@ -478,7 +558,7 @@ export async function exportManualResumeToWord(
   )
 
   if (projectItems.length) {
-    children.push(new Paragraph({ text: '项目经验', heading: HeadingLevel.HEADING_1 }))
+    children.push(createSectionHeading('\u9879\u76ee\u7ecf\u9a8c'))
 
     for (const item of projectItems) {
       children.push(
@@ -488,18 +568,19 @@ export async function exportManualResumeToWord(
             new TextRun({ text: asText(item.tech) ? `  ${asText(item.tech)}` : '' })
           ],
           spacing: {
-            before: 120
+            before: 100,
+            after: 60
           }
         })
       )
 
       if (asText(item.date)) {
-        children.push(new Paragraph({ text: item.date }))
+        children.push(createBodyParagraph(item.date, { after: 80 }))
       }
 
-      const lines = item.desc.split('\n').map(line => line.trim()).filter(Boolean)
+      const lines = item.desc.split(/\r?\n+/).map(line => line.trim()).filter(Boolean)
       if (lines.length <= 1 && asText(item.desc)) {
-        children.push(new Paragraph({ text: item.desc }))
+        children.push(createBodyParagraph(asText(item.desc)))
       } else {
         children.push(...toBulletParagraphs(lines))
       }
@@ -507,40 +588,86 @@ export async function exportManualResumeToWord(
   }
 
   const skillItems = asText(resume.skills)
-    .split(/[，,]/)
+    .split(/[\uFF0C,\u3001]/)
     .map(item => item.trim())
     .filter(Boolean)
 
   if (skillItems.length) {
     children.push(
-      new Paragraph({ text: '专业技能', heading: HeadingLevel.HEADING_1 }),
-      new Paragraph({ text: skillItems.join('、') })
+      createSectionHeading('\u4e13\u4e1a\u6280\u80fd'),
+      createBodyParagraph(skillItems.join(' / '))
     )
   }
 
-  const awardItems = resume.awards.split('\n').map(item => item.trim()).filter(Boolean)
+  const awardItems = resume.awards.split(/\r?\n+/).map(item => item.trim()).filter(Boolean)
   if (awardItems.length) {
     children.push(
-      new Paragraph({ text: '荣誉证书', heading: HeadingLevel.HEADING_1 }),
+      createSectionHeading('\u8363\u8a89\u8bc1\u4e66'),
       ...toBulletParagraphs(awardItems)
     )
   }
 
   const otherItems = [
-    ...resume.languages.split('\n').map(item => item.trim()).filter(Boolean),
+    ...resume.languages.split(/\r?\n+/).map(item => item.trim()).filter(Boolean),
     asText(resume.portfolio)
   ].filter(Boolean)
 
   if (otherItems.length) {
     children.push(
-      new Paragraph({ text: '其他信息', heading: HeadingLevel.HEADING_1 }),
+      createSectionHeading('\u5176\u4ed6\u4fe1\u606f'),
       ...toBulletParagraphs(otherItems)
     )
   }
 
   const doc = new Document({
+    styles: {
+      default: {
+        document: {
+          run: {
+            font: 'Microsoft YaHei',
+            size: 22,
+            color: '243B53'
+          },
+          paragraph: {
+            spacing: {
+              line: 360
+            }
+          }
+        }
+      },
+      paragraphStyles: [
+        {
+          id: 'ResumeTitle',
+          name: 'ResumeTitle',
+          basedOn: 'Normal',
+          quickFormat: true,
+          run: {
+            font: 'Microsoft YaHei',
+            size: 32,
+            bold: true,
+            color: '18304C'
+          },
+          paragraph: {
+            alignment: AlignmentType.CENTER,
+            spacing: {
+              after: 80
+            }
+          }
+        }
+      ]
+    },
     sections: [
       {
+        properties: {
+          page: {
+            margin: {
+              top: 900,
+              right: 1000,
+              bottom: 900,
+              left: 1000
+            }
+          }
+        },
         children
       }
     ]
@@ -610,33 +737,132 @@ export async function exportGrowthPlanToWord(
   plan: GrowthPlanWordExportData,
   options?: ResumeWordExportOptions
 ): Promise<void> {
-  const children: Paragraph[] = []
-  const reportDate = new Date().toLocaleDateString('zh-CN')
+  // ===== 设计令牌 =====
+  const BRAND_PRIMARY = '1E3A8A'      // 深蓝
+  const BRAND_ACCENT = '2563EB'        // 亮蓝
+  const BRAND_LIGHT = 'DBEAFE'         // 浅蓝背景
+  const TEXT_PRIMARY = '1F2937'        // 主文字
+  const TEXT_SECONDARY = '6B7280'      // 辅助文字
+  const TEXT_LABEL = '374151'          // 标签文字
+  const BORDER_COLOR = 'D1D5DB'       // 边框
+  const BG_HIGHLIGHT = 'EFF6FF'       // 高亮背景
+  const BG_TASK = 'F9FAFB'            // 任务背景
+  const HEADING_LINE = '93C5FD'       // 标题底线
 
-  const pushHeading = (text: string, level: HeadingLevelValue = HeadingLevel.HEADING_1) => {
-    children.push(
+  const reportDate = new Date().toLocaleDateString('zh-CN', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
+
+  // ===== 封面页 =====
+  const coverChildren: Paragraph[] = [
+    // 顶部间距
+    new Paragraph({ spacing: { before: 3200 } }),
+    // 品牌标识线
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 200 },
+      children: [
+        new TextRun({ text: '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', color: BRAND_ACCENT, size: 16, font: 'Microsoft YaHei' }),
+      ],
+    }),
+    // 报告标题
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 100 },
+      children: [
+        new TextRun({
+          text: asText(plan.target_position) || '生涯成长报告',
+          bold: true,
+          size: 48,
+          color: BRAND_PRIMARY,
+          font: 'Microsoft YaHei',
+        }),
+      ],
+    }),
+    // 副标题
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 80 },
+      children: [
+        new TextRun({
+          text: '职业目标  ·  路径规划  ·  行动计划',
+          size: 24,
+          color: TEXT_SECONDARY,
+          font: 'Microsoft YaHei',
+        }),
+      ],
+    }),
+    // 品牌标识线
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 600 },
+      children: [
+        new TextRun({ text: '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', color: BRAND_ACCENT, size: 16, font: 'Microsoft YaHei' }),
+      ],
+    }),
+    // 报告元信息
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 120 },
+      children: [
+        new TextRun({ text: '生成日期：', color: TEXT_SECONDARY, size: 20, font: 'Microsoft YaHei' }),
+        new TextRun({ text: reportDate, color: TEXT_PRIMARY, size: 20, font: 'Microsoft YaHei' }),
+      ],
+    }),
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 120 },
+      children: [
+        new TextRun({ text: '短期周期：', color: TEXT_SECONDARY, size: 20, font: 'Microsoft YaHei' }),
+        new TextRun({ text: asText(plan.short_term_plan.duration) || '待补充', color: TEXT_PRIMARY, size: 20, font: 'Microsoft YaHei' }),
+        new TextRun({ text: '    中期周期：', color: TEXT_SECONDARY, size: 20, font: 'Microsoft YaHei' }),
+        new TextRun({ text: asText(plan.mid_term_plan.duration) || '待补充', color: TEXT_PRIMARY, size: 20, font: 'Microsoft YaHei' }),
+      ],
+    }),
+  ]
+
+  // ===== 正文页 =====
+  const bodyChildren: Paragraph[] = []
+
+  // --- 辅助函数 ---
+  const pushH1 = (text: string) => {
+    bodyChildren.push(
       new Paragraph({
-        text,
-        heading: level,
-        spacing: {
-          before: 240,
-          after: 120
-        }
+        spacing: { before: 480, after: 60 },
+        border: {
+          bottom: { style: BorderStyle.SINGLE, color: BRAND_ACCENT, size: 8 },
+        },
+        children: [
+          new TextRun({ text, bold: true, size: 32, color: BRAND_PRIMARY, font: 'Microsoft YaHei' }),
+        ],
       })
     )
   }
 
-  const pushCaption = (text?: string) => {
-    const value = asText(text)
-    if (!value) return
-
-    children.push(
+  const pushH2 = (text: string) => {
+    bodyChildren.push(
       new Paragraph({
-        text: value,
-        alignment: AlignmentType.CENTER,
-        spacing: {
-          after: 120
-        }
+        spacing: { before: 320, after: 80 },
+        border: {
+          bottom: { style: BorderStyle.SINGLE, color: HEADING_LINE, size: 4 },
+        },
+        children: [
+          new TextRun({ text, bold: true, size: 26, color: BRAND_PRIMARY, font: 'Microsoft YaHei' }),
+        ],
+      })
+    )
+  }
+
+  const pushH3 = (text: string) => {
+    bodyChildren.push(
+      new Paragraph({
+        spacing: { before: 200, after: 60 },
+        children: [
+          new TextRun({ text: '▸ ', color: BRAND_ACCENT, size: 22, font: 'Microsoft YaHei' }),
+          new TextRun({ text, bold: true, size: 22, color: TEXT_PRIMARY, font: 'Microsoft YaHei' }),
+        ],
       })
     )
   }
@@ -646,255 +872,522 @@ export async function exportGrowthPlanToWord(
       .split(/\r?\n+/)
       .map(item => item.trim())
       .filter(Boolean)
-
     if (!paragraphs.length) return
-
-    children.push(
-      ...paragraphs.map(item => new Paragraph({
-        text: item,
-        spacing: {
-          after: 120
-        }
-      }))
+    bodyChildren.push(
+      ...paragraphs.map(item =>
+        new Paragraph({
+          spacing: { after: 100, line: 360 },
+          indent: { firstLine: 420 },
+          children: [
+            new TextRun({ text: item, size: 21, color: TEXT_PRIMARY, font: 'Microsoft YaHei' }),
+          ],
+        })
+      )
     )
   }
 
-  const pushLabelValue = (label: string, value?: string) => {
+  const pushBodyNoIndent = (text?: string) => {
+    const paragraphs = asText(text)
+      .split(/\r?\n+/)
+      .map(item => item.trim())
+      .filter(Boolean)
+    if (!paragraphs.length) return
+    bodyChildren.push(
+      ...paragraphs.map(item =>
+        new Paragraph({
+          spacing: { after: 100, line: 360 },
+          children: [
+            new TextRun({ text: item, size: 21, color: TEXT_PRIMARY, font: 'Microsoft YaHei' }),
+          ],
+        })
+      )
+    )
+  }
+
+  const pushLabelValue = (label: string, value?: string, inline = false) => {
     const normalized = asText(value)
     if (!normalized) return
-
-    children.push(
+    bodyChildren.push(
       new Paragraph({
+        spacing: { after: 80, line: 360 },
+        indent: inline ? { left: 420 } : undefined,
         children: [
-          new TextRun({
-            text: `${label}：`,
-            bold: true
-          }),
-          new TextRun({
-            text: normalized
-          })
+          new TextRun({ text: `${label}：`, bold: true, size: 21, color: TEXT_LABEL, font: 'Microsoft YaHei' }),
+          new TextRun({ text: normalized, size: 21, color: TEXT_PRIMARY, font: 'Microsoft YaHei' }),
         ],
-        spacing: {
-          after: 120
-        }
       })
     )
   }
 
-  const pushSummaryBlock = (title: string, content?: string) => {
-    const normalized = asText(content)
-    if (!normalized) return
-    children.push(
+  const pushTagGroup = (label: string, items: string[]) => {
+    if (!items.length) return
+    bodyChildren.push(
       new Paragraph({
-        text: title,
-        heading: HeadingLevel.HEADING_2
+        spacing: { before: 80, after: 60 },
+        children: [
+          new TextRun({ text: `${label}：`, bold: true, size: 21, color: TEXT_LABEL, font: 'Microsoft YaHei' }),
+          new TextRun({ text: items.join('  ·  '), size: 21, color: BRAND_ACCENT, font: 'Microsoft YaHei' }),
+        ],
       })
     )
-    pushBody(normalized)
   }
 
-  const pushMilestoneSection = (
-    title: string,
-    milestones: GrowthPlanWordExportData['short_term_plan']['milestones']
-  ) => {
-    if (!milestones.length) return
-
-    children.push(
-      new Paragraph({
-        text: title,
-        heading: HeadingLevel.HEADING_2
-      })
-    )
-
-    for (const [index, milestone] of milestones.entries()) {
-      children.push(
+  const pushBulletList = (items: string[]) => {
+    bodyChildren.push(
+      ...(items.filter(i => asText(i)).map(item =>
         new Paragraph({
+          bullet: { level: 0 },
+          spacing: { after: 60, line: 340 },
           children: [
-            new TextRun({ text: `${index + 1}. ${milestone.milestone_name || '未命名里程碑'}`, bold: true }),
-            new TextRun({ text: milestone.target_date ? `  ${milestone.target_date}` : '' })
+            new TextRun({ text: item, size: 21, color: TEXT_PRIMARY, font: 'Microsoft YaHei' }),
           ],
-          spacing: {
-            before: 140,
-            after: 120
-          }
         })
-      )
-
-      if (milestone.key_results.length) {
-        children.push(
-          new Paragraph({
-            text: '关键成果',
-            heading: HeadingLevel.HEADING_3
-          }),
-          ...toBulletParagraphs(milestone.key_results)
-        )
-      }
-
-      if (!milestone.tasks.length) continue
-
-      children.push(
-        new Paragraph({
-          text: '任务拆解',
-          heading: HeadingLevel.HEADING_3
-        })
-      )
-
-      for (const task of milestone.tasks) {
-        children.push(
-          new Paragraph({
-            children: [
-              new TextRun({ text: task.task_name || '未命名任务', bold: true }),
-              new TextRun({ text: task.priority ? `  [${task.priority}优先级]` : '' })
-            ],
-            spacing: {
-              before: 120,
-              after: 120
-            }
-          })
-        )
-        pushBody(task.description)
-        pushLabelValue('预计时间', task.estimated_time)
-        pushLabelValue('目标能力', task.skill_target)
-        pushLabelValue('成功标准', task.success_criteria)
-      }
-    }
+      ))
+    )
   }
 
-  children.push(
-    new Paragraph({
-      text: asText(plan.target_position) || '\u751f\u6daf\u6210\u957f\u62a5\u544a',
-      heading: HeadingLevel.TITLE,
-      alignment: AlignmentType.CENTER,
-      spacing: {
-        after: 160
-      }
-    }),
-    new Paragraph({
-      text: '\u804c\u4e1a\u76ee\u6807 / \u8def\u5f84\u89c4\u5212 / \u884c\u52a8\u8ba1\u5212',
-      alignment: AlignmentType.CENTER,
-      spacing: {
-        after: 280
-      }
-    })
-  )
+  const pushHighlightBox = (text: string) => {
+    bodyChildren.push(
+      new Paragraph({
+        spacing: { before: 120, after: 120 },
+        border: {
+          left: { style: BorderStyle.SINGLE, color: BRAND_ACCENT, size: 12 },
+        },
+        indent: { left: 360 },
+        children: [
+          new TextRun({ text, size: 21, color: TEXT_PRIMARY, font: 'Microsoft YaHei', italics: true }),
+        ],
+      })
+    )
+  }
 
-  pushCaption(`生成日期：${reportDate}`)
-  pushCaption(`短期周期：${asText(plan.short_term_plan.duration) || '待补充'}  |  中期周期：${asText(plan.mid_term_plan.duration) || '待补充'}`)
+  const pushInfoRow = (label: string, value: string) => {
+    bodyChildren.push(
+      new Paragraph({
+        spacing: { after: 60, line: 340 },
+        indent: { left: 420 },
+        children: [
+          new TextRun({ text: `◆ `, color: BRAND_ACCENT, size: 18, font: 'Microsoft YaHei' }),
+          new TextRun({ text: `${label}：`, bold: true, size: 20, color: TEXT_LABEL, font: 'Microsoft YaHei' }),
+          new TextRun({ text: value, size: 20, color: TEXT_PRIMARY, font: 'Microsoft YaHei' }),
+        ],
+      })
+    )
+  }
 
-  pushHeading('\u6267\u884c\u6458\u8981')
-  pushBody(plan.target_position)
-  pushSummaryBlock('\u5b66\u751f\u753b\u50cf\u6458\u8981', plan.student_summary)
-  pushSummaryBlock('\u80fd\u529b\u5dee\u8ddd\u5206\u6790', plan.current_gap)
+  // --- 第一章：职业画像 ---
+  pushH1('一、职业画像')
+
+  pushH2('1.1 目标岗位')
+  pushBodyNoIndent(plan.target_position)
+
+  pushH2('1.2 学生画像摘要')
+  pushBody(plan.student_summary)
+
+  pushH2('1.3 能力差距分析')
+  pushBody(plan.current_gap)
 
   if (plan.action_checklist.length) {
-    children.push(
-      new Paragraph({
-        text: '\u5f53\u524d\u5efa\u8bae\u4f18\u5148\u6267\u884c',
-        heading: HeadingLevel.HEADING_2
-      }),
-      ...toBulletParagraphs(plan.action_checklist.slice(0, 3))
-    )
+    pushH2('1.4 优先执行建议')
+    pushHighlightBox('以下为当前建议优先执行的 Top 3 事项：')
+    pushBulletList(plan.action_checklist.slice(0, 3))
   }
 
-  pushHeading('\u77ed\u671f\u884c\u52a8\u8ba1\u5212')
-  pushLabelValue('\u5468\u671f', plan.short_term_plan.duration)
+  // --- 第二章：短期行动计划 ---
+  pushH1('二、短期行动计划')
+
+  pushLabelValue('周期', plan.short_term_plan.duration)
+
+  pushH2('2.1 阶段目标')
   pushBody(plan.short_term_plan.goal)
 
   if (plan.short_term_plan.focus_areas.length) {
-    children.push(
-      new Paragraph({
-        text: '\u91cd\u70b9\u65b9\u5411',
-        heading: HeadingLevel.HEADING_2
-      }),
-      ...toBulletParagraphs(plan.short_term_plan.focus_areas)
-    )
+    pushH2('2.2 重点方向')
+    pushTagGroup('聚焦领域', plan.short_term_plan.focus_areas)
   }
 
   if (plan.short_term_plan.quick_wins.length) {
-    children.push(
-      new Paragraph({
-        text: '\u77ed\u671f\u5feb\u901f\u52a8\u4f5c',
-        heading: HeadingLevel.HEADING_2
-      }),
-      ...toBulletParagraphs(plan.short_term_plan.quick_wins)
-    )
+    pushH2('2.3 快速见效行动')
+    pushBulletList(plan.short_term_plan.quick_wins)
   }
 
-  pushMilestoneSection('\u77ed\u671f\u91cc\u7a0b\u7891', plan.short_term_plan.milestones)
+  // 短期里程碑
+  if (plan.short_term_plan.milestones.length) {
+    pushH2('2.4 短期里程碑')
 
-  pushHeading('\u4e2d\u671f\u8def\u5f84\u89c4\u5212')
-  pushLabelValue('\u5468\u671f', plan.mid_term_plan.duration)
-  pushBody(plan.mid_term_plan.goal)
+    for (const [index, milestone] of plan.short_term_plan.milestones.entries()) {
+      pushH3(`里程碑 ${index + 1}：${milestone.milestone_name || '未命名里程碑'}`)
+      if (milestone.target_date) {
+        pushInfoRow('目标日期', milestone.target_date)
+      }
 
-  if (plan.mid_term_plan.skill_roadmap.length) {
-    children.push(
-      new Paragraph({
-        text: '\u6280\u80fd\u8def\u7ebf',
-        heading: HeadingLevel.HEADING_2
-      }),
-      ...toBulletParagraphs(plan.mid_term_plan.skill_roadmap)
-    )
-  }
+      if (milestone.key_results.length) {
+        bodyChildren.push(
+          new Paragraph({
+            spacing: { before: 60, after: 40 },
+            indent: { left: 420 },
+            children: [
+              new TextRun({ text: '关键成果', bold: true, size: 20, color: BRAND_ACCENT, font: 'Microsoft YaHei' }),
+            ],
+          })
+        )
+        pushBulletList(milestone.key_results)
+      }
 
-  pushMilestoneSection('\u4e2d\u671f\u91cc\u7a0b\u7891', plan.mid_term_plan.milestones)
+      if (milestone.tasks.length) {
+        bodyChildren.push(
+          new Paragraph({
+            spacing: { before: 80, after: 40 },
+            indent: { left: 420 },
+            children: [
+              new TextRun({ text: '任务拆解', bold: true, size: 20, color: BRAND_ACCENT, font: 'Microsoft YaHei' }),
+            ],
+          })
+        )
 
-  pushHeading('\u804c\u4e1a\u53d1\u5c55\u9884\u671f')
-  pushBody(plan.mid_term_plan.career_progression)
+        for (const task of milestone.tasks) {
+          // 任务名称行
+          bodyChildren.push(
+            new Paragraph({
+              spacing: { before: 100, after: 40 },
+              indent: { left: 560 },
+              border: {
+                left: { style: BorderStyle.SINGLE, color: HEADING_LINE, size: 4 },
+              },
+              children: [
+                new TextRun({ text: task.task_name || '未命名任务', bold: true, size: 21, color: TEXT_PRIMARY, font: 'Microsoft YaHei' }),
+                new TextRun({
+                  text: task.priority ? `  [${task.priority}优先级]` : '',
+                  size: 18,
+                  color: task.priority === '高' ? 'DC2626' : task.priority === '中' ? 'D97706' : TEXT_SECONDARY,
+                  font: 'Microsoft YaHei',
+                }),
+              ],
+            })
+          )
 
-  if (plan.mid_term_plan.recommended_internships.length) {
-    children.push(
-      new Paragraph({
-        text: '\u63a8\u8350\u5b9e\u4e60\u5c97\u4f4d',
-        heading: HeadingLevel.HEADING_2
-      })
-    )
-
-    for (const [index, item] of plan.mid_term_plan.recommended_internships.entries()) {
-      children.push(
-        new Paragraph({
-          children: [
-            new TextRun({ text: `${index + 1}. ${item.job_title || '未命名岗位'}`, bold: true }),
-            new TextRun({ text: item.company_name ? `  ${item.company_name}` : '' })
-          ],
-          spacing: {
-            before: 120
+          // 任务详情
+          if (asText(task.description)) {
+            bodyChildren.push(
+              new Paragraph({
+                spacing: { after: 40, line: 340 },
+                indent: { left: 700 },
+                children: [
+                  new TextRun({ text: task.description, size: 20, color: TEXT_PRIMARY, font: 'Microsoft YaHei' }),
+                ],
+              })
+            )
           }
-        })
-      )
 
-      pushLabelValue('\u57ce\u5e02/\u85aa\u8d44/\u7c7b\u578b', [asText(item.city), asText(item.salary), asText(item.job_type)].filter(Boolean).join(' | '))
-      pushLabelValue('\u63a8\u8350\u7406\u7531', item.reason)
-      pushLabelValue('\u6280\u672f\u6808', item.tech_stack)
-      pushBody(item.content)
+          // 任务元信息
+          const taskMetaItems: Array<[string, string]> = []
+          if (asText(task.estimated_time)) taskMetaItems.push(['预计时间', task.estimated_time])
+          if (asText(task.skill_target)) taskMetaItems.push(['目标能力', task.skill_target])
+          if (asText(task.success_criteria)) taskMetaItems.push(['成功标准', task.success_criteria])
+
+          for (const [metaLabel, metaValue] of taskMetaItems) {
+            bodyChildren.push(
+              new Paragraph({
+                spacing: { after: 30, line: 320 },
+                indent: { left: 700 },
+                children: [
+                  new TextRun({ text: `${metaLabel}：`, bold: true, size: 19, color: TEXT_LABEL, font: 'Microsoft YaHei' }),
+                  new TextRun({ text: metaValue, size: 19, color: TEXT_SECONDARY, font: 'Microsoft YaHei' }),
+                ],
+              })
+            )
+          }
+        }
+      }
     }
   }
 
-  if (plan.action_checklist.length) {
-    children.push(
-      new Paragraph({
-        text: '\u884c\u52a8\u6e05\u5355',
-        heading: HeadingLevel.HEADING_1
-      }),
-      ...toBulletParagraphs(plan.action_checklist)
-    )
+  // --- 第三章：中期路径规划 ---
+  pushH1('三、中期路径规划')
+
+  pushLabelValue('周期', plan.mid_term_plan.duration)
+
+  pushH2('3.1 阶段目标')
+  pushBody(plan.mid_term_plan.goal)
+
+  if (plan.mid_term_plan.skill_roadmap.length) {
+    pushH2('3.2 技能路线')
+    pushBulletList(plan.mid_term_plan.skill_roadmap)
   }
 
-  if (plan.tips.length) {
-    children.push(
-      new Paragraph({
-        text: '\u5b66\u4e60\u5efa\u8bae',
-        heading: HeadingLevel.HEADING_1
-      }),
-      ...toBulletParagraphs(plan.tips)
-    )
-  }
+  // 中期里程碑
+  if (plan.mid_term_plan.milestones.length) {
+    pushH2('3.3 中期里程碑')
 
-  const doc = new Document({
-    sections: [
-      {
-        children
+    for (const [index, milestone] of plan.mid_term_plan.milestones.entries()) {
+      pushH3(`里程碑 ${index + 1}：${milestone.milestone_name || '未命名里程碑'}`)
+      if (milestone.target_date) {
+        pushInfoRow('目标日期', milestone.target_date)
       }
-    ]
+
+      if (milestone.key_results.length) {
+        bodyChildren.push(
+          new Paragraph({
+            spacing: { before: 60, after: 40 },
+            indent: { left: 420 },
+            children: [
+              new TextRun({ text: '关键成果', bold: true, size: 20, color: BRAND_ACCENT, font: 'Microsoft YaHei' }),
+            ],
+          })
+        )
+        pushBulletList(milestone.key_results)
+      }
+
+      if (milestone.tasks.length) {
+        bodyChildren.push(
+          new Paragraph({
+            spacing: { before: 80, after: 40 },
+            indent: { left: 420 },
+            children: [
+              new TextRun({ text: '任务拆解', bold: true, size: 20, color: BRAND_ACCENT, font: 'Microsoft YaHei' }),
+            ],
+          })
+        )
+
+        for (const task of milestone.tasks) {
+          bodyChildren.push(
+            new Paragraph({
+              spacing: { before: 100, after: 40 },
+              indent: { left: 560 },
+              border: {
+                left: { style: BorderStyle.SINGLE, color: HEADING_LINE, size: 4 },
+              },
+              children: [
+                new TextRun({ text: task.task_name || '未命名任务', bold: true, size: 21, color: TEXT_PRIMARY, font: 'Microsoft YaHei' }),
+                new TextRun({
+                  text: task.priority ? `  [${task.priority}优先级]` : '',
+                  size: 18,
+                  color: task.priority === '高' ? 'DC2626' : task.priority === '中' ? 'D97706' : TEXT_SECONDARY,
+                  font: 'Microsoft YaHei',
+                }),
+              ],
+            })
+          )
+
+          if (asText(task.description)) {
+            bodyChildren.push(
+              new Paragraph({
+                spacing: { after: 40, line: 340 },
+                indent: { left: 700 },
+                children: [
+                  new TextRun({ text: task.description, size: 20, color: TEXT_PRIMARY, font: 'Microsoft YaHei' }),
+                ],
+              })
+            )
+          }
+
+          const taskMetaItems: Array<[string, string]> = []
+          if (asText(task.estimated_time)) taskMetaItems.push(['预计时间', task.estimated_time])
+          if (asText(task.skill_target)) taskMetaItems.push(['目标能力', task.skill_target])
+          if (asText(task.success_criteria)) taskMetaItems.push(['成功标准', task.success_criteria])
+
+          for (const [metaLabel, metaValue] of taskMetaItems) {
+            bodyChildren.push(
+              new Paragraph({
+                spacing: { after: 30, line: 320 },
+                indent: { left: 700 },
+                children: [
+                  new TextRun({ text: `${metaLabel}：`, bold: true, size: 19, color: TEXT_LABEL, font: 'Microsoft YaHei' }),
+                  new TextRun({ text: metaValue, size: 19, color: TEXT_SECONDARY, font: 'Microsoft YaHei' }),
+                ],
+              })
+            )
+          }
+        }
+      }
+    }
+  }
+
+  // --- 第四章：职业发展预期 ---
+  pushH1('四、职业发展预期')
+  pushBody(plan.mid_term_plan.career_progression)
+
+  // --- 第五章：推荐实习岗位 ---
+  if (plan.mid_term_plan.recommended_internships.length) {
+    pushH1('五、推荐实习岗位')
+
+    for (const [index, item] of plan.mid_term_plan.recommended_internships.entries()) {
+      pushH3(`${index + 1}. ${item.job_title || '未命名岗位'}`)
+      if (item.company_name) {
+        pushInfoRow('公司', item.company_name)
+      }
+      const locationInfo = [asText(item.city), asText(item.salary), asText(item.job_type)].filter(Boolean).join('  |  ')
+      if (locationInfo) {
+        pushInfoRow('地点/薪资/类型', locationInfo)
+      }
+      if (asText(item.reason)) {
+        pushInfoRow('推荐理由', item.reason)
+      }
+      if (asText(item.tech_stack)) {
+        pushInfoRow('技术栈', item.tech_stack)
+      }
+      if (asText(item.content)) {
+        pushBodyNoIndent(item.content)
+      }
+    }
+  }
+
+  // --- 第六章：行动清单 ---
+  if (plan.action_checklist.length) {
+    pushH1('六、行动清单')
+    pushBulletList(plan.action_checklist)
+  }
+
+  // --- 第七章：学习建议 ---
+  if (plan.tips.length) {
+    pushH1('七、学习建议')
+    pushBulletList(plan.tips)
+  }
+
+  // --- 页脚信息 ---
+  bodyChildren.push(
+    new Paragraph({ spacing: { before: 600 } }),
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      border: {
+        top: { style: BorderStyle.SINGLE, color: BORDER_COLOR, size: 4 },
+      },
+      spacing: { before: 200 },
+      children: [
+        new TextRun({
+          text: `本报告由 Career Planning AI 生成  |  ${reportDate}`,
+          size: 16,
+          color: TEXT_SECONDARY,
+          font: 'Microsoft YaHei',
+        }),
+      ],
+    })
+  )
+
+  // ===== 组装文档 =====
+  const doc = new Document({
+    styles: {
+      default: {
+        document: {
+          run: {
+            font: 'Microsoft YaHei',
+            size: 21,
+            color: TEXT_PRIMARY,
+          },
+          paragraph: {
+            spacing: {
+              line: 360,
+            },
+          },
+        },
+      },
+    },
+    sections: [
+      // 封面页
+      {
+        properties: {
+          page: {
+            margin: {
+              top: 1200,
+              right: 1200,
+              bottom: 1200,
+              left: 1200,
+            },
+          },
+        },
+        headers: {
+          default: new DocxHeader({
+            children: [
+              new Paragraph({
+                alignment: AlignmentType.RIGHT,
+                children: [
+                  new TextRun({
+                    text: 'Career Planning',
+                    size: 16,
+                    color: TEXT_SECONDARY,
+                    font: 'Microsoft YaHei',
+                    italics: true,
+                  }),
+                ],
+              }),
+            ],
+          }),
+        },
+        footers: {
+          default: new DocxFooter({
+            children: [
+              new Paragraph({
+                alignment: AlignmentType.CENTER,
+                children: [
+                  new TextRun({
+                    children: [PageNumber.CURRENT],
+                    size: 16,
+                    color: TEXT_SECONDARY,
+                    font: 'Microsoft YaHei',
+                  }),
+                ],
+              }),
+            ],
+          }),
+        },
+        children: coverChildren,
+      },
+      // 正文页
+      {
+        properties: {
+          page: {
+            margin: {
+              top: 1000,
+              right: 1100,
+              bottom: 1000,
+              left: 1100,
+            },
+          },
+        },
+        headers: {
+          default: new DocxHeader({
+            children: [
+              new Paragraph({
+                alignment: AlignmentType.RIGHT,
+                children: [
+                  new TextRun({
+                    text: asText(plan.target_position) || '生涯成长报告',
+                    size: 16,
+                    color: TEXT_SECONDARY,
+                    font: 'Microsoft YaHei',
+                    italics: true,
+                  }),
+                ],
+              }),
+            ],
+          }),
+        },
+        footers: {
+          default: new DocxFooter({
+            children: [
+              new Paragraph({
+                alignment: AlignmentType.CENTER,
+                children: [
+                  new TextRun({
+                    text: 'Career Planning  |  ',
+                    size: 16,
+                    color: TEXT_SECONDARY,
+                    font: 'Microsoft YaHei',
+                  }),
+                  new TextRun({
+                    children: [PageNumber.CURRENT],
+                    size: 16,
+                    color: TEXT_SECONDARY,
+                    font: 'Microsoft YaHei',
+                  }),
+                ],
+              }),
+            ],
+          }),
+        },
+        children: bodyChildren,
+      },
+    ],
   })
 
   const blob = await Packer.toBlob(doc)

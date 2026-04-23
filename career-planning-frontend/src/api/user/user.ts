@@ -22,9 +22,9 @@ export interface LoginResponse {
 }
 
 export const userLoginService = (loginInfo: LoginFormDTO) => {
-  if (ENABLE_MOCK) {
-    return mockUserLoginApi(loginInfo)
-  }
+  // if (ENABLE_MOCK) {
+  //   return mockUserLoginApi(loginInfo)
+  // }
   return request.post('/user/login', loginInfo)
 }
 
@@ -45,6 +45,15 @@ export const userSendCodeForgetService = (loginInfo: LoginFormDTO) => {
 }
 
 export const userGetUserInfoService = () => {
+  if (ENABLE_MOCK) {
+    return Promise.resolve({
+      data: { code: 200, data: { checkUser: { id: 5442, name: '用户', nickname: '职引未来用户', avatar: '', signature: '成为更好的自己', gender: '男', education: '本科' } } },
+      status: 200,
+      statusText: 'OK',
+      headers: {},
+      config: {} as any
+    })
+  }
   return request.get('/user/get-user-info')
 }
 

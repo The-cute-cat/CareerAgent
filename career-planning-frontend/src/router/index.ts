@@ -34,6 +34,11 @@ const routes = [
     component: () => import('../views/CareerFormVoice.vue'),
   },
   {
+    path: '/ws-test',
+    name: 'ws-test',
+    component: () => import('../components/WebSocketTest.vue'),
+  },
+  {
     path: '/',
     component: () => import('../components/Layout.vue'), // 布局组件
     children: [
@@ -104,10 +109,22 @@ const routes = [
         meta: { title: '设置中心' }
       },
       {
+        path: 'interviews/ai-avatar',
+        name: 'ai-interview-avatar',
+        component: () => import('../components/CInterviews_Component/AIInterviewAvatar.vue'),
+        meta: { title: 'AI 智能面试' }
+      },
+      {
         path: 'interviews/:type?',
         name: 'interviews',
         component: () => import('../views/CInterviews.vue'),
         meta: { title: '我的面试' }
+      },
+      {
+        path: 'interview-report/:id',
+        name: 'interview-report',
+        component: () => import('../views/InterviewReport.vue'),
+        meta: { title: '面试报告' }
       },
       {
         path: 'admin',
@@ -133,44 +150,48 @@ const router = createRouter({
 router.beforeEach(async (to, _from, next) => {
   try {
     const userStore = useUserStore()
+
+    // 如果已登录但没有用户信息，尝试获取
     if (userStore.isLoggedIn && !userStore.userInfo) {
       try {
         const res = await userGetUserInfoService()
-        userStore.userInfo = res.data.data.checkUser
+        const userData = res?.data?.data?.checkUser || res?.data?.data || res?.data
+        if (userData) {
+          userStore.userInfo = userData
+        } else {
+          userStore.clearTokens()
+          userStore.userInfo = { id: Date.now(), name: '用户' } as any
+        }
       } catch (error) {
+        console.warn('获取用户信息失败:', error)
         userStore.clearUserALLInfo()
       }
     }
 
-    // 延迟执行以确保 Pinia 持久化状态已恢复
-    const checkAuth = () => {
-      const isLoggedIn = userStore.isLoggedIn
+    // ✅ 同步检查认证状态（移除异步包装）
+    const isLoggedIn = userStore.isLoggedIn
 
-      // 已登录用户访问登录页或欢迎页，重定向到首页
-      if ((to.name === 'login' || to.name === 'welcome') && isLoggedIn) {
-        const redirect = to.query.redirect as string
-        next(redirect || { name: 'home' })
-        return
-      }
-
-      // 未登录用户访问首页，重定向到欢迎页
-      if (to.name === 'home' && !isLoggedIn) {
-        next({ name: 'welcome' })
-        return
-      }
-
-      // 需要认证但未登录，重定向到登录页
-      if (to.meta.requiresAuth && !isLoggedIn) {
-        next({ name: 'login', query: { redirect: to.fullPath } })
-        return
-      }
-
-      // 其他情况正常放行
-      next()
+    // 已登录用户访问登录页或欢迎页，重定向到首页
+    if ((to.name === 'login' || to.name === 'welcome') && isLoggedIn) {
+      const redirect = to.query.redirect as string
+      next(redirect || { name: 'home' })
+      return
     }
 
-    // 使用微任务队列确保状态恢复后再检查
-    Promise.resolve().then(checkAuth)
+    // 未登录用户访问首页，重定向到欢迎页
+    if (to.name === 'home' && !isLoggedIn) {
+      next({ name: 'welcome' })
+      return
+    }
+
+    // 需要认证但未登录，重定向到登录页
+    if (to.meta.requiresAuth && !isLoggedIn) {
+      next({ name: 'login', query: { redirect: to.fullPath } })
+      return
+    }
+
+    // 其他情况正常放行
+    next()
   } catch (error) {
     console.error('路由守卫错误:', error)
     // 发生错误时放行，避免用户被卡在空白页

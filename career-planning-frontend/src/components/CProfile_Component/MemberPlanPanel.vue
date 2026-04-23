@@ -2,21 +2,17 @@
 import { computed, ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
-  Calendar, Back, Close, Coin, Medal, TrendCharts,
-  ArrowRight, Share, ShoppingCart, WarningFilled, Promotion, Reading, Setting, Search, InfoFilled,
-  Loading, CircleCheckFilled, CircleCloseFilled
+  Back, Close, Coin, Medal, TrendCharts,
+  ArrowRight, Share, ShoppingCart, Promotion, Reading, Setting, Search, InfoFilled,
+  Loading, CircleCheckFilled, CircleCloseFilled, Wallet, Document, Star
 } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/modules/user'
-import { rechargePointsService, getPackagesByTypeService, type PointsMembershipChangeDTO } from '@/api/points'
+import { rechargePointsService, getPackagesByTypeService } from '@/api/points'
 import type { AccountPointsData } from '@/api/points'
+import { usePoints } from '@/composables/usePoints'
+import { getPointsRecords, type PointsRecord } from '@/mock/mockdata/Points_mockdata'
 import alipayIcon from '@/assets/images/alipay.png'
 import wechatIcon from '@/assets/images/wechat.png'
-import {
-  createPaymentService,
-  buildAlipayPagePayUrl,
-  queryPaymentStatusService
-} from '@/api/payment'
-import type { PaymentOrderRequest } from '@/api/payment'
 
 // 计划类型定义
 interface MemberPlan {
@@ -54,9 +50,119 @@ const props = defineProps({
   inviteCode: { type: String as () => string | null, default: null }
 })
 
-const emit = defineEmits(['open-invite'])
+const emit = defineEmits(['open-invite', 'purchase-success'])
 
 const userStore = useUserStore()
+const { memberType, discountRate } = usePoints()
+
+// 是否会员
+const isMember = computed(() => memberType.value !== 'normal')
+
+// 积分记录
+const pointsRecords = ref<PointsRecord[]>([])
+const recordsLoading = ref(false)
+const showAllRecords = ref(false)
+
+// 获取积分记录
+const fetchPointsRecords = async () => {
+  const userId = Number(userStore.userInfo?.id)
+  if (!userId) return
+  
+  recordsLoading.value = true
+  try {
+    pointsRecords.value = getPointsRecords(userId)
+  } finally {
+    recordsLoading.value = false
+  }
+}
+
+// 格式化记录类型
+const formatRecordType = (type: string) => {
+  const typeMap: Record<string, { label: string; color: string; icon: any }> = {
+    earn: { label: '获得', color: '#10b981', icon: Wallet },
+    consume: { label: '消费', color: '#ef4444', icon: ShoppingCart },
+    recharge: { label: '充值', color: '#3b82f6', icon: Coin },
+    gift: { label: '赠送', color: '#f59e0b', icon: Star },
+    refund: { label: '退还', color: '#8b5cf6', icon: Document }
+  }
+  return typeMap[type] || { label: type, color: '#64748b', icon: Document }
+}
+
+// 格式化时间
+const formatTime = (time: string) => {
+  const date = new Date(time)
+  return date.toLocaleString('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
+// 会员到期时间
+const memberExpireText = computed(() => {
+  const expireAt = (userStore.userInfo as any)?.memberExpireAt
+  if (!expireAt) return '未开通会员'
+  
+  const date = new Date(expireAt)
+  const now = new Date()
+  
+  if (date < now) return '会员已过期'
+  
+  const days = Math.ceil((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} 到期（剩余${days}天）`
+})
+
+// 当前会员折扣文本
+const discountText = computed(() => {
+  if (discountRate.value === 1) return '无折扣'
+  return `${Math.round((1 - discountRate.value) * 100)}折优惠`
+})
+
+// 功能消耗配置
+const functionPointsConfig = [
+  { name: 'AI职业测评', points: 30, key: 'careerAssessment' },
+  { name: '岗位推荐分析', points: 20, key: 'jobMatching' },
+  { name: '简历优化', points: 50, key: 'resumeOptimize' },
+  { name: '简历一键生成', points: 60, key: 'resumeGenerate' },
+  { name: '模拟面试', points: 80, key: 'mockInterview' },
+  { name: '生涯规划报告', points: 100, key: 'careerReport' },
+  { name: 'AI问答', points: 10, key: 'aiChat' }
+]
+
+// 计算实际消耗（考虑会员折扣）
+const getActualPoints = (basePoints: number) => {
+  return Math.ceil(basePoints * discountRate.value)
+}
+
+onMounted(() => {
+  fetchPointsRecords()
+})
+
+// 支付弹窗相关
+const payDialogVisible = ref(false)
+const payStatus = ref<'pending' | 'paid' | 'cancelled' | 'expired'>('pending')
+const payCountdown = ref(900) // 15分钟倒计时
+const currentOrderId = ref('')
+const currentPlan = computed(() => activePurchaseTab.value === 'points' ? currentSelectedPointsObj.value : currentSelectedMemberObj.value)
+
+const cancelPayment = () => {
+  payDialogVisible.value = false
+  payStatus.value = 'cancelled'
+}
+
+const retryPayment = () => {
+  // 重新支付逻辑
+  if (payStatus.value === 'expired') {
+    // 重新下单
+    handlePay()
+  } else {
+    // 重新打开支付宝
+    if (currentOrderId.value) {
+      window.location.href = `/api/alipay/pay/${currentOrderId.value}`
+    }
+  }
+}
 
 // Purchase Center Dialog
 const purchaseCenterVisible = ref(false)
@@ -141,7 +247,6 @@ const DEFAULT_POINTS_PLANS = [
 const memberPlans = ref<any[]>(DEFAULT_MEMBER_PLANS)
 const pointsPurchasePlans = ref<any[]>(DEFAULT_POINTS_PLANS)
 
-const memberType = computed(() => String((userStore.userInfo as any)?.memberType || 'normal').toLowerCase())
 const displayPoints = computed(() => Number(props.points || (userStore.userInfo as any)?.points || 0))
 
 const fetchPackages = async () => {
@@ -162,13 +267,25 @@ const fetchPackages = async () => {
 
       const backendPoints = pointsRes.data.data.map((pkg: any, index: number) => {
         const theme = themes[index % themes.length] as ColorTheme
+        const price = parseFloat(pkg.price || pkg.amount || 0)
+        // 根据价格自动生成标签，避免标签与价格不匹配
+        let tag = pkg.description || '推荐'
+        if (price === 0) {
+          tag = '免费获取'
+        } else if (price <= 9) {
+          tag = '尝鲜首选'
+        } else if (price <= 16) {
+          tag = '高性价比'
+        } else {
+          tag = '超值优选'
+        }
         return {
           packageId: pkg.id,
           key: pkg.id,
-          title: pkg.name || pkg.description || `积分方案 ${pkg.id}`,
+          title: pkg.name || `积分方案 ${pkg.id}`,
           points: pkg.points || 0,
-          price: (pkg.price || pkg.amount || 0).toFixed(2),
-          tag: pkg.description || '推荐',
+          price: price.toFixed(2),
+          tag: tag,
           color: theme.color,
           gradient: theme.gradient
         }
@@ -272,7 +389,7 @@ const handlePay = async () => {
   }
 
   try {
-    const payload: PointsMembershipChangeDTO = {
+    const payload: any = {
       packageId: Number(pkg.packageId) || 0,
       name: pkg.title,
       amount: Number(pkg.price),
@@ -288,8 +405,12 @@ const handlePay = async () => {
       else if (pid.includes('yearly') || pkg.packageId === 3) payload.membershipLevel = 3
       else payload.membershipLevel = 1 // 默认
     }
+    
+    // 添加用户ID
+    payload.userId = Number(userStore.userInfo?.id) || 0
+    payload.type = activePurchaseTab.value === 'member' ? 2 : 1 // 2:会员, 1:积分
 
-    if (!userStore.userInfo?.id) {
+    if (!payload.userId) {
       ElMessage.error('未获取到用户信息，请重新登录')
       return
     }
@@ -299,9 +420,12 @@ const handlePay = async () => {
       ElMessage.success('下单成功')
       console.log('下单成功', res.data.data)
       const orderNo = res.data.data;
+      currentOrderId.value = orderNo
+      payStatus.value = 'pending'
+      payDialogVisible.value = true
+      purchaseCenterVisible.value = false
       // 加上 /api 前缀，让跳转请求被 vite.config.ts 拦截并代理到后端
       window.location.href = `/api/alipay/pay/${orderNo}`;
-      purchaseCenterVisible.value = false
     } else {
       ElMessage.error(res.data.msg || '提交支付失败')
     }
@@ -324,11 +448,6 @@ const handleInvite = () => {
     purchaseCenterVisible.value = false
   }
 }
-
-// 组件卸载时清理定时器
-onUnmounted(() => {
-  clearTimers()
-})
 
 </script>
 
@@ -377,41 +496,72 @@ onUnmounted(() => {
       </button>
     </div>
 
+    <!-- 功能积分消耗说明 -->
+    <div class="points-usage-guide">
+      <div class="guide-header">
+        <h3>功能积分消耗</h3>
+        <span v-if="isMember" class="discount-tag">{{ discountText }}</span>
+      </div>
+      <div class="guide-list">
+        <div v-for="func in functionPointsConfig" :key="func.key" class="guide-item">
+          <span class="func-name">{{ func.name }}</span>
+          <div class="func-points">
+            <span v-if="getActualPoints(func.points) !== func.points" class="original">{{ func.points }}</span>
+            <span class="actual" :class="{ 'has-discount': getActualPoints(func.points) !== func.points }">
+              {{ getActualPoints(func.points) }}
+            </span>
+            <span class="unit">积分/次</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- 积分明细容器 -->
     <div class="points-records-container">
       <div class="pr-header">
         <h3>积分明细</h3>
         <div class="pr-links">
-          <span>服务价格</span>
-          <span>消费记录</span>
+          <span @click="showAllRecords = !showAllRecords">
+            {{ showAllRecords ? '收起' : '查看全部' }}
+          </span>
         </div>
       </div>
 
-      <div class="record-list">
-        <div v-for="item in pointRecords" :key="item.id" class="record-item">
-          <div class="ri-top">
-            <div class="ri-title">
-              <el-icon :class="item.type === '每日积分' ? 'icon-calendar' : 'icon-invite'">
-                <Calendar v-if="item.type === '每日积分'" />
-                <Share v-else />
-              </el-icon>
-              {{ item.type }}
+      <div v-if="recordsLoading" class="records-loading">
+        <el-icon class="is-loading"><Loading /></el-icon>
+        <span>加载中...</span>
+      </div>
+
+      <div v-else-if="pointsRecords.length === 0" class="records-empty">
+        <el-icon><Document /></el-icon>
+        <span>暂无积分记录</span>
+      </div>
+
+      <div v-else class="records-list">
+        <div 
+          v-for="record in (showAllRecords ? pointsRecords : pointsRecords.slice(0, 5))" 
+          :key="record.id" 
+          class="record-item"
+          :class="record.type"
+        >
+          <div class="record-icon" :style="{ backgroundColor: formatRecordType(record.type).color + '15', color: formatRecordType(record.type).color }">
+            <el-icon>
+              <component :is="formatRecordType(record.type).icon" />
+            </el-icon>
+          </div>
+          <div class="record-info">
+            <div class="record-title">
+              <span class="type-badge" :style="{ backgroundColor: formatRecordType(record.type).color + '15', color: formatRecordType(record.type).color }">
+                {{ formatRecordType(record.type).label }}
+              </span>
+              <span class="description">{{ record.description }}</span>
             </div>
+            <div class="record-time">{{ formatTime(record.createTime) }}</div>
           </div>
-          <div class="ri-progress">
-            <div class="progress-bg">
-              <div class="progress-fill" :style="{
-                width: (item.remain / item.total * 100) + '%',
-                backgroundColor: item.type === '每日积分' ? '#3b82f6' : '#10b981'
-              }">
-              </div>
-            </div>
+          <div class="record-amount" :class="record.type">
+            <span class="sign">{{ record.type === 'consume' ? '-' : '+' }}</span>
+            <span class="number">{{ record.amount }}</span>
           </div>
-          <div class="ri-bottom">
-            <span class="ri-remain">剩余: {{ item.remain }}</span>
-            <span class="ri-total">总计: {{ item.total }}</span>
-          </div>
-          <div class="ri-expire" v-if="item.expireText">{{ item.expireText }}</div>
         </div>
       </div>
     </div>
@@ -1359,5 +1509,247 @@ onUnmounted(() => {
   object-fit: contain;
   margin-right: 8px;
   border-radius: 4px;
+}
+
+/* 功能积分消耗说明 */
+.points-usage-guide {
+  background: #fff;
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.guide-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.guide-header h3 {
+  margin: 0;
+  font-size: 16px;
+  color: #1e293b;
+  font-weight: 700;
+}
+
+.discount-tag {
+  padding: 4px 12px;
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  color: #b45309;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.guide-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.guide-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  background: #f8fafc;
+  border-radius: 10px;
+}
+
+.func-name {
+  font-size: 14px;
+  color: #475569;
+  font-weight: 500;
+}
+
+.func-points {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.func-points .original {
+  font-size: 13px;
+  color: #94a3b8;
+  text-decoration: line-through;
+}
+
+.func-points .actual {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.func-points .actual.has-discount {
+  color: #10b981;
+}
+
+.func-points .unit {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+/* 积分明细列表 */
+.records-loading,
+.records-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  color: #94a3b8;
+  gap: 12px;
+}
+
+.records-loading .el-icon,
+.records-empty .el-icon {
+  font-size: 32px;
+}
+
+.records-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.record-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  background: #fff;
+  border-radius: 12px;
+  transition: all 0.2s;
+}
+
+.record-item:hover {
+  background: #f8fafc;
+  transform: translateX(4px);
+}
+
+.record-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.record-icon .el-icon {
+  font-size: 20px;
+}
+
+.record-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.record-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.type-badge {
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.description {
+  font-size: 14px;
+  color: #1e293b;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.record-time {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.record-amount {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-weight: 800;
+  font-size: 16px;
+}
+
+.record-amount.consume {
+  color: #ef4444;
+}
+
+.record-amount.earn,
+.record-amount.gift,
+.record-amount.recharge {
+  color: #10b981;
+}
+
+.record-amount.refund {
+  color: #8b5cf6;
+}
+
+.record-amount .sign {
+  font-size: 14px;
+}
+
+/* 会员信息卡片增强 */
+.member-status-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.member-status-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 120px;
+  height: 120px;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.08) 0%, transparent 70%);
+  border-radius: 50%;
+  transform: translate(30%, -30%);
+}
+
+.ms-info h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.member-badge {
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.member-badge.normal {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.member-badge.monthly {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.member-badge.quarterly {
+  background: #ede9fe;
+  color: #7c3aed;
+}
+
+.member-badge.yearly {
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  color: #b45309;
 }
 </style>

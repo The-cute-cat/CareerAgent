@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, nextTick, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox, ElLoading } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { cloneDeep } from 'lodash'
 
@@ -44,17 +44,19 @@ import { submitCareerFormApi, convertToSubmitDTO } from '@/api/career-form/formd
 import { evaluateCodeAbilityApi } from '@/api/career-form/codeAbility'
 import { submitQuiz, getQuestionsApi, getPersonQuizApi } from '@/api/career-form/questions'
 import type { CareerFormData, QuizDetailItem, UploadResponse } from '@/types/careerform_report'
-import type { Question, BackendPersonData } from '@/types/careerform_question'
+import type { Question, BackendPersonData, QuizType } from '@/types/careerform_question'
 import type { CodeAbilityEvaluateData } from '@/types/code-ability'
 import type { JobMatchItem } from '@/types/job-match'
 import type { JsonResumeGenerationResult, ResumeProfileExtras } from '@/types/json-resume'
 import { useJsonResumeStore } from '@/stores/modules/jsonResume'
+import { useCareerModeStore } from '@/stores/careerMode'
 import { createDefaultResumeProfileExtras, generateJsonResume } from '@/utils/json-resume'
 import { exportJsonResumeToWord, exportResumePreviewToPdf } from '@/utils/resume-export'
 import { clearCareerFormData, loadCareerFormData, saveCareerFormData } from '@/utils/career-runtime'
 import {
   majorOptions
 } from '@/mock/mockdata/CareerForm_mockdata'
+import { usePoints } from '@/composables/usePoints'
 
 
 // --- 状态定义 ---
@@ -63,6 +65,43 @@ import {
 const route = useRoute()
 const router = useRouter()
 const jsonResumeStore = useJsonResumeStore()
+const careerModeStore = useCareerModeStore()
+
+// 积分系统
+const { consumePoints } = usePoints()
+
+// 代码能力评估（带积分检查）
+const handleCodeAbilityEvaluateWithPoints = async (options?: {
+  rawLinks?: string
+  useAi?: boolean
+  openResultDialog?: boolean
+}) => {
+  // 扣除积分（AI职业测评：30积分）
+  const pointsResult = await consumePoints('careerAssessment', '代码能力评估')
+  if (!pointsResult.success) {
+    // 积分不足，已弹出提示
+    return
+  }
+  // 积分扣除成功，继续评估
+  await handleCodeAbilityEvaluate(options)
+}
+
+// 提交表单（带积分检查）
+const submitFormWithPoints = async () => {
+  // 扣除积分（简历优化：50积分）
+  const pointsResult = await consumePoints('resumeOptimize', '简历优化')
+  if (!pointsResult.success) {
+    // 积分不足，已弹出提示
+    return
+  }
+  // 积分扣除成功，继续提交
+  // 学习模式使用模拟数据，就业模式调用后端API
+  if (isLearningMode.value) {
+    await submitFormWithMockData()
+  } else {
+    await submitForm()
+  }
+}
 
 /** 表单引用，用于表单验证和重置 */
 const formRef = ref<FormInstance>()
@@ -126,8 +165,33 @@ const resumeProfileExtras = ref<ResumeProfileExtras>(
   cloneDeep(jsonResumeStore.profileExtras || createDefaultResumeProfileExtras())
 )
 const selectedResumeTemplate = ref<'professional' | 'modern' | 'compact'>('professional')
+const isLearningMode = computed(() => careerModeStore.isLearningMode)
+const isJobMode = computed(() => careerModeStore.isJobMode)
+const modeMenuTexts = computed<Record<string, string>>(() => {
+  if (isLearningMode.value) {
+    return {
+      '1': '学习方向',
+      '2': '能力基础',
+      '3': '项目沉淀',
+      '4': '成长评估',
+      '5': '学习规划'
+    }
+  }
 
-if (!resumeProfileExtras.value.educationHistory?.length) {
+  return {
+    '1': '基本信息',
+    '2': '技能证书',
+    '3': '经历项目',
+    '4': '素质测评',
+    '5': '职业意向'
+  }
+})
+
+// 安全初始化教育历史
+if (!resumeProfileExtras.value?.educationHistory?.length) {
+  if (!resumeProfileExtras.value) {
+    resumeProfileExtras.value = createDefaultResumeProfileExtras()
+  }
   resumeProfileExtras.value.educationHistory = [
     {
       institution: '',
@@ -173,15 +237,18 @@ const internshipForm = reactive({
 /** 人岗匹配结果数据（后端返回的岗位匹配数组） */
 const jobMatchResult = reactive<JobMatchItem[]>([])
 
-/** 画像完整度 (0-100) */
+/** 画像完整度 (0-100) - 使用缓存优化性能 */
 const profileCompleteness = computed(() => {
+  // 边界检查
+  if (!formData) return 0
+  
   let total = 0
   let completed = 0
 
   // 基本信息项
   const basicItems = [
     !!formData.education,
-    formData.major.length > 0,
+    formData.major?.length > 0,
     !!formData.graduationDate
   ]
   total += basicItems.length
@@ -189,27 +256,27 @@ const profileCompleteness = computed(() => {
 
   // 技能与证书项
   const skillItems = [
-    formData.languages.some(l => l.type && l.level),
-    formData.certificates.length > 0,
-    formData.skills.length > 0,
-    formData.tools.length > 0
+    Array.isArray(formData.languages) && formData.languages.some(l => l?.type && l?.level),
+    formData.certificates?.length > 0,
+    formData.skills?.length > 0,
+    formData.tools?.length > 0
   ]
   total += skillItems.length
   completed += skillItems.filter(Boolean).length
 
   // 经历与项目项
   const expItems = [
-    formData.projects.length > 0,
-    formData.internships.length > 0
+    formData.projects?.length > 0,
+    formData.internships?.length > 0
   ]
   total += expItems.length
   completed += expItems.filter(Boolean).length
 
   // 素质测评项
   const quizItems = [
-    quizCompleted.communication,
-    quizCompleted.stress,
-    quizCompleted.learning,
+    quizCompleted?.communication,
+    quizCompleted?.stress,
+    quizCompleted?.learning,
     !!formData.innovation
   ]
   total += quizItems.length
@@ -218,11 +285,14 @@ const profileCompleteness = computed(() => {
   // 职业意向项
   const careerItems = [
     !!formData.targetJob,
-    formData.targetIndustries.length > 0
+    formData.targetIndustries?.length > 0
   ]
   total += careerItems.length
   completed += careerItems.filter(Boolean).length
 
+  // 防止除以零
+  if (total === 0) return 0
+  
   return Math.round((completed / total) * 100)
 })
 
@@ -303,13 +373,16 @@ const currentSectionTitle = computed(() => {
  * 根据5个主要步骤的完成情况计算：基本信息、技能证书、经历项目、素质测评、职业意向
  */
 const formProgress = computed(() => {
+  // 边界检查
+  if (!formData) return 0
+  
   let completed = 0
   const total = 5
 
   if (formData.education) completed++
-  if (formData.major.length > 0) completed++
-  if (formData.skills.length > 0) completed++
-  if (formData.projects.length > 0 || formData.internships.length > 0) completed++
+  if (formData.major?.length > 0) completed++
+  if (formData.skills?.length > 0) completed++
+  if (formData.projects?.length > 0 || formData.internships?.length > 0) completed++
   if (formData.targetJob) completed++
 
   return Math.round((completed / total) * 100)
@@ -330,6 +403,34 @@ const currentSectionDescription = computed(() => {
   return descriptions[activeMenu.value] || '聚焦本步核心信息完善'
 })
 
+const displaySectionTitle = computed(() => {
+  if (!isLearningMode.value) return currentSectionTitle.value
+
+  const titles: Record<string, string> = {
+    '1': '学习方向定位',
+    '2': '学习基础盘点',
+    '3': '项目成果沉淀',
+    '4': '成长潜力评估',
+    '5': '阶段学习规划'
+  }
+
+  return titles[activeMenu.value] || '学习方向定位'
+})
+
+const displaySectionDescription = computed(() => {
+  if (!isLearningMode.value) return currentSectionDescription.value
+
+  const descriptions: Record<string, string> = {
+    '1': '先明确主攻方向与当前最适合投入的学习主题',
+    '2': '盘点技能基础、证书能力与短期需要补齐的内容',
+    '3': '通过项目和实践经历沉淀可以展示的学习成果',
+    '4': '用测评结果补足成长潜力与能力侧画像',
+    '5': '形成阶段性学习重点与后续发展路径'
+  }
+
+  return descriptions[activeMenu.value] || '先明确主攻方向与当前最适合投入的学习主题'
+})
+
 const readinessText = computed(() => {
   if (profileCompleteness.value >= 80) return '较完善'
   if (profileCompleteness.value >= 40) return '完善中'
@@ -343,9 +444,21 @@ const readinessHint = computed(() => {
 })
 
 const hasValidLanguage = (languages: Array<{ type: string; level: string }>) => {
-  return Array.isArray(languages) && languages.some((language) => {
-    const type = typeof language?.type === 'string' ? language.type.trim() : ''
-    const level = typeof language?.level === 'string' ? language.level.trim() : ''
+  // 边界检查
+  if (!Array.isArray(languages) || languages.length === 0) {
+    return false
+  }
+  
+  // 限制检查数量防止性能问题
+  const MAX_CHECK = 100
+  const languagesToCheck = languages.slice(0, MAX_CHECK)
+  
+  return languagesToCheck.some((language) => {
+    // 安全检查
+    if (!language || typeof language !== 'object') return false
+    
+    const type = typeof language.type === 'string' ? language.type.trim() : ''
+    const level = typeof language.level === 'string' ? language.level.trim() : ''
     return !!(type && level)
   })
 }
@@ -810,12 +923,18 @@ const removeInternship = (index: number) => {
  * @returns 格式化后的日期字符串
  */
 const formatDateRange = (dateRange: Date[]) => {
-  if (!dateRange || dateRange.length !== 2) return ''
+  // 边界检查
+  if (!Array.isArray(dateRange) || dateRange.length !== 2) return ''
   const startDate = dateRange[0]
   const endDate = dateRange[1]
   if (!startDate || !endDate) return ''
+  
   const start = new Date(startDate)
   const end = new Date(endDate)
+  
+  // 验证日期有效性
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) return ''
+  
   const format = (date: Date) => {
     const y = date.getFullYear()
     const m = String(date.getMonth() + 1).padStart(2, '0')
@@ -1131,8 +1250,26 @@ const quizSubmitting = ref(false)
  * 根据测试类型更新相应的分数或完成状态
  * @param submitData - 问卷提交的数据 { quizType, answers }
  */
-const handleQuizSubmit = async (submitData: any) => {
+const handleQuizSubmit = async (submitData: { quizType: string; answers: Record<string, string> }) => {
+  // 边界检查
+  if (!submitData || typeof submitData !== 'object') {
+    console.error('提交数据无效')
+    return
+  }
+  
   const { quizType, answers } = submitData
+  
+  // 验证必要字段
+  if (!quizType || typeof quizType !== 'string') {
+    console.error('quizType 无效')
+    return
+  }
+
+  const validQuizTypes = ['communication', 'stress', 'learning', 'skill', 'tool', 'code']
+  if (!validQuizTypes.includes(quizType)) {
+    console.error('无效的测评类型:', quizType)
+    return
+  }
 
   // ---- 素质测评（communication / stress / learning）：不做评分，直接收集答案 ----
   if (['communication', 'stress', 'learning'].includes(quizType)) {
@@ -1189,7 +1326,7 @@ const handleQuizSubmit = async (submitData: any) => {
     }
 
     const result = await submitQuiz({
-      quizType,
+      quizType: quizType as QuizType,
       name: ['skill', 'tool'].includes(quizType) ? currentTestSkill.value || '' : undefined,
       questions: (backendQuizData.value?.questions || []) as Question[],
       userAnswers
@@ -1263,12 +1400,43 @@ const getCodeAbilityUrls = (rawLinks: string) => {
 }
 
 const isValidCodeProfileUrl = (url: string) => {
-  // 只接受主页链接格式：https://github.com/username 或 https://gitee.com/username
-  return /^https?:\/\/(www\.)?(github\.com|gitee\.com)\/[^/]+\/?$/i.test(url)
+  // 安全验证：只接受主页链接格式：https://github.com/username 或 https://gitee.com/username
+  // 限制长度防止 ReDoS 攻击
+  if (!url || typeof url !== 'string' || url.length > 200) return false
+  
+  // 基本 URL 格式验证
+  const validProtocol = url.startsWith('https://') || url.startsWith('http://')
+  if (!validProtocol) return false
+  
+  // 使用更严格的正则，限制用户名长度和字符
+  return /^https?:\/\/(www\.)?(github\.com|gitee\.com)\/[a-zA-Z0-9_-]{1,39}\/?$/i.test(url)
 }
 
 const getCodeRepoMeta = (url: string) => {
+  // 边界检查
+  if (!url || typeof url !== 'string') {
+    return {
+      hostLabel: '未知平台',
+      owner: '',
+      repo: '',
+      fullName: '',
+      normalized: ''
+    }
+  }
+  
   const normalized = url.trim().replace(/\/+$/, '')
+  
+  // 限制 URL 长度防止性能问题
+  if (normalized.length > 200) {
+    return {
+      hostLabel: '未知平台',
+      owner: '',
+      repo: '',
+      fullName: '',
+      normalized: normalized.slice(0, 200)
+    }
+  }
+  
   const match = normalized.match(/^https?:\/\/(?:www\.)?(github\.com|gitee\.com)\/([^/]+)\/([^/]+)$/i)
 
   if (!match) {
@@ -1281,8 +1449,7 @@ const getCodeRepoMeta = (url: string) => {
     }
   }
 
-  const matchResult = match as RegExpMatchArray
-  const [, host, owner, repo] = matchResult
+  const [, host, owner, repo] = match
 
   return {
     hostLabel: host?.toLowerCase() === 'gitee.com' ? 'Gitee' : 'GitHub',
@@ -1294,7 +1461,17 @@ const getCodeRepoMeta = (url: string) => {
 }
 
 const getRepoDisplayNames = (urls: string[]) => {
-  return urls.map((url) => {
+  // 边界检查：确保 urls 是有效数组
+  if (!Array.isArray(urls)) return []
+  
+  // 限制处理数量防止性能问题
+  const MAX_URLS = 50
+  const urlsToProcess = urls.slice(0, MAX_URLS)
+  
+  return urlsToProcess.map((url) => {
+    // 跳过无效 URL
+    if (!url || typeof url !== 'string') return '无效链接'
+    
     const meta = getCodeRepoMeta(url)
     return meta.fullName || meta.normalized || url
   })
@@ -1327,9 +1504,23 @@ const handleCodeAbilityEvaluate = async (options?: {
   useAi?: boolean
   openResultDialog?: boolean
 }) => {
-  const rawLinks = (options?.rawLinks ?? formData.codeAbility.links).trim()
+  // 输入验证
+  const rawLinksInput = options?.rawLinks ?? formData.codeAbility.links
+  if (!rawLinksInput || typeof rawLinksInput !== 'string') {
+    ElMessage.warning('请输入有效的代码仓库链接')
+    return
+  }
+  
+  const rawLinks = rawLinksInput.trim()
   const useAi = options?.useAi ?? codeAbilityUseAi.value
   const openResultDialog = options?.openResultDialog ?? true
+  
+  // 限制链接长度
+  if (rawLinks.length > 2000) {
+    ElMessage.warning('链接总长度超出限制，请减少链接数量')
+    return
+  }
+  
   const repoUrls = getCodeAbilityUrls(rawLinks)
 
   if (!repoUrls.length) {
@@ -1337,21 +1528,21 @@ const handleCodeAbilityEvaluate = async (options?: {
     return
   }
 
+  // 限制评估仓库数量防止性能问题
+  const MAX_REPO_COUNT = 10
+  if (repoUrls.length > MAX_REPO_COUNT) {
+    ElMessage.warning(`最多支持同时评估 ${MAX_REPO_COUNT} 个仓库，已自动截取前 ${MAX_REPO_COUNT} 个`)
+    repoUrls.length = MAX_REPO_COUNT
+  }
+
   const invalidUrl = repoUrls.find(url => !isValidCodeProfileUrl(url))
   if (invalidUrl) {
-    ElMessage.warning(`链接格式不正确，仅支持主页链接如 https://github.com/username：${invalidUrl}`)
+    ElMessage.warning(`链接格式不正确，仅支持主页链接如 https://github.com/username`)
     return
   }
 
   codeAbilityEvaluating.value = true
   lastEvaluatedCodeRepoUrls.value = repoUrls
-
-  // 显示加载提示
-  const loadingInstance = ElLoading.service({
-    lock: true,
-    text: useAi ? '正在进行代码能力深度分析，预计需要 8-15 秒...' : '正在进行代码能力评估，预计需要 3-5 秒...',
-    background: 'rgba(0, 0, 0, 0.7)',
-  })
 
   try {
     const res = await evaluateCodeAbilityApi({
@@ -1359,21 +1550,16 @@ const handleCodeAbilityEvaluate = async (options?: {
       use_ai: useAi,
       cache_enabled: true
     })
-    const result = res.data as any
+    
+    // 安全的类型检查
+    const result = res?.data as { code?: number; data?: CodeAbilityEvaluateData; msg?: string } | undefined
+    
+    if (!result) {
+      throw new Error('返回数据为空')
+    }
 
-    // 在浏览器控制台输出完整数据
-    console.log('%c[代码能力评估] 返回数据:', 'color: #409EFF; font-size: 14px; font-weight: bold;')
-    console.log('完整响应:', result)
-    console.log('评估数据:', result?.data)
-    console.log('平台:', result?.data?.platform)
-    console.log('用户名:', result?.data?.username)
-    console.log('综合评分:', result?.data?.composite_score)
-    console.log('等级:', result?.data?.level)
-    console.log('五维评分:', result?.data?.features?.composite?.dimension_scores)
-    console.log('AI分析:', result?.data?.ai_analysis)
-
-    if (result?.code !== 200 || !result?.data) {
-      throw new Error(result?.msg || '代码能力评估失败')
+    if (result.code !== 200 || !result.data) {
+      throw new Error(result.msg || '代码能力评估失败')
     }
 
     codeAbilityResult.value = result.data
@@ -1383,12 +1569,12 @@ const handleCodeAbilityEvaluate = async (options?: {
     }
 
     ElMessage.success(result.data?.ai_analysis ? '代码能力深度分析完成' : '代码能力评估完成')
-  } catch (error: any) {
+  } catch (error) {
     console.error('代码能力评估失败:', error)
-    ElMessage.error(error?.message || '代码能力评估失败，请稍后重试')
+    const errorMessage = error instanceof Error ? error.message : '代码能力评估失败，请稍后重试'
+    ElMessage.error(errorMessage)
   } finally {
     codeAbilityEvaluating.value = false
-    loadingInstance.close()
   }
 }
 
@@ -1644,6 +1830,15 @@ const normalizeUploadResponses = (parsedData: unknown): UploadResponse[] => {
 }
 
 const mergeUploadResponses = (responses: UploadResponse[]): UploadResponse => {
+  // 边界检查
+  if (!Array.isArray(responses) || responses.length === 0) {
+    return {}
+  }
+  
+  // 限制处理数量防止性能问题
+  const MAX_RESPONSES = 100
+  const responsesToProcess = responses.slice(0, MAX_RESPONSES)
+  
   const merged: UploadResponse = {}
   const certificates: string[] = []
   const targetIndustries: string[] = []
@@ -1656,7 +1851,9 @@ const mergeUploadResponses = (responses: UploadResponse[]): UploadResponse => {
   const quizDetail: NonNullable<UploadResponse['quizDetail']> = []
   const codeLinks: string[] = []
 
-  responses.forEach((response) => {
+  responsesToProcess.forEach((response) => {
+    // 跳过无效响应
+    if (!response || typeof response !== 'object') return
     if (!merged.education && isNonEmptyString(response.education)) {
       merged.education = response.education
     }
@@ -1710,7 +1907,8 @@ const mergeUploadResponses = (responses: UploadResponse[]): UploadResponse => {
       priorities.push(...response.priorities)
     }
 
-    const linksValue = response.codeAbility?.links ?? response.codeLinks
+    // 使用类型断言访问可能存在的 codeLinks 属性（后端返回的兼容字段）
+    const linksValue = response.codeAbility?.links ?? (response as Record<string, unknown>).codeLinks
     if (Array.isArray(linksValue)) {
       codeLinks.push(...linksValue.map(item => String(item)))
     } else if (isNonEmptyString(linksValue)) {
@@ -1774,34 +1972,40 @@ const mergeUploadResponses = (responses: UploadResponse[]): UploadResponse => {
   return merged
 }
 
-const hasFillableResumeData = (parsedFormData: UploadResponse) => Boolean(
-  isNonEmptyString(parsedFormData.education)
-  || isNonEmptyString(parsedFormData.educationOther)
-  || normalizeMajorValue(parsedFormData.major).length > 0
-  || isNonEmptyString(parsedFormData.graduationDate)
-  || parsedFormData.languages?.length
-  || parsedFormData.certificates?.length
-  || isNonEmptyString(parsedFormData.certificateOther)
-  || parsedFormData.skills?.length
-  || parsedFormData.tools?.length
-  || isNonEmptyString(parsedFormData.codeAbility?.links)
-  || (Array.isArray(parsedFormData.codeLinks) && parsedFormData.codeLinks.length > 0)
-  || isNonEmptyString(parsedFormData.codeLinks)
-  || parsedFormData.projects?.length
-  || parsedFormData.internships?.length
-  || parsedFormData.quizDetail?.length
-  || isNonEmptyString(parsedFormData.innovation)
-  || isNonEmptyString(parsedFormData.targetJob)
-  || parsedFormData.targetIndustries?.length
-  || parsedFormData.priorities?.length
-)
+const hasFillableResumeData = (parsedFormData: UploadResponse) => {
+  // 使用类型断言访问可能存在的 codeLinks 属性
+  const codeLinks = (parsedFormData as Record<string, unknown>).codeLinks
+  
+  return Boolean(
+    isNonEmptyString(parsedFormData.education)
+    || isNonEmptyString(parsedFormData.educationOther)
+    || normalizeMajorValue(parsedFormData.major).length > 0
+    || isNonEmptyString(parsedFormData.graduationDate)
+    || parsedFormData.languages?.length
+    || parsedFormData.certificates?.length
+    || isNonEmptyString(parsedFormData.certificateOther)
+    || parsedFormData.skills?.length
+    || parsedFormData.tools?.length
+    || isNonEmptyString(parsedFormData.codeAbility?.links)
+    || (Array.isArray(codeLinks) && codeLinks.length > 0)
+    || isNonEmptyString(codeLinks as string)
+    || parsedFormData.projects?.length
+    || parsedFormData.internships?.length
+    || parsedFormData.quizDetail?.length
+    || isNonEmptyString(parsedFormData.innovation)
+    || isNonEmptyString(parsedFormData.targetJob)
+    || parsedFormData.targetIndustries?.length
+    || parsedFormData.priorities?.length
+  )
+}
 
 /**
  * 将后端返回的表单数据填充到前端表单
  * @param parsedFormData 后端返回的解析后的表单数据
  */
 const fillFormWithParsedData = (parsedFormData: UploadResponse) => {
-  if (!parsedFormData) return 0
+  // 严格类型检查
+  if (!parsedFormData || typeof parsedFormData !== 'object') return 0
 
   let appliedFieldCount = 0
 
@@ -1870,8 +2074,10 @@ const fillFormWithParsedData = (parsedFormData: UploadResponse) => {
   }
 
   // 填充代码能力
-  if (parsedFormData.codeAbility?.links || parsedFormData.codeLinks) {
-    const parsedCodeLinks = parsedFormData.codeAbility?.links || parsedFormData.codeLinks || ''
+  // 使用类型断言访问可能存在的 codeLinks 属性
+  const parsedCodeLinksValue = (parsedFormData as Record<string, unknown>).codeLinks
+  if (parsedFormData.codeAbility?.links || parsedCodeLinksValue) {
+    const parsedCodeLinks = parsedFormData.codeAbility?.links || parsedCodeLinksValue || ''
     formData.codeAbility.links = Array.isArray(parsedCodeLinks)
       ? parsedCodeLinks.join('\n')
       : String(parsedCodeLinks)
@@ -1986,6 +2192,7 @@ const hydrateCareerFormFromStorage = () => {
 }
 
 onMounted(() => {
+  careerModeStore.initMode()
   hydrateCareerFormFromStorage()
 })
 
@@ -2052,10 +2259,16 @@ const formRules = reactive<FormRules>({
 
 /**
  * 获取模拟人岗匹配结果
+ * 学习模式和就业模式使用不同的数据集
  */
 const fetchMockJobMatchResult = async (): Promise<JobMatchItem[]> => {
-  const { mockJobMatchItems } = await import('@/mock/mockdata/JobMatch_mockdata')
-  return mockJobMatchItems
+  if (isLearningMode.value) {
+    const { mockLearningJobMatchItems } = await import('@/mock/mockdata/LearningMode_mockdata')
+    return mockLearningJobMatchItems
+  } else {
+    const { mockJobMatchItems } = await import('@/mock/mockdata/JobMatch_mockdata')
+    return mockJobMatchItems
+  }
 }
 
 /** 当前生成的 JSON Resume。 */
@@ -2413,51 +2626,77 @@ const exportResumeWord = async () => {
  * 验证表单数据，提交到后端并等待返回能力评估报告
  */
 const submitForm = async () => {
-  if (!formRef.value) return
+  if (!formRef.value) {
+    ElMessage.error('表单引用异常，请刷新页面重试')
+    return
+  }
 
-  const valid = await formRef.value.validate().catch(() => false)
+  // 表单验证
+  let valid = false
+  try {
+    valid = await formRef.value.validate()
+  } catch (validationError) {
+    console.error('表单验证失败:', validationError)
+  }
+  
   if (!valid) {
     ElMessage.error('请完善必填信息')
     return
   }
 
   submitting.value = true
+  
   try {
     const submitData = convertToSubmitDTO(formData, {
       codeAbilityResult: codeAbilityResult.value,
       codeAbilityUseAi: codeAbilityUseAi.value
     })
+    
     console.log('submitData', submitData)
+    
     const res = await submitCareerFormApi(submitData)
 
     console.log("表单提交返回结果:", res)
-    console.log("res.data:", res.data)
-    console.log("res.data.data:", res.data.data)
+
+    // 安全访问响应数据
+    const responseData = res?.data
+    if (!responseData) {
+      ElMessage.error('返回数据为空，请稍后重试')
+      return
+    }
 
     // 处理两种响应格式：1) res.data 是数组 2) res.data 是 {code, data} 对象
     let matchResult: JobMatchItem[]
-    if (Array.isArray(res.data)) {
-      matchResult = res.data as JobMatchItem[]
-    } else if (res.data?.code === 200) {
-      matchResult = res.data.data as JobMatchItem[]
+    if (Array.isArray(responseData)) {
+      matchResult = responseData as JobMatchItem[]
+    } else if (responseData.code === 200 && Array.isArray(responseData.data)) {
+      matchResult = responseData.data as JobMatchItem[]
     } else {
-      ElMessage.error(res.data?.msg || '提交失败，请稍后重试')
+      ElMessage.error(responseData.msg || '提交失败，请稍后重试')
       return
     }
-    localStorage.setItem('jobMatchResult', JSON.stringify(matchResult))
+    
+    // 安全存储到 localStorage
+    try {
+      localStorage.setItem('jobMatchResult', JSON.stringify(matchResult))
+    } catch (storageError) {
+      console.error('存储结果失败:', storageError)
+    }
+    
     ElMessage.success('人岗匹配分析完成！')
-    router.push('/job-matching')
-  } catch (error: any) {
+    await router.push('/job-matching')
+  } catch (error) {
     console.error('提交失败:', error)
-    ElMessage.error(error.message || '网络错误，请稍后重试')
+    const errorMessage = error instanceof Error ? error.message : '网络错误，请稍后重试'
+    ElMessage.error(errorMessage)
   } finally {
     submitting.value = false
   }
 }
 
 /**
- * 使用模拟数据生成人岗匹配结果（调试/预览模式）
- * 当后端服务不可用时，可调用此方法使用前端模拟数据
+ * 使用本地示例数据生成人岗匹配结果（预览模式）
+ * 当后端服务不可用时，可调用此方法使用本地示例数据
  */
 const submitFormWithMockData = async () => {
   if (!formRef.value) return
@@ -2471,13 +2710,13 @@ const submitFormWithMockData = async () => {
     submitting.value = true
 
     try {
-      // 使用模拟数据生成人岗匹配结果
-      const mockResult = await fetchMockJobMatchResult()
+      // 使用本地示例数据生成人岗匹配结果
+      const matchResult = await fetchMockJobMatchResult()
 
       // 保存人岗匹配结果到本地存储
-      localStorage.setItem('jobMatchResult', JSON.stringify(mockResult))
+      localStorage.setItem('jobMatchResult', JSON.stringify(matchResult))
 
-      console.log('【模拟模式】人岗匹配结果:', mockResult)
+      console.log('【预览模式】人岗匹配结果:', matchResult)
       ElMessage.success('人岗匹配分析完成，正在跳转...')
 
       // 直接跳转到人岗匹配页面
@@ -2609,7 +2848,7 @@ const resetForm = () => {
                 </el-icon>
                 <span v-else>1</span>
               </div>
-              <span class="menu-text">基本信息</span>
+              <span class="menu-text">{{ modeMenuTexts['1'] }}</span>
               <el-icon class="menu-check" v-if="isStepCompleted(1)"><Circle-Check /></el-icon>
             </el-menu-item>
 
@@ -2620,7 +2859,7 @@ const resetForm = () => {
                 </el-icon>
                 <span v-else>2</span>
               </div>
-              <span class="menu-text">技能证书</span>
+              <span class="menu-text">{{ modeMenuTexts['2'] }}</span>
               <el-icon class="menu-check" v-if="isStepCompleted(2)"><Circle-Check /></el-icon>
             </el-menu-item>
 
@@ -2631,7 +2870,7 @@ const resetForm = () => {
                 </el-icon>
                 <span v-else>3</span>
               </div>
-              <span class="menu-text">经历项目</span>
+              <span class="menu-text">{{ modeMenuTexts['3'] }}</span>
               <el-icon class="menu-check" v-if="isStepCompleted(3)"><Circle-Check /></el-icon>
             </el-menu-item>
 
@@ -2642,7 +2881,7 @@ const resetForm = () => {
                 </el-icon>
                 <span v-else>4</span>
               </div>
-              <span class="menu-text">素质测评</span>
+              <span class="menu-text">{{ modeMenuTexts['4'] }}</span>
               <el-icon class="menu-check" v-if="isStepCompleted(4)"><Circle-Check /></el-icon>
             </el-menu-item>
 
@@ -2653,7 +2892,7 @@ const resetForm = () => {
                 </el-icon>
                 <span v-else>5</span>
               </div>
-              <span class="menu-text">职业意向</span>
+              <span class="menu-text">{{ modeMenuTexts['5'] }}</span>
               <el-icon class="menu-check" v-if="isStepCompleted(5)"><Circle-Check /></el-icon>
             </el-menu-item>
           </el-menu>
@@ -2687,7 +2926,7 @@ const resetForm = () => {
             <div class="dashboard-header-modern">
               <div class="dashboard-hero-main">
                 <div class="header-left">
-                  <h2>{{ currentSectionTitle }}</h2>
+                  <h2>{{ displaySectionTitle }}</h2>
                   <div class="step-indicator">第 {{ activeMenu }} 步，共 5 步</div>
                 </div>
 
@@ -2712,9 +2951,9 @@ const resetForm = () => {
                   <div class="stat-info">
                     <span class="stat-label">当前阶段</span>
                     <div class="stat-value-row">
-                      <span class="stat-value">{{ currentSectionTitle }}</span>
+                      <span class="stat-value">{{ displaySectionTitle }}</span>
                     </div>
-                    <span class="stat-desc">{{ currentSectionDescription }}</span>
+                    <span class="stat-desc">{{ displaySectionDescription }}</span>
                   </div>
                 </div>
 
@@ -2738,6 +2977,8 @@ const resetForm = () => {
                   </div>
                 </div>
               </div>
+
+
             </div>
           </template>
 
@@ -2897,7 +3138,7 @@ const resetForm = () => {
                       type="warning"
                       :icon="DataAnalysis"
                       :loading="codeAbilityEvaluating"
-                      @click="handleCodeAbilityEvaluate"
+                      @click="handleCodeAbilityEvaluateWithPoints"
                     >
                       {{ codeAbilityEvaluating ? '评估中...' : '开始评估' }}
                     </el-button>
@@ -3194,7 +3435,7 @@ const resetForm = () => {
               <el-button class="form-action-btn form-action-btn--template" @click="switchCareerSection('template')" :icon="Document">
                 前往简历模板
               </el-button>
-              <el-button type="primary" class="form-action-btn form-action-btn--primary" @click="submitForm"
+              <el-button type="primary" class="form-action-btn form-action-btn--primary" @click="submitFormWithPoints"
                 :loading="submitting" :icon="Check">
                 提交画像
               </el-button>
@@ -3341,6 +3582,26 @@ const resetForm = () => {
             <span class="progress-dot"></span>
           </div>
           <div class="submit-overlay-tip">页面会在分析完成后自动跳转，请稍候片刻。</div>
+        </div>
+      </div>
+    </transition>
+
+    <!-- 代码能力评估等待动画 -->
+    <transition name="submit-overlay-fade">
+      <div v-if="codeAbilityEvaluating" class="submit-overlay">
+        <div class="submit-overlay-card">
+          <div class="submit-overlay-badge">AI 正在分析中</div>
+          <el-icon class="loading-icon submit-overlay-icon" :size="54">
+            <Loading />
+          </el-icon>
+          <h3>正在进行代码能力评估</h3>
+          <p>我们正在分析你的代码仓库，评估编程能力和技术栈匹配度，请稍候片刻。</p>
+          <div class="submit-overlay-progress">
+            <span class="progress-dot"></span>
+            <span class="progress-dot"></span>
+            <span class="progress-dot"></span>
+          </div>
+          <div class="submit-overlay-tip">预计需要 3-15 秒，分析完成后将自动展示结果</div>
         </div>
       </div>
     </transition>
@@ -4703,6 +4964,12 @@ const resetForm = () => {
 
 .dashboard-stat-row {
   min-width: min(100%, 560px);
+}
+
+.mode-layer-stack {
+  display: grid;
+  gap: 16px;
+  margin-top: 22px;
 }
 
 .header-stats {

@@ -26,9 +26,13 @@ import {
   Opportunity,
   Connection,
   Promotion,
+  TrendCharts as ReportIcon,
+  Loading,
 } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import type { JobMatchItem } from '@/types/job-match'
+import { useCareerReportStore } from '@/stores/modules/careerReport'
+import { usePoints } from '@/composables/usePoints'
 
 const props = defineProps<{
   jobData?: JobMatchItem
@@ -36,8 +40,14 @@ const props = defineProps<{
 
 const route = useRoute()
 const router = useRouter()
+const reportStore = useCareerReportStore()
 const jobItem = ref<JobMatchItem | null>(props.jobData || null)
 const loading = ref(!props.jobData)
+const navigating = ref(false)
+const navigateTarget = ref<'map' | 'report'>('map')
+
+// 积分系统
+const { consumePoints } = usePoints()
 
 let literacyChart: echarts.ECharts | null = null
 let potentialChart: echarts.ECharts | null = null
@@ -272,6 +282,66 @@ const goBack = () => {
   router.push('/job-matching')
 }
 
+const goToDevelopmentMap = async () => {
+  // 扣除积分（职业发展图谱：80积分）
+  const pointsResult = await consumePoints('developmentMap', '生成职业发展图谱')
+  if (!pointsResult.success) {
+    // 积分不足，已弹出提示
+    return
+  }
+
+  navigating.value = true
+  navigateTarget.value = 'map'
+  const jobId = route.query.jobId as string || jobItem.value?.job_id
+
+  // 标记岗位为已生成
+  if (jobId) {
+    const existingReport = reportStore.getReportByJob(jobId)
+    if (!existingReport) {
+      reportStore.setReportForJob(jobId, { target_position: jobItem.value?.raw_data?.job_name || '' } as any)
+    }
+  }
+
+  setTimeout(() => {
+    router.replace({
+      name: 'development-map',
+      query: { jobId }
+    }).finally(() => {
+      navigating.value = false
+    })
+  }, 800)
+}
+
+const goToReport = async () => {
+  // 扣除积分（生涯规划报告：100积分）
+  const pointsResult = await consumePoints('careerReport', '生成生涯规划报告')
+  if (!pointsResult.success) {
+    // 积分不足，已弹出提示
+    return
+  }
+
+  navigating.value = true
+  navigateTarget.value = 'report'
+  const jobId = route.query.jobId as string || jobItem.value?.job_id
+
+  // 标记岗位为已生成
+  if (jobId) {
+    const existingReport = reportStore.getReportByJob(jobId)
+    if (!existingReport) {
+      reportStore.setReportForJob(jobId, { target_position: jobItem.value?.raw_data?.job_name || '' } as any)
+    }
+  }
+
+  setTimeout(() => {
+    router.replace({
+      name: 'report',
+      query: { jobId }
+    }).finally(() => {
+      navigating.value = false
+    })
+  }, 800)
+}
+
 const formatLiteracyKey = (key: string): string => {
   const map: Record<string, string> = {
     communication: '沟通能力',
@@ -305,19 +375,47 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="position-detail-container">
+    <Transition name="submit-overlay-fade">
+      <div v-if="navigating" class="submit-overlay">
+        <div class="submit-overlay-card">
+          <div class="submit-overlay-badge">AI 正在生成中</div>
+          <el-icon class="loading-icon submit-overlay-icon" :size="54">
+            <Loading />
+          </el-icon>
+          <h3>正在生成{{ navigateTarget === 'map' ? '发展图谱' : '生涯报告' }}</h3>
+          <p>我们正在基于岗位匹配结果，为你生成个性化的{{ navigateTarget === 'map' ? '发展图谱' : '生涯报告' }}，请稍候。</p>
+          <div class="submit-overlay-progress">
+            <span class="progress-dot"></span>
+            <span class="progress-dot"></span>
+            <span class="progress-dot"></span>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
     <div class="detail-header">
-      <el-button type="primary" text @click="goBack">
-        <el-icon>
-          <ArrowLeft />
-        </el-icon>
-        返回岗位列表
-      </el-button>
-      <h1 class="detail-title">
-        <el-icon>
-          <TrendCharts />
-        </el-icon>
-        岗位匹配分析报告
-      </h1>
+      <div class="detail-header__left">
+        <el-button type="primary" text @click="goBack">
+          <el-icon>
+            <ArrowLeft />
+          </el-icon>
+          返回岗位列表
+        </el-button>
+        <h1 class="detail-title">
+          <el-icon>
+            <TrendCharts />
+          </el-icon>
+          岗位匹配分析报告
+        </h1>
+      </div>
+      <div class="detail-header__actions" v-if="jobItem">
+        <el-button type="primary" plain :icon="Promotion" @click="goToDevelopmentMap">
+          生成发展图谱
+        </el-button>
+        <el-button type="success" plain :icon="ReportIcon" @click="goToReport">
+          生成生涯报告
+        </el-button>
+      </div>
     </div>
 
     <div v-if="loading" class="loading-container">
@@ -737,8 +835,22 @@ onBeforeUnmount(() => {
 .detail-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 16px;
   margin-bottom: 20px;
+
+  .detail-header__left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .detail-header__actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+  }
 
   .detail-title {
     display: flex;
@@ -1422,6 +1534,112 @@ onBeforeUnmount(() => {
   to {
     transform: rotate(360deg);
   }
+}
+
+/* 生成等待界面 - 与表单提交风格一致 */
+.submit-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(241, 247, 255, 0.82);
+  backdrop-filter: blur(10px);
+}
+
+.submit-overlay-card {
+  width: min(100%, 520px);
+  padding: 32px 32px 28px;
+  border-radius: 28px;
+  text-align: center;
+  background:
+    radial-gradient(circle at top left, rgba(96, 165, 250, 0.2), transparent 32%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 250, 255, 0.98));
+  border: 1px solid rgba(191, 219, 254, 0.85);
+  box-shadow: 0 24px 60px rgba(37, 99, 235, 0.14);
+}
+
+.submit-overlay-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 0 14px;
+  margin-bottom: 16px;
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563eb;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.submit-overlay-icon {
+  margin-bottom: 18px;
+}
+
+.submit-overlay-card h3 {
+  margin: 0 0 12px;
+  color: #173a5d;
+  font-size: 30px;
+  font-weight: 800;
+}
+
+.submit-overlay-card p {
+  margin: 0 auto;
+  max-width: 420px;
+  color: #5f738b;
+  font-size: 15px;
+  line-height: 1.8;
+}
+
+.submit-overlay-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 22px 0 16px;
+}
+
+.progress-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #60a5fa 0%, #2563eb 100%);
+  animation: submitPulse 1.2s ease-in-out infinite;
+}
+
+.progress-dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.progress-dot:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes submitPulse {
+  0%,
+  80%,
+  100% {
+    transform: scale(0.85);
+    opacity: 0.45;
+  }
+
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* 生成等待界面过渡 */
+.submit-overlay-fade-enter-active,
+.submit-overlay-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.submit-overlay-fade-enter-from,
+.submit-overlay-fade-leave-to {
+  opacity: 0;
 }
 
 @media (max-width: 1400px) {
