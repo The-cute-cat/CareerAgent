@@ -96,7 +96,7 @@ const form = reactive<ResumeEditorState>({
 })
 
 const demo: ResumeEditorState = {
-  name: '张三', title: 'Java 后端开发工程师', phone: '13800000000', email: 'zhangsan@example.com', location: '广州',
+  name: '张三', title: 'Java后端工程师', phone: '13800000000', email: 'zhangsan@example.com', location: '广州',
   education: '本科 / 计算机科学与技术', school: '华南理工大学',
   summary: '3 年 Java 后端开发经验，熟悉 Spring 生态体系，具备高并发系统设计与优化能力。主导过多个核心系统的架构设计与开发，对微服务、分布式系统有较深入理解。',
   skills: 'Java, Spring Boot, Spring Cloud, MySQL, Redis, Kafka, Docker, Vue.js',
@@ -569,7 +569,7 @@ onMounted(importPortrait)
                 <label class="input-label">
                   <span class="label-text">职位 / 目标岗位</span>
                 </label>
-                <input v-model="form.title" class="form-input" placeholder="如：Java 后端开发工程师" maxlength="30">
+                <input v-model="form.title" class="form-input" placeholder="如：Java后端工程师" maxlength="30">
               </div>
               <div class="input-group" :class="{ 'has-value': hasText(form.phone) }">
                 <label class="input-label">

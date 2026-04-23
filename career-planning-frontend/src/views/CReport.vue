@@ -2248,23 +2248,18 @@ function runLocalCompletenessCheck() {
 }
 
 async function runCompletenessCheck() {
-  // 只使用前端逻辑进行完整性检查，不调用后端接口
-  checkingWithAi.value = true
-
-  // 模拟延迟，让用户感知到检查过程
-  await new Promise(resolve => setTimeout(resolve, 800))
-
-  try {
-    runLocalCompletenessCheck()
-  } finally {
-    checkingWithAi.value = false
-  }
-
-  /* 后端接口检查（已停用）
+  // 优先调用后端 AI 接口进行完整性检查
   const reportContent = buildReportContentForCheck()
 
+  // 内容太短时使用本地检查
   if (reportContent.replace(/\s+/g, '').length < 50) {
-    runLocalCompletenessCheck()
+    checkingWithAi.value = true
+    await new Promise(resolve => setTimeout(resolve, 500))
+    try {
+      runLocalCompletenessCheck()
+    } finally {
+      checkingWithAi.value = false
+    }
     return
   }
 
@@ -2291,14 +2286,13 @@ async function runCompletenessCheck() {
 
     throw new Error(result?.msg || 'AI 完整性检查失败')
   } catch (error: any) {
-    console.error(error)
+    console.error('AI 完整性检查失败:', error)
     pushAssistantNote('AI 完整性检查失败，已切换为本地检查', 'warning')
     ElMessage.warning(error?.message || 'AI 完整性检查失败，已切换为本地检查')
     runLocalCompletenessCheck()
   } finally {
     checkingWithAi.value = false
   }
-  */
 }
 
 const reportRef = ref<HTMLElement | null>(null)
