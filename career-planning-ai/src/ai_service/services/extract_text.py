@@ -16,7 +16,7 @@ async def extract_from_file(file_path: str, extension: str) -> str:
     Returns:
         提取的文本内容
     """
-    if extension.lower() == [suffix.lower() for suffix in settings.pdf.suffix]:
+    if extension.lower() in [suffix.lower() for suffix in settings.pdf.suffix]:
         content = await pdf_extractor.get_pdf_content(file_path)
         if not content:
             raise CommonHandleError(msg="PDF 文件提取失败")

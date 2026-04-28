@@ -20,7 +20,8 @@ __all__ = ["router"]
 
 router = APIRouter(prefix="/report", tags=["report"])
 redis = RedisService.get_instance("report")
-
+if not redis.is_available:
+    log.warning(f"⚠️警告：{__name__}的Redis缓存服务不可用")
 
 @router.post("/plan")
 async def get_plan(

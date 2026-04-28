@@ -130,7 +130,7 @@ const createDefaultMemberInfo = (id: number): MemberInfo => ({
 // 创建默认积分账户
 const createMockPointsData = (id: number): AccountPointsData => ({
   userId: id,
-  pointsBalance: 500, // 新用户默认500积分
+  pointsBalance: 50000, // 新用户默认50000积分
   totalConsumed: 0,
   updateTime: new Date().toISOString(),
   referralCount: 0,
@@ -247,7 +247,7 @@ export const isMemberExpired = (userId: number): boolean => {
   const memberInfo = memberInfoStore.get(userId)
   if (!memberInfo || !memberInfo.memberExpireAt) return true
   if (memberInfo.memberType === 'normal') return true
-  
+
   const expireAt = new Date(memberInfo.memberExpireAt)
   return expireAt < new Date()
 }
@@ -259,7 +259,7 @@ export async function mockGetAccountPointsApi(
 ): Promise<AxiosResponse<MockAccountPointsResponse>> {
   await delay(delayMs)
   const account = getOrCreateAccount(id)
-  
+
   // 检查会员是否过期
   if (isMemberExpired(id) && account.pointsBalance >= 0) {
     const memberInfo = memberInfoStore.get(id)
@@ -270,7 +270,7 @@ export async function mockGetAccountPointsApi(
       memberInfoStore.set(id, memberInfo)
     }
   }
-  
+
   return wrapAsAxiosResponse({
     code: 200,
     msg: '获取账号积分成功',
@@ -284,10 +284,10 @@ export async function mockConsumePointsApi(
   delayMs = 500
 ): Promise<AxiosResponse<Result<PointsConsumeData>>> {
   await delay(delayMs)
-  
+
   const base = getOrCreateAccount(request.userId)
   const amount = request.amount // 负数表示消费
-  
+
   // 检查积分是否足够（只检查消费场景）
   if (amount < 0 && base.pointsBalance < Math.abs(amount)) {
     return wrapAsAxiosResponse({
@@ -296,17 +296,17 @@ export async function mockConsumePointsApi(
       data: null as any
     })
   }
-  
+
   const nextBalance = Math.max(0, base.pointsBalance + amount)
   const consumedAmount = amount < 0 ? Math.abs(amount) : 0
-  
+
   const nextAccount: AccountPointsData = {
     ...base,
     pointsBalance: nextBalance,
     totalConsumed: base.totalConsumed + consumedAmount,
     updateTime: new Date().toISOString()
   }
-  
+
   pointsAccountStore.set(request.userId, nextAccount)
 
   // 添加积分记录
@@ -348,11 +348,11 @@ export async function mockGetUserFullInfoApi(
   delayMs = 300
 ): Promise<AxiosResponse<Result<any>>> {
   await delay(delayMs)
-  
+
   const account = getOrCreateAccount(userId)
   const memberInfo = getMemberInfo(userId)
   const records = getPointsRecords(userId)
-  
+
   return wrapAsAxiosResponse({
     code: 200,
     msg: '获取用户信息成功',
