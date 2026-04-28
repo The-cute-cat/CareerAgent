@@ -17,7 +17,8 @@ router = APIRouter(prefix="/parse", tags=["parse"])
 
 semaphore = asyncio.Semaphore(3)  # 限制最多 3 个并发
 redis = RedisService.get_instance("parse")
-
+if not redis.is_available:
+    log.warning(f"⚠️警告：{__name__}的Redis缓存服务不可用")
 
 @router.post("/file")
 async def parse_file(

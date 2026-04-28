@@ -15,7 +15,8 @@ from config import settings
 
 router = APIRouter(prefix="/question", tags=["question"])
 redis = RedisService.get_instance("question")
-
+if not redis.is_available:
+    log.warning(f"⚠️警告：{__name__}的Redis缓存服务不可用")
 
 class QuestionType(str, Enum):
     skill = "skill"
