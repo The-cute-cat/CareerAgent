@@ -73,8 +73,8 @@ milvus:
     host: 49.235.164.243
     port: 19530
   cloud:
-    url: <url>
-    token: <token>
+    url: <URL>
+    token: <TOKEN>
 chroma_config:
   save_path: <SAVE_PATH>
   model_name: text-embedding-v4

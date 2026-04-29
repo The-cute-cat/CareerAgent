@@ -197,7 +197,35 @@ chore: 构建/工具
 - [前端功能文档](docs/FRONTEND_DOC.md)
 - [简历上传 API 文档](docs/RESUME_UPLOAD_API.md)
 - [测试配置文档](docs/TEST_SETUP.md)
+- [Docker 部署指南](docs/DOCKER.md)
 - [Vite 配置参考](https://vite.dev/config/)
+
+## Docker 部署
+
+### 快速启动
+
+```bash
+# 构建镜像
+docker build -t career-planning-frontend .
+
+# 运行容器（需与 backend 在同一 Docker 网络中）
+docker run -d -p 8081:80 --name frontend career-planning-frontend
+
+# 浏览器访问 http://localhost:8081
+```
+
+### 使用 Docker Compose
+
+推荐使用根目录 `docker-compose.yml` 一键启动前后端所有服务：
+
+```bash
+# 在项目根目录执行
+docker compose up -d --build frontend
+```
+
+Nginx 已配置 API 代理，`/api/*` 请求自动转发到后端服务。
+
+> 详细说明请参考 [Docker 部署指南](docs/DOCKER.md)
 
 ## License
 

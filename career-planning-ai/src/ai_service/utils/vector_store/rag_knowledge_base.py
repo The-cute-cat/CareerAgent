@@ -17,11 +17,11 @@ from config import settings
 # =========================
 
 ALLOWED_CATEGORIES = {
-    "job_jd",          # 原始岗位JD
-    "job_profile",     # 标准岗位画像
-    "learning_path",   # 学习路径
-    "resume",          # 简历/学生画像
-    "general",         # 其他通用知识
+    "job_jd",  # 原始岗位JD
+    "job_profile",  # 标准岗位画像
+    "learning_path",  # 学习路径
+    "resume",  # 简历/学生画像
+    "general",  # 其他通用知识
 }
 
 DEFAULT_EMBED_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
@@ -106,9 +106,9 @@ def read_file(file_path: str) -> str:
 # =========================
 
 def split_text(
-    text: str,
-    chunk_size: int = 500,
-    chunk_overlap: int = 100
+        text: str,
+        chunk_size: int = 500,
+        chunk_overlap: int = 100
 ) -> List[str]:
     """
     简单字符分块
@@ -154,20 +154,21 @@ class RAGKnowledgeBase:
     """
 
     def __init__(
-        self,
-        local_host: str = None,
-        local_port: int = 19530,
-        cloud_url: str = None,
-        cloud_token: str = None,
-        db_name: str = "default",
-        collection_name: str = "career_rag_kb",
-        embedding_model_name: str = DEFAULT_EMBED_MODEL,
+            self,
+            local_host: str = None,
+            local_port: int = 19530,
+            cloud_url: str = None,
+            cloud_token: str = None,
+            db_name: str = "default",
+            collection_name: str = "career_rag_kb",
+            embedding_model_name: str = DEFAULT_EMBED_MODEL,
     ):
         # 从配置文件读取默认值
         self.local_host = local_host or settings.milvus.local.host
         self.local_port = local_port or settings.milvus.local.port
         self.cloud_url = cloud_url or settings.milvus.cloud.url
-        self.cloud_token = cloud_token or (settings.milvus.cloud.token.get_secret_value() if settings.milvus.cloud.token else None)
+        self.cloud_token = cloud_token or (
+            settings.milvus.cloud.token.get_secret_value() if settings.milvus.cloud.token else None)
         self.db_name = db_name
         self.collection_name = collection_name
         self.is_available = True
@@ -197,10 +198,7 @@ class RAGKnowledgeBase:
         - force_local=true: 强制使用本地配置，不进行故障转移
         - force_local=false: 自动选择（优先本地，失败后尝试云端）
         """
-        use_cloud = (
-            self.cloud_url not in ("", "<url>", None)
-            and self.cloud_token not in ("", "<token>", None)
-        )
+        use_cloud = settings.milvus.cloud.is_can_use
         force_local = getattr(settings.milvus, 'force_local', False)
 
         if force_local:
@@ -337,15 +335,15 @@ class RAGKnowledgeBase:
 
     # ---------- 通用单条文本入库 ----------
     def add_text(
-        self,
-        category: str,
-        text: str,
-        title: str,
-        source: str = "",
-        metadata: Optional[Dict[str, Any]] = None,
-        doc_id: Optional[str] = None,
-        chunk_size: int = 500,
-        chunk_overlap: int = 100,
+            self,
+            category: str,
+            text: str,
+            title: str,
+            source: str = "",
+            metadata: Optional[Dict[str, Any]] = None,
+            doc_id: Optional[str] = None,
+            chunk_size: int = 500,
+            chunk_overlap: int = 100,
     ) -> Dict[str, Any]:
         if not self.is_available:
             return {"success": False, "message": "知识库服务暂不可用，请稍后重试", "doc_id": doc_id}
@@ -391,14 +389,14 @@ class RAGKnowledgeBase:
 
     # ---------- PDF 入库：按页 + 分块 ----------
     def add_pdf(
-        self,
-        category: str,
-        file_path: str,
-        title: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-        doc_id: Optional[str] = None,
-        chunk_size: int = 500,
-        chunk_overlap: int = 100,
+            self,
+            category: str,
+            file_path: str,
+            title: Optional[str] = None,
+            metadata: Optional[Dict[str, Any]] = None,
+            doc_id: Optional[str] = None,
+            chunk_size: int = 500,
+            chunk_overlap: int = 100,
     ) -> Dict[str, Any]:
         if not self.is_available:
             return {"success": False, "message": "知识库服务暂不可用，请稍后重试", "doc_id": doc_id}
@@ -471,14 +469,14 @@ class RAGKnowledgeBase:
 
     # ---------- 通用文件入库 ----------
     def add_file(
-        self,
-        category: str,
-        file_path: str,
-        title: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-        doc_id: Optional[str] = None,
-        chunk_size: int = 500,
-        chunk_overlap: int = 100,
+            self,
+            category: str,
+            file_path: str,
+            title: Optional[str] = None,
+            metadata: Optional[Dict[str, Any]] = None,
+            doc_id: Optional[str] = None,
+            chunk_size: int = 500,
+            chunk_overlap: int = 100,
     ) -> Dict[str, Any]:
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"文件不存在: {file_path}")
@@ -517,12 +515,12 @@ class RAGKnowledgeBase:
 
     # ---------- 批量文件入库 ----------
     def add_files(
-        self,
-        category: str,
-        file_paths: List[str],
-        common_metadata: Optional[Dict[str, Any]] = None,
-        chunk_size: int = 500,
-        chunk_overlap: int = 100,
+            self,
+            category: str,
+            file_paths: List[str],
+            common_metadata: Optional[Dict[str, Any]] = None,
+            chunk_size: int = 500,
+            chunk_overlap: int = 100,
     ) -> List[Dict[str, Any]]:
         results = []
         for fp in file_paths:
@@ -545,15 +543,15 @@ class RAGKnowledgeBase:
 
     # ---------- 结构化 JSON 入库 ----------
     def add_structured_records(
-        self,
-        category: str,
-        records: List[Dict[str, Any]],
-        title_field: str = "title",
-        content_fields: Optional[List[str]] = None,
-        metadata_fields: Optional[List[str]] = None,
-        id_field: Optional[str] = None,
-        chunk_size: int = 500,
-        chunk_overlap: int = 100,
+            self,
+            category: str,
+            records: List[Dict[str, Any]],
+            title_field: str = "title",
+            content_fields: Optional[List[str]] = None,
+            metadata_fields: Optional[List[str]] = None,
+            id_field: Optional[str] = None,
+            chunk_size: int = 500,
+            chunk_overlap: int = 100,
     ) -> List[Dict[str, Any]]:
         self._check_category(category)
         results = []
@@ -602,12 +600,12 @@ class RAGKnowledgeBase:
 
     # ---------- 检索 ----------
     def search(
-        self,
-        query: str,
-        category: Optional[str] = None,
-        top_k: int = 5,
-        filters: Optional[Dict[str, Any]] = None,
-        output_fields: Optional[List[str]] = None,
+            self,
+            query: str,
+            category: Optional[str] = None,
+            top_k: int = 5,
+            filters: Optional[Dict[str, Any]] = None,
+            output_fields: Optional[List[str]] = None,
     ) -> List[Dict[str, Any]]:
         if not self.is_available:
             return [{"error": "知识库服务暂不可用，请稍后重试"}]
@@ -657,10 +655,10 @@ class RAGKnowledgeBase:
 
     # ---------- 全局检索 ----------
     def search_global(
-        self,
-        query: str,
-        top_k: int = 8,
-        filters: Optional[Dict[str, Any]] = None,
+            self,
+            query: str,
+            top_k: int = 8,
+            filters: Optional[Dict[str, Any]] = None,
     ) -> List[Dict[str, Any]]:
         return self.search(
             query=query,
@@ -696,9 +694,9 @@ class RAGKnowledgeBase:
 
     # ---------- 查询某文档 ----------
     def query_by_doc_id(
-        self,
-        doc_id: str,
-        limit: int = 1000,
+            self,
+            doc_id: str,
+            limit: int = 1000,
     ) -> List[Dict[str, Any]]:
         result = self.client.query(
             collection_name=self.collection_name,
@@ -853,10 +851,10 @@ class CareerKnowledgeService:
 
     # ---- 6) 存某类资料文件 ----
     def add_category_files(
-        self,
-        category: str,
-        file_paths: List[str],
-        common_metadata: Optional[Dict[str, Any]] = None,
+            self,
+            category: str,
+            file_paths: List[str],
+            common_metadata: Optional[Dict[str, Any]] = None,
     ) -> List[Dict[str, Any]]:
         return self.kb.add_files(
             category=category,
@@ -891,7 +889,7 @@ class CareerKnowledgeService:
 def demo():
     kb = RAGKnowledgeBase(
         uri="http://localhost:19530",
-        token=None,                  # 若有用户名密码可填: "root:Milvus"
+        token=None,  # 若有用户名密码可填: "root:Milvus"
         db_name="default",
         collection_name="career_rag_kb",
     )

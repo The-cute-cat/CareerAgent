@@ -2,10 +2,6 @@
 
 > **职引未来** —— 基于 AI 的全方位职业发展规划平台，为大学生提供智能对话、人岗匹配、职业路径规划、能力评估等一站式职业发展服务。
 
-## 项目预览
-
-![CareerAgent 封面]
-
 ## 项目架构
 
 ```
@@ -13,6 +9,9 @@ CareerAgent/
 ├── career-planning-ai/          # AI 服务 (Python / FastAPI)
 ├── career-planning-backend/     # 业务后端 (Java / Spring Boot)
 ├── career-planning-frontend/    # 前端应用 (Vue 3 / TypeScript)
+├── docker-compose.yml           # Docker Compose 编排（一键启动全部服务）
+├── .env.example                 # 后端环境变量模板
+├── .dockerignore                # Docker 构建排除规则
 └── docs/                        # 项目文档
 ```
 
@@ -113,19 +112,58 @@ CareerAgent/
 
 ### 环境要求
 
-| 环境 | 版本要求 |
-|------|----------|
-| Java | 21+ |
-| Python | 3.12+ |
-| Node.js | 18+ |
-| MySQL | 8.0+ |
-| Redis | 6.0+ |
-| Neo4j | 5.0+ (可选) |
-| Milvus | 可选，向量检索 |
+| 环境 | 本地开发 | Docker 部署 |
+|------|----------|------------|
+| Java | 21+ | 由镜像提供 |
+| Python | 3.12+ | 由镜像提供 |
+| Node.js | 18+ | 由镜像提供 |
+| MySQL | 8.0+ | 容器自动启动 |
+| Redis | 6.0+ | 容器自动启动 |
+| Neo4j | 5.0+ (可选) | 容器自动启动 |
+| RabbitMQ | 3.x | 容器自动启动 |
+| Milvus | 可选，向量检索 | 云端或自建 |
 
-### 1. AI 服务
+### 方式一：Docker Compose 一键部署（推荐）
 
-#### 方式一：本地运行
+一键启动全部 7 个服务（4 个基础设施 + 3 个应用），无需手动安装依赖：
+
+```bash
+# 1. 克隆项目
+git clone <repo-url>
+cd CareerAgent
+
+# 2. 配置环境变量
+cp .env.example .env                                    # 后端配置（端口、密码等）
+cp career-planning-ai/.env.example career-planning-ai/.env  # AI 服务 API Keys
+# 编辑这两个文件，填入实际密码和 DashScope API Key
+
+# 3. 一键构建并启动（首次约 5-10 分钟，取决于网速）
+docker compose up -d --build
+
+# 4. 查看服务状态
+docker compose ps
+
+# 5. 访问服务
+#   前端:         http://localhost:8081
+#   后端 API:     http://localhost:8080
+#   RabbitMQ管理: http://localhost:15672
+#   Neo4j浏览器:  http://localhost:7474
+
+# 6. 查看日志
+docker compose logs -f backend
+docker compose logs -f ai-service
+
+# 7. 停止所有服务
+docker compose down
+```
+
+> 详细说明请参考 [Docker Compose 编排详解](#docker-compose-编排详解) 及各子项目 Docker 文档。
+
+### 方式二：本地开发
+
+#### 1. AI 服务
+
+##### 方式一：本地运行
 
 ```bash
 cd career-planning-ai
@@ -142,7 +180,7 @@ poetry run python main.py
 # 服务运行在 http://localhost:9000
 ```
 
-#### 方式二：Docker 部署
+##### 方式二：Docker 单独部署
 
 ```bash
 cd career-planning-ai
@@ -168,7 +206,7 @@ docker logs -f career-ai
 
 > Docker 部署详情请参考 [career-planning-ai/docs/docker.md](career-planning-ai/docs/docker.md)
 
-### 2. 业务后端
+#### 2. 业务后端
 
 ```bash
 cd career-planning-backend
@@ -181,7 +219,7 @@ mvn spring-boot:run -Dspring-boot.run.profiles=dev
 # 服务运行在 http://localhost:8080
 ```
 
-### 3. 前端应用
+#### 3. 前端应用
 
 ```bash
 cd career-planning-frontend
@@ -223,6 +261,7 @@ career-planning-ai/
 career-planning-backend/
 ├── pom.xml                   # Maven 依赖配置
 ├── README.md                 # 后端文档
+├── Dockerfile                # Docker 构建文件
 ├── docs/                     # 后端相关文档
 └── src/main/
     ├── java/com/backend/careerplanningbackend/
@@ -236,7 +275,8 @@ career-planning-backend/
     └── resources/
         ├── application.yaml          # 主配置
         ├── application-dev.yaml      # 开发环境
-        └── application-prod.yaml     # 生产环境
+        ├── application-prod.yaml     # 生产环境
+        └── application-docker.yaml   # Docker 环境（主机地址用服务名）
 ```
 
 ### 前端应用
@@ -245,6 +285,8 @@ career-planning-backend/
 career-planning-frontend/
 ├── package.json              # npm 依赖配置
 ├── vite.config.ts            # Vite 配置
+├── Dockerfile                # 多阶段构建 (Node → Nginx)
+├── nginx.conf                # Nginx 配置（API代理/SSE/缓存）
 ├── README.md                 # 前端文档
 ├── docs/                     # 前端相关文档
 └── src/
@@ -319,6 +361,86 @@ proxy: {
 
 > 详细配置说明请参考 [docs/CONFIGURATION.md](docs/CONFIGURATION.md)
 
+## Docker Compose 编排详解
+
+### 服务清单
+
+| 服务 | 镜像/构建 | 端口 | 说明 |
+|------|-----------|------|------|
+| mysql | mysql:8.0 | 3306 | 关系数据库 |
+| redis | redis:7-alpine | 6379 | 缓存 |
+| neo4j | neo4j:5-community | 7474/7687 | 知识图谱 (含 APOC 插件) |
+| rabbitmq | rabbitmq:3-management-alpine | 5672/15672 | 消息队列 (含管理界面) |
+| ai-service | Dockerfile 构建 | 9000 (内部) | AI 服务 (Python/FastAPI) |
+| backend | Dockerfile 构建 | 8080 | 业务后端 (Spring Boot) |
+| frontend | Dockerfile 构建 | 8081→80 | 前端应用 (Vue/Nginx) |
+
+### 环境变量
+
+| 文件 | 用途 | 必填项 |
+|------|------|--------|
+| `.env` | 后端 Spring Boot + 基础设施密码 | 密码、OSS Key、JWT Secret |
+| `career-planning-ai/.env` | AI 服务 Pydantic Settings | **DashScope API Key** (必填) |
+
+### 网络与服务发现
+
+所有服务通过 `career-network` bridge 网络互联，容器间使用**服务名**作为主机名通信：
+
+```
+backend → mysql:3306      # 数据库
+backend → redis:6379      # 缓存
+backend → rabbitmq:5672   # 消息队列
+backend → ai-service:9000 # AI 服务
+ai-service → redis:6379  # 缓存
+ai-service → neo4j:7687  # 知识图谱
+frontend → backend:8080  # API 反向代理
+```
+
+### 数据持久化
+
+所有数据库数据通过命名卷持久化，`docker compose down` 不会丢失数据：
+
+| 卷名 | 用途 |
+|------|------|
+| `career-mysql-data` | MySQL 数据文件 |
+| `career-redis-data` | Redis 快照 |
+| `career-neo4j-data` | Neo4j 图数据 |
+| `career-rabbitmq-data` | RabbitMQ 队列消息 |
+| `career-ai-data` | AI 服务向量库/模型缓存 |
+| `career-ai-logs` | AI 服务日志 |
+
+### 常用运维命令
+
+```bash
+# 查看日志
+docker compose logs -f                    # 全部服务
+docker compose logs -f backend            # 仅后端
+docker compose logs -f ai-service --tail 100  # 最近 100 行
+
+# 重启单个服务
+docker compose restart backend
+
+# 重新构建并重启
+docker compose up -d --build backend
+
+# 进入容器调试
+docker compose exec backend sh
+docker compose exec ai-service bash
+
+# 查看资源占用
+docker stats --no-stream
+
+# 清理（保留数据卷）
+docker compose down
+
+# 清理（删除数据卷，慎用！）
+docker compose down -v
+
+# 完全重建（清除镜像+缓存）
+docker compose down -v --rmi all
+docker builder prune -f
+```
+
 ## 文档
 
 | 文档 | 说明 |
@@ -328,8 +450,11 @@ proxy: {
 | [docs/CONFIGURATION.md](docs/CONFIGURATION.md) | 配置详解 |
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | 部署指南 |
 | [career-planning-ai/docs/docker.md](career-planning-ai/docs/docker.md) | AI 服务 Docker 部署指南 |
+| [career-planning-backend/docs/docker.md](career-planning-backend/docs/docker.md) | 后端 Docker 部署指南 |
+| [career-planning-frontend/docs/DOCKER.md](career-planning-frontend/docs/DOCKER.md) | 前端 Docker 部署指南 |
 | [career-planning-backend/README.md](career-planning-backend/README.md) | 后端详细文档 |
 | [career-planning-frontend/README.md](career-planning-frontend/README.md) | 前端详细文档 |
+| [career-planning-ai/README.md](career-planning-ai/README.md) | AI 服务详细文档 |
 
 ## 贡献指南
 

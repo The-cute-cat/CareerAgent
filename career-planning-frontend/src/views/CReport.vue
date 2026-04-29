@@ -2293,7 +2293,6 @@ async function runCompletenessCheck() {
   } finally {
     checkingWithAi.value = false
   }
-  */
 }
 
 const reportRef = ref<HTMLElement | null>(null)

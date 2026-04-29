@@ -264,11 +264,25 @@ class _Milvus(BaseModel):
 
     class _Local(BaseModel):
         host: str = ""
-        port: int = 19530
+        port: int = 0
+
+        @model_validator(mode="after")
+        def _check(self):
+            if self.host in ("", "<HOST>", "<host>", None) or self.port <= 0:
+                raise ValueError(f"请在 .env 文件中配置正确的 Milvus 配置")
+            return self
 
     class _Cloud(BaseModel):
+        is_can_use: bool = True # Milvus 云服务是否可以使用
         url: str = ""
         token: SecretStr = SecretStr("")
+
+        @model_validator(mode="after")
+        def _check(self):
+            if self.is_can_use and (self.url in ("", "<URL>", "<url>", None) or self.token.get_secret_value() in ("", "<TOKEN>", "<token>", None)):
+                self.is_can_use = False
+                print("⚠️注意：Milvus 云服务未配置，当本地 Milvus 服务不可用后，无法使用向量搜索功能")
+            return self
 
     local: _Local = Field(default_factory=_Local)
     cloud: _Cloud = Field(default_factory=_Cloud)

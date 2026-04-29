@@ -130,11 +130,14 @@ mvn spring-boot:run -Dspring-boot.run.profiles=dev
 ### 多环境运行
 
 ```bash
-# 开发环境
+# 开发环境（本地数据库）
 mvn spring-boot:run -Dspring-boot.run.profiles=dev
 
-# 生产环境
+# 生产环境（远程服务器/云数据库）
 mvn spring-boot:run -Dspring-boot.run.profiles=prod
+
+# Docker 环境（使用 docker-compose 启动时自动激活，主机地址为 Docker 服务名）
+mvn spring-boot:run -Dspring-boot.run.profiles=docker
 
 # 打包
 mvn clean package -DskipTests
@@ -142,6 +145,11 @@ mvn clean package -DskipTests
 # 运行 JAR
 java -jar target/career-planning-backend-*.jar --spring.profiles.active=prod
 ```
+
+> **Profile 说明**：
+> - `dev` — 本地开发，连接本地 MySQL/Redis/RabbitMQ
+> - `prod` — 生产部署，连接远程服务器（配置硬编码在 `application-prod.yaml`）
+> - `docker` — 容器化部署，所有主机地址替换为 Docker 服务名（mysql、redis、rabbitmq、ai-service），密码从 `.env` 环境变量读取
 
 ### API 文档
 
@@ -175,6 +183,27 @@ Body: { "message": "你好", "userId": "xxx" }
 - [后端技术文档](docs/BACKEND_DOC.md)
 - [API 接口文档](../docs/AI_SERVICE_API.md)
 - [项目配置详解](../docs/CONFIGURATION.md)
+- [Docker 部署指南](docs/docker.md)
+
+## Docker 部署
+
+项目支持 Docker 容器化部署，详细指南请查看 [Docker 部署指南](docs/docker.md)。
+
+### 快速部署
+
+```bash
+# 构建镜像
+docker build -t career-planning-backend .
+
+# 运行容器
+docker run -d -p 8080:8080 --name career-backend career-planning-backend
+```
+
+### 使用 Docker Compose
+
+```bash
+docker-compose up -d
+```
 
 ## 端口
 

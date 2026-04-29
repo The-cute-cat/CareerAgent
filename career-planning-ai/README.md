@@ -404,6 +404,20 @@ python -m uvicorn main:app --host 0.0.0.0 --port 9000 --reload
 
 详细文档请参考 [Docker 部署指南](docs/docker.md)。
 
+#### 方式 A：Docker Compose（推荐）
+
+使用根目录 `docker-compose.yml` 一键启动，AI 服务会自动连接同网络中的 Redis 和 Neo4j：
+
+```bash
+# 在项目根目录执行
+cd ..
+docker compose up -d --build ai-service
+```
+
+环境变量覆盖规则：`docker-compose.yml` 中的 `environment` 会覆盖 `.env` 中的 Redis/Neo4j 主机地址为 Docker 服务名，API Key 等敏感配置仍从 `career-planning-ai/.env` 读取。
+
+#### 方式 B：单独运行容器
+
 **快速开始：**
 
 ```bash
