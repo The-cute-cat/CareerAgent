@@ -1,0 +1,45 @@
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# 测试
+tests/
+*.test
+coverage/
+
+# 文档
+docs/
+*.md
+!README.md
+
+# 临时文件
+*.log
+*.tmp
+temp/
+logs/
+
+# 其他
+.DS_Store
+Thumbs.db
+
+# 依赖
+node_modules/
+
+# 构建输出
+dist/
+
+# Docker
+Dockerfile
+.dockerignore
+
+# 本地配置和环境文件
+.env
+.env.*

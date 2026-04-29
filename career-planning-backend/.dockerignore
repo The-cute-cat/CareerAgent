@@ -1,0 +1,51 @@
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# 测试
+tests/
+*.test
+
+# 文档
+docs/
+*.md
+!README.md
+
+# 临时文件
+*.log
+*.tmp
+temp/
+logs/
+
+
+# 其他
+.DS_Store
+Thumbs.db
+
+# 构建输出
+target/
+out/
+build/
+
+# Maven Wrapper
+mvnw
+mvnw.cmd
+.mvn/
+
+# Docker
+Dockerfile
+.dockerignore
+
+# 本地配置和环境文件
+.env
+.env.*
+src/main/resources/application-local*
+src/main/resources/application-dev*

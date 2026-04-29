@@ -1,0 +1,197 @@
+# Docker Compose 配置文件（待验证，不建议使用）
+services:
+  # ==================== 基础设施 ====================
+  mysql:
+    image: mysql:8.0
+    container_name: career-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-CareerAgent_root_2025}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-career_backend}
+      MYSQL_USER: ${MYSQL_USER:-career}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-career_dev_2025}
+      TZ: Asia/Shanghai
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --max_connections=200
+      - --innodb_buffer_pool_size=256M
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-CareerAgent_root_2025}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - career-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: career-redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD:-redis_dev_2025}
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redis_dev_2025}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - career-network
+
+  neo4j:
+    image: neo4j:5-community
+    container_name: career-neo4j
+    restart: unless-stopped
+    environment:
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:-neo4j_dev_2025}
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_server_memory_heap_initial__size: "256M"
+      NEO4J_server_memory_heap_max__size: "512M"
+      NEO4J_server_memory_pagecache_size: "128M"
+      TZ: Asia/Shanghai
+    ports:
+      - "${NEO4J_PORT:-7474}:7474"   # HTTP
+      - "${NEO4J_BOLT_PORT:-7687}:7687"  # Bolt
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+    healthcheck:
+      test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "${NEO4J_PASSWORD:-neo4j_dev_2025}", "RETURN 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    networks:
+      - career-network
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: career-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-admin}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-mq_dev_2025}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST:-/user-career-agent}
+    ports:
+      - "${RABBITMQ_AMQP_PORT:-5672}:5672"   # AMQP
+      - "${RABBITMQ_MGMT_PORT:-15672}:15672"  # 管理界面
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+    networks:
+      - career-network
+
+  # ==================== 应用服务 ====================
+  ai-service:
+    build:
+      context: ./career-planning-ai
+      dockerfile: Dockerfile
+    container_name: career-ai-service
+    restart: unless-stopped
+    env_file:
+      - ./career-planning-ai/.env
+    environment:
+      # 覆盖 .env 中的主机地址为 Docker 服务名（Pydantic Settings 双下划线格式）
+      REDIS__HOST: redis
+      REDIS__PORT: "6379"
+      DATABASE__HOST: mysql
+      DATABASE__PORT: "3306"
+      NEO4J__URL: bolt://neo4j:7687
+      NEO4J__USERNAME: neo4j
+      NEO4J__PASSWORD: ${NEO4J_PASSWORD:-neo4j_dev_2025}
+      # 容器内路径（覆盖 config.yaml 中的 <PLACEHOLDER>）
+      PATH_CONFIG__TEMP__PATH: /app/data/temp
+      PATH_CONFIG__LOG__PATH: /app/logs
+    depends_on:
+      redis:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+    volumes:
+      - ai_data:/app/data
+      - ai_logs:/app/logs
+    expose:
+      - 9000
+    networks:
+      - career-network
+
+  backend:
+    build:
+      context: ./career-planning-backend
+      dockerfile: Dockerfile
+    container_name: career-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      JAVA_OPTS: >-
+        -XX:+UseContainerSupport
+        -XX:MaxRAMPercentage=75.0
+        -Djava.security.egd=file:/dev/./urandom
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      ai-service:
+        condition: service_started
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    networks:
+      - career-network
+
+  frontend:
+    build:
+      context: ./career-planning-frontend
+      dockerfile: Dockerfile
+    container_name: career-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_started
+    ports:
+      - "${FRONTEND_PORT:-8081}:80"
+    networks:
+      - career-network
+
+# ==================== 网络 ====================
+networks:
+  career-network:
+    driver: bridge
+    name: career-network
+
+# ==================== 数据卷 ====================
+volumes:
+  mysql_data:
+    name: career-mysql-data
+  redis_data:
+    name: career-redis-data
+  neo4j_data:
+    name: career-neo4j-data
+  neo4j_logs:
+    name: career-neo4j-logs
+  rabbitmq_data:
+    name: career-rabbitmq-data
+  ai_data:
+    name: career-ai-data
+  ai_logs:
+    name: career-ai-logs
