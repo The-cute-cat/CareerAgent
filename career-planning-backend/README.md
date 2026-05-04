@@ -9,30 +9,43 @@
 | 框架 | Spring Boot | 3.5.9 |
 | 语言 | Java | 21 |
 | ORM | MyBatis-Plus | 3.5.15 |
-| 数据库 | MySQL | 8.0+ |
-| 缓存 | Redis | 6.0+ |
-| 消息队列 | RabbitMQ | - |
-| 认证 | JWT (jjwt) | - |
-| 文件存储 | 阿里云 OSS | - |
-| 支付 | 支付宝 SDK | - |
-| 文档生成 | POI-tl / OpenHTMLToPDF | - |
-| 工具库 | Hutool / Lombok | - |
+| 数据库 | MySQL Connector/J | 9.6.0 |
+| 缓存 | Spring Data Redis / Jedis | - |
+| 消息队列 | RabbitMQ (Spring AMQP) | 3.x |
+| 认证 | JWT (jjwt) | 0.13.0 |
+| 密码加密 | BCrypt (jbcrypt) | 0.4 |
+| 文件存储 | 阿里云 OSS SDK | 3.18.5 |
+| 支付 | 支付宝 SDK | 4.28.ALL |
+| 文档导出 | POI-tl / OpenHTMLToPDF | 1.12.2 / 1.0.10 |
+| 模板引擎 | Thymeleaf | - |
+| HTTP 客户端 | RestTemplate + WebClient | 调用 AI Service |
+| 工具库 | Hutool / Lombok | 5.8.40 |
+| 日志 | Logback + Logstash Encoder | 7.4 |
 
 ## 主要功能
 
 | 模块 | 功能 | 接口示例 |
 |------|------|----------|
-| **用户认证** | 登录/注册/验证码/忘记密码 | `/user/login`, `/user/register` |
-| **AI 聊天** | 智能对话、SSE 流式输出 | `/chat/message`, `/chat/stream/*` |
-| **简历管理** | 简历上传/解析/编辑/导出 | `/resume/*`, `/file/upload` |
-| **人岗匹配** | 简历与职位智能匹配 | `/matching/*` |
-| **职业路径** | 知识图谱路径规划 | `/graph_path/*` |
-| **成长报告** | 报告生成与编辑 | `/report/*` |
-| **代码评估** | GitHub/Gitee 代码分析 | `/code-ability/*` |
-| **支付订阅** | 支付宝支付集成 | `/pay/*` |
-| **积分系统** | 积分获取与消费 | `/points/*` |
-| **知识库** | 职位知识管理 | `/knowledge/*` |
-| **面试管理** | 面试记录与提醒 | `/interview/*` |
+| **用户认证** | 登录/注册/邮箱验证码/忘记密码 (JWT) | `/user/login`, `/user/register` |
+| **AI 聊天** | 多轮对话、SSE 流式转发、会话管理 | `/chat/message`, `/chat/stream/*` |
+| **文件解析** | PDF/DOCX/图片上传与解析 | `/file/upload` |
+| **简历管理** | JSON Resume 标准、编辑器、Word/PDF 导出 | `/resume/*` |
+| **人岗匹配** | 基于向量检索 + LLM 的深度匹配 | `/matching/*` |
+| **职业路径** | 知识图谱晋升/换岗/跨界路径规划 | `/graph_path/*` |
+| **成长报告** | AI 生成计划、完整性检查、润色、编辑 | `/report/*` |
+| **代码评估** | GitHub/Gitee 仓库质量分析与评分 | `/code-ability/*` |
+| **测试题** | 技能相关题目生成与答案评估 | `/question/*` |
+| **知识导师** | 知识点讲解与岗位影响分析 | `/knowledge_tutor/*` |
+| **支付订阅** | 支付宝沙箱/正式环境切换 | `/pay/*` |
+| **积分系统** | 积分消费确认、充值、会员变更 | `/points/*` |
+| **会员套餐** | 套餐配置查询与管理 | `/member/*`, `/package/*` |
+| **交易记录** | 用户交易流水查询 | `/transaction/*` |
+| **数据转换** | 用户表单标准化格式转换 | `/convert/*` |
+| **知识图谱** | 图谱关系查询与可视化 | `/knowledge-graph/*` |
+| **全文搜索** | 全文检索服务 | `/search/*` |
+| **用户反馈** | 反馈提交与管理 | `/feedback/*` |
+| **面试管理** | AI 面试记录、日历、报告查看 | `/interview/*` |
+| **管理后台** | 反馈处理、用量统计 | `/admin/*` |
 
 ## 项目结构
 
@@ -44,19 +57,31 @@ src/main/java/com/backend/careerplanningbackend/
 │   ├── InterceptorConfig.java              # 拦截器配置
 │   ├── AIConfig.java                       # AI 服务配置
 │   ├── AlipayConfig.java                   # 支付宝配置
-│   └── SwaggerConfig.java                   # API 文档配置
-├── controller/                             # 控制器层 (18个)
+│   └── MailConfig.java                     # 邮件服务配置
+├── controller/                             # 控制器层 (18 个)
 │   ├── UserController.java                 # 用户认证
-│   ├── ChatController.java                  # AI 聊天
+│   ├── ChatController.java                  # AI 聊天 (SSE 流式)
 │   ├── ResumeController.java                # 简历管理
+│   ├── ResumeExportController.java          # 简历导出 (Word/PDF)
 │   ├── ReportController.java                # 报告管理
-│   ├── PaymentController.java               # 支付
-│   └── ...
-├── service/                                # 业务逻辑层
+│   ├── MatchJobController.java              # 人岗匹配
+│   ├── QuestionController.java              # 测试题管理
+│   ├── PayController.java                   # 支付宝支付
+│   ├── PointsReferController.java           # 积分系统
+│   ├── MemberController.java                # 会员管理
+│   ├── PackageController.java               # 套餐配置
+│   ├── TransactionController.java           # 交易记录
+│   ├── FeedbackController.java              # 用户反馈
+│   ├── CodeAbilityController.java           # 代码能力评估
+│   ├── ConvertController.java               # 数据转换
+│   ├── KnowledgeGraphController.java        # 知识图谱查询
+│   ├── SearchController.java                # 全文搜索
+│   └── AdminController.java                 # 管理后台
+├── service/                                # 业务逻辑层 (接口 + 实现)
 │   ├── UserService.java
 │   ├── ChatService.java
 │   └── ...
-├── mapper/                                 # MyBatis Mapper (14个)
+├── mapper/                                 # MyBatis Mapper (14 个)
 │   ├── UserMapper.java
 │   └── ...
 ├── domain/                                 # 域对象
@@ -67,9 +92,11 @@ src/main/java/com/backend/careerplanningbackend/
 │   ├── JwtUtil.java                        # JWT 工具
 │   ├── AliOSSUtil.java                     # OSS 上传
 │   ├── AIHttpClient.java                   # AI 服务调用
+│   ├── RedisUtil.java                      # Redis 缓存
 │   └── ...
-└── http/                                   # HTTP 客户端
-    └── AIClient.java                       # Python AI 服务客户端
+├── http/                                   # HTTP 客户端
+│   └── AIClient.java                       # Python AI 服务客户端
+└── listeners/                              # MQ 消息监听器
 ```
 
 ## 数据库配置
@@ -110,6 +137,7 @@ spring:
 - Maven 3.8+
 - MySQL 8.0+
 - Redis 6.0+
+- RabbitMQ 3.x (消息队列)
 
 ### 快速启动
 
