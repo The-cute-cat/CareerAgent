@@ -26,6 +26,25 @@ git clone <repository_url>
 cd CareerAgent/career-planning-ai
 ```
 
+### 1.5. 拉取 Git LFS 大文件数据（**必须！**）
+
+> **本项目使用 Git LFS 管理大体积初始化数据文件。**
+> `git clone` 后这些文件仅为指针（几 KB），**必须手动拉取实际内容**，否则种子数据导入会失败。
+
+```bash
+# 在项目根目录 CareerAgent/ 下执行
+git lfs install   # 首次使用需初始化 LFS（如已配置可跳过）
+git lfs pull       # 拉取所有 LFS 追踪的实际内容
+
+# 包含的数据文件：
+#   - career-planning-ai/data/init/chroma/*_seed.json    (~170MB, ChromaDB 种子)
+#   - career-planning-backend/docs/init/mysql/*.sql        (MySQL 初始化)
+#   - career-planning-ai/data/init/milvus/*_seed.json      (Milvus 种子)
+
+# 验证：确认 JSON 文件大小正常（应数十~百 MB，而非几 KB）
+ls -lh data/init/chroma/*_seed.json
+```
+
 ### 2. 安装依赖
 
 ```bash

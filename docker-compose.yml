@@ -1,4 +1,6 @@
-# Docker Compose 配置文件（待验证，不建议使用）
+# Docker Compose 配置文件
+# 启动: docker compose up -d --build
+# 停止: docker compose down
 services:
   # ==================== 基础设施 ====================
   mysql:
@@ -15,6 +17,7 @@ services:
       - "${MYSQL_PORT:-3306}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
+      - ./career-planning-backend/docs/init/mysql:/docker-entrypoint-initdb.d:ro
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
@@ -67,6 +70,7 @@ services:
     volumes:
       - neo4j_data:/data
       - neo4j_logs:/logs
+      - ./career-planning-ai/data/init/neo4j:/var/lib/neo4j/init-scripts:ro
     healthcheck:
       test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "${NEO4J_PASSWORD:-neo4j_dev_2025}", "RETURN 1"]
       interval: 15s
@@ -97,6 +101,29 @@ services:
     networks:
       - career-network
 
+  milvus:
+    image: milvusdb/milvus:v2.4-latest
+    container_name: career-milvus
+    restart: unless-stopped
+    command: milvus run standalone  # 单机 Standalone 模式（无需 etcd）
+    environment:
+      ETCD_ENDPOINTS: etcd:2379    # 必须设置（standalone 模式内部使用）
+      ETCD_USE_EMBED: "true"        # 使用内嵌 etcd，无需额外容器
+      COMMON_STORAGETYPE: local     # 本地存储模式
+    ports:
+      - "${MILVUS_PORT:-19530}:19530"
+      - "${MILVUS_MANAGEMENT_PORT:-9091}:9091"   # 管理接口
+    volumes:
+      - milvus_data:/var/lib/milvus
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s            # Milvus 首次启动较慢（约 30-60 秒）
+    networks:
+      - career-network
+
   # ==================== 应用服务 ====================
   ai-service:
     build:
@@ -104,30 +131,47 @@ services:
       dockerfile: Dockerfile
     container_name: career-ai-service
     restart: unless-stopped
-    env_file:
-      - ./career-planning-ai/.env
     environment:
-      # 覆盖 .env 中的主机地址为 Docker 服务名（Pydantic Settings 双下划线格式）
-      REDIS__HOST: redis
-      REDIS__PORT: "6379"
       DATABASE__HOST: mysql
       DATABASE__PORT: "3306"
+      DATABASE__USER: ${MYSQL_USER:-career}
+      DATABASE__PASSWORD: ${MYSQL_PASSWORD:-career_dev_2025}
+      REDIS__HOST: redis
+      REDIS__PORT: "6379"
+      REDIS__USERNAME: default
+      REDIS__PASSWORD: ${REDIS_PASSWORD:-redis_dev_2025}
       NEO4J__URL: bolt://neo4j:7687
       NEO4J__USERNAME: neo4j
       NEO4J__PASSWORD: ${NEO4J_PASSWORD:-neo4j_dev_2025}
-      # 容器内路径（覆盖 config.yaml 中的 <PLACEHOLDER>）
-      PATH_CONFIG__TEMP__PATH: /app/data/temp
-      PATH_CONFIG__LOG__PATH: /app/logs
+      COMMUNICATION__TOKEN__SECRET: ${COMMUNICATION_TOKEN_SECRET:-CareerAgent}
+      # Milvus 向量数据库（Docker 内部使用服务名）
+      MILVUS__LOCAL__HOST: milvus
+      MILVUS__LOCAL__PORT: "19530"
+      # Milvus 种子初始化脚本所需的环境变量（兼容 init_milvus_seed.py）
+      MILVUS_HOST: milvus
+      MILVUS_PORT: "19530"
+      SEED_DATA_DIR: ${SEED_DATA_DIR:-/app/data/init}  # 初始化数据目录
     depends_on:
+      mysql:
+        condition: service_healthy
       redis:
         condition: service_healthy
       neo4j:
         condition: service_healthy
+      milvus:
+        condition: service_healthy
     volumes:
-      - ai_data:/app/data
-      - ai_logs:/app/logs
+      - ai_data:${PATH_CONFIG__TEMP__PATH:-/app/data}
+      - ai_logs:${PATH_CONFIG__LOG:-/app/logs}
+      - ./career-planning-ai/data/init:/app/data/init:ro
     expose:
-      - 9000
+      - ${AI_SERVICE_PORT:-9000}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/docs"]
+      interval: 15s
+      timeout: 10s
+      retries: 30
+      start_period: 600s           # AI 服务依赖多，首次启动可能需要 5~15 分钟安装依赖
     networks:
       - career-network
 
@@ -153,7 +197,7 @@ services:
       rabbitmq:
         condition: service_healthy
       ai-service:
-        condition: service_started
+        condition: service_healthy
     ports:
       - "${BACKEND_PORT:-8080}:8080"
     networks:
@@ -195,3 +239,5 @@ volumes:
     name: career-ai-data
   ai_logs:
     name: career-ai-logs
+  milvus_data:
+    name: career-milvus-data

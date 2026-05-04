@@ -125,14 +125,20 @@ CareerAgent/
 
 ### 方式一：Docker Compose 一键部署（推荐）
 
-一键启动全部 7 个服务（4 个基础设施 + 3 个应用），无需手动安装依赖：
+一键启动全部服务（基础设施 + 应用），无需手动安装依赖：
 
 ```bash
 # 1. 克隆项目
 git clone <repo-url>
 cd CareerAgent
 
-# 2. 配置环境变量
+# 2. ⚠️ 拉取 Git LFS 大文件数据（必须！）
+#    项目中的 ChromaDB/Milvus 种子数据等大文件通过 Git LFS 管理，
+#    clone 后仅为指针文件，需手动拉取实际内容（约 170MB）
+git lfs install   # 首次使用需初始化 LFS（如已配置可跳过）
+git lfs pull       # 拉取所有 LFS 追踪的实际文件内容
+
+# 3. 配置环境变量
 cp .env.example .env                                    # 后端配置（端口、密码等）
 cp career-planning-ai/.env.example career-planning-ai/.env  # AI 服务 API Keys
 # 编辑这两个文件，填入实际密码和 DashScope API Key
@@ -160,6 +166,8 @@ docker compose down
 > 详细说明请参考 [Docker Compose 编排详解](#docker-compose-编排详解) 及各子项目 Docker 文档。
 
 ### 方式二：本地开发
+
+> **⚠️ 首次克隆后请务必执行 `git lfs pull` 拉取种子数据（约 170MB），详见上方 Docker 部署步骤说明。**
 
 #### 1. AI 服务
 

@@ -39,6 +39,7 @@ htmlcov/
 
 # 文档
 docs/
+!docs/init/**
 *.md
 !README.md
 

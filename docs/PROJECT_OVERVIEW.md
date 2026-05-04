@@ -102,6 +102,17 @@ CareerAgent/
 
 ## 配置说明
 
+> **Git LFS 注意事项**
+>
+> 项目中的大文件（ChromaDB/Milvus 种子数据、SQL 初始化脚本）通过 [Git LFS](https://git-lfs.com/) 管理。
+> 克隆仓库后，这些文件默认为指针文件，**必须执行 `git lfs pull`** 才能获取实际内容：
+>
+> ```bash
+> git lfs install && git lfs pull
+> ```
+>
+> 未拉取时，种子数据初始化脚本会因找不到有效数据而跳过导入。
+
 主要配置项位于 `config.yaml`：
 
 | 配置项 | 说明 |

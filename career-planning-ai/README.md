@@ -84,6 +84,23 @@ career-planning-ai/
 
 # 项目启动指南
 
+> **⚠️ Git LFS 数据拉取（必须）**
+>
+> 本项目的初始化数据文件通过 Git LFS 管理，`git clone` 后仅为指针文件，
+> **必须在首次使用前执行 `git lfs pull`** 下载实际内容，否则种子数据导入将失败。
+>
+> ```bash
+> # 在项目根目录执行
+> git lfs install   # 首次需初始化 LFS（如已配置可跳过）
+> git lfs pull       # 拉取 ChromaDB 种子数据 (~170MB) 和 Milvus 种子数据
+>
+> # 验证：确认以下目录中的 JSON 文件大小正常（非几 KB 的指针文件）
+> ls -lh career-planning-ai/data/init/chroma/*_seed.json
+> ls -lh career-planning-backend/docs/init/mysql/career_backend.sql
+> ```
+>
+> Docker 容器内无 `.git` 目录，无法自动执行此操作，请务必在宿主机上提前完成。
+
 ## 一、安装依赖
 
 ### 1. Python 依赖（使用 Poetry）

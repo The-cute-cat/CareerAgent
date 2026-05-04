@@ -10,20 +10,19 @@ spring:
   # 数据源 —— 使用 Docker 服务名替代 IP
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://${DB_HOST:mysql}:${DB_PORT:3306}/${DB_NAME:career_backend}?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
-    username: ${DB_USERNAME:career}
-    password: ${DB_PASSWORD:career_dev_2025}
+    url: jdbc:mysql://mysql:${MYSQL_PORT:3306}/${MYSQL_DATABASE:career_backend}?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: ${MYSQL_USER:career}
+    password: ${MYSQL_PASSWORD:career_dev_2025}
 
   # Redis —— 使用 Docker 服务名
   data:
     redis:
-      host: ${REDIS_HOST:redis}
+      host: redis
       port: 6379
       username: ${REDIS_USERNAME:default}
-      password: ${REDIS_CONN_PASSWORD:${REDIS_PASSWORD:redis_dev_2025}}
+      password: ${REDIS_PASSWORD:redis_dev_2025}
       connect-timeout: 2000
 
-  # RabbitMQ —— 使用 Docker 服务名
   rabbitmq:
     host: rabbitmq
     port: 5672
@@ -39,8 +38,8 @@ spring:
   mail:
     host: ${MAIL_HOST:smtp.qq.com}
     port: ${MAIL_PORT:587}
-    username: ${MAIL_USERNAME_QQ}
-    password: ${MAIL_PASSWORD_QQ}
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
     protocol: smtp
     properties:
       mail:
@@ -92,13 +91,13 @@ mybatis-plus:
 # Token
 communication:
   token:
-    secret: ${SECRET:CareerAgent}
+    secret: ${COMMUNICATION_TOKEN_SECRET:CareerAgent}
     expire: 1800
 
 # AI 服务地址 —— Docker 内部使用服务名
 ai:
   service:
-    base-url: http://ai-service:9000
+    base-url: http://ai-service:${AI_SERVICE_PORT}
     timeout: 300000
     retry:
       max-attempts: 3
@@ -110,9 +109,9 @@ jwt:
 
 # 支付宝
 alipay:
-  app-id: ${ALIPAY_APP_ID:9021000156657096}
+  app-id: ${ALIPAY_APP_ID}
   private-key: ${ALIPAY_PRIVATE_KEY}
   public-key: ${ALIPAY_PUBLIC_KEY}
   gateway: https://openapi-sandbox.dl.alipaydev.com/gateway.do
-  notify-url: http://localhost:8080/api/alipay/toSuccess
-  return-url: http://localhost:8080/api/alipay/toSuccess
+  notify-url: ${ALIPAY_NOTIFY_URL:http://${SERVER_HOST:localhost}:8080/api/alipay/toSuccess}
+  return-url: ${ALIPAY_RETURN_URL:http://${SERVER_HOST:localhost}:8080/api/alipay/toSuccess}
