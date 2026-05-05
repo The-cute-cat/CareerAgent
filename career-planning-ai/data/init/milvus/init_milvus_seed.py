@@ -81,13 +81,16 @@ def import_all_seeds(client):
 
 def wait_for_milvus():
     """等待 Milvus 服务就绪"""
-    from pymilvus import utility
+    from pymilvus import connections, utility
 
     for i in range(1, MAX_RETRIES + 1):
         try:
-            if utility.list_connections():
+            connections.connect(alias="health", host=MILVUS_HOST, port=MILVUS_PORT)
+            if utility.ping(alias="health"):
                 log.info(f"✅ Milvus ({MILVUS_HOST}:{MILVUS_PORT}) 已就绪")
+                connections.disconnect("health")
                 return True
+            connections.disconnect("health")
         except Exception:
             pass
         log.info(f"⏳ 等待 Milvus 就绪... ({i}/{MAX_RETRIES})")

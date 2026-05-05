@@ -156,6 +156,12 @@ npm install --registry=https://registry.npmmirror.com
 
 ## 二、配置环境
 
+> **⚠️ 重要警示：.env 配置冲突**
+>
+> - **使用 Docker Compose 时**：请勿在 `career-planning-ai/.env` 中配置变量，应统一使用根目录 `.env`（AI 服务会通过 `env_file: .env` 加载根目录配置）
+> - **单独运行 AI 服务时**：仅在 `career-planning-ai/.env` 中配置变量
+> - **切勿同时配置**：根目录 `.env` 和 `career-planning-ai/.env` 中的相同变量，否则可能导致配置混乱
+
 项目配置分为两部分：
 - **`.env`**: 存储敏感信息（API Keys、密码、Token等）
 - **`config.yaml`**: 存储非敏感配置（模型名称、超时时间、路径等）
@@ -391,13 +397,13 @@ other:
 
 ```bash
 # 开发模式（带热重载）
-poetry run uvicorn main:app --host 0.0.0.0 --port 9000 --reload
+poetry run uvicorn main:app --host 127.0.0.1 --port 9000 --reload
 
 # 生产模式
-poetry run uvicorn main:app --host 0.0.0.0 --port 9000
+poetry run uvicorn main:app --host 127.0.0.1 --port 9000
 
 # 指定workers数量（生产环境）
-poetry run uvicorn main:app --host 0.0.0.0 --port 9000 --workers 4
+poetry run uvicorn main:app --host 127.0.0.1 --port 9000 --workers 4
 ```
 
 ### 方法2: 直接使用Python
@@ -407,14 +413,14 @@ poetry run uvicorn main:app --host 0.0.0.0 --port 9000 --workers 4
 poetry shell
 
 # 然后启动服务
-python -m uvicorn main:app --host 0.0.0.0 --port 9000 --reload
+python -m uvicorn main:app --host 127.0.0.1 --port 9000 --reload
 ```
 
 ### 方法3: 直接运行（不推荐）
 
 ```bash
 # 不使用Poetry环境
-python -m uvicorn main:app --host 0.0.0.0 --port 9000 --reload
+python -m uvicorn main:app --host 127.0.0.1 --port 9000 --reload
 ```
 
 ### 方法4: Docker 部署

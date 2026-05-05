@@ -12,6 +12,9 @@ CareerAgent/
 ├── docker-compose.yml           # Docker Compose 编排（一键启动全部服务）
 ├── .env.example                 # 后端 + AI 服务环境变量模板（统一配置）
 ├── .dockerignore                # Docker 构建排除规则
+├── scripts/                     # 运维脚本
+│   ├── cleanup-docker.ps1        # Windows: Docker 全量清理 (PowerShell)
+│   └── cleanup-docker.sh         # Linux/macOS: Docker 全量清理 (Bash)
 └── docs/                        # 项目文档
 ```
 
@@ -196,7 +199,7 @@ cp .env.example .env
 # 编辑 .env 填入 API Keys 等敏感配置
 
 # 启动服务
-poetry run python main.py
+poetry run uvicorn main:app --host 127.0.0.1 --port 9000 --reload
 # 服务运行在 http://localhost:9000
 ```
 
@@ -420,6 +423,12 @@ proxy: {
 | `.env` (根目录) | **后端 Spring Boot + AI 服务** 统一配置（端口/密码/API Keys 等） | 密码、OSS Key、JWT Secret、**DashScope API Key** |
 | `career-planning-ai/.env` | 仅**单独运行 AI 服务**时使用（独立于 Docker Compose） | 同上 |
 
+> **⚠️ 重要警示：避免 .env 配置冲突**
+>
+> - **使用 Docker Compose 时**：AI 服务会自动加载根目录 `.env`，请勿在 `career-planning-ai/.env` 中重复配置相同变量
+> - **单独运行 AI 服务时**：仅在 `career-planning-ai/.env` 中配置变量
+> - **推荐做法**：统一使用根目录 `.env`，仅在需要独立运行 AI 服务时创建子项目 `.env`
+
 ### 网络与服务发现
 
 所有服务通过 `career-network` bridge 网络互联，容器间使用**服务名**作为主机名通信：
@@ -479,6 +488,16 @@ docker compose down -v
 # 完全重建（清除镜像+缓存）
 docker compose down -v --rmi all
 docker builder prune -f
+
+# 全量清理（容器+镜像+卷+网络+缓存，推荐使用脚本）
+#   Windows (PowerShell):
+.\scripts\cleanup-docker.ps1           # 预览模式
+.\scripts\cleanup-docker.ps1 -Force    # 逐项确认执行
+.\scripts\cleanup-docker.ps1 -Yes      # 跳过确认，一键全清
+#   Linux/macOS/WSL:
+./scripts/cleanup-docker.sh            # 预览模式
+./scripts/cleanup-docker.sh --force    # 逐项确认执行
+./scripts/cleanup-docker.sh --yes      # 跳过确认，一键全清
 ```
 
 ## 文档
@@ -495,6 +514,8 @@ docker builder prune -f
 | [career-planning-backend/README.md](career-planning-backend/README.md) | 后端详细文档 |
 | [career-planning-frontend/README.md](career-planning-frontend/README.md) | 前端详细文档 |
 | [career-planning-ai/README.md](career-planning-ai/README.md) | AI 服务详细文档 |
+| [scripts/cleanup-docker.ps1](scripts/cleanup-docker.ps1) | Docker 全量清理脚本 (PowerShell) |
+| [scripts/cleanup-docker.sh](scripts/cleanup-docker.sh) | Docker 全量清理脚本 (Bash) |
 
 ## 贡献指南
 

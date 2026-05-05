@@ -4,7 +4,7 @@
 services:
   # ==================== 基础设施 ====================
   mysql:
-    image: mysql:8.0
+    image: docker.1ms.run/mysql:8.0
     container_name: career-mysql
     restart: unless-stopped
     environment:
@@ -33,7 +33,7 @@ services:
       - career-network
 
   redis:
-    image: redis:7-alpine
+    image: docker.1ms.run/redis:7-alpine
     container_name: career-redis
     restart: unless-stopped
     command: >
@@ -54,7 +54,7 @@ services:
       - career-network
 
   neo4j:
-    image: neo4j:5-community
+    image: docker.1ms.run/neo4j:5-community
     container_name: career-neo4j
     restart: unless-stopped
     environment:
@@ -70,7 +70,7 @@ services:
     volumes:
       - neo4j_data:/data
       - neo4j_logs:/logs
-      - ./career-planning-ai/data/init/neo4j:/var/lib/neo4j/init-scripts:ro
+      - ./career-planning-ai/data/init/neo4j:/var/lib/neo4j/init-scripts
     healthcheck:
       test: ["CMD", "cypher-shell", "-u", "neo4j", "-p", "${NEO4J_PASSWORD:-neo4j_dev_2025}", "RETURN 1"]
       interval: 15s
@@ -81,7 +81,7 @@ services:
       - career-network
 
   rabbitmq:
-    image: rabbitmq:3-management-alpine
+    image: docker.1ms.run/rabbitmq:3-management-alpine
     container_name: career-rabbitmq
     restart: unless-stopped
     environment:
@@ -102,7 +102,7 @@ services:
       - career-network
 
   milvus:
-    image: milvusdb/milvus:v2.4-latest
+    image: docker.1ms.run/milvusdb/milvus:v2.4.14
     container_name: career-milvus
     restart: unless-stopped
     command: milvus run standalone  # 单机 Standalone 模式（无需 etcd）
@@ -126,11 +126,14 @@ services:
 
   # ==================== 应用服务 ====================
   ai-service:
+    image: careeragent-ai-service:latest
     build:
       context: ./career-planning-ai
       dockerfile: Dockerfile
     container_name: career-ai-service
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       DATABASE__HOST: mysql
       DATABASE__PORT: "3306"
@@ -176,6 +179,7 @@ services:
       - career-network
 
   backend:
+    image: careeragent-backend:latest
     build:
       context: ./career-planning-backend
       dockerfile: Dockerfile
@@ -204,6 +208,7 @@ services:
       - career-network
 
   frontend:
+    image: careeragent-frontend:latest
     build:
       context: ./career-planning-frontend
       dockerfile: Dockerfile
