@@ -20,6 +20,8 @@ from config import settings
 router = APIRouter(prefix="/code-ability", tags=["code-ability"])
 
 redis = RedisService.get_instance("code_ability")
+if not redis.is_available:
+    log.warning(f"⚠️警告：{__name__}的Redis缓存服务不可用")
 
 
 class EvaluateRequest(BaseModel):

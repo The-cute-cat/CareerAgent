@@ -1,9 +1,19 @@
 <script setup lang="ts">
 import { RouterView } from 'vue-router'
+import { onMounted } from 'vue'
+import { useCareerModeStore } from '@/stores/careerMode'
+import PointsDialogs from '@/components/PointsDialogs/index.vue'
+
+onMounted(() => {
+  const modeStore = useCareerModeStore()
+  modeStore.initMode()
+})
 </script>
 
 <template>
   <RouterView />
+  <!-- 全局积分相关弹窗 -->
+  <PointsDialogs />
 </template>
 
 <style>

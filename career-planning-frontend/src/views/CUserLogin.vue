@@ -6,6 +6,8 @@ import { userLoginService } from '@/api/user/user'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores'
 import { ArrowRight, Lock, User, View, Hide } from '@element-plus/icons-vue'
+import { showWelcomeGift, welcomeGiftPoints } from '@/composables/usePoints'
+import { getAccountPointsService } from '@/api/points'
 
 const router = useRouter()
 const loginform = reactive<LoginFormDTO>({})
@@ -22,11 +24,46 @@ const handleLogin = async () => {
     }
     console.log("登录成功", result);
 
+    // 获取用户ID
+    const userId = result.data.data.userInfo?.id || result.data.data.userInfo?.userId
+
+    // 从API获取积分数据（mock模式下会从localStorage读取）
+    let pointsBalance = 500
+    try {
+      const pointsResult = await getAccountPointsService(userId)
+      if (pointsResult.data.code === 200 && pointsResult.data.data) {
+        pointsBalance = pointsResult.data.data.pointsBalance
+      }
+    } catch (e) {
+      console.warn('获取积分信息失败，使用默认值:', e)
+    }
+
+    // 设置用户信息，包括积分余额
+    const userInfo = {
+      ...result.data.data.userInfo,
+      pointsBalance: pointsBalance,
+      points: pointsBalance
+    }
+
     userStore.setUserALLInfo(
       result.data.data.accessToken,
       result.data.data.refreshToken,
-      result.data.data.userInfo
+      userInfo
     )
+
+    // 检查是否需要显示新用户欢迎弹窗
+    const shouldShowWelcome = localStorage.getItem('showWelcomeGift')
+    if (shouldShowWelcome === 'true') {
+      const points = parseInt(localStorage.getItem('welcomeGiftPoints') || '500')
+      welcomeGiftPoints.value = points
+      // 延迟显示欢迎弹窗
+      setTimeout(() => {
+        showWelcomeGift.value = true
+      }, 500)
+      // 清除标志
+      localStorage.removeItem('showWelcomeGift')
+      localStorage.removeItem('welcomeGiftPoints')
+    }
 
     router.push('/')
     showSuccessNotification()

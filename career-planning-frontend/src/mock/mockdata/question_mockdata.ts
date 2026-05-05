@@ -1,7 +1,7 @@
 import type { QuizResponse, OpenEndedScoreResult, BackendPersonData } from '@/types/careerform_question'
 import type { Result } from '@/types/type'
 
-// ==================== 素质测评模拟数据 ====================
+// ==================== 素质测评测试数据 ====================
 
 /** 沟通能力测评题目（19题） */
 export const communicationQuestions: BackendPersonData[] = [
@@ -102,10 +102,10 @@ export const getPersonMockQuestions = (type: 'communication' | 'stress' | 'learn
   return selected.map((q, i) => ({ ...q, id: i + 1 }))
 }
 
-// ==================== 技能/工具测评模拟数据 ====================
+// ==================== 技能/工具测评测试数据 ====================
 
 /**
- * 生成模拟题目数据
+ * 生成测试题目数据
  * @param type - 测试类型
  * @param name - 技能/工具名称（可选）
  * @returns QuizResponse 题目数据

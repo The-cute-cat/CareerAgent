@@ -244,7 +244,7 @@ export const mockCareerReportByJobId: Record<string, GrowthPlanData> = {
   },
   job_004: {
     student_summary: '你目前更像是具备转向潜力的前端候选人，而不是已经成熟的 Java 后端候选人，需要明确“是否真的要转型”。',
-    target_position: 'Java后端开发工程师（校招）',
+    target_position: 'Java后端工程师（校招）',
     target_position_profile_summary: '岗位要求 Java、Spring Boot、MySQL、Redis 等基础后端能力，以及清晰的服务端开发思维。',
     current_gap: '最大差距是技术主线不一致，当前需要从语言、框架、数据库到后端工程思维做系统性迁移。',
     short_term_plan: {

@@ -21,8 +21,8 @@ const formatDate = (date) => {
 
 const selectedDate = ref(formatDate(new Date())) 
 
-// 模拟面试数据，用于日历打点和列表展示
-const mockInterviews = ref([
+// 面试示例数据，用于日历打点和列表展示
+const interviewsData = ref([
   { id: 1, company: '字节跳动', role: '前端开发工程师', time: '2026-04-01 10:00', location: '视频面试 (飞书)', type: '初面(技术面试)', status: 'pending', logo: 'https://p1-tt.byteimg.com/origin/pgc-image/80387588147d4e3cb98e3b5695a0468e' },
   { id: 2, company: '腾讯', role: '全栈开发工程师', time: '2026-04-03 15:30', location: '腾讯会议', type: '二面', status: 'ongoing', logo: 'https://www.tencent.com/img/index/menu-logo-hover.png' },
   { id: 3, company: '阿里巴巴', role: 'Java 专家', time: '2026-03-28 14:00', location: '钉钉会议', type: '终面', status: 'passed', logo: 'https://img.alicdn.com/tfs/TB1_uT8n6ihY1JjSZFwXXcj3FXa-115-115.png' },
@@ -32,12 +32,12 @@ const mockInterviews = ref([
 
 const todayInterviews = computed(() => {
   const today = formatDate(new Date())
-  return mockInterviews.value.filter(item => item.time.startsWith(today))
+  return interviewsData.value.filter(item => item.time.startsWith(today))
 })
 
 const filteredInterviews = computed(() => {
-  if (!selectedDate.value) return mockInterviews.value
-  return mockInterviews.value.filter(item => item.time.startsWith(selectedDate.value))
+  if (!selectedDate.value) return interviewsData.value
+  return interviewsData.value.filter(item => item.time.startsWith(selectedDate.value))
 })
 
 const handleResize = () => {
@@ -106,7 +106,7 @@ const handleHeaderAction = (action) => {
       <div class="sidebar-column">
         <!-- 迷你日历 -->
         <InterviewCalendarView 
-          :interviews="mockInterviews"
+          :interviews="interviewsData"
           @select-date="date => selectedDate = date"
           class="mini-calendar-wrapper"
         />

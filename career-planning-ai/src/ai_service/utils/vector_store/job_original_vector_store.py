@@ -51,6 +51,7 @@ def get_model_local_path(model_name: str) -> str:
         log.error(f"❌ 模型加载失败: {e}")
         raise
 
+
 def clean_text(text: str) -> str:
     """
     轻量文本清洗：
@@ -128,15 +129,15 @@ class JobOriginalVectorStore:
     """
 
     def __init__(
-        self,
-        host: str = settings.milvus.local.host,
-        port: str = settings.milvus.local.port,
-        url: str = settings.milvus.cloud.url,
-        token: str = settings.milvus.cloud.token.get_secret_value(),
-        collection_name: str = "job_original_embeddings",
-        embedding_model: str = "BAAI/bge-base-zh-v1.5",
-        index_type: str = "HNSW",
-        metric_type: str = "COSINE",
+            self,
+            host: str = settings.milvus.local.host,
+            port: str = settings.milvus.local.port,
+            url: str = settings.milvus.cloud.url,
+            token: str = settings.milvus.cloud.token.get_secret_value(),
+            collection_name: str = "job_original_embeddings",
+            embedding_model: str = "BAAI/bge-base-zh-v1.5",
+            index_type: str = "HNSW",
+            metric_type: str = "COSINE",
     ):
         self.host = host
         self.port = port
@@ -176,10 +177,7 @@ class JobOriginalVectorStore:
             ]
         }
 
-        use_cloud = (
-            self.url not in ("", "<url>", None)
-            and self.token not in ("", "<token>", None)
-        )
+        use_cloud = settings.milvus.cloud.is_can_use
         force_local = getattr(settings.milvus, 'force_local', False)
 
         if force_local:
@@ -268,9 +266,9 @@ class JobOriginalVectorStore:
 
     @classmethod
     def build_valid_jobs_and_texts(
-        cls,
-        jobs: List[JobInfo],
-        desc_max_len: int = 10000,
+            cls,
+            jobs: List[JobInfo],
+            desc_max_len: int = 10000,
     ) -> Tuple[List[JobInfo], List[int], List[str], List[int]]:
         """
         构建可向量化输入。
@@ -307,9 +305,9 @@ class JobOriginalVectorStore:
         return int(self.collection.num_entities or 0)
 
     def upsert_embeddings(
-        self,
-        job_ids: List[int],
-        embeddings: np.ndarray,
+            self,
+            job_ids: List[int],
+            embeddings: np.ndarray,
     ) -> Dict[str, Any]:
         """将向量批量写入 Milvus。"""
         if not job_ids:
@@ -340,11 +338,11 @@ class JobOriginalVectorStore:
             }
 
     async def sync_embeddings_with_database(
-        self,
-        session: AsyncSession,
-        filters: Optional[Dict[str, Any]] = None,
-        batch_size: int = 64,
-        desc_max_len: int = 10000,
+            self,
+            session: AsyncSession,
+            filters: Optional[Dict[str, Any]] = None,
+            batch_size: int = 64,
+            desc_max_len: int = 10000,
     ) -> Dict[str, Any]:
         """
         根据“数据库岗位数量 vs 向量库数量”执行同步。
@@ -433,8 +431,6 @@ class JobOriginalVectorStore:
             "skipped_ids": skipped_ids,
         }
 
-
-
     # 一次性拉取整个集合的数据
     async def query_embeddings_by_job_ids(
             self,
@@ -488,7 +484,7 @@ class JobOriginalVectorStore:
             embedding_map[jid] = np.array(row["embedding"], dtype=np.float32)
 
         return embedding_map
-        
+
     # 正规的函数
     # async def query_embeddings_by_job_ids(
     #     self,
@@ -555,11 +551,11 @@ class JobOriginalVectorStore:
     #     return embedding_map
 
     async def get_jobs_and_embeddings_for_hdbscan(
-        self,
-        session: AsyncSession,
-        filters: Optional[Dict[str, Any]] = None,
-        batch_size: int = 64,
-        desc_max_len: int = 10000,
+            self,
+            session: AsyncSession,
+            filters: Optional[Dict[str, Any]] = None,
+            batch_size: int = 64,
+            desc_max_len: int = 10000,
     ) -> Tuple[List[JobInfo], np.ndarray, Dict[str, Any]]:
         """
         提供给 HDBSCAN 调用：
@@ -615,11 +611,11 @@ class JobOriginalVectorStore:
         }
 
     async def vectorize_and_store_all(
-        self,
-        session: AsyncSession,
-        filters: Optional[Dict[str, Any]] = None,
-        batch_size: int = 64,
-        desc_max_len: int = 10000,
+            self,
+            session: AsyncSession,
+            filters: Optional[Dict[str, Any]] = None,
+            batch_size: int = 64,
+            desc_max_len: int = 10000,
     ) -> Dict[str, Any]:
         """
         保留全量入口：直接把数据库全部岗位重新向量化并 upsert。
@@ -679,11 +675,11 @@ class JobOriginalVectorStore:
         }
 
     async def vectorize_and_store_all_async(
-        self,
-        session: AsyncSession,
-        filters: Optional[Dict[str, Any]] = None,
-        batch_size: int = 64,
-        desc_max_len: int = 10000,
+            self,
+            session: AsyncSession,
+            filters: Optional[Dict[str, Any]] = None,
+            batch_size: int = 64,
+            desc_max_len: int = 10000,
     ) -> Dict[str, Any]:
         return await self.vectorize_and_store_all(
             session=session,
@@ -693,10 +689,10 @@ class JobOriginalVectorStore:
         )
 
     def search_similar(
-        self,
-        text: str,
-        top_k: int = 20,
-        search_params: Optional[Dict[str, Any]] = None,
+            self,
+            text: str,
+            top_k: int = 20,
+            search_params: Optional[Dict[str, Any]] = None,
     ) -> List[Dict[str, Any]]:
         """
         用同一套向量化逻辑做相似岗位召回。
@@ -776,7 +772,7 @@ async def main():
 
 
 if __name__ == "__main__":
-   # asyncio.run(main())
+    # asyncio.run(main())
     store = JobOriginalVectorStore(
         collection_name="job_original_embeddings",
         embedding_model="BAAI/bge-base-zh-v1.5",

@@ -2,6 +2,9 @@ import axios from 'axios'
 import { useUserStore } from '@/stores/index'
 import router from '@/router'
 
+// 检查是否为 Mock 模式
+const ENABLE_MOCK = import.meta.env.VITE_ENABLE_MOCK === 'true'
+
 let isRefreshing = false
 
 const baseURL = '/api'
@@ -81,6 +84,12 @@ instance.interceptors.response.use(
 )
 
 function logout() {
+  // Mock 模式下不执行登出逻辑（避免误触发）
+  if (ENABLE_MOCK) {
+    console.warn('Mock 模式：忽略 401 响应，不执行登出')
+    return
+  }
+  
   const userStore = useUserStore()
   userStore.clearUserALLInfo()
   console.log('登录已过期，请重新登录')

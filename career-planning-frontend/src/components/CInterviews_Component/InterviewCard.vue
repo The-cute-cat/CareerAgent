@@ -8,7 +8,7 @@ const props = defineProps({
     default: () => ({
       id: 1,
       company: '蚂蚁集团',
-      role: 'Java 后端开发工程师',
+      role: 'Java后端工程师',
       time: '2026-04-05 14:00',
       location: '线上面试 (Zoom)',
       type: '技术复面',

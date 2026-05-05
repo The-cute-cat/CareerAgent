@@ -2,6 +2,17 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Close, Microphone } from '@element-plus/icons-vue'
 import Live2DCat from '@/components/Live2DCat.vue'
+import {
+  completeVoiceQuestions,
+  voiceScenes,
+  type CompleteVoiceAnswers,
+  type VoiceSceneKey,
+  type VoiceQuestionConfig,
+  REQUIRED_VOICE_FIELDS,
+  calculateSceneProgress,
+  calculateOverallProgress,
+  areAllRequiredFieldsFilled,
+} from '@/mock/mockdata/VoiceInput_mockdata'
 
 declare global {
   interface Window {
@@ -36,20 +47,14 @@ interface SpeechRecognitionConstructor {
   new (): SpeechRecognitionLike
 }
 
-type VoiceSceneKey = 'campus' | 'office' | 'code' | 'future'
 type VoiceRole = 'pixie' | 'user'
 
 type VoiceHistoryItem = {
   role: VoiceRole
   text: string
   step: number
-}
-
-type VoiceQuestion = {
-  field: string
-  scene: VoiceSceneKey
-  question: string
-  sampleAnswer: string
+  required: boolean
+  skipped: boolean
 }
 
 type VoiceFormSnapshot = {
@@ -71,64 +76,47 @@ const props = defineProps<{
   formSnapshot: VoiceFormSnapshot
 }>()
 
-const emit = defineEmits<{ back: [] }>()
+const emit = defineEmits<{
+  back: []
+  'save-to-form': [answers: Record<string, string>]
+  'generate-matching': [answers: Record<string, string>]
+}>()
 
 const sceneDecoSvg =
   '<svg width="100%" height="100%" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" style="opacity:.2"><circle cx="1300" cy="0" r="130" fill="#a8ebd7"/><rect x="198" y="585" width="122" height="360" rx="12" fill="rgba(148,163,184,.32)"/><circle cx="258" cy="508" r="122" fill="rgba(152,240,217,.52)"/><rect x="620" y="626" width="132" height="320" rx="12" fill="rgba(148,163,184,.28)"/><circle cx="686" cy="548" r="142" fill="rgba(128,230,214,.46)"/><rect x="1134" y="592" width="138" height="352" rx="12" fill="rgba(148,163,184,.26)"/><circle cx="1203" cy="509" r="132" fill="rgba(69,197,216,.30)"/></svg>'
 
-const sceneMap: Record<VoiceSceneKey, { title: string; className: string; deco: string }> = {
-  campus: { title: '校园', className: 'scene-campus', deco: sceneDecoSvg },
-  office: { title: '实践', className: 'scene-office', deco: sceneDecoSvg },
-  code: { title: '技能', className: 'scene-code', deco: sceneDecoSvg },
-  future: { title: '方向', className: 'scene-future', deco: sceneDecoSvg }
+// 场景配置（使用新的5场景配置）
+const sceneInfoMap = voiceScenes
+
+// 场景映射（兼容原有组件结构）
+const sceneMap = {
+  campus: { title: sceneInfoMap.campus.title, className: `scene-${sceneInfoMap.campus.key}`, deco: sceneDecoSvg },
+  skill: { title: sceneInfoMap.skill.title, className: `scene-${sceneInfoMap.skill.key}`, deco: sceneDecoSvg },
+  experience: { title: sceneInfoMap.experience.title, className: `scene-${sceneInfoMap.experience.key}`, deco: sceneDecoSvg },
+  assessment: { title: sceneInfoMap.assessment.title, className: `scene-${sceneInfoMap.assessment.key}`, deco: sceneDecoSvg },
+  career: { title: sceneInfoMap.career.title, className: `scene-${sceneInfoMap.career.key}`, deco: sceneDecoSvg },
 }
 
-const questions: VoiceQuestion[] = [
-  {
-    field: 'education',
-    scene: 'campus',
-    question: '你好呀！我是职业规划小精灵 Pixie。我们先轻松聊聊，你现在的学历、专业和所处阶段是什么？',
-    sampleAnswer: '我是本科，软件工程专业，目前大四在读。'
-  },
-  {
-    field: 'skills',
-    scene: 'code',
-    question: '那我们接着聊技能。你目前最拿手的技术栈、框架，或者擅长的工作内容是什么？',
-    sampleAnswer: '我比较熟悉 Vue3、TypeScript、Element Plus，也做过组件封装和接口联调。'
-  },
-  {
-    field: 'tools',
-    scene: 'office',
-    question: '平时你常用哪些工具和平台？比如 Git、Apifox、Docker、Figma、云服务这些都可以说。',
-    sampleAnswer: '我常用 Git、Apifox、Figma，也会用 Docker 做本地环境配置。'
-  },
-  {
-    field: 'experience',
-    scene: 'office',
-    question: '说一段你最能代表自己的项目经历吧。你负责了什么，做出了什么结果？',
-    sampleAnswer: '我做过一个后台管理系统，负责页面搭建、权限路由和公共组件封装，也优化了列表页加载体验。'
-  },
-  {
-    field: 'target',
-    scene: 'future',
-    question: '你现在更想投递什么岗位？如果有偏好的行业方向，也可以顺便告诉我。',
-    sampleAnswer: '我主要想投前端开发工程师，也比较偏向互联网产品和企业服务方向。'
-  },
-  {
-    field: 'expectation',
-    scene: 'future',
-    question: '最后告诉我，你希望这份职业画像重点帮你看什么，是优势、短板，还是下一步该怎么补齐？',
-    sampleAnswer: '我希望重点突出项目成果，也想知道自己在工程化和项目包装方面还需要补哪些内容。'
-  }
-]
+// 使用完整的问答列表（包含必填/非必填标记）
+const questions: VoiceQuestionConfig[] = completeVoiceQuestions
 
+// 当前步骤索引
 const currentStep = ref(0)
+// 对话历史
 const history = ref<VoiceHistoryItem[]>([])
+// 已收集的答案
 const collectedAnswers = ref<Record<string, string>>({})
+// 跳过的非必填字段
+const skippedFields = ref<Set<string>>(new Set())
+// 当前气泡文本
 const currentBubbleText = ref('')
+// 用户字幕文本
 const userSubtitleText = ref('')
+
+// UI 状态控制
 const showHistoryModal = ref(false)
 const showProfileModal = ref(false)
+const showActionPanel = ref(false)
 const sceneTitleVisible = ref(false)
 const bubbleVisible = ref(false)
 const listeningVisible = ref(false)
@@ -152,19 +140,39 @@ let recognitionSessionId = 0
 
 const synth = typeof window !== 'undefined' ? window.speechSynthesis : null
 
+// 计算属性
 const currentQuestion = computed(() => questions[currentStep.value] ?? questions[questions.length - 1]!)
-const currentScene = computed(() => sceneMap[currentQuestion.value.scene])
+const currentScene = computed(() => (sceneMap as Record<string, any>)[currentQuestion.value.scene] || sceneMap.campus)
 const bubbleChars = computed(() => [...currentBubbleText.value])
 const visibleHistory = computed(() => history.value.slice(-8))
 const latestPixieMessage = computed(() => [...history.value].reverse().find(item => item.role === 'pixie') ?? null)
-const completed = computed(() => Object.keys(collectedAnswers.value).length >= questions.length)
+
+// 完成状态：必填字段全部完成即可
+const completed = computed(() => areAllRequiredFieldsFilled(collectedAnswers.value))
+const actionDisabled = computed(() => !completed.value || thinking.value || recording.value)
+
+// 总体进度（基于必填字段）
+const overallProgress = computed(() => calculateOverallProgress(collectedAnswers.value))
+
+// 当前场景进度
+const currentSceneProgress = computed(() =>
+  calculateSceneProgress(collectedAnswers.value, currentQuestion.value.scene as VoiceSceneKey)
+)
+
+// 麦克风提示文字
 const micHintText = computed(() => {
   if (speaking.value) return '点击可打断'
   if (recording.value) return '点击结束'
-  if (thinking.value) return '正在整理'
-  return '点击说话'
+  if (thinking.value) return '正在整理...'
+  if (completed.value) return '已完成采集，请选择下一步操作'
+  if (currentQuestion.value.required) return `这个很重要，来聊聊吧~`
+  return `想分享就说说看，也可以跳过~`
 })
 
+// 是否可以跳过当前问题（仅非必填）
+const canSkipCurrent = computed(() => !currentQuestion.value.required)
+
+// 学生画像摘要
 const profileSummaryList = computed(() => {
   const items: string[] = []
   if (props.formSnapshot.education) items.push(`学历：${props.formSnapshot.education}`)
@@ -174,34 +182,48 @@ const profileSummaryList = computed(() => {
   return items
 })
 
+// 各场景的完成情况统计
+const sceneStats = computed(() => {
+  const stats: Record<string, { total: number; answered: number; label: string }> = {}
+  for (const [key, scene] of Object.entries(sceneInfoMap)) {
+    const sceneQuestions = questions.filter(q => q.scene === key)
+    const answered = sceneQuestions.filter(q => collectedAnswers.value[q.field]).length
+    stats[key] = {
+      total: sceneQuestions.length,
+      answered,
+      label: `${answered}/${sceneQuestions.length}`,
+    }
+  }
+  return stats
+})
+
+// 画像面板各部分内容
 const profileSections = computed(() => [
   {
-    title: '表单快照',
-    items: [`表单完成度 ${props.formProgress}%`, `画像完整度 ${props.profileCompleteness}%`, `${props.completedStepCount}/5 个模块已完成`]
-  },
-  {
-    title: '基础信息',
+    title: '📊 采集进度',
     items: [
-      props.formSnapshot.education ? `学历：${props.formSnapshot.education}` : '学历：待补充',
-      props.formSnapshot.major.length ? `专业：${props.formSnapshot.major.join(' / ')}` : '专业：待补充',
-      props.formSnapshot.targetJob ? `目标岗位：${props.formSnapshot.targetJob}` : '目标岗位：待补充',
-      props.formSnapshot.targetIndustries.length ? `目标行业：${props.formSnapshot.targetIndustries.join(' / ')}` : '目标行业：待补充'
+      `总体完成 ${overallProgress.value}%`,
+      `已回答 ${Object.keys(collectedAnswers.value).length}/${questions.length} 题`,
+      `必填项 ${Array.from(REQUIRED_VOICE_FIELDS).filter(f => collectedAnswers.value[f]).length}/${REQUIRED_VOICE_FIELDS.size}`,
     ]
   },
-  {
-    title: '经验概况',
+  ...Object.entries(sceneInfoMap).map(([key, scene]) => ({
+    title: `${scene.icon} ${scene.title}`,
     items: [
-      props.formSnapshot.skillNames.length ? `技能：${props.formSnapshot.skillNames.join('、')}` : '技能：待补充',
-      props.formSnapshot.toolNames.length ? `工具：${props.formSnapshot.toolNames.join('、')}` : '工具：待补充',
-      `项目经历：${props.formSnapshot.projectCount} 项`,
-      `实习经历：${props.formSnapshot.internshipCount} 项`
+      scene.description,
+      `进度：${sceneStats[key]?.label || '0/0'}`,
     ]
-  },
+  })),
   {
-    title: '本轮对话摘要',
-    items: Object.entries(collectedAnswers.value).map(([key, value]) => `${key}：${value}`)
-  }
+    title: '📝 本轮对话摘要',
+    items: Object.entries(collectedAnswers.value).map(([key, value]) => {
+      const q = questions.find(qu => qu.field === key)
+      return `[${q?.required ? '必填' : '选填'}] ${q?.group || key}：${value?.substring(0, 50)}${value && value.length > 50 ? '...' : ''}`
+    })
+  },
 ])
+
+// ==================== 工具函数 ====================
 
 function clearTimers(): void {
   if (highlightTimer) window.clearInterval(highlightTimer)
@@ -218,8 +240,8 @@ function clearTimers(): void {
   bounceTimer = null
 }
 
-function addHistory(role: VoiceRole, text: string, step: number): void {
-  history.value.push({ role, text, step })
+function addHistory(role: VoiceRole, text: string, step: number, required: boolean, skipped = false): void {
+  history.value.push({ role, text, step, required, skipped })
 }
 
 function setSceneTitle(): void {
@@ -326,48 +348,162 @@ function speak(text: string): void {
   synth.speak(utterance)
 }
 
+// ==================== 核心对话逻辑 ====================
+
 async function startConversation(): Promise<void> {
   const firstQuestion = questions[0]!
   setSceneTitle()
-  addHistory('pixie', firstQuestion.question, 0)
+  addHistory('pixie', firstQuestion.question, 0, firstQuestion.required)
   showBubble(firstQuestion.question)
   await nextTick()
   window.setTimeout(() => speak(firstQuestion.question), 120)
 }
 
+/** 构建回复文本 */
 function buildReply(): string {
-  if (currentStep.value >= questions.length - 1) {
-    return '太好了，这一轮信息我已经帮你整理好了。你可以返回表单继续完善，也可以重新开始再补充一轮。'
+  // 检查是否所有问题都已回答或跳过
+  const remainingRequired = questions.filter(q => q.required && !collectedAnswers.value[q.field])
+  
+  // 找下一个未回答的问题
+  const nextUnansweredIndex = questions.findIndex((q, idx) => 
+    idx > currentStep.value && !collectedAnswers.value[q.field]
+  )
+
+  if (nextUnansweredIndex === -1 && remainingRequired.length === 0) {
+    // 所有必填问题都已完成
+    const answeredCount = Object.keys(collectedAnswers.value).length
+    return `太棒了！我已经收集了 ${answeredCount} 个问题的信息，其中所有必填项都已填写完毕。接下来你可以选择「保存到表单」或「生成人岗匹配结果」！`
   }
-  const nextQuestion = questions[currentStep.value + 1]!
-  const intros = ['收到，我先帮你记下来。', '很好，这部分已经清晰了。', '我已经抓到重点啦。', '这段经历很有参考价值。']
-  return `${intros[currentStep.value % intros.length]} ${nextQuestion.question}`
+
+  if (nextUnansweredIndex === -1) {
+    // 还有必填项没填完，找第一个未答的必填项
+    const nextRequired = questions.find(q => q.required && !collectedAnswers.value[q.field])
+    if (nextRequired) {
+      return `好的。我们还有个重要的信息需要补充——${nextRequired.question}`
+    }
+  }
+
+  const nextQuestion = questions[nextUnansweredIndex]!
+  const intros = ['收到，记下来了！', '很好，这部分已经清晰了。', '我已经抓到重点啦。', '这段经历很有参考价值。', '了解，继续下一个~']
+  const prefix = intros[currentStep.value % intros.length]
+  const hint = nextQuestion.required ? '（这个需要你回答哦）' : '（不想说可以跳过）'
+  return `${prefix}\n${hint}${nextQuestion.question}`
 }
 
+/** 推进对话 */
 function advanceConversation(text: string): void {
-  addHistory('user', text, currentStep.value)
+  addHistory('user', text, currentStep.value, currentQuestion.value.required)
   collectedAnswers.value = { ...collectedAnswers.value, [currentQuestion.value.field]: text }
   thinking.value = true
   bounceMascot()
   window.setTimeout(() => {
     thinking.value = false
     const reply = buildReply()
-    addHistory('pixie', reply, currentStep.value)
-    if (currentStep.value < questions.length - 1) {
-      currentStep.value += 1
+    addHistory('pixie', reply, currentStep.value, false)
+    
+    // 查找下一个未答问题
+    const nextUnansweredIndex = questions.findIndex((q, idx) => 
+      idx > currentStep.value && !collectedAnswers.value[q.field]
+    )
+    
+    if (nextUnansweredIndex !== -1) {
+      currentStep.value = nextUnansweredIndex
       setSceneTitle()
+    } else {
+      // 检查是否还有必填项未答
+      const remainingRequired = questions.find(q => q.required && !collectedAnswers.value[q.field])
+      if (remainingRequired) {
+        const reqIdx = questions.indexOf(remainingRequired)
+        currentStep.value = reqIdx
+        setSceneTitle()
+      } else {
+        showActionPanel.value = true
+      }
     }
+    
     showBubble(reply)
     speak(reply)
   }, 780)
 }
 
+/** 跳过当前问题（仅限非必填）*/
+function skipCurrentQuestion(): void {
+  if (canSkipCurrent.value && !recording.value && !thinking.value) {
+    const question = currentQuestion.value
+    const skipHint = question.skipHint || `已跳过「${question.group || question.field}」`
+    skippedFields.value = new Set([...skippedFields.value, question.field])
+    
+    addHistory('用户', `[跳过] ${skipHint}`, currentStep.value, question.required, true)
+    thinking.value = true
+    bounceMascot()
+    
+    window.setTimeout(() => {
+      thinking.value = false
+      const reply = buildReply()
+      addHistory('pixie', reply, currentStep.value, false)
+      
+      // 移动到下一题
+      const nextUnansweredIndex = questions.findIndex((q, idx) => 
+        idx > currentStep.value && !collectedAnswers.value[q.field]
+      )
+      
+      if (nextUnansweredIndex !== -1) {
+        currentStep.value = nextUnansweredIndex
+        setSceneTitle()
+      } else {
+        const remainingRequired = questions.find(q => q.required && !collectedAnswers.value[q.field])
+        if (remainingRequired) {
+          currentStep.value = questions.indexOf(remainingRequired)
+          setSceneTitle()
+        } else {
+          showActionPanel.value = true
+        }
+      }
+      
+      showBubble(reply)
+      speak(reply)
+    }, 500)
+  }
+}
+
+/** 保存到表单 */
+function handleSaveToForm(): void {
+  // 只有未完成时才阻止，语音播放中允许点击
+  if (!completed.value || thinking.value || recording.value) return
+  showActionPanel.value = false
+  const reply = '好的，我先帮你把刚刚收集到的信息保存到表单里，然后带你跳转回去查看。'
+  addHistory('pixie', reply, currentStep.value, false)
+  showBubble(reply)
+  speak(reply)
+  // 延迟跳转，让用户听到回复并看到气泡提示
+  window.setTimeout(() => {
+    emit('save-to-form', { ...collectedAnswers.value })
+  }, 1500)
+}
+
+/** 生成人岗匹配结果并跳转 */
+function handleGenerateMatching(): void {
+  // 只有未完成时才阻止，语音播放中允许点击
+  if (!completed.value || thinking.value || recording.value) return
+  showActionPanel.value = false
+  const reply = '好的，我现在就根据这些信息生成人岗匹配结果，马上带你过去看看。'
+  addHistory('pixie', reply, currentStep.value, false)
+  showBubble(reply)
+  speak(reply)
+  // 延迟跳转，让用户听到回复并看到气泡提示
+  window.setTimeout(() => {
+    emit('generate-matching', { ...collectedAnswers.value })
+  }, 1800)
+}
+
+/** 模拟语音识别（返回示例答案）*/
 function mockRecognize(): Promise<string> {
   return new Promise(resolve => {
     window.setTimeout(() => resolve(currentQuestion.value.sampleAnswer), 1100)
   })
 }
 
+/** 使用浏览器原生语音识别 */
 function recognizeByBrowser(): Promise<string | null> {
   const RecognitionCtor = window.SpeechRecognition ?? window.webkitSpeechRecognition
   if (!RecognitionCtor) return Promise.resolve(null)
@@ -414,6 +550,7 @@ function recognizeByBrowser(): Promise<string | null> {
   })
 }
 
+/** 停止录音 */
 function stopRecording(): void {
   recognitionStoppedByUser = true
   recording.value = false
@@ -426,6 +563,7 @@ function stopRecording(): void {
   }
 }
 
+/** 麦克风按钮点击事件 */
 async function onMic(): Promise<void> {
   if (speaking.value) {
     stopSpeech()
@@ -452,12 +590,15 @@ async function onMic(): Promise<void> {
   advanceConversation(text)
 }
 
+/** 重置对话 */
 function restartConversation(): void {
   clearTimers()
   synth?.cancel()
   currentStep.value = 0
   history.value = []
   collectedAnswers.value = {}
+  skippedFields.value = new Set()
+  showActionPanel.value = false
   currentBubbleText.value = ''
   userSubtitleText.value = ''
   thinking.value = false
@@ -491,16 +632,19 @@ onBeforeUnmount(() => {
     <div class="scene-bg"></div>
     <div class="scene-deco" v-html="currentScene.deco"></div>
 
+    <!-- 场景标题 -->
     <div class="scene-title" :class="{ show: sceneTitleVisible }">
       <span class="scene-title-text">{{ currentScene.title }}</span>
     </div>
 
+    <!-- 左侧对话历史面板 -->
     <div class="side-panel side-panel-left">
       <div class="side-panel-inner side-panel-card history-card" @click="showHistoryModal = true">
         <p class="panel-caption">对话历史</p>
         <div class="panel-scroll">
           <span v-if="!history.length" class="panel-empty">等待对话开始...</span>
-          <div v-for="(item, index) in visibleHistory" :key="`${item.role}-${index}-${item.text}`" class="history-item">
+          <div v-for="(item, index) in visibleHistory" :key="`${item.role}-${index}-${item.text}`" 
+               :class="['history-item', { 'skipped-item': item.skipped }]">
             <div class="hi-step">{{ item.role === 'pixie' ? `✨ 第${item.step + 1}轮` : `🎙 第${item.step + 1}轮` }}</div>
             <div :class="item.role === 'pixie' ? 'hi-q' : 'hi-a'">{{ item.text }}</div>
           </div>
@@ -508,6 +652,7 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
+    <!-- 右侧学生画像面板 -->
     <div class="side-panel side-panel-right" @click="showProfileModal = true">
       <div class="side-panel-inner side-panel-card profile-card">
         <p class="panel-caption">学生画像</p>
@@ -518,9 +663,24 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
+    <!-- 浮动按钮 -->
     <button type="button" class="floating-btn floating-back" @click="emit('back')">返回表单</button>
     <button type="button" class="floating-btn floating-reset" @click="restartConversation">重新开始</button>
 
+    <!-- 进度指示器 -->
+    <div class="progress-indicator">
+      <div class="progress-bar-container">
+        <div class="progress-bar-fill" :style="{ width: `${overallProgress}%` }"></div>
+      </div>
+      <span class="progress-text">{{ overallProgress }}% 完成</span>
+    </div>
+
+    <!-- 当前问题类型标签 -->
+    <div class="question-badge" :class="{ required: currentQuestion.required }">
+      {{ currentQuestion.required ? '⚡ 必填' : '💡 选填' }} · {{ currentQuestion.group || '其他' }}
+    </div>
+
+    <!-- Pixie 气泡对话框 -->
     <div class="elf-bubble" :class="bubbleVisible ? 'show' : 'hide'">
       <div class="elf-bubble-inner">
         <p class="elf-bubble-text">
@@ -531,12 +691,14 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
+    <!-- 思考中动画 -->
     <div class="thinking-dots" :class="{ show: thinking }">
       <div class="thinking-dot"></div>
       <div class="thinking-dot"></div>
       <div class="thinking-dot"></div>
     </div>
 
+    <!-- Live2D 角色 -->
     <div class="mascot-wrap">
       <div class="mascot-live2d" :class="{ bounce: mascotBouncing }">
         <Live2DCat :speaking-text="currentBubbleText" :active="speaking || thinking" />
@@ -548,10 +710,50 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
+    <!-- 操作面板（完成后显示）-->
+    <transition name="dialog-fade">
+      <div v-if="showActionPanel" class="action-panel">
+        <div class="action-panel__title">✅ 信息采集完成</div>
+        <div class="action-panel__desc">
+          已收集 {{ Object.keys(collectedAnswers).length }} 项信息，{{ REQUIRED_VOICE_FIELDS.size }} 项必填信息已全部填写。
+          你可以选择保存到表单，或直接生成人岗匹配结果。
+        </div>
+        <div class="action-panel__buttons">
+          <el-button 
+            type="primary" 
+            size="large" 
+            :disabled="!completed || thinking || recording" 
+            @click="handleSaveToForm"
+          >
+            💾 保存到表单
+          </el-button>
+          <el-button 
+            type="success" 
+            size="large" 
+            plain 
+            :disabled="!completed || thinking || recording" 
+            @click="handleGenerateMatching"
+          >
+            🎯 生成人岗匹配
+          </el-button>
+        </div>
+      </div>
+    </transition>
+
+    <!-- 跳过按钮（仅非必填时显示）-->
+    <transition name="fade-slide">
+      <button v-if="canSkipCurrent && !completed && !recording && !thinking && !speaking" 
+              type="button" class="skip-btn" @click="skipCurrentQuestion">
+        ⏭️ 跳过此题
+      </button>
+    </transition>
+
+    <!-- 用户字幕 -->
     <div class="user-subtitle" :class="[{ show: subtitleVisible }, { 'subtitle-flash': subtitleFlash }]">
       <div class="user-subtitle-inner">{{ userSubtitleText }}</div>
     </div>
 
+    <!-- 聆听中指示器 -->
     <div class="listening-indicator" :class="{ show: listeningVisible }">
       <div class="listening-dot"></div>
       <div class="listening-dot"></div>
@@ -559,12 +761,14 @@ onBeforeUnmount(() => {
       <span class="listening-text">聆听中...</span>
     </div>
 
+    <!-- 麦克风提示 -->
     <div class="mic-hint">{{ micHintText }}</div>
     <button type="button" class="mic-btn" :class="{ active: recording }" @click="onMic">
       <el-icon v-if="!recording && !speaking"><Microphone /></el-icon>
       <span v-else class="mic-stop"></span>
     </button>
 
+    <!-- 对话历史弹窗 -->
     <transition name="dialog-fade">
       <div v-if="showHistoryModal" class="history-modal-overlay" @click.self="showHistoryModal = false">
         <div class="history-modal">
@@ -575,8 +779,9 @@ onBeforeUnmount(() => {
             </button>
           </div>
           <div class="history-modal-body">
-            <div v-for="(item, index) in history" :key="`modal-${index}`" class="hm-item">
-              <div class="hm-step">{{ item.role === 'pixie' ? 'Pixie' : '你' }} · 第{{ item.step + 1 }}轮</div>
+            <div v-for="(item, index) in history" :key="`modal-${index}`" 
+                 :class="['hm-item', { 'skipped-item': item.skipped }]">
+              <div class="hm-step">{{ item.role === 'pixie' ? 'Pixie' : '你' }} · 第{{ item.step + 1 }}轮{{ item.skipped ? ' (跳过)' : '' }}</div>
               <div :class="item.role === 'pixie' ? 'hm-q' : 'hm-a'">{{ item.text }}</div>
             </div>
           </div>
@@ -584,6 +789,7 @@ onBeforeUnmount(() => {
       </div>
     </transition>
 
+    <!-- 学生画像弹窗 -->
     <transition name="dialog-fade">
       <div v-if="showProfileModal" class="history-modal-overlay" @click.self="showProfileModal = false">
         <div class="history-modal history-modal--wide">
@@ -594,21 +800,23 @@ onBeforeUnmount(() => {
             </button>
           </div>
           <div class="history-modal-body">
+            <!-- 概览卡片 -->
             <div class="profile-overview">
               <div class="profile-overview-card">
-                <strong>{{ props.formProgress }}%</strong>
-                <span>表单完成度</span>
-              </div>
-              <div class="profile-overview-card">
-                <strong>{{ props.profileCompleteness }}%</strong>
-                <span>画像完整度</span>
+                <strong>{{ overallProgress }}%</strong>
+                <span>总体完成度</span>
               </div>
               <div class="profile-overview-card">
                 <strong>{{ Object.keys(collectedAnswers).length }}</strong>
-                <span>本轮已回答</span>
+                <span>已回答问题</span>
+              </div>
+              <div class="profile-overview-card">
+                <strong>{{ REQUIRED_VOICE_FIELDS.size }}</strong>
+                <span>必填项总数</span>
               </div>
             </div>
 
+            <!-- 各部分详情 -->
             <div v-for="section in profileSections" :key="section.title" class="profile-section">
               <div class="profile-section-title">{{ section.title }}</div>
               <div class="profile-fields-grid">
@@ -617,6 +825,7 @@ onBeforeUnmount(() => {
               </div>
             </div>
 
+            <!-- 最近一轮引导 -->
             <div v-if="latestPixieMessage" class="profile-section">
               <div class="profile-section-title">最近一轮引导</div>
               <div class="profile-field-value">{{ latestPixieMessage.text }}</div>
@@ -629,9 +838,7 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-* {
-  box-sizing: border-box;
-}
+* { box-sizing: border-box; }
 
 .pixie-scene-page {
   position: relative;
@@ -647,12 +854,12 @@ onBeforeUnmount(() => {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.08));
 }
 
-.scene-campus,
-.scene-office,
-.scene-code,
-.scene-future {
-  background: linear-gradient(180deg, #cfe4f5 0%, #78c9f5 58%, #46b5ee 100%);
-}
+/* 5种场景渐变背景 */
+.scene-campus { background: linear-gradient(180deg, #e8f4fd 0%, #a8d8f0 58%, #78c9f5 100%); }
+.scene-skill { background: linear-gradient(180deg, #fef3e2 0%, #fdd8a8 58%, #f9c46b 100%); }
+.scene-experience { background: linear-gradient(180deg, #e8fbe8 0%, #b8e8b8 58%, #8cd48c 100%); }
+.scene-assessment { background: linear-gradient(180deg, #f3e8fd 0%, #d4b8f5 58%, #b89cf0 100%); }
+.scene-career { background: linear-gradient(180deg, #fee8e8 0%, #f8b4b4 58%, #f09090 100%); }
 
 .scene-deco {
   position: absolute;
@@ -670,15 +877,12 @@ onBeforeUnmount(() => {
   transform: translateX(-50%);
   transition: opacity 0.45s ease;
 }
-
-.scene-title.show {
-  opacity: 1;
-}
+.scene-title.show { opacity: 1; }
 
 .scene-title-text {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
+  gap: 6px;
   min-width: 96px;
   height: 34px;
   padding: 0 18px;
@@ -695,15 +899,8 @@ onBeforeUnmount(() => {
   top: 18px;
   z-index: 8;
 }
-
-.side-panel-left {
-  left: 18px;
-}
-
-.side-panel-right {
-  right: 18px;
-  cursor: pointer;
-}
+.side-panel-left { left: 18px; }
+.side-panel-right { right: 18px; cursor: pointer; }
 
 .side-panel-inner {
   background: rgba(255, 255, 255, 0.82);
@@ -743,9 +940,8 @@ onBeforeUnmount(() => {
   font-style: italic;
 }
 
-.history-item {
-  margin-bottom: 6px;
-}
+.history-item { margin-bottom: 6px; }
+.history-item.skipped-item .hi-a { opacity: 0.5; font-style: italic; }
 
 .hi-step {
   margin-bottom: 2px;
@@ -753,8 +949,7 @@ onBeforeUnmount(() => {
   font-size: 10px;
 }
 
-.hi-q,
-.hi-a {
+.hi-q, .hi-a {
   color: #55697d;
   font-size: 11px;
   line-height: 1.45;
@@ -762,10 +957,7 @@ onBeforeUnmount(() => {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
-.hi-a {
-  color: #5b6f8a;
-}
+.hi-a { color: #5b6f8a; }
 
 .profile-chip {
   margin-bottom: 8px;
@@ -788,13 +980,64 @@ onBeforeUnmount(() => {
   cursor: pointer;
   box-shadow: 0 8px 20px rgba(33, 89, 147, 0.08);
 }
+.floating-back { left: 352px; }
+.floating-reset { right: 146px; }
 
-.floating-back {
-  left: 352px;
+/* 进度指示器 */
+.progress-indicator {
+  position: absolute;
+  top: 72px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
-.floating-reset {
-  right: 146px;
+.progress-bar-container {
+  width: 200px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #6678ff, #4d5ff5);
+  border-radius: 3px;
+  transition: width 0.35s ease;
+}
+
+.progress-text {
+  color: #55697d;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* 问题标签 */
+.question-badge {
+  position: absolute;
+  top: 92px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 8;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.question-badge.required {
+  background: rgba(239, 68, 68, 0.15);
+  color: #dc2626;
+}
+
+.question-badge:not(.required) {
+  background: rgba(59, 130, 246, 0.15);
+  color: #2563eb;
 }
 
 .elf-bubble {
@@ -802,31 +1045,22 @@ onBeforeUnmount(() => {
   bottom: calc(36% + 230px);
   left: 50%;
   z-index: 6;
-  width: min(500px, calc(100vw - 72px));
+  width: min(520px, calc(100vw - 72px));
   opacity: 0;
   transform: translateX(-50%);
   transition: opacity 0.35s ease, transform 0.35s ease;
 }
-
-.elf-bubble.show {
-  opacity: 1;
-  transform: translateX(-50%) translateY(0);
-}
-
-.elf-bubble.hide {
-  opacity: 0;
-  transform: translateX(-50%) translateY(-10px);
-}
+.elf-bubble.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.elf-bubble.hide { opacity: 0; transform: translateX(-50%) translateY(-10px); }
 
 .elf-bubble-inner {
   position: relative;
   padding: 16px 20px;
-  background: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.94);
   border: 1px solid rgba(255, 255, 255, 0.6);
   border-radius: 20px;
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
 }
-
 .elf-bubble-inner::after {
   content: '';
   position: absolute;
@@ -835,7 +1069,7 @@ onBeforeUnmount(() => {
   transform: translateX(-50%);
   border-left: 10px solid transparent;
   border-right: 10px solid transparent;
-  border-top: 10px solid rgba(255, 255, 255, 0.92);
+  border-top: 10px solid rgba(255, 255, 255, 0.94);
 }
 
 .elf-bubble-text {
@@ -849,11 +1083,7 @@ onBeforeUnmount(() => {
   color: #97a6b7;
   transition: color 0.25s ease, font-weight 0.25s ease;
 }
-
-.ec.lit {
-  color: #2563eb;
-  font-weight: 700;
-}
+.ec.lit { color: #2563eb; font-weight: 700; }
 
 .thinking-dots {
   position: absolute;
@@ -864,29 +1094,19 @@ onBeforeUnmount(() => {
   gap: 8px;
   transform: translateX(-50%);
 }
+.thinking-dots.show { display: flex; }
 
-.thinking-dots.show {
-  display: flex;
-}
-
-.thinking-dot,
-.listening-dot {
+.thinking-dot, .listening-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
   background: #4f8cff;
   animation: ldot 0.8s ease-in-out infinite;
 }
-
 .thinking-dot:nth-child(2),
-.listening-dot:nth-child(2) {
-  animation-delay: 0.12s;
-}
-
+.listening-dot:nth-child(2) { animation-delay: 0.12s; }
 .thinking-dot:nth-child(3),
-.listening-dot:nth-child(3) {
-  animation-delay: 0.24s;
-}
+.listening-dot:nth-child(3) { animation-delay: 0.24s; }
 
 .mascot-wrap {
   position: absolute;
@@ -903,10 +1123,7 @@ onBeforeUnmount(() => {
   width: 220px;
   height: 280px;
 }
-
-.mascot-live2d.bounce {
-  animation: mascotBounce 0.55s ease;
-}
+.mascot-live2d.bounce { animation: mascotBounce 0.55s ease; }
 
 .wave-wrap {
   display: flex;
@@ -923,17 +1140,65 @@ onBeforeUnmount(() => {
   border-radius: 2px;
   background: linear-gradient(180deg, #60a5fa, #2563eb);
 }
+.wave-bar.speaking:nth-child(1) { animation: w1 0.5s ease-in-out infinite; }
+.wave-bar.speaking:nth-child(2) { animation: w2 0.5s ease-in-out infinite 0.12s; }
+.wave-bar.speaking:nth-child(3) { animation: w3 0.5s ease-in-out infinite 0.24s; }
 
-.wave-bar.speaking:nth-child(1) {
-  animation: w1 0.5s ease-in-out infinite;
+.action-panel {
+  position: absolute;
+  bottom: 232px;
+  left: 50%;
+  z-index: 7;
+  width: min(600px, calc(100vw - 32px));
+  padding: 22px 24px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.18);
+  transform: translateX(-50%);
+  backdrop-filter: blur(14px);
 }
 
-.wave-bar.speaking:nth-child(2) {
-  animation: w2 0.5s ease-in-out infinite 0.12s;
+.action-panel__title {
+  color: #0f172a;
+  font-size: 19px;
+  font-weight: 800;
 }
 
-.wave-bar.speaking:nth-child(3) {
-  animation: w3 0.5s ease-in-out infinite 0.24s;
+.action-panel__desc {
+  margin-top: 10px;
+  color: #475569;
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.action-panel__buttons {
+  display: flex;
+  gap: 14px;
+  margin-top: 20px;
+}
+
+/* 跳过按钮 */
+.skip-btn {
+  position: absolute;
+  bottom: 196px;
+  right: 80px;
+  z-index: 7;
+  padding: 8px 18px;
+  border: 1px solid rgba(150, 163, 184, 0.4);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.85);
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  transition: all 0.25s ease;
+}
+.skip-btn:hover {
+  background: rgba(255, 255, 255, 0.95);
+  color: #66798e;
+  border-color: rgba(150, 163, 184, 0.6);
+  transform: scale(1.03);
 }
 
 .user-subtitle {
@@ -945,10 +1210,7 @@ onBeforeUnmount(() => {
   transform: translateX(-50%);
   transition: opacity 0.32s ease;
 }
-
-.user-subtitle.show {
-  opacity: 1;
-}
+.user-subtitle.show { opacity: 1; }
 
 .user-subtitle-inner {
   max-width: 80vw;
@@ -960,10 +1222,7 @@ onBeforeUnmount(() => {
   line-height: 1.6;
   text-align: center;
 }
-
-.subtitle-flash .user-subtitle-inner {
-  animation: greenFlash 1.4s ease-out forwards;
-}
+.subtitle-flash .user-subtitle-inner { animation: greenFlash 1.4s ease-out forwards; }
 
 .listening-indicator {
   position: absolute;
@@ -975,15 +1234,9 @@ onBeforeUnmount(() => {
   gap: 8px;
   transform: translateX(-50%);
 }
+.listening-indicator.show { display: flex; }
 
-.listening-indicator.show {
-  display: flex;
-}
-
-.listening-text {
-  color: rgba(255, 255, 255, 0.72);
-  font-size: 12px;
-}
+.listening-text { color: rgba(255, 255, 255, 0.72); font-size: 12px; }
 
 .mic-hint {
   position: absolute;
@@ -1016,15 +1269,8 @@ onBeforeUnmount(() => {
   transform: translateX(-50%);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
-
-.mic-btn:hover {
-  transform: translateX(-50%) scale(1.05);
-  box-shadow: 0 18px 40px rgba(79, 93, 255, 0.34);
-}
-
-.mic-btn.active {
-  animation: micPulse 1s ease-in-out infinite;
-}
+.mic-btn:hover { transform: translateX(-50%) scale(1.05); box-shadow: 0 18px 40px rgba(79, 93, 255, 0.34); }
+.mic-btn.active { animation: micPulse 1s ease-in-out infinite; }
 
 .mic-stop {
   width: 18px;
@@ -1053,10 +1299,7 @@ onBeforeUnmount(() => {
   background: rgba(255, 255, 255, 0.98);
   box-shadow: 0 24px 60px rgba(20, 49, 84, 0.18);
 }
-
-.history-modal--wide {
-  width: min(760px, 100%);
-}
+.history-modal--wide { width: min(780px, 100%); }
 
 .history-modal-header {
   display: flex;
@@ -1066,11 +1309,7 @@ onBeforeUnmount(() => {
   border-bottom: 1px solid rgba(228, 236, 245, 0.95);
 }
 
-.modal-title {
-  color: #244564;
-  font-size: 18px;
-  font-weight: 800;
-}
+.modal-title { color: #244564; font-size: 18px; font-weight: 800; }
 
 .modal-close-btn {
   display: inline-flex;
@@ -1091,33 +1330,19 @@ onBeforeUnmount(() => {
   padding: 20px 22px 24px;
 }
 
-.hm-item {
-  margin-bottom: 14px;
-}
+.hm-item { margin-bottom: 14px; }
+.hm-item.skipped-item .hm-a { opacity: 0.5; font-style: italic; }
 
-.hm-step {
-  margin-bottom: 4px;
-  color: #94a3b8;
-  font-size: 11px;
-}
+.hm-step { margin-bottom: 4px; color: #94a3b8; font-size: 11px; }
 
-.hm-q,
-.hm-a {
+.hm-q, .hm-a {
   padding: 10px 14px;
   border-radius: 14px;
   font-size: 14px;
   line-height: 1.7;
 }
-
-.hm-q {
-  color: #486483;
-  background: rgba(246, 249, 253, 0.98);
-}
-
-.hm-a {
-  color: #355b89;
-  background: rgba(236, 245, 255, 0.96);
-}
+.hm-q { color: #486483; background: rgba(246, 249, 253, 0.98); }
+.hm-a { color: #355b89; background: rgba(236, 245, 255, 0.96); }
 
 .profile-overview {
   display: grid;
@@ -1134,29 +1359,11 @@ onBeforeUnmount(() => {
   border-radius: 18px;
   background: rgba(246, 249, 253, 0.98);
 }
+.profile-overview-card strong { color: #214b75; font-size: 28px; line-height: 1; }
+.profile-overview-card span { color: #69819b; font-size: 13px; font-weight: 700; }
 
-.profile-overview-card strong {
-  color: #214b75;
-  font-size: 28px;
-  line-height: 1;
-}
-
-.profile-overview-card span {
-  color: #69819b;
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.profile-section {
-  margin-bottom: 18px;
-}
-
-.profile-section-title {
-  margin-bottom: 10px;
-  color: #4b6787;
-  font-size: 14px;
-  font-weight: 800;
-}
+.profile-section { margin-bottom: 18px; }
+.profile-section-title { margin-bottom: 10px; color: #4b6787; font-size: 14px; font-weight: 800; }
 
 .profile-fields-grid {
   display: flex;
@@ -1183,125 +1390,58 @@ onBeforeUnmount(() => {
 }
 
 .dialog-fade-enter-active,
-.dialog-fade-leave-active {
-  transition: opacity 0.24s ease;
-}
-
+.dialog-fade-leave-active { transition: opacity 0.24s ease; }
 .dialog-fade-enter-from,
-.dialog-fade-leave-to {
-  opacity: 0;
-}
+.dialog-fade-leave-to { opacity: 0; }
+
+.fade-slide-enter-active,
+.fade-slide-leave-active { transition: all 0.3s ease; }
+.fade-slide-enter-from { opacity: 0; transform: translateX(20px); }
+.fade-slide-leave-to { opacity: 0; transform: translateX(20px); }
 
 @keyframes mascotBounce {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  30% {
-    transform: translateY(-12px);
-  }
-  60% {
-    transform: translateY(-4px);
-  }
+  0%, 100% { transform: translateY(0); }
+  30% { transform: translateY(-12px); }
+  60% { transform: translateY(-4px); }
 }
 
-@keyframes w1 {
-  0%,
-  100% {
-    height: 6px;
-  }
-  50% {
-    height: 20px;
-  }
-}
-
-@keyframes w2 {
-  0%,
-  100% {
-    height: 10px;
-  }
-  50% {
-    height: 28px;
-  }
-}
-
-@keyframes w3 {
-  0%,
-  100% {
-    height: 6px;
-  }
-  50% {
-    height: 16px;
-  }
-}
+@keyframes w1 { 0%, 100% { height: 6px; } 50% { height: 20px; } }
+@keyframes w2 { 0%, 100% { height: 10px; } 50% { height: 28px; } }
+@keyframes w3 { 0%, 100% { height: 6px; } 50% { height: 16px; } }
 
 @keyframes ldot {
-  0%,
-  80%,
-  100% {
-    transform: translateY(0);
-    opacity: 0.5;
-  }
-  40% {
-    transform: translateY(-6px);
-    opacity: 1;
-  }
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.5; }
+  40% { transform: translateY(-6px); opacity: 1; }
 }
 
 @keyframes greenFlash {
-  0% {
-    background-color: rgba(34, 197, 94, 0.4);
-  }
-  100% {
-    background-color: rgba(0, 0, 0, 0.6);
-  }
+  0% { background-color: rgba(34, 197, 94, 0.4); }
+  100% { background-color: rgba(0, 0, 0, 0.6); }
 }
 
 @keyframes micPulse {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 rgba(79, 93, 255, 0.34);
-  }
-  50% {
-    box-shadow: 0 0 0 14px rgba(79, 93, 255, 0);
-  }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(79, 93, 255, 0.34); }
+  50% { box-shadow: 0 0 0 14px rgba(79, 93, 255, 0); }
 }
 
 @media (max-width: 960px) {
-  .side-panel,
-  .floating-btn {
-    display: none;
-  }
-
-  .elf-bubble {
-    width: calc(100vw - 32px);
-  }
+  .side-panel, .floating-btn { display: none; }
+  .elf-bubble { width: calc(100vw - 32px); }
+  .action-panel { bottom: 214px; }
+  .skip-btn { bottom: 180px; right: 20px; }
+  .progress-indicator { display: none; }
+  .question-badge { display: none; }
 }
 
 @media (max-width: 768px) {
-  .scene-title {
-    top: 72px;
-  }
-
-  .elf-bubble {
-    bottom: calc(36% + 196px);
-  }
-
-  .elf-bubble-inner {
-    padding: 18px;
-  }
-
-  .elf-bubble-text {
-    font-size: 15px;
-  }
-
-  .mascot-live2d {
-    width: 190px;
-    height: 250px;
-  }
-
-  .profile-overview {
-    grid-template-columns: 1fr;
-  }
+  .scene-title { top: 72px; }
+  .elf-bubble { bottom: calc(36% + 196px); }
+  .elf-bubble-inner { padding: 18px; }
+  .elf-bubble-text { font-size: 15px; }
+  .mascot-live2d { width: 190px; height: 250px; }
+  .action-panel { bottom: 196px; width: calc(100vw - 24px); padding: 16px; }
+  .action-panel__buttons { flex-direction: column; }
+  .profile-overview { grid-template-columns: 1fr; }
+  .skip-btn { display: none; }
 }
 </style>

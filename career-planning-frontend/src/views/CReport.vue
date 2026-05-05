@@ -92,7 +92,7 @@
               <el-button
                 type="primary"
                 :loading="bootstrappingPlan && pendingJobId === currentJobOption.jobId"
-                @click="generateReportForJob(currentJobOption.jobId)"
+                @click="generateReportForJobWithPoints(currentJobOption.jobId)"
               >
                 {{ currentJobOption.hasSavedReport ? '重新生成' : '生成并切换' }}
               </el-button>
@@ -143,9 +143,12 @@
                 </div>
                 <div class="job-picker-actions-col">
                   <div class="job-picker-card-actions">
-                    <el-button @click="selectJobContext(item.jobId)">切换查看</el-button>
-                    <el-button type="primary" :loading="bootstrappingPlan && pendingJobId === item.jobId" @click="generateReportForJob(item.jobId)">
-                      {{ item.hasSavedReport ? '重新生成' : '生成并切换' }}
+                    <el-button
+                      type="primary"
+                      :loading="bootstrappingPlan && pendingJobId === item.jobId"
+                      @click="selectJobContext(item.jobId)"
+                    >
+                      {{ item.hasSavedReport ? '切换查看' : '生成并切换' }}
                     </el-button>
                   </div>
                 </div>
@@ -972,6 +975,46 @@
         </el-button>
       </div>
     </el-drawer>
+
+    <!-- AI 完整性检查等待动画 -->
+    <transition name="ai-processing-fade">
+      <div v-if="checkingWithAi" class="ai-processing-overlay">
+        <div class="ai-processing-card">
+          <div class="ai-processing-badge">AI 完整性检查中</div>
+          <el-icon class="loading-icon ai-processing-icon" :size="54">
+            <Loading />
+          </el-icon>
+          <h3>正在分析报告完整性</h3>
+          <p>我们正在检查报告各区块的完整度，识别缺失内容和可优化表达。</p>
+          <div class="ai-processing-progress">
+            <span class="progress-dot"></span>
+            <span class="progress-dot"></span>
+            <span class="progress-dot"></span>
+          </div>
+          <div class="ai-processing-tip">检查完成后将显示详细结果，请稍候片刻。</div>
+        </div>
+      </div>
+    </transition>
+
+    <!-- AI 润色等待动画 -->
+    <transition name="ai-processing-fade">
+      <div v-if="polishingAll || polishingSectionKey" class="ai-processing-overlay">
+        <div class="ai-processing-card">
+          <div class="ai-processing-badge">AI 智能润色中</div>
+          <el-icon class="loading-icon ai-processing-icon" :size="54">
+            <MagicStick />
+          </el-icon>
+          <h3>正在优化文本表达</h3>
+          <p>{{ polishingSectionKey ? `正在润色${sectionLabel(polishingSectionKey)}内容，提升措辞专业性...` : '正在逐段润色整份报告，优化表达清晰度...' }}</p>
+          <div class="ai-processing-progress">
+            <span class="progress-dot"></span>
+            <span class="progress-dot"></span>
+            <span class="progress-dot"></span>
+          </div>
+          <div class="ai-processing-tip">润色完成后将自动更新内容，请稍候片刻。</div>
+        </div>
+      </div>
+    </transition>
   </div>
 </template>
 
@@ -1016,6 +1059,7 @@ import {
 } from '@/types/career-report'
 import type { JobMatchItem } from '@/types/job-match'
 import { getMockCareerReportByJobId, mockCareerReportData } from '@/mock/mockdata/CareerReport_mockdata'
+import { usePoints } from '@/composables/usePoints'
 
 type AssistantNote = {
   message: string
@@ -1057,6 +1101,21 @@ const router = useRouter()
 const reportStore = useCareerReportStore()
 const ENABLE_MOCK = import.meta.env.VITE_ENABLE_MOCK === 'true'
 
+// 积分系统
+const { consumePoints } = usePoints()
+
+// 生成报告（带积分检查）
+async function generateReportForJobWithPoints(jobId: string) {
+  // 扣除积分
+  const result = await consumePoints('careerReport', '生涯规划报告')
+  if (!result.success) {
+    // 积分不足，已弹出提示
+    return
+  }
+  // 积分扣除成功，继续生成报告
+  await generateReportForJob(jobId)
+}
+
 const emptyReport = createEmptyCareerReport
 function deepClone<T>(data: T): T {
   const source = toRaw(data)
@@ -1090,6 +1149,11 @@ function normalizeText(text: string) {
     .replace(/\r\n/g, '\n')
     .replace(/[ \t]+/g, ' ')
     .replace(/\n{3,}/g, '\n\n')
+    // 去除Markdown标题符号
+    .replace(/^#{1,6}\s+/gm, '')
+    // 去除其他Markdown符号
+    .replace(/\*\*|__/g, '')
+    .replace(/[`*_~]/g, '')
     .trim()
 }
 
@@ -1154,6 +1218,36 @@ function smartPolishHtml(html: string) {
   )
 
   return textToHtml(polished)
+}
+
+/**
+ * 清理AI润色返回的内容，去除特殊符号和Markdown标记
+ */
+function cleanAiPolishedContent(text: string): string {
+  return text
+    // 去除Markdown标题符号 (### 标题)
+    .replace(/^#{1,6}\s+/gm, '')
+    // 去除加粗和斜体标记
+    .replace(/\*\*|__/g, '')
+    .replace(/\*|_/g, '')
+    // 去除行内代码
+    .replace(/`([^`]+)`/g, '$1')
+    // 去除删除线
+    .replace(/~~([^~]+)~~/g, '$1')
+    // 去除链接标记，保留文本 [文本](链接) -> 文本
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    // 去除图片标记
+    .replace(/!\[[^\]]*\]\([^)]+\)/g, '')
+    // 去除引用符号
+    .replace(/^>\s*/gm, '')
+    // 去除列表符号
+    .replace(/^[-*+]\s+/gm, '')
+    .replace(/^\d+\.\s+/gm, '')
+    // 去除水平线
+    .replace(/^-{3,}$/gm, '')
+    // 去除多余的空行
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
 }
 
 const report = ref<GrowthPlanData>(emptyReport())
@@ -1247,11 +1341,19 @@ function getInitialReportData(data?: GrowthPlanData) {
     return { source: 'props' as const, data }
   }
 
+  // 优先检查当前 routeJobId 对应的存储报告
   if (routeJobId) {
     const reportForJob = reportStore.getReportByJob(routeJobId)
     if (reportForJob && hasPersistedReportData(reportForJob)) {
       reportStore.setCurrentJobId(routeJobId)
       return { source: 'store' as const, data: reportForJob }
+    }
+    // 如果有 routeJobId 但没有存储数据，使用 mock 数据
+    if (ENABLE_MOCK) {
+      const mockData = getMockCareerReportByJobId(routeJobId)
+      if (mockData && hasPersistedReportData(mockData)) {
+        return { source: 'mock' as const, data: mockData }
+      }
     }
   }
 
@@ -1262,7 +1364,8 @@ function getInitialReportData(data?: GrowthPlanData) {
     }
   }
 
-  if (reportStore.hasHydrated && hasPersistedReportData(reportStore.report)) {
+  // 只有当没有 routeJobId 时，才使用默认的 reportStore.report
+  if (!routeJobId && reportStore.hasHydrated && hasPersistedReportData(reportStore.report)) {
     return { source: 'store' as const, data: reportStore.report }
   }
 
@@ -1441,12 +1544,14 @@ async function polishOneSection(key: EditableSectionKey) {
       const result = res.data
 
       if (result?.code === 200 && result.data?.polished_content) {
-        const polished = textToHtml(result.data.polished_content)
+        // 清理AI返回的特殊符号
+        const cleanedContent = cleanAiPolishedContent(result.data.polished_content)
+        const polished = textToHtml(cleanedContent)
         setSectionContent(key, polished)
         pushAssistantNote(`已通过 AI 润色 ${sectionLabel(key)}`, 'success')
         emit('polish-request', {
           section: key,
-          content: result.data.polished_content,
+          content: cleanedContent,
         })
         return
       }
@@ -1905,32 +2010,32 @@ function syncRouteJobContext(jobId?: string) {
   }
 }
 
-function resolveRouteJobId() {
+function resolveRouteJobId(): string | null {
   const raw = route.query.jobId ?? route.query.job_id
-  if (Array.isArray(raw)) return Number(raw[0])
-  const parsed = Number(raw)
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : null
+  if (Array.isArray(raw)) return raw[0] || null
+  return typeof raw === 'string' && raw.trim() ? raw.trim() : null
 }
 
-function selectJobContext(jobId: string) {
+async function selectJobContext(jobId: string) {
   syncRouteJobContext(jobId)
   const storedReport = reportStore.getReportByJob(jobId)
+  const hasReport = storedReport && hasPersistedReportData(storedReport)
 
-  router.replace({
+  await router.replace({
     name: 'report',
     query: { ...route.query, jobId },
   })
 
-  if (storedReport && hasPersistedReportData(storedReport)) {
+  // 如果已生成过报告，直接切换查看（不消耗积分）
+  if (hasReport) {
     syncReport(storedReport)
     markReportSynced('store')
     activeView.value = 'report'
     return
   }
 
-  syncReport(emptyReport())
-  markReportSynced('empty')
-  activeView.value = 'report'
+  // 未生成过，先消耗积分再执行生成
+  await generateReportForJobWithPoints(jobId)
 }
 
 async function generateReportForJob(jobId: string) {
@@ -1953,18 +2058,32 @@ function goToJobMatching() {
 
 async function bootstrapReportPlan() {
   const jobId = resolveRouteJobId()
-  const jobIdKey = jobId ? String(jobId) : ''
-  const storedReport = jobIdKey ? reportStore.getReportByJob(jobIdKey) : null
+  const jobIdKey = jobId || ''
 
   if (!jobId) {
     return
   }
 
-  if (hasPersistedReportData(props.data) || hasPersistedReportData(storedReport || undefined)) {
-    if (storedReport) {
-      syncReport(storedReport)
-      markReportSynced('store')
+  const storedReport = jobIdKey ? reportStore.getReportByJob(jobIdKey) : null
+
+  // 优先检查 mock 模式下是否有对应数据（避免被旧 store 数据覆盖）
+  if (ENABLE_MOCK) {
+    const mockData = getMockCareerReportByJobId(jobId)
+    if (mockData && hasPersistedReportData(mockData)) {
+      console.log('[bootstrapReportPlan] 使用 Mock 数据:', jobId, '->', mockData.target_position)
+      syncReport(mockData)
+      persistReport(mockData)
+      syncRouteJobContext(jobIdKey)
+      markReportSynced('mock')
+      pushAssistantNote(`已加载 ${mockData.target_position} 的示例报告数据`, 'success')
+      return
     }
+  }
+
+  // 使用已存储的报告（对应岗位）
+  if (hasPersistedReportData(storedReport || undefined)) {
+    syncReport(storedReport)
+    markReportSynced('store')
     return
   }
 
@@ -1986,6 +2105,18 @@ async function bootstrapReportPlan() {
     throw new Error(result?.msg || '报告生成失败')
   } catch (error: any) {
     console.error(error)
+    // API 失败时，尝试使用 mock 数据
+    if (ENABLE_MOCK) {
+      const mockData = getMockCareerReportByJobId(jobId)
+      if (mockData && hasPersistedReportData(mockData)) {
+        syncReport(mockData)
+        persistReport(mockData)
+        markReportSynced('mock')
+        pushAssistantNote(`已加载岗位 ${jobId} 的示例报告数据`, 'success')
+        bootstrappingPlan.value = false
+        return
+      }
+    }
     pushAssistantNote('报告生成接口调用失败，当前保留本地数据', 'warning')
     ElMessage.warning(error?.message || '报告生成失败，已保留当前页面数据')
   } finally {
@@ -2117,10 +2248,18 @@ function runLocalCompletenessCheck() {
 }
 
 async function runCompletenessCheck() {
+  // 优先调用后端 AI 接口进行完整性检查
   const reportContent = buildReportContentForCheck()
 
+  // 内容太短时使用本地检查
   if (reportContent.replace(/\s+/g, '').length < 50) {
-    runLocalCompletenessCheck()
+    checkingWithAi.value = true
+    await new Promise(resolve => setTimeout(resolve, 500))
+    try {
+      runLocalCompletenessCheck()
+    } finally {
+      checkingWithAi.value = false
+    }
     return
   }
 
@@ -2147,7 +2286,7 @@ async function runCompletenessCheck() {
 
     throw new Error(result?.msg || 'AI 完整性检查失败')
   } catch (error: any) {
-    console.error(error)
+    console.error('AI 完整性检查失败:', error)
     pushAssistantNote('AI 完整性检查失败，已切换为本地检查', 'warning')
     ElMessage.warning(error?.message || 'AI 完整性检查失败，已切换为本地检查')
     runLocalCompletenessCheck()
@@ -2515,7 +2654,30 @@ onMounted(() => {
   activeView.value = routeJobId ? 'report' : 'jobs'
   if (routeJobId) {
     syncRouteJobContext(routeJobId)
-    void bootstrapReportPlan()
+
+    // 强制使用 mock 数据模式下的最新模拟数据
+    if (ENABLE_MOCK) {
+      const mockData = getMockCareerReportByJobId(routeJobId)
+      if (mockData && hasPersistedReportData(mockData)) {
+        console.log('[CReport] 使用 Mock 数据:', routeJobId, '->', mockData.target_position)
+        syncReport(mockData)
+        persistReport(mockData)
+        markReportSynced('mock')
+        pushAssistantNote(`已加载 ${mockData.target_position} 的示例报告数据`, 'success')
+      } else {
+        console.warn('[CReport] Mock 数据无效或缺失:', routeJobId)
+        void bootstrapReportPlan()
+      }
+    } else {
+      // 非 mock 模式：优先使用存储数据
+      const storedReport = reportStore.getReportByJob(routeJobId)
+      if (storedReport && hasPersistedReportData(storedReport)) {
+        syncReport(storedReport)
+        markReportSynced('store')
+      } else {
+        void bootstrapReportPlan()
+      }
+    }
     return
   }
 
@@ -2607,9 +2769,9 @@ onMounted(() => {
   gap: 20px;
   padding: 32px;
   border-radius: var(--radius-xl);
-  background: var(--primary-gradient);
+  background: linear-gradient(135deg, #1e40af 0%, #3b82f6 55%, #60a5fa 100%);
   color: #fff;
-  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
+  box-shadow: 0 18px 40px rgba(37, 99, 235, 0.2);
   position: relative;
   overflow: hidden;
 }
@@ -4328,5 +4490,126 @@ button:focus-visible,
 ::selection {
   background: rgba(59, 130, 246, 0.2);
   color: #1e3a8a;
+}
+
+/* ===== AI Processing Overlay ===== */
+.ai-processing-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(241, 247, 255, 0.82);
+  backdrop-filter: blur(10px);
+}
+
+.ai-processing-card {
+  width: min(100%, 520px);
+  padding: 32px 32px 28px;
+  border-radius: 28px;
+  text-align: center;
+  background:
+    radial-gradient(circle at top left, rgba(139, 92, 246, 0.2), transparent 32%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(246, 250, 255, 0.98));
+  border: 1px solid rgba(191, 219, 254, 0.85);
+  box-shadow: 0 24px 60px rgba(139, 92, 246, 0.14);
+}
+
+.ai-processing-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 0 14px;
+  margin-bottom: 16px;
+  border-radius: 999px;
+  background: rgba(139, 92, 246, 0.12);
+  color: #7c3aed;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ai-processing-icon {
+  margin-bottom: 18px;
+  color: #8b5cf6;
+  animation: aiProcessingPulse 2s ease-in-out infinite;
+}
+
+.ai-processing-card h3 {
+  margin: 0 0 12px;
+  color: #173a5d;
+  font-size: 30px;
+  font-weight: 800;
+}
+
+.ai-processing-card p {
+  margin: 0 auto;
+  max-width: 420px;
+  color: #5f738b;
+  font-size: 15px;
+  line-height: 1.8;
+}
+
+.ai-processing-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 22px 0 16px;
+}
+
+.ai-processing-progress .progress-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #8b5cf6;
+  animation: aiProcessingBounce 1.4s ease-in-out infinite both;
+}
+
+.ai-processing-progress .progress-dot:nth-child(1) {
+  animation-delay: -0.32s;
+}
+
+.ai-processing-progress .progress-dot:nth-child(2) {
+  animation-delay: -0.16s;
+}
+
+.ai-processing-tip {
+  color: #7b91a7;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+@keyframes aiProcessingPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
+}
+
+@keyframes aiProcessingBounce {
+  0%, 80%, 100% {
+    transform: scale(0.6);
+    opacity: 0.5;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.ai-processing-fade-enter-active,
+.ai-processing-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.ai-processing-fade-enter-from,
+.ai-processing-fade-leave-to {
+  opacity: 0;
 }
 </style>

@@ -64,10 +64,7 @@ class JobVectorStore:
         - force_local=true: 强制使用本地配置，不进行故障转移
         - force_local=false: 自动选择（优先本地，失败后尝试云端）
         """
-        use_cloud = (
-                self.url not in ("", "<url>", None)
-                and self.token not in ("", "<token>", None)
-        )
+        use_cloud = settings.milvus.cloud.is_can_use
         force_local = getattr(settings.milvus, 'force_local', False)
         if force_local:
             # 强制使用本地，不尝试云端

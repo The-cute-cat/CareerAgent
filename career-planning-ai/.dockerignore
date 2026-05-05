@@ -39,6 +39,7 @@ htmlcov/
 
 # 文档
 docs/
+!docs/init/**
 *.md
 !README.md
 
@@ -48,10 +49,16 @@ docs/
 temp/
 logs/
 
+# Docker
+Dockerfile
+.dockerignore
+
 # Node.js
 node_modules/
 npm-debug.log
 package-lock.json
+jsconfig.json
+package.json
 
 
 # 其他

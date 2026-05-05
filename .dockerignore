@@ -1,0 +1,44 @@
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# 文档
+docs/
+*.md
+!README.md
+
+# 依赖 & 构建产物
+node_modules/
+dist/
+target/
+
+# Docker 文件（避免循环复制）
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# 环境文件（敏感信息，通过 env_file 或 environment 注入）
+.env
+.env.*
+!.env.example
+
+# 代码工具
+.codebuddy/
+.jbeval/
+
+# 日志与临时
+*.log
+temp/
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
