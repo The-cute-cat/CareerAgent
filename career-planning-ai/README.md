@@ -84,6 +84,23 @@ career-planning-ai/
 
 # 项目启动指南
 
+> **⚠️ Git LFS 数据拉取（必须）**
+>
+> 本项目的初始化数据文件通过 Git LFS 管理，`git clone` 后仅为指针文件，
+> **必须在首次使用前执行 `git lfs pull`** 下载实际内容，否则种子数据导入将失败。
+>
+> ```bash
+> # 在项目根目录执行
+> git lfs install   # 首次需初始化 LFS（如已配置可跳过）
+> git lfs pull       # 拉取 ChromaDB 种子数据 (~170MB) 和 Milvus 种子数据
+>
+> # 验证：确认以下目录中的 JSON 文件大小正常（非几 KB 的指针文件）
+> ls -lh career-planning-ai/data/init/chroma/*_seed.json
+> ls -lh career-planning-backend/docs/init/mysql/career_backend.sql
+> ```
+>
+> Docker 容器内无 `.git` 目录，无法自动执行此操作，请务必在宿主机上提前完成。
+
 ## 一、安装依赖
 
 ### 1. Python 依赖（使用 Poetry）
@@ -138,6 +155,12 @@ npm install --registry=https://registry.npmmirror.com
 ```
 
 ## 二、配置环境
+
+> **⚠️ 重要警示：.env 配置冲突**
+>
+> - **使用 Docker Compose 时**：请勿在 `career-planning-ai/.env` 中配置变量，应统一使用根目录 `.env`（AI 服务会通过 `env_file: .env` 加载根目录配置）
+> - **单独运行 AI 服务时**：仅在 `career-planning-ai/.env` 中配置变量
+> - **切勿同时配置**：根目录 `.env` 和 `career-planning-ai/.env` 中的相同变量，否则可能导致配置混乱
 
 项目配置分为两部分：
 - **`.env`**: 存储敏感信息（API Keys、密码、Token等）
@@ -374,13 +397,13 @@ other:
 
 ```bash
 # 开发模式（带热重载）
-poetry run uvicorn main:app --host 0.0.0.0 --port 9000 --reload
+poetry run uvicorn main:app --host 127.0.0.1 --port 9000 --reload
 
 # 生产模式
-poetry run uvicorn main:app --host 0.0.0.0 --port 9000
+poetry run uvicorn main:app --host 127.0.0.1 --port 9000
 
 # 指定workers数量（生产环境）
-poetry run uvicorn main:app --host 0.0.0.0 --port 9000 --workers 4
+poetry run uvicorn main:app --host 127.0.0.1 --port 9000 --workers 4
 ```
 
 ### 方法2: 直接使用Python
@@ -390,14 +413,14 @@ poetry run uvicorn main:app --host 0.0.0.0 --port 9000 --workers 4
 poetry shell
 
 # 然后启动服务
-python -m uvicorn main:app --host 0.0.0.0 --port 9000 --reload
+python -m uvicorn main:app --host 127.0.0.1 --port 9000 --reload
 ```
 
 ### 方法3: 直接运行（不推荐）
 
 ```bash
 # 不使用Poetry环境
-python -m uvicorn main:app --host 0.0.0.0 --port 9000 --reload
+python -m uvicorn main:app --host 127.0.0.1 --port 9000 --reload
 ```
 
 ### 方法4: Docker 部署

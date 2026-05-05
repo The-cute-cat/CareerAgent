@@ -7,6 +7,7 @@ logs/
 tests/
 temp/
 temp*/
+data/chroma/
 poetry.lock
 package-lock.json
 *.pyc

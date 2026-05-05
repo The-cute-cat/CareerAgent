@@ -30,30 +30,61 @@ neo4j>=6.1.0
 redis>=7.4.0
 sentence-transformers>=5.3.0
 pymilvus>=2.6.10
+scikit-learn  # 聚类/分类
+hdbscan       # 密度聚类
+umap-learn    # 降维
+networkx      # 图算法
+igraph        # 图计算
+leidenalg     # 社区发现
+pymoo         # 多目标优化 (Pareto)
+pymupdf       # PDF 解析
+python-docx   # Word 解析
+docling       # 文档解析
+selenium      # 网页自动化 (代码评估)
 ```
 
 ## 项目结构
 
 ```
 CareerAgent/
-├── career-planning-ai/          # AI服务后端
+├── career-planning-ai/          # AI服务后端 (Python/FastAPI)
 │   ├── src/
 │   │   └── ai_service/
-│   │       ├── agents/          # AI智能体
+│   │       ├── agents/          # AI智能体 (11 个, 含记忆系统)
 │   │       ├── engine/          # 核心引擎
 │   │       ├── models/          # 数据模型
-│   │       ├── prompts/         # Prompt模板
+│   │       ├── prompts/         # Prompt模板 (20+ 个)
 │   │       ├── repository/      # 数据访问层
 │   │       ├── response/        # 响应处理
-│   │       ├── routers/         # API路由
+│   │       ├── routers/         # API路由 (9 个模块)
 │   │       ├── schemas/         # 数据结构
 │   │       ├── services/        # 业务服务
+│   │       ├── scripts/         # 数据爬取/清洗/导入脚本
 │   │       └── utils/           # 工具类
 │   ├── config.yaml              # 配置文件
 │   ├── main.py                  # 入口文件
-│   └── pyproject.toml           # 依赖配置
-├── career-planning-backend/     # Java业务后端
-├── career-planning-frontend/    # 前端应用
+│   └── pyproject.toml           # 依赖配置 (~70个依赖包)
+├── career-planning-backend/     # Java业务后端 (Spring Boot 3.5.9)
+│   └── src/main/java/com/backend/careerplanningbackend/
+│       ├── controller/          # 控制器层 (18 个)
+│       ├── service/             # 业务逻辑层
+│       ├── mapper/              # MyBatis Mapper (14 个)
+│       ├── domain/              # 域对象 (po/dto/vo)
+│       ├── config/              # 配置类
+│       ├── util/                # 工具类
+│       ├── http/                # HTTP 客户端 (调用 Python API)
+│       └── listeners/           # MQ 消息监听器
+├── career-planning-frontend/    # 前端应用 (Vue 3.5 + TypeScript 5.9)
+│   └── src/
+│       ├── api/                 # API 接口层 (按模块划分)
+│       ├── components/          # 组件 (50+ 个)
+│       ├── views/               # 页面视图 (20+ 个页面)
+│       ├── router/              # 路由 (~25 个路由)
+│       ├── stores/              # Pinia 状态管理
+│       ├── composables/         # 组合式函数
+│       ├── types/               # TypeScript 类型定义
+│       └── utils/               # 工具函数
+├── docker-compose.yml           # Docker 编排 (9 个服务)
 └── docs/                        # 项目文档
 ```
 
@@ -101,6 +132,17 @@ CareerAgent/
 - 知识点详细解释
 
 ## 配置说明
+
+> **Git LFS 注意事项**
+>
+> 项目中的大文件（ChromaDB/Milvus 种子数据、SQL 初始化脚本）通过 [Git LFS](https://git-lfs.com/) 管理。
+> 克隆仓库后，这些文件默认为指针文件，**必须执行 `git lfs pull`** 才能获取实际内容：
+>
+> ```bash
+> git lfs install && git lfs pull
+> ```
+>
+> 未拉取时，种子数据初始化脚本会因找不到有效数据而跳过导入。
 
 主要配置项位于 `config.yaml`：
 

@@ -1,3 +1,2 @@
-*.sqlite3 filter=lfs diff=lfs merge=lfs -text
-*.bin filter=lfs diff=lfs merge=lfs -text
-*.pickle filter=lfs diff=lfs merge=lfs -text
+*_seed.json filter=lfs diff=lfs merge=lfs -text
+*.cql filter=lfs diff=lfs merge=lfs -text
